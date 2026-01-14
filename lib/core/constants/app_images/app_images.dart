@@ -1,0 +1,50 @@
+  final key_icon = "assets/icons/key_icon.png";
+  final key_icon_2 = "assets/icons/key_icon_2.png";
+  final gift_icon = "assets/icons/gift_icon.png";
+  final bolt_icon = "assets/icons/bolt_icon.png";
+  final gradient_fire_icon = "assets/icons/gradient_fire_icon.png";
+  final cyan_fire_icon = "assets/icons/cyan_fire_icon.png";
+  final loader_icon = "assets/icons/loader_icon.png";
+  final bell_icon = "assets/icons/bell_icon.png";
+  final light_bulb_icon = "assets/icons/light_bulb_icon.png";
+  final clock_icon = "assets/icons/clock_icon.png";
+  final time_zone_icon = "assets/icons/time_zone_icon.png";
+  final view_count_icon = "assets/icons/view_count_icon.png";
+  final privacy_icon = "assets/icons/privacy_icon.png";
+  final color_brush_icon = "assets/icons/color_brush_icon.png";
+  final linking_icon = "assets/icons/privacy_icon.png";
+  final x_icon = "assets/icons/x_icon.png";
+  final network_icon = "assets/icons/network_icon.png";
+  final notification_icon = "assets/icons/notification_icon.png";
+  final setting_icon = "assets/icons/setting_icon.png";
+  final setting_icon_2 = "assets/icons/notification_icon.png";
+  final font_size_icon = "assets/icons/font_size_icon.png";
+  final language_icon = "assets/icons/language_icon.png";
+  final low_battery_icon = "assets/icons/low_battery_icon.png";
+  final forward_arrow_icon = "assets/icons/forward_arrow_icon.png";
+  final speaker_icon = "assets/icons/speaker_icon.png";
+  final screen_icon = "assets/icons/screen_icon.png";
+  final multi_chat_icon = "assets/icons/multi_chat_icon.png";
+  final filter_icon = "assets/icons/filter_icon.png";
+  final animation_icon = "assets/icons/animation_icon.png";
+  final verified_icon = "assets/icons/verified_icon.png";
+  final subscribers_icon = "assets/icons/subscribers_icon.png";
+  final twitch_icon = "assets/icons/twitch_icon.png";
+  final youtube_icon = "assets/icons/youtube_icon.png";
+  final kick_icon = "assets/icons/kick_icon.png";
+  final back_arrow_icon = "assets/icons/back_arrow_icon.png";
+  final wifi_icon = "assets/icons/wifi_icon.png";
+
+
+  /// Images and logos
+
+  final background = "assets/images/background.png";
+  final logo = "assets/images/logo.png";
+  final background_image = "assets/images/Background.png";
+  final topBarShade = "assets/images/topbarshade.png";
+  final logo1 = "assets/images/background.png";
+  final twitch_logo = "assets/images/twitch_logo.png";
+  final youtube_logo = "assets/images/youtube_logo.png";
+  final kick_logo = "assets/images/kick_logo.png";
+  final kick = "assets/images/kick.png";
+
