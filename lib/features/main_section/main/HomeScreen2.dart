@@ -70,22 +70,82 @@ class HomeScreen2 extends StatelessWidget {
                   // Right Buttons
                   Row(
                     children: [
-                      _buildImageButton(
-                        'assets/images/streak_icon.png',
-                        width: 72.w,
-                        height: 36.w,
+                      InkWell(
+                        onTap: () {
+                          Get.bottomSheet(
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            Container(
+                              height: Get.height * .9,
+                              decoration: BoxDecoration(
+                                color: bottomSheetGrey,
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(18.r),
+                                  topLeft: Radius.circular(18.r),
+                                ),
+                              ),
+                              child: StreamStreakSetupBottomSheet(),
+                            ),
+                          );
+                        },
+                        child: _buildImageButton(
+                          'assets/images/streak_icon.png',
+                          width: 72.w,
+                          height: 36.w,
+                        ),
                       ),
                       SizedBox(width: 6.w),
-                      _buildImageButton(
-                        'assets/images/gift.png',
-                        width: 36.w,
-                        height: 36.w,
+            InkWell(
+              onTap: () {
+                Get.bottomSheet(
+                  isDismissible: true,
+                  isScrollControlled: true,
+                  enableDrag: true,
+                  Container(
+                    height: Get.height * .9,
+                    decoration: BoxDecoration(
+                      color: bottomSheetGrey,
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(18.r),
+                        topLeft: Radius.circular(18.r),
+                      ),
+                    ),
+                    child: InviteBottomSheet(),
+                  ),
+                );
+              },
+              child: _buildImageButton(
+                          'assets/images/gift.png',
+                          width: 36.w,
+                          height: 36.w,
+                        ),
                       ),
                       SizedBox(width: 6.w),
-                      _buildImageButton(
-                        'assets/images/settings.png',
-                        width: 36.w,
-                        height: 36.w,
+                      InkWell(
+                        onTap: () {
+                          Get.bottomSheet(
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            Container(
+                              height: Get.height * .9,
+                              decoration: BoxDecoration(
+                                color: bottomSheetGrey,
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(18.r),
+                                  topLeft: Radius.circular(18.r),
+                                ),
+                              ),
+                              child: SettingsBottomsheetColumn(),
+                            ),
+                          );
+                        },
+                        child: _buildImageButton(
+                          'assets/images/settings.png',
+                          width: 36.w,
+                          height: 36.w,
+                        ),
                       ),
                     ],
                   ),

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import '../../../../core/themes/textstyles.dart';
+import '../../core/constants/app_colors/app_colors.dart';
+import '../Invite/Invite_screen.dart';
+import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
 
@@ -76,16 +80,56 @@ class _LivestreamingState extends State<Livestreaming> {
                   Row(
                     children: [
                       SizedBox(width: 6.w),
-                      buildImageButton(
-                        'assets/images/gift.png',
-                        width: 36.w,
-                        height: 36.w,
+                      InkWell(
+                        onTap: () {
+                          Get.bottomSheet(
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            Container(
+                              height: Get.height * .9,
+                              decoration: BoxDecoration(
+                                color: bottomSheetGrey,
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(18.r),
+                                  topLeft: Radius.circular(18.r),
+                                ),
+                              ),
+                              child: InviteBottomSheet(),
+                            ),
+                          );
+                        },
+                        child:  buildImageButton(
+                          'assets/images/gift.png',
+                          width: 36.w,
+                          height: 36.w,
+                        ),
                       ),
                       SizedBox(width: 6.w),
-                      buildImageButton(
-                        'assets/images/settings.png',
-                        width: 36.w,
-                        height: 36.w,
+                      InkWell(
+                        onTap: () {
+                          Get.bottomSheet(
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            Container(
+                              height: Get.height * .9,
+                              decoration: BoxDecoration(
+                                color: bottomSheetGrey,
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(18.r),
+                                  topLeft: Radius.circular(18.r),
+                                ),
+                              ),
+                              child: SettingsBottomsheetColumn(),
+                            ),
+                          );
+                        },
+                        child: buildImageButton(
+                          'assets/images/settings.png',
+                          width: 36.w,
+                          height: 36.w,
+                        ),
                       ),
                     ],
                   ),
