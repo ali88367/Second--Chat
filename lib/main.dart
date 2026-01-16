@@ -161,7 +161,7 @@ class MyApp extends StatelessWidget {
           ),
 
           // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
-          home: Livestreaming(),
+          home: IntroScreen1(),
 
           // Navigation settings
           defaultTransition: Transition.cupertino,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
+import 'package:second_chat/features/intro/Intro_notification.dart';
 import '../../core/themes/textstyles.dart';
 import 'intro_screen3.dart';
 
@@ -23,7 +24,7 @@ class IntroScreen2 extends StatelessWidget {
               ),
             ),
           ),
-// Top Bar
+          // Top Bar
           Positioned(
             top: 40.h,
             right: 2,
@@ -37,7 +38,7 @@ class IntroScreen2 extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Color.fromRGBO(48, 48, 48, 0.5),
 
-    borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(25),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -48,24 +49,17 @@ class IntroScreen2 extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             image: DecorationImage(
-                              image: NetworkImage(
-                                'https://flagcdn.com/w40/us.png',
+                              image: AssetImage(
+                                'assets/images/USA Flag (1).png',
                               ),
                               fit: BoxFit.cover,
                             ),
                           ),
                         ),
                         SizedBox(width: 8),
-                        Text(
-                          'Eng',
-                          style: sfProText400(17.sp, Colors.white)
-                        ),
+                        Text('Eng', style: sfProText400(17.sp, Colors.white)),
                         SizedBox(width: 4),
-                        Icon(
-                          Icons.keyboard_arrow_down,
-                          color: grey,
-                          size: 20,
-                        ),
+                        Icon(Icons.keyboard_arrow_down, color: grey, size: 20),
                       ],
                     ),
                   ),
@@ -75,6 +69,7 @@ class IntroScreen2 extends StatelessWidget {
           ),
 
           Spacer(flex: 2),
+
           /// Glow Effect (20% smaller)
           Positioned(
             top: 100.h,
@@ -98,16 +93,12 @@ class IntroScreen2 extends StatelessWidget {
             ),
           ),
 
-
           /// Bunny
           Positioned(
             top: 60.h,
             left: 0,
             right: 0,
-            child: Image.asset(
-              'assets/images/bunny.png',
-              height: 300.h,
-            ),
+            child: Image.asset('assets/images/bunny.png', height: 300.h),
           ),
 
           /// Titles
@@ -118,17 +109,11 @@ class IntroScreen2 extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  'All-In-One',
-                  style:sfProDisplay600(34.sp, Colors.white)
-                ),
+                Text('All-In-One', style: sfProDisplay600(34.sp, Colors.white)),
                 ShimmerText(
                   text: 'Multichat',
                   style: sfProDisplay600(34.sp, Colors.white),
-                  gradientColors: [
-                    Color(0xFFFFD966),
-                    Color(0xFFFF7A18),
-                  ],
+                  gradientColors: [Color(0xFFFFD966), Color(0xFFFF7A18)],
                 ),
               ],
             ),
@@ -151,24 +136,23 @@ class IntroScreen2 extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: blackbox,
                     borderRadius: BorderRadius.circular(22.r),
-
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: (){
-                          Get.to(IntroScreen3());
+                        onTap: () {
+                          Get.to(IntroScreenNotification2());
                         },
                         child: Text(
                           'Enjoy Better Streaming',
-                          style: sfProDisplay600(22.sp, Colors.white)
+                          style: sfProDisplay600(22.sp, Colors.white),
                         ),
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                          'And enjoy a smoother experience',
-                          style: sfProText400(15.sp, grey)
+                        'And enjoy a smoother experience',
+                        style: sfProText400(15.sp, grey),
                       ),
                       SizedBox(height: 18.h),
 
@@ -189,14 +173,15 @@ class IntroScreen2 extends StatelessWidget {
                       PlatformButton(
                         label: 'Kick',
                         color: const Color(0xFF42A720), // solid green
-                        imagePath: 'assets/images/kick.png',                      ),
+                        imagePath: 'assets/images/kick.png',
+                      ),
                       SizedBox(height: 12.h),
 
                       PlatformButton(
                         label: 'YouTube',
                         color: const Color(0xFFDD2C28), // solid red
-                        imagePath: 'assets/images/youtube.png',                      ),
-
+                        imagePath: 'assets/images/youtube.png',
+                      ),
                     ],
                   ),
                 ),
@@ -208,8 +193,6 @@ class IntroScreen2 extends StatelessWidget {
     );
   }
 }
-
-
 
 class PlatformButton extends StatelessWidget {
   final String label;
@@ -233,7 +216,7 @@ class PlatformButton extends StatelessWidget {
       onEnter: (_) => _controller.onEnter(),
       onExit: (_) => _controller.onExit(),
       child: Obx(
-            () => AnimatedContainer(
+        () => AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           width: double.infinity,
           height: 50.h,
@@ -243,12 +226,12 @@ class PlatformButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
             boxShadow: _controller.isHover.value
                 ? [
-              BoxShadow(
-                color: Colors.white.withOpacity(0.3),
-                blurRadius: 12,
-                spreadRadius: 1,
-              ),
-            ]
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.3),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
                 : [],
           ),
           child: ElevatedButton(
@@ -265,16 +248,9 @@ class PlatformButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (imagePath != null)
-                  Image.asset(
-                    imagePath!,
-                    height: 24.h,
-                    width: 24.w,
-                  ),
+                  Image.asset(imagePath!, height: 24.h, width: 24.w),
                 SizedBox(width: 6.w),
-                Text(
-                  label,
-                  style: sfProText600(17.sp, Colors.white),
-                ),
+                Text(label, style: sfProText600(17.sp, Colors.white)),
               ],
             ),
           ),
@@ -291,8 +267,6 @@ class _PlatformButtonController extends GetxController {
   void onExit() => isHover.value = false;
 }
 
-
-
 class ButtonController extends GetxController {
   final RxBool isLoading = false.obs;
 
@@ -303,7 +277,6 @@ class ButtonController extends GetxController {
     isLoading.value = false;
   }
 }
-
 
 class ShimmerText extends StatefulWidget {
   final String text;
@@ -336,10 +309,10 @@ class _ShimmerTextState extends State<ShimmerText>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    _glowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
+    _glowAnimation = Tween<double>(
+      begin: 0.3,
+      end: 0.8,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override

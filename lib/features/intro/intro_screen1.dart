@@ -83,7 +83,8 @@ class IntroScreen1 extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.black,
-                    fontSize: 16,
+                    fontFamily: 'SFProText',
+                    fontSize: 17,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

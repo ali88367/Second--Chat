@@ -61,6 +61,7 @@ class IntroScreen3 extends StatelessWidget {
                       child: Container(
                         width: 44.w,
                         height: 44.w,
+
                         decoration: BoxDecoration(
                           color: blackbox.withOpacity(0.6),
                           shape: BoxShape.circle,
@@ -75,7 +76,7 @@ class IntroScreen3 extends StatelessWidget {
                   ),
                 ),
 
-              //  SizedBox(height: 20.h),
+                //  SizedBox(height: 20.h),
 
                 // Logo Image
                 Image.asset(
@@ -85,7 +86,7 @@ class IntroScreen3 extends StatelessWidget {
                   fit: BoxFit.contain,
                 ),
 
-                SizedBox(height: 10.h),
+                SizedBox(height: 20.h),
 
                 // Title
                 RichText(
@@ -141,8 +142,10 @@ class IntroScreen3 extends StatelessWidget {
                   height: 283.h,
                   child: Image.asset('assets/images/trial.png'),
                 ),
-Spacer(),
+                Spacer(),
                 // Bottom Button
+                SizedBox(height: 8.h),
+
                 Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: 30.w,
@@ -184,7 +187,10 @@ Spacer(),
                                   end: Alignment.bottomRight,
                                 ),
                                 borderRadius: BorderRadius.circular(28.r),
-                                border: Border.all(width: 0.7,color: Colors.white),
+                                border: Border.all(
+                                  width: 0.7,
+                                  color: Colors.white,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: const Color(
@@ -223,7 +229,6 @@ Spacer(),
                     ),
                   ),
                 ),
-
               ],
             ),
           ),

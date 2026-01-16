@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,7 +5,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/intro_screen5.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import '../../core/themes/textstyles.dart';
 
@@ -90,8 +88,6 @@ class _IntroScreen4State extends State<IntroScreen4> {
                   ),
                 ),
 
-
-
                 // Title
                 Column(
                   children: [
@@ -105,22 +101,26 @@ class _IntroScreen4State extends State<IntroScreen4> {
                           ),
                           TextSpan(
                             text: 'Premium',
-                            style: sfProDisplay600(34.sp, Colors.white).copyWith(
-                              foreground: Paint()
-                                ..shader = LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Color(0xFFF2B269),
-                                    Color(0xFFF17A7A),
-                                    Color(0xFFFFE6A7),
-                                  ],
-                                  stops: [0.2, 0.5, 0.8],
-                                  transform: GradientRotation(
-                                    135.5 * 3.1415927 / 180,
-                                  ),
-                                ).createShader(Rect.fromLTWH(0, 0, 200, 50)),
-                            ),
+                            style: sfProDisplay600(34.sp, Colors.white)
+                                .copyWith(
+                                  foreground: Paint()
+                                    ..shader =
+                                        LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFFF2B269),
+                                            Color(0xFFF17A7A),
+                                            Color(0xFFFFE6A7),
+                                          ],
+                                          stops: [0.2, 0.5, 0.8],
+                                          transform: GradientRotation(
+                                            135.5 * 3.1415927 / 180,
+                                          ),
+                                        ).createShader(
+                                          Rect.fromLTWH(0, 0, 200, 50),
+                                        ),
+                                ),
                           ),
                         ],
                       ),
@@ -128,7 +128,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                   ],
                 ),
 
-                SizedBox(height: 30.h),
+                SizedBox(height: 20.h),
 
                 // Main Content
                 Expanded(
@@ -150,15 +150,77 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                   padding: EdgeInsets.only(top: 82.h),
                                   child: Column(
                                     children: [
-                                      _buildFeatureRow('Multi-Platform Chat', true, false),
-                                      _buildFeatureRow('Multi-Stream Monitor', false, true),
-                                      _buildFeatureRow('Activity Feed', true, false),
-                                      _buildFeatureRow('Title/Category Manage', false, true),
-                                      _buildFeatureRow('Edge LED Notification', false, true),
-                                      _buildFeatureRow('Custom Notification', false, true),
-                                      _buildFeatureRow('Analytics', false, true),
-                                      _buildFeatureRow('Animated Elements', false, true),
-                                      _buildFeatureRow('Stream Streak', true, false),
+                                      _buildFeatureRow(
+                                        'Multi-Platform Chat',
+                                        true,
+                                        false,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Multi-Stream Monitor',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Activity Feed',
+                                        true,
+                                        false,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Title/Category Manage',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Edge LED Notification',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Custom Notification',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Analytics',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Animated Elements',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Stream Streak',
+                                        true,
+                                        false,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Advanced Chat Filters',
+                                        false,
+                                        false,
+                                      ),
+                                      _buildFeatureRow(
+                                        'AI Title/Category',
+                                        false,
+                                        false,
+                                      ),
+                                      _buildFeatureRow('Ad Free', false, false),
+                                      _buildFeatureRow(
+                                        'Early Access Updates',
+                                        false,
+                                        false,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Refer a Friend Rewards',
+                                        true,
+                                        false,
+                                      ),
+                                      _buildFeatureRow(
+                                        'Support Level',
+                                        true,
+                                        false,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -178,11 +240,152 @@ class _IntroScreen4State extends State<IntroScreen4> {
                       // 30% - Premium Badge
                       Expanded(
                         flex: 2,
-                        child: AnimatedBuilder(
-                          animation: _scrollController,
-                          builder: (context, child) {
-                            return _buildPremiumBadge();
-                          },
+                        child: Container(
+                          width: 40.w,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color.fromRGBO(255, 230, 167, 1),
+                                Color.fromRGBO(242, 178, 105, 1),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(30.r),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE8B87E).withOpacity(0.4),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              // Scrollable Badge Content
+                              Positioned.fill(
+                                child: SingleChildScrollView(
+                                  controller: _scrollController,
+                                  // Same padding as features list to align
+                                  padding: EdgeInsets.only(top: 82.h),
+                                  child: Column(
+                                    children: [
+                                      // First badge (xmark) - aligns with first feature
+                                      SizedBox(height: 0.h),
+                                      _buildBadgeIcon(
+                                        imagePath:
+                                            'assets/images/xmark.circle.fill.png',
+                                        width: 23.91.w,
+                                        height: 23.91.h,
+                                        isInfo: false,
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Second badge - aligns with second feature
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Third badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkPlus.png',
+                                          isInfo: false,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Fourth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Fifth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Sixth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Seventh badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Eighth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                              'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Sticky Crown at top
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        height: 32.h,
+                                        width: 32.w,
+                                        child: Image.asset(
+                                          'assets/images/crown.png',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       SizedBox(width: 20.w),
@@ -193,8 +396,10 @@ class _IntroScreen4State extends State<IntroScreen4> {
 
                 // Start Trial Button
                 Obx(
-                      () => GestureDetector(
-                    onTap: controller.isLoading.value ? null : controller.startTrial,
+                  () => GestureDetector(
+                    onTap: controller.isLoading.value
+                        ? null
+                        : controller.startTrial,
                     child: Container(
                       margin: EdgeInsets.symmetric(horizontal: 16.w),
                       width: double.infinity,
@@ -206,7 +411,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(28.r),
-                        border: Border.all(width: 0.7,color: Colors.white),
+                        border: Border.all(width: 0.7, color: Colors.white),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFFFFC107).withOpacity(0.35),
@@ -218,17 +423,19 @@ class _IntroScreen4State extends State<IntroScreen4> {
                       child: Center(
                         child: controller.isLoading.value
                             ? SizedBox(
-                          width: 24.w,
-                          height: 24.w,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
+                                width: 24.w,
+                                height: 24.w,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
                             : Text(
-                          'Start My 14 Day Free Trial',
-                          style: sfProText600(17.sp, Colors.white),
-                        ),
+                                'Start My 14 Day Free Trial',
+                                style: sfProText600(17.sp, Colors.white),
+                              ),
                       ),
                     ),
                   ),
@@ -297,7 +504,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                     ),
                     child: Icon(
                       isFree ? Icons.check : Icons.close,
-                      color: isFree ? Colors.white : Colors.white.withOpacity(0.5),
+                      color: isFree ? Colors.white : Colors.white,
                       size: 16.sp,
                     ),
                   ),
@@ -318,68 +525,18 @@ class _IntroScreen4State extends State<IntroScreen4> {
     );
   }
 
-  Widget _buildPremiumBadge() {
-    return Container(
-      width: 40.w,
-      padding: EdgeInsets.symmetric(vertical: 16.h),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color.fromRGBO(255, 230, 167, 1),
-            Color.fromRGBO(242, 178, 105, 1),
-                 ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(30.r),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFE8B87E).withOpacity(0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 32.h,
-              width: 32.w,
-              child: Image.asset('assets/images/crown.png'),
-            ),
-            SizedBox(height: 20.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkPlus.png', isInfo: false),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkPlus.png', isInfo: false),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-            SizedBox(height: 48.h),
-            _buildBadgeIcon(imagePath: 'assets/images/checkInfo.png', isInfo: true),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBadgeIcon({required String imagePath, required bool isInfo}) {
+  Widget _buildBadgeIcon({
+    required String imagePath,
+    required bool isInfo,
+    double? width,
+    double? height,
+  }) {
     return Container(
       child: Center(
         child: Image.asset(
           imagePath,
-          width: 40.w,
-          height: 40.w,
+          width: width ?? 40.w,
+          height: height ?? 40.w,
           fit: BoxFit.contain,
         ),
       ),

@@ -182,11 +182,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
               int sectionIndex = index - 1;
               String sectionTitle = settingsData.keys.elementAt(sectionIndex);
               List<Map<String, dynamic>> tiles = settingsData[sectionTitle]!;
-
+              print(sectionTitle);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (sectionTitle.isNotEmpty)
+                  if (sectionTitle.isNotEmpty &&
+                      sectionTitle != "Notifications")
                     Padding(
                       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
                       child: Text(
@@ -197,8 +198,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         ),
                       ),
                     )
+                  else if (sectionTitle.isEmpty)
+                    SizedBox(height: 6.h)
                   else
-                    SizedBox(height: 6.h),
+                    SizedBox(height: 2.h),
                   if (sectionTitle == "CHAT")
                     Padding(
                       padding: EdgeInsets.only(bottom: 12.h),
@@ -210,8 +213,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16.r),
                     ),
                     child: Column(
-                      children: tiles.map((tile) {
-                        return _buildTile(tile, tiles, controller);
+                      children: tiles.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        Map<String, dynamic> tile = entry.value;
+                        return _buildTile(tile, controller, index);
                       }).toList(),
                     ),
                   ),
@@ -225,10 +230,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   }
 
   Widget _buildTile(
-      Map<String, dynamic> tile,
-      List<Map<String, dynamic>> allTiles,
-      SettingsController controller,
-      ) {
+    Map<String, dynamic> tile,
+    SettingsController controller,
+    int index,
+  ) {
     final bool isSwitch = tile["isSwitch"] ?? false;
     final bool isForward = tile["isForward"] ?? false;
     final bool isLocked = tile["isLocked"] ?? false;
@@ -264,64 +269,72 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         Container(
           height: 56.h,
           padding: EdgeInsets.symmetric(horizontal: 16.w),
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                width: allTiles.indexOf(tile) == 0 ? 0 : 0.5.w,
-                color: const Color.fromRGBO(120, 120, 128, 0.36),
-              ),
-            ),
-          ),
+          decoration: index > 0
+              ? BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      width: 0.5.w,
+                      color: const Color.fromRGBO(120, 120, 128, 0.36),
+                    ),
+                  ),
+                )
+              : null,
           child: InkWell(
             onTap: isLocked
                 ? null
                 : () {
-              if (tile["title"] == "LED Notifications" || openAsBottomSheet != null) {
-                if (openAsBottomSheet != null) Get.back();
+                    if (tile["title"] == "LED Notifications" ||
+                        openAsBottomSheet != null) {
+                      if (openAsBottomSheet != null) Get.back();
 
-                Get.bottomSheet(
-                  isDismissible: true,
-                  isScrollControlled: true,
-                  enableDrag: true,
-                  backgroundColor: Colors.transparent, // REQUIRED FOR FLOATING GAP
-                  enterBottomSheetDuration: const Duration(milliseconds: 300),
-                  Padding(
-                    padding: EdgeInsets.only(
-                        left: 12.w,
-                        right: 12.w,
-                        bottom: 15.h // Space at the very bottom
-                    ),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        // Updated dimensions
-                        width: 361.w,
-                        height: 586.h,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2C2C2E),
-                          borderRadius: BorderRadius.circular(36.r), // Rounds bottom corners too
+                      Get.bottomSheet(
+                        isDismissible: true,
+                        isScrollControlled: true,
+                        enableDrag: true,
+                        backgroundColor:
+                            Colors.transparent, // REQUIRED FOR FLOATING GAP
+                        enterBottomSheetDuration: const Duration(
+                          milliseconds: 300,
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(36.r),
-                          child: tile["title"] == "LED Notifications"
-                              ? const LedSettingsBottomSheet()
-                              : (openAsBottomSheet == "connect"
-                              ? ConnectPlatformSetting()
-                              : PlatformColorSettings()),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: 12.w,
+                            right: 12.w,
+                            bottom: 15.h, // Space at the very bottom
+                          ),
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Container(
+                              // Updated dimensions
+                              width: 361.w,
+                              height: 586.h,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2C2C2E),
+                                borderRadius: BorderRadius.circular(
+                                  36.r,
+                                ), // Rounds bottom corners too
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(36.r),
+                                child: tile["title"] == "LED Notifications"
+                                    ? const LedSettingsBottomSheet()
+                                    : (openAsBottomSheet == "connect"
+                                          ? ConnectPlatformSetting()
+                                          : PlatformColorSettings()),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                );
-                return;
-              }
+                      );
+                      return;
+                    }
 
-              if (isForward && tile["nextPage"] != null) {
-                Get.toNamed(tile["nextPage"]!);
-              } else if (isSwitch && switchObs != null) {
-                switchObs!.toggle();
-              }
-            },
+                    if (isForward && tile["nextPage"] != null) {
+                      Get.toNamed(tile["nextPage"]!);
+                    } else if (isSwitch && switchObs != null) {
+                      switchObs.toggle();
+                    }
+                  },
             child: Row(
               children: [
                 Image.asset(
@@ -353,10 +366,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         ),
                       ),
                     if (isSwitch && switchObs != null)
-                      Obx(() => CustomSwitch(
-                        value: switchObs!.value,
-                        onChanged: (val) => switchObs!.value = val,
-                      )),
+                      Obx(
+                        () => CustomSwitch(
+                          value: switchObs!.value,
+                          onChanged: (val) => switchObs!.value = val,
+                        ),
+                      ),
                     if (isForward || openAsBottomSheet != null)
                       Padding(
                         padding: EdgeInsets.only(left: 4.w),
@@ -385,7 +400,7 @@ class FreePlanWidget extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
-      margin: EdgeInsets.only(bottom: 10.h),
+      margin: EdgeInsets.only(bottom: 12.h),
       decoration: BoxDecoration(
         color: onBottomSheetGrey,
         borderRadius: BorderRadius.circular(24.r),
@@ -396,13 +411,22 @@ class FreePlanWidget extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("£4.99 per month", style: sfProDisplay400(13.sp, Colors.white.withOpacity(0.5))),
+              Text(
+                "£4.99 per month",
+                style: sfProDisplay400(13.sp, Colors.white.withOpacity(0.5)),
+              ),
               SizedBox(height: 4.h),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text("Your Plan", style: sfProDisplay600(17.sp, Colors.white.withOpacity(0.6))),
+                  Text(
+                    "Your Plan",
+                    style: sfProDisplay600(
+                      17.sp,
+                      Colors.white.withOpacity(0.6),
+                    ),
+                  ),
 
                   Text("Free", style: sfProDisplay600(20.sp, Colors.white)),
                 ],

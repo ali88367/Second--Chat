@@ -4,10 +4,10 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import '../constants/app_colors/app_colors.dart';
 
 /// CustomSwitch
-/// 
+///
 /// A beautiful custom switch widget using Flutter's built-in Switch
 /// with customized appearance - wider, shorter, with rounded rectangle thumb.
-/// 
+///
 /// Features:
 /// - Uses Flutter's Material Switch widget for behavior
 /// - Custom visual appearance (wider, shorter, rounded rectangle thumb)
@@ -68,7 +68,7 @@ class CustomSwitch extends StatelessWidget {
     final double finalSpacing = spacing ?? 12.w;
 
     // Dimensions: wider and shorter for lengthy look
-    final double switchWidth = 64.w; // Increased width for lengthy look
+    final double switchWidth = 62.w; // Increased width for lengthy look
     final double switchHeight = 28.h; // Reduced height
     final double thumbPadding = 2.h;
     final double thumbHeight = switchHeight - (thumbPadding * 2);
@@ -76,26 +76,28 @@ class CustomSwitch extends StatelessWidget {
 
     // Custom switch theme
     final SwitchThemeData switchTheme = SwitchThemeData(
-      thumbColor: WidgetStateProperty.all(Colors.transparent), // Make transparent to overlay custom thumb
-      trackColor: WidgetStateProperty.resolveWith<Color?>(
-            (Set<WidgetState> states) {
-          if (states.contains(WidgetState.disabled)) {
-            return finalInactiveColor.withOpacity(0.5);
-          }
-          if (states.contains(WidgetState.selected)) {
-            return finalActiveColor;
-          }
-          return finalInactiveColor;
-        },
-      ),
-      overlayColor: WidgetStateProperty.resolveWith<Color?>(
-            (Set<WidgetState> states) {
-          if (states.contains(WidgetState.pressed)) {
-            return finalActiveColor.withOpacity(0.2);
-          }
-          return null;
-        },
-      ),
+      thumbColor: WidgetStateProperty.all(
+        Colors.transparent,
+      ), // Make transparent to overlay custom thumb
+      trackColor: WidgetStateProperty.resolveWith<Color?>((
+        Set<WidgetState> states,
+      ) {
+        if (states.contains(WidgetState.disabled)) {
+          return finalInactiveColor.withOpacity(0.5);
+        }
+        if (states.contains(WidgetState.selected)) {
+          return finalActiveColor;
+        }
+        return finalInactiveColor;
+      }),
+      overlayColor: WidgetStateProperty.resolveWith<Color?>((
+        Set<WidgetState> states,
+      ) {
+        if (states.contains(WidgetState.pressed)) {
+          return finalActiveColor.withOpacity(0.2);
+        }
+        return null;
+      }),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
 
@@ -131,14 +133,18 @@ class CustomSwitch extends StatelessWidget {
             AnimatedPositioned(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
-              left: value ? (switchWidth - thumbWidth - thumbPadding) : thumbPadding,
+              left: value
+                  ? (switchWidth - thumbWidth - thumbPadding)
+                  : thumbPadding,
               top: thumbPadding,
               child: Container(
                 width: thumbWidth,
                 height: thumbHeight,
                 decoration: BoxDecoration(
                   color: finalThumbColor,
-                  borderRadius: BorderRadius.circular(switchHeight / 1.5), // Rounded borders matching track
+                  borderRadius: BorderRadius.circular(
+                    switchHeight / 1.5,
+                  ), // Rounded borders matching track
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.15),
@@ -161,10 +167,7 @@ class CustomSwitch extends StatelessWidget {
         child: switchWidget,
       );
     } else if (isDisabled) {
-      switchWidget = Opacity(
-        opacity: 0.5,
-        child: switchWidget,
-      );
+      switchWidget = Opacity(opacity: 0.5, child: switchWidget);
     }
 
     // If no label, return just the switch
@@ -185,9 +188,7 @@ class CustomSwitch extends StatelessWidget {
                 label!,
                 style: sfProDisplay500(
                   14.sp,
-                  isDisabled
-                      ? textDisabled
-                      : textPrimary,
+                  isDisabled ? textDisabled : textPrimary,
                 ),
               ),
             if (description != null) ...[
@@ -196,9 +197,7 @@ class CustomSwitch extends StatelessWidget {
                 description!,
                 style: sfProDisplay500(
                   15.sp,
-                  isDisabled
-                      ? textDisabled
-                      : textSecondary,
+                  isDisabled ? textDisabled : textSecondary,
                 ),
               ),
             ],
