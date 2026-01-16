@@ -10,17 +10,17 @@ class ConnectPlatformSetting extends StatelessWidget {
   // Reusable platform card widget
   Widget _buildPlatformCard({
     required String title,
-    required String largeLogoAsset,   // Big logo on top
-    required String smallLogoAsset,   // Small logo inside button
+    required String largeLogoAsset, // Big logo on top
+    required String smallLogoAsset, // Small logo inside button
     required Color buttonColor,
     required VoidCallback onPressed,
-    bool isConnected = false,         // Optional: dim if not connected
+    bool isConnected = false, // Optional: dim if not connected
   }) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(15.w),
       decoration: BoxDecoration(
-        color: onBottomSheetGrey, // Dark grey background
+        color: Color.fromRGBO(30, 29, 32, 1), // Dark grey background
         borderRadius: BorderRadius.circular(24.r),
         boxShadow: [
           BoxShadow(
@@ -34,11 +34,7 @@ class ConnectPlatformSetting extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Large logo on top
-          Image.asset(
-            largeLogoAsset,
-            width: 76.w,
-            height: 76.h,
-          ),
+          Image.asset(largeLogoAsset, width: 76.w, height: 76.h),
           SizedBox(height: 24.h),
 
           // Connect button
@@ -57,17 +53,10 @@ class ConnectPlatformSetting extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Small icon inside button
-                    Image.asset(
-                      smallLogoAsset,
-                      width: 22.w,
-                      height: 22.h,
-                    ),
+                    Image.asset(smallLogoAsset, width: 22.w, height: 22.h),
                     // Platform name
-                    SizedBox(width: 6.w,),
-                    Text(
-                      title,
-                      style: sfProText600(18.sp, Colors.white),
-                    ),
+                    SizedBox(width: 6.w),
+                    Text(title, style: sfProText600(18.sp, Colors.white)),
                   ],
                 ),
               ),
@@ -80,11 +69,13 @@ class ConnectPlatformSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      color: const Color.fromRGBO(20, 18, 18, 1),
+      child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w),
         child: Column(
           children: [
-            SizedBox(height: 40.h),
+            SizedBox(height: 10.h),
 
             // Header
             Row(
@@ -92,17 +83,12 @@ class ConnectPlatformSetting extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Image.asset(back_arrow_icon, height: 44.h),
-                Text(
-                  "Connect Platform",
-                  style: sfProDisplay600(17.sp, onDark),
-                ),
+                Text("Connect Platform", style: sfProDisplay600(17.sp, onDark)),
                 SizedBox(width: 44.w),
               ],
             ),
 
             SizedBox(height: 40.h),
-
-
 
             // Twitch
             Row(
@@ -111,7 +97,8 @@ class ConnectPlatformSetting extends StatelessWidget {
                   child: _buildPlatformCard(
                     title: 'Twitch',
                     largeLogoAsset: twitch_logo, // Your big purple Twitch logo
-                    smallLogoAsset: twitch_icon, // Small white version for button
+                    smallLogoAsset:
+                        twitch_icon, // Small white version for button
                     buttonColor: twitchPurple,
                     isConnected: true,
                     onPressed: () {
@@ -119,7 +106,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                     },
                   ),
                 ),
-                SizedBox(width: 12.w,),
+                SizedBox(width: 12.w),
                 // Kick
                 Expanded(
                   child: _buildPlatformCard(
@@ -135,7 +122,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 12.w,),
+            SizedBox(height: 12.w),
             // YouTube (can span or just place normally)
             _buildPlatformCard(
               title: 'YouTube',
@@ -151,6 +138,7 @@ class ConnectPlatformSetting extends StatelessWidget {
             SizedBox(height: 20.h),
           ],
         ),
-      );
+      ),
+    );
   }
 }

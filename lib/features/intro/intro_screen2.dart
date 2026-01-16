@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import '../../core/themes/textstyles.dart';
-import 'intro_screen3.dart';
 
 class IntroScreen2 extends StatelessWidget {
   const IntroScreen2({super.key});
@@ -67,8 +66,6 @@ class IntroScreen2 extends StatelessWidget {
               ),
             ),
           ),
-
-          Spacer(flex: 2),
 
           /// Glow Effect (20% smaller)
           Positioned(

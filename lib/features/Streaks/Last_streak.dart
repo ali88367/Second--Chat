@@ -17,7 +17,9 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
-      decoration: highlighted ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle) : null,
+      decoration: highlighted
+          ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
+          : null,
       child: Icon(
         Icons.check,
         size: 18.sp,
@@ -26,7 +28,8 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _cross() =>
+      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
 
   // ---------------- LAYOUT HELPERS ----------------
 
@@ -37,7 +40,9 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
     Decoration decoration;
     if (count >= 3) {
       decoration = BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF7EDDE4), Color(0xFFC5F3F1)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7EDDE4), Color(0xFFC5F3F1)],
+        ),
         borderRadius: BorderRadius.circular(22.r),
       );
     } else if (count == 1) {
@@ -60,7 +65,9 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
       bottom: 0,
       child: Container(
         // Remove horizontal margin for circles to keep them centered
-        margin: count == 1 ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
+        margin: count == 1
+            ? EdgeInsets.zero
+            : EdgeInsets.symmetric(horizontal: 2.w),
         decoration: decoration,
       ),
     );
@@ -94,8 +101,13 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            InkWell(onTap: Get.back, child: Image.asset('assets/icons/x_icon.png', height: 44.h)),
-
+                            InkWell(
+                              onTap: Get.back,
+                              child: Image.asset(
+                                'assets/icons/x_icon.png',
+                                height: 44.h,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -104,19 +116,26 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         children: [
                           // 1. Adjusted Glow Effect
                           Container(
-                            width: 300.w,  // Narrower than height to match the flame's vertical profile
+                            width: 300
+                                .w, // Narrower than height to match the flame's vertical profile
                             height: 240.h,
                             decoration: BoxDecoration(
                               shape: BoxShape.rectangle,
-                              borderRadius: BorderRadius.all(Radius.elliptical(70.w, 110.h)),
+                              borderRadius: BorderRadius.all(
+                                Radius.elliptical(70.w, 110.h),
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF7EDDE4).withOpacity(0.35), // Soft pale yellow
+                                  color: const Color(
+                                    0xFF7EDDE4,
+                                  ).withOpacity(0.35), // Soft pale yellow
                                   blurRadius: 200, // Spread the glow out
                                   spreadRadius: 10,
                                 ),
                                 BoxShadow(
-                                  color: const Color(0xFFC5F3F1).withOpacity(0.2), // Inner warm glow
+                                  color: const Color(
+                                    0xFFC5F3F1,
+                                  ).withOpacity(0.2), // Inner warm glow
                                   blurRadius: 40,
                                   spreadRadius: -10,
                                 ),
@@ -127,24 +146,32 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                           // 2. The Flame Image
                           Image.asset(
                             'assets/images/hello.png',
+                            height: 250.h,
                             // Ensure fit is contain to keep original proportions
                           ),
 
                           // 3. The Number Image
                           Positioned(
-                            bottom: 10.h,
+                            bottom: 0.h,
                             child: Image.asset(
-                              'assets/images/Streak number.png',width: 155.w,height: 120.h
+                              'assets/images/Streak number.png',
+                              width: 155.w,
+                              height: 90.h,
                             ),
                           ),
                         ],
-                      ),                      Text("Go ahead, freeze it. Commitment is overrated anyway.",
-                        style: sfProDisplay600(18.sp, Colors.white),
+                      ),
+                      Text(
+                        "Go ahead, freeze it. Commitment is \noverrated anyway.",
+                        style: sfProDisplay600(22.sp, Colors.white),
                         textAlign: TextAlign.center,
                       ),
                       SizedBox(height: 12.h),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 4.h,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF32393D),
                           borderRadius: BorderRadius.circular(40.r),
@@ -156,18 +183,25 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset("assets/images/checkmark.circle.fill.png",width: 19.w,height: 24.h),
+                            Image.asset(
+                              "assets/images/checkmark.circle.fill.png",
+                              width: 19.w,
+                              height: 24.h,
+                            ),
                             SizedBox(width: 8.w),
                             RichText(
                               text: TextSpan(
                                 children: [
                                   TextSpan(
-                                      text: '3 ',
-                                      style: sfProDisplay400(15.sp, Colors.white)
+                                    text: '3 ',
+                                    style: sfProDisplay400(15.sp, Colors.white),
                                   ),
                                   TextSpan(
-                                      text: 'available',
-                                      style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))
+                                    text: 'available',
+                                    style: sfProDisplay400(
+                                      15.sp,
+                                      const Color(0xFFB0B3B8),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -181,65 +215,94 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                       // --- CALENDAR CARD ---
                       Container(
                         width: 361.w,
-                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding.w,
+                          vertical: 16.h,
+                        ),
                         decoration: BoxDecoration(
-                            color: const Color(0xFF1E1D20),
-                            borderRadius: BorderRadius.circular(24.r)
+                          color: const Color(0xFF1E1D20),
+                          borderRadius: BorderRadius.circular(24.r),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Row(
-                              children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((day) {
-                                return Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      day,
-                                      maxLines: 1,
-                                      softWrap: false,
-                                      overflow: TextOverflow.visible,
-                                      style: TextStyle(
-                                        color: const Color(0xFF8E8E93),
-                                        fontSize: 13.sp,
+                              children:
+                                  [
+                                    'Mon',
+                                    'Tue',
+                                    'Wed',
+                                    'Thur',
+                                    'Fri',
+                                    'Sat',
+                                    'Sun',
+                                  ].map((day) {
+                                    return Expanded(
+                                      child: Center(
+                                        child: Text(
+                                          day,
+                                          maxLines: 1,
+                                          softWrap: false,
+                                          overflow: TextOverflow.visible,
+                                          style: TextStyle(
+                                            color: const Color(0xFF8E8E93),
+                                            fontSize: 13.sp,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                    );
+                                  }).toList(),
                             ),
                             SizedBox(height: 16.h),
 
                             LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final totalWidth = constraints.maxWidth;
-                                  return SizedBox(
-                                    height: rowHeight.h,
-                                    child: Obx(() {
-                                      final rowData = controller.singleRowCells;
-                                      final groups = controller.getTickGroups(rowData);
-                                      return Stack(
-                                        children: [
-                                          for (final g in groups) _highlight(g[0], g[1], totalWidth),
-                                          Row(
-                                            children: List.generate(days, (i) {
-                                              final cell = rowData[i];
-                                              final isLatest = controller.lastTappedCol.value == i;
-                                              return Expanded(
-                                                child: GestureDetector(
-                                                  behavior: HitTestBehavior.opaque,
-                                                  onTap: () => controller.toggleCalendarCell(0, i, isSingleRow: true),
-                                                  child: Center(
-                                                    child: cell == CellType.tick ? _tick(highlighted: isLatest) : _cross(),
-                                                  ),
+                              builder: (context, constraints) {
+                                final totalWidth = constraints.maxWidth;
+                                return SizedBox(
+                                  height: rowHeight.h,
+                                  child: Obx(() {
+                                    final rowData = controller.singleRowCells;
+                                    final groups = controller.getTickGroups(
+                                      rowData,
+                                    );
+                                    return Stack(
+                                      children: [
+                                        for (final g in groups)
+                                          _highlight(g[0], g[1], totalWidth),
+                                        Row(
+                                          children: List.generate(days, (i) {
+                                            final cell = rowData[i];
+                                            final isLatest =
+                                                controller
+                                                    .lastTappedCol
+                                                    .value ==
+                                                i;
+                                            return Expanded(
+                                              child: GestureDetector(
+                                                behavior:
+                                                    HitTestBehavior.opaque,
+                                                onTap: () => controller
+                                                    .toggleCalendarCell(
+                                                      0,
+                                                      i,
+                                                      isSingleRow: true,
+                                                    ),
+                                                child: Center(
+                                                  child: cell == CellType.tick
+                                                      ? _tick(
+                                                          highlighted: isLatest,
+                                                        )
+                                                      : _cross(),
                                                 ),
-                                              );
-                                            }),
-                                          ),
-                                        ],
-                                      );
-                                    }),
-                                  );
-                                }
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                );
+                              },
                             ),
                             SizedBox(height: 12.h),
                           ],
@@ -267,9 +330,17 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             backgroundColor: const Color(0xFF2C2C2E),
                             side: BorderSide.none,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.r)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25.r),
+                            ),
                           ),
-                          child: Text("Ignore", style: sfProText600(17.sp, Colors.white.withOpacity(0.8))),
+                          child: Text(
+                            "Ignore",
+                            style: sfProText600(
+                              17.sp,
+                              Colors.white.withOpacity(0.8),
+                            ),
+                          ),
                         ),
                       ),
                       SizedBox(height: 12.h),
@@ -281,12 +352,17 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7EDDE4),
                             elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.r)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25.r),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text("Use 1 ", style: sfProText600(17.sp, Colors.white)),
+                              Text(
+                                "Use 1 ",
+                                style: sfProText600(17.sp, Colors.white),
+                              ),
                               Image.asset('assets/images/Mask group.png'),
                             ],
                           ),

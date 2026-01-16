@@ -87,8 +87,9 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       {
         "prefixImageAsset": language_icon,
         "title": "App Language",
-        "suffixText": "D",
+        "suffixText": "English",
         "isForward": true,
+        "customForwardIcon": "assets/images/changer.png",
         "nextPage": "/language",
       },
       {
@@ -103,6 +104,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "suffixText": "12h",
         "isForward": true,
         "nextPage": "/clock",
+        "customForwardIcon": "assets/images/changer.png",
       },
     ],
     "OTHER": [
@@ -221,7 +223,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         int index = entry.key;
                         Map<String, dynamic> tile = entry.value;
                         // Passing sectionTitle to handle CHAT logic
-                        return _buildTile(tile, controller, index, sectionTitle);
+                        return _buildTile(
+                          tile,
+                          controller,
+                          index,
+                          sectionTitle,
+                        );
                       }).toList(),
                     ),
                   ),
@@ -235,11 +242,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   }
 
   Widget _buildTile(
-      Map<String, dynamic> tile,
-      SettingsController controller,
-      int index,
-      String sectionTitle,
-      ) {
+    Map<String, dynamic> tile,
+    SettingsController controller,
+    int index,
+    String sectionTitle,
+  ) {
     final bool isSwitch = tile["isSwitch"] ?? false;
     final bool isForward = tile["isForward"] ?? false;
     final bool isLocked = tile["isLocked"] ?? false;
@@ -278,10 +285,14 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         return const Color.fromRGBO(255, 230, 167, 1);
       }
       switch (controller.selectedPlatform.value) {
-        case "Twitch": return twitchPurple;
-        case "Kick": return kickGreen;
-        case "YouTube": return youtubeRed;
-        default: return const Color.fromRGBO(255, 230, 167, 1);
+        case "Twitch":
+          return twitchPurple;
+        case "Kick":
+          return kickGreen;
+        case "YouTube":
+          return youtubeRed;
+        default:
+          return const Color.fromRGBO(255, 230, 167, 1);
       }
     }
 
@@ -290,16 +301,17 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         Container(
           height: 56.h,
           padding: EdgeInsets.symmetric(horizontal: 16.w),
-          decoration: index > 0
-              ? BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                width: 0.5.w,
-                color: const Color.fromRGBO(120, 120, 128, 0.36),
-              ),
-            ),
-          )
-              : null,
+          decoration: BoxDecoration(
+            color: isLocked ? const Color.fromRGBO(20, 18, 18, 1) : null,
+            border: index > 0
+                ? Border(
+                    top: BorderSide(
+                      width: 0.5.w,
+                      color: const Color.fromRGBO(120, 120, 128, 0.36),
+                    ),
+                  )
+                : null,
+          ),
           child: InkWell(
             // Logic updated here
             onTap: () {
@@ -308,7 +320,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                 Get.bottomSheet(
                   // The Widget to display
                   Padding(
-                    padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 25.h),
+                    padding: EdgeInsets.only(
+                      left: 12.w,
+                      right: 12.w,
+                      bottom: 25.h,
+                    ),
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: Container(
@@ -332,7 +348,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                                 width: double.infinity,
                               ),
                             ),
-
                           ],
                         ),
                       ),
@@ -364,7 +379,9 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       alignment: Alignment.bottomCenter,
                       child: Container(
                         width: 361.w,
-                        height: 586.h,
+                        height: tile["title"] == "LED Notifications"
+                            ? 386.h
+                            : 730.h,
                         decoration: BoxDecoration(
                           color: const Color(0xFF2C2C2E),
                           borderRadius: BorderRadius.circular(36.r),
@@ -374,8 +391,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                           child: tile["title"] == "LED Notifications"
                               ? const LedSettingsBottomSheet()
                               : (openAsBottomSheet == "connect"
-                              ? ConnectPlatformSetting()
-                              : PlatformColorSettings()),
+                                    ? ConnectPlatformSetting()
+                                    : PlatformColorSettings()),
                         ),
                       ),
                     ),
@@ -384,9 +401,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                   isScrollControlled: true,
                   enableDrag: true,
                   backgroundColor: Colors.transparent,
-                  enterBottomSheetDuration: const Duration(
-                    milliseconds: 300,
-                  ),
+                  enterBottomSheetDuration: const Duration(milliseconds: 300),
                 );
                 return;
               }
@@ -400,19 +415,25 @@ class SettingsBottomsheetColumn extends StatelessWidget {
             child: Row(
               children: [
                 if (sectionTitle == "CHAT")
-                  Obx(() => Image.asset(
-                    tile["prefixImageAsset"],
-                    width: 24.w,
-                    height: 24.h,
-                    color: getBaseColor().withOpacity(opacity),
-                  ))
+                  Obx(
+                    () => Image.asset(
+                      tile["prefixImageAsset"],
+                      width: 24.w,
+                      height: 24.h,
+                      color: getBaseColor().withOpacity(opacity),
+                    ),
+                  )
                 else
                   Image.asset(
                     tile["prefixImageAsset"],
                     width: 24.w,
                     height: 24.h,
-                    color: const Color.fromRGBO(255, 230, 167, 1)
-                        .withOpacity(opacity),
+                    color: const Color.fromRGBO(
+                      255,
+                      230,
+                      167,
+                      1,
+                    ).withOpacity(opacity),
                   ),
                 SizedBox(width: 12.w),
                 Expanded(
@@ -442,7 +463,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     if (isSwitch && switchObs != null)
                       if (sectionTitle == "CHAT")
                         Obx(
-                              () => CustomSwitch(
+                          () => CustomSwitch(
                             value: switchObs!.value,
                             onChanged: (val) => switchObs!.value = val,
                             activeColor: getBaseColor(),
@@ -450,7 +471,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         )
                       else
                         Obx(
-                              () => CustomSwitch(
+                          () => CustomSwitch(
                             value: switchObs!.value,
                             onChanged: (val) => switchObs!.value = val,
                             activeColor: const Color.fromRGBO(255, 230, 167, 1),
@@ -459,7 +480,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     if (isForward || openAsBottomSheet != null)
                       Padding(
                         padding: EdgeInsets.only(left: 4.w),
-                        child: Image.asset(forward_arrow_icon, height: 28.h),
+                        child: Image.asset(
+                          customForwardIcon ?? forward_arrow_icon,
+                          height: customForwardIcon != null ? 12.h : 28.h,
+                        ),
                       ),
 
                     if (isLocked)
@@ -475,7 +499,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         ),
       ],
     );
-  }}
+  }
+}
 
 class FreePlanWidget extends StatelessWidget {
   const FreePlanWidget({super.key});
@@ -547,57 +572,59 @@ class ChatPlatformTabs extends StatelessWidget {
           children: [
             for (int i = 0; i < tabs.length; i++) ...[
               Expanded(
-                child: Builder(builder: (context) {
-                  final String tab = tabs[i];
-                  final bool isSelected = selected == tab;
+                child: Builder(
+                  builder: (context) {
+                    final String tab = tabs[i];
+                    final bool isSelected = selected == tab;
 
-                  Color getTextColor() {
-                    if (isSelected) return Colors.white;
-                    switch (tab) {
-                      case "Twitch":
-                        return twitchPurple;
-                      case "Kick":
-                        return kickGreen;
-                      case "YouTube":
-                        return youtubeRed;
-                      default:
-                        return Colors.grey;
+                    Color getTextColor() {
+                      if (isSelected) return Colors.white;
+                      switch (tab) {
+                        case "Twitch":
+                          return twitchPurple;
+                        case "Kick":
+                          return kickGreen;
+                        case "YouTube":
+                          return youtubeRed;
+                        default:
+                          return Colors.grey;
+                      }
                     }
-                  }
 
-                  Color getBackgroundColor() {
-                    if (!isSelected) return Colors.transparent;
-                    switch (tab) {
-                      case "Twitch":
-                        return twitchPurple;
-                      case "Kick":
-                        return kickGreen;
-                      case "YouTube":
-                        return youtubeRed;
-                      default:
-                        return Colors.black;
+                    Color getBackgroundColor() {
+                      if (!isSelected) return Colors.transparent;
+                      switch (tab) {
+                        case "Twitch":
+                          return twitchPurple;
+                        case "Kick":
+                          return kickGreen;
+                        case "YouTube":
+                          return youtubeRed;
+                        default:
+                          return Colors.black;
+                      }
                     }
-                  }
 
-                  return GestureDetector(
-                    onTap: () => controller.selectedPlatform.value = tab,
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: getBackgroundColor(),
-                        borderRadius: BorderRadius.circular(16.r),
-                      ),
-                      child: Text(
-                        tab,
-                        style: TextStyle(
-                          color: getTextColor(),
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w600,
+                    return GestureDetector(
+                      onTap: () => controller.selectedPlatform.value = tab,
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: getBackgroundColor(),
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                        child: Text(
+                          tab,
+                          style: TextStyle(
+                            color: getTextColor(),
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
               ),
               if (i != tabs.length - 1)
                 Builder(

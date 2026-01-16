@@ -12,7 +12,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The hex color code derived from your image
-    const Color darkCharcoal = Color(0xFF212121);
+    const Color darkCharcoal = Color(0xFF2C2C2E);
 
     return Container(
       // Applying the background color to the entire sheet container
@@ -58,13 +58,13 @@ class LedSettingsBottomSheet extends StatelessWidget {
                 _buildSettingGroup([
                   _buildSwitchTile("New Followers", true.obs),
                 ]),
-                SizedBox(height: 16.h),
+                SizedBox(height: 12.h),
 
                 // Group 2: All Subs
                 _buildSettingGroup([
                   _buildSwitchTile("All Subscribers", true.obs),
                 ]),
-                SizedBox(height: 16.h),
+                SizedBox(height: 12.h),
 
                 // Group 3: Milestones
                 _buildSettingGroup([
@@ -93,30 +93,32 @@ class LedSettingsBottomSheet extends StatelessWidget {
 
   Widget _buildSwitchTile(String title, RxBool val, {bool isNested = false}) {
     return Container(
-      height: 64.h,
+      height: 56.h,
       padding: EdgeInsets.symmetric(horizontal: 20.w),
       decoration: BoxDecoration(
         border: isNested
             ? Border(
-            top: BorderSide(
-                color: Colors.white.withOpacity(0.1), width: 0.5))
+                top: BorderSide(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 0.5,
+                ),
+              )
             : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: sfProText400(17.sp, Colors.white),
+          Text(title, style: sfProText400(17.sp, Colors.white)),
+          Obx(
+            () => CustomSwitch(
+              // Applying requested active color #E6C571
+              activeColor: const Color(0xFFE6C571),
+              // Applying requested inactive color #3C3C434D (4D is 30% opacity)
+              inactiveColor: const Color(0x4D3C3C43),
+              value: val.value,
+              onChanged: (newValue) => val.value = newValue,
+            ),
           ),
-          Obx(() => CustomSwitch(
-            // Applying requested active color #E6C571
-            activeColor: const Color(0xFFE6C571),
-            // Applying requested inactive color #3C3C434D (4D is 30% opacity)
-            inactiveColor: const Color(0x4D3C3C43),
-            value: val.value,
-            onChanged: (newValue) => val.value = newValue,
-          )),
         ],
       ),
     );
@@ -124,19 +126,17 @@ class LedSettingsBottomSheet extends StatelessWidget {
 
   Widget _buildActionTile(String title, IconData icon) {
     return Container(
-      height: 64.h,
+      height: 56.h,
       padding: EdgeInsets.symmetric(horizontal: 20.w),
       decoration: BoxDecoration(
         border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5)),
+          top: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: sfProText400(17.sp, Colors.white),
-          ),
+          Text(title, style: sfProText400(17.sp, Colors.white)),
           Icon(icon, color: Colors.white.withOpacity(0.3), size: 28.sp),
         ],
       ),

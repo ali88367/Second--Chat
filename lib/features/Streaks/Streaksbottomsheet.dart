@@ -50,7 +50,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                     ),
                     Text(
                       "Stream Streaks",
-                      style:TextStyle(
+                      style: TextStyle(
                         fontSize: 17.sp,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -65,35 +65,29 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: 20.w),
                   child: Column(
                     children: [
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 10.h),
                       Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0XFFFFE6A7).withOpacity(0.2),
-                              blurRadius: 60,
-                              spreadRadius: 10,
-                            ),
-                          ],
-                        ),
                         child: Image.asset(
                           'assets/images/abc.png',
+                          height: 177.h,
                         ),
                       ),
-                      SizedBox(height: 12.h,),
-                      Text("Build a long-term habit",
-                      style: sfProDisplay600(22.sp, Colors.white),),
-                      SizedBox(height: 4.h,),
-                      Text("Settings a streak goals  helps you stay consistent",
-                      style: sfProDisplay400(15.sp, Color(0xFFB0B3B8)),
-                      textAlign: TextAlign.center,
+                      SizedBox(height: 6.h),
+                      Text(
+                        "Build a long-term habit",
+                        style: sfProDisplay600(22.sp, Colors.white),
                       ),
-                      SizedBox(height: 24.h),
+                      SizedBox(height: 4.h),
+                      Text(
+                        "Settings a streak goals  helps you stay consistent",
+                        style: sfProDisplay400(15.sp, Color(0xFFB0B3B8)),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 14.h),
                       _buildDayToggles(controller),
-                      SizedBox(height: 24.h),
+                      SizedBox(height: 14.h),
                       _buildDivider(),
-                      SizedBox(height: 24.h),
+                      SizedBox(height: 10.h),
                       _buildThreeTimesOption(controller),
                       SizedBox(height: 100.h), // Extra space for scrolling
                     ],
@@ -129,6 +123,31 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
             ],
           ),
 
+          // Glow effect above the header text - positioned to extend upward
+          Positioned(
+            top: 0.h + 4.h + 0.h + 68.5.h, // Center of image position
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  width: 177.h, // Match image width
+                  height: 177.h, // Match image height
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0XFFFFE6A7).withOpacity(0.2),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           Obx(() {
             if (!controller.isSelectingThreeDays.value) {
               return const SizedBox.shrink();
@@ -143,8 +162,9 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                   child: Stack(
                     children: [
                       Positioned(
-                        bottom: 145.h, // Positioned right above the "3-times" bar
-                        left: 40.w,   // Aligned with the indicator icon
+                        bottom:
+                            145.h, // Positioned right above the "3-times" bar
+                        left: 40.w, // Aligned with the indicator icon
                         child: Container(
                           width: 96.w,
                           padding: EdgeInsets.symmetric(vertical: 14.h),
@@ -156,24 +176,31 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                                 color: Colors.black.withOpacity(0.4),
                                 blurRadius: 12,
                                 spreadRadius: 2,
-                              )
+                              ),
                             ],
                             border: Border.all(
-                                color: Colors.white.withOpacity(0.12)),
+                              color: Colors.white.withOpacity(0.12),
+                            ),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ...controller.selectedMenuNumbers.map(
-                                    (n) => GestureDetector(
+                                (n) => GestureDetector(
                                   onTap: () => controller.toggleMenuNumber(n),
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 6.h),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 6.h,
+                                    ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.check,
-                                            size: 18.sp, color: Colors.white),
+                                        Icon(
+                                          Icons.check,
+                                          size: 18.sp,
+                                          color: Colors.white,
+                                        ),
                                         SizedBox(width: 6.w),
                                         Text(
                                           "$n",
@@ -188,7 +215,9 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (controller.selectedMenuNumbers.isNotEmpty) ...[
+                              if (controller
+                                  .selectedMenuNumbers
+                                  .isNotEmpty) ...[
                                 SizedBox(height: 12.h),
                                 Container(
                                   height: 1,
@@ -198,10 +227,12 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                                 SizedBox(height: 12.h),
                               ],
                               ...controller.availableMenuNumbers.map(
-                                    (n) => GestureDetector(
+                                (n) => GestureDetector(
                                   onTap: () => controller.toggleMenuNumber(n),
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 6.h),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 6.h,
+                                    ),
                                     child: Text(
                                       "$n",
                                       style: TextStyle(
@@ -331,8 +362,9 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                   Text(
                     '3-times a week',
                     style: sfProText400(
-                        17.sp,
-                        selected ? Colors.white : const Color(0xFF8E8E93)),
+                      17.sp,
+                      selected ? Colors.white : const Color(0xFF8E8E93),
+                    ),
                   ),
                 ],
               ),
@@ -340,7 +372,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                 value: selected,
                 onChanged: (val) {
                   controller.toggleThreeTimesWeek(val);
-                  if(val) controller.isSelectingThreeDays.value = true;
+                  if (val) controller.isSelectingThreeDays.value = true;
                 },
               ),
             ],

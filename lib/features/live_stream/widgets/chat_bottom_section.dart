@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -35,8 +34,14 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   ];
 
   static const List<Color> nameColors = [
-    Colors.green, Colors.blue, Colors.purple, Colors.orange,
-    Colors.red, Colors.teal, Colors.yellow, Colors.pink,
+    Colors.green,
+    Colors.blue,
+    Colors.purple,
+    Colors.orange,
+    Colors.red,
+    Colors.teal,
+    Colors.yellow,
+    Colors.pink,
   ];
 
   static const Color twitchColor = Color.fromRGBO(185, 80, 239, 1);
@@ -47,22 +52,57 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _mainScrollController = ScrollController();
   final ScrollController _expandedScrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _comments = [
-      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan1', 'message': 'Amazing play!'},
-      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan2', 'message': 'Wow, insane!'},
-      {'platform': 'assets/images/kick.png', 'name': 'KickFan1', 'message': 'Lets goooo!'},
-      {'platform': 'assets/images/kick.png', 'name': 'KickFan2', 'message': 'Hyped for this!'},
-      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer1', 'message': 'Nice content!'},
-      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer2', 'message': 'Love this!'},
+      {
+        'platform': 'assets/images/twitch1.png',
+        'name': 'TwitchFan1',
+        'message': 'Amazing play!',
+      },
+      {
+        'platform': 'assets/images/twitch1.png',
+        'name': 'TwitchFan2',
+        'message': 'Wow, insane!',
+      },
+      {
+        'platform': 'assets/images/kick.png',
+        'name': 'KickFan1',
+        'message': 'Lets goooo!',
+      },
+      {
+        'platform': 'assets/images/kick.png',
+        'name': 'KickFan2',
+        'message': 'Hyped for this!',
+      },
+      {
+        'platform': 'assets/images/youtube1.png',
+        'name': 'YTViewer1',
+        'message': 'Nice content!',
+      },
+      {
+        'platform': 'assets/images/youtube1.png',
+        'name': 'YTViewer2',
+        'message': 'Love this!',
+      },
     ];
-    for(int i=0; i<10; i++) {
-      _comments.add({'platform': 'assets/images/twitch1.png', 'name': 'User$i', 'message': 'Hello $i'});
+    for (int i = 0; i < 10; i++) {
+      _comments.add({
+        'platform': 'assets/images/twitch1.png',
+        'name': 'User$i',
+        'message': 'Hello $i',
+      });
     }
     _comments.shuffle();
+
+    // Auto-scroll to bottom on initial load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom(_mainScrollController, animate: false);
+      _scrollToBottom(_expandedScrollController, animate: false);
+    });
   }
 
   @override
@@ -70,16 +110,42 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     _messageController.dispose();
     _mainScrollController.dispose();
     _expandedScrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom(ScrollController controller, {bool animate = true}) {
+    if (!controller.hasClients) {
+      // If not ready, schedule for next frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom(controller, animate: animate);
+      });
+      return;
+    }
+
+    if (animate) {
+      // Use a shorter duration for instant feel
+      controller.animateTo(
+        controller.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+      );
+    } else {
+      controller.jumpTo(controller.position.maxScrollExtent);
+    }
   }
 
   String _getPlatformAsset(String? platformName) {
     if (platformName == null) return platforms[0];
     switch (platformName.toLowerCase()) {
-      case 'twitch': return 'assets/images/twitch1.png';
-      case 'kick': return 'assets/images/kick.png';
-      case 'youtube': return 'assets/images/youtube1.png';
-      default: return 'assets/images/twitch1.png';
+      case 'twitch':
+        return 'assets/images/twitch1.png';
+      case 'kick':
+        return 'assets/images/kick.png';
+      case 'youtube':
+        return 'assets/images/youtube1.png';
+      default:
+        return 'assets/images/twitch1.png';
     }
   }
 
@@ -97,25 +163,29 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     if (text.isEmpty) return;
 
     String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
+    if (widget.chatFilter.value == null &&
+        widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!;
     }
 
     final platformAsset = _getPlatformAsset(currentPlatform);
     final item = {'platform': platformAsset, 'name': 'You', 'message': text};
 
+    // Add comment and trigger rebuild immediately
     setState(() {
       _comments.add(item);
     });
+
+    // Clear text field but keep keyboard open
     _messageController.clear();
 
+    // Keep focus on text field (keyboard stays open)
+    _focusNode.requestFocus();
+
+    // Scroll to bottom immediately after frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_mainScrollController.hasClients) {
-        _mainScrollController.jumpTo(_mainScrollController.position.maxScrollExtent + 100);
-      }
-      if (_expandedScrollController.hasClients) {
-        _expandedScrollController.jumpTo(_expandedScrollController.position.maxScrollExtent + 100);
-      }
+      _scrollToBottom(_mainScrollController, animate: true);
+      _scrollToBottom(_expandedScrollController, animate: true);
     });
   }
 
@@ -146,13 +216,17 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
           data: Theme.of(context).copyWith(
             popupMenuTheme: PopupMenuThemeData(
               color: const Color(0xFF141414),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.r),
+              ),
             ),
           ),
           child: PopupMenuButton<String>(
             offset: Offset(0, -220.h),
             constraints: BoxConstraints(minWidth: 140.w, maxWidth: 140.w),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24.r),
+            ),
             color: const Color(0xFF141414),
             elevation: 8,
             onSelected: (String value) {
@@ -237,8 +311,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(label, style: TextStyle(color: labelColor, fontSize: 16.sp)),
-                  Icon(Icons.unfold_more, color: Colors.white.withOpacity(0.6), size: 16.sp),
+                  Text(
+                    label,
+                    style: TextStyle(color: labelColor, fontSize: 16.sp),
+                  ),
+                  Icon(
+                    Icons.unfold_more,
+                    color: Colors.white.withOpacity(0.6),
+                    size: 16.sp,
+                  ),
                 ],
               ),
             ),
@@ -247,6 +328,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       },
     );
   }
+
   void _openExpandedChat(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -258,136 +340,212 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
             return FractionallySizedBox(
               heightFactor: 0.94,
               child: AnimatedPadding(
-                padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                ),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.grey.shade900,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(30.r),
+                    ),
                   ),
                   child: SafeArea(
-                    child: Column(
-                      children: [
-                        SizedBox(height: 10.h),
-                        Container(
-                          width: 40.w, height: 4.h,
-                          decoration: BoxDecoration(color: Colors.grey.shade700, borderRadius: BorderRadius.circular(2.r)),
-                        ),
-                        SizedBox(height: 16.h),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: Row(
-                            children: [
-                              ValueListenableBuilder<bool>(
-                                valueListenable: widget.showActivity,
-                                builder: (context, active, _) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      final newVal = !active;
-                                      widget.showActivity.value = newVal;
-                                      if (newVal) {
-                                        widget.selectedPlatform.value = null;
-                                        widget.showServiceCard.value = true;
-                                      } else {
-                                        widget.showServiceCard.value = widget.titleSelected.value;
-                                      }
-                                      setState(() {});
-                                      setSheetState(() {});
-                                    },
-                                    child: pillButton("Activity", isActive: active, assetPath: 'assets/images/line.png'),
-                                  );
-                                },
-                              ),
-                              SizedBox(width: 12.w),
-                              ValueListenableBuilder<bool>(
-                                valueListenable: widget.titleSelected,
-                                builder: (context, val, _) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      final newVal = !val;
-                                      widget.titleSelected.value = newVal;
-                                      widget.showServiceCard.value = newVal || widget.showActivity.value;
-                                      setState(() {});
-                                      setSheetState(() {});
-                                    },
-                                    child: pillButton("Title", isActive: val, assetPath: 'assets/images/magic.png'),
-                                  );
-                                },
-                              ),
-                              const Spacer(),
-                              SizedBox(width: 12.w),
-                              GestureDetector(
-                                onTap: () => Navigator.pop(context),
-                                child: SizedBox(height: 36.h, width: 36.w, child: Image.asset('assets/images/expand.png', color: Colors.yellow)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 16.h),
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            child: ValueListenableBuilder<String?>(
-                              valueListenable: widget.chatFilter,
-                              builder: (context, filter, child) {
-                                final filteredList = _getFilteredComments(filter);
-                                return ListView.builder(
-                                  controller: _expandedScrollController,
-                                  padding: EdgeInsets.only(bottom: 16.h),
-                                  itemCount: filteredList.length,
-                                  itemBuilder: (context, index) {
-                                    final item = filteredList[index];
-                                    final nameColor = nameColors[Random().nextInt(nameColors.length)];
-                                    return _chatItem(item['platform'], item['name'], item['message'], nameColor);
-                                  },
-                                );
-                              },
+                    child: GestureDetector(
+                      onTap: () {
+                        // Dismiss keyboard when tapping outside in expanded view
+                        _focusNode.unfocus();
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        children: [
+                          SizedBox(height: 10.h),
+                          Container(
+                            width: 40.w,
+                            height: 4.h,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade700,
+                              borderRadius: BorderRadius.circular(2.r),
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(25.r),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                                height: 55.h,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(25.r),
-                                  border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5.w),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _messageController,
-                                        style: sfProText400(17.sp, Colors.white),
-                                        decoration: InputDecoration(
-                                          border: InputBorder.none,
-                                          hintText: 'Text',
-                                          hintStyle: TextStyle(color: const Color.fromRGBO(235, 235, 245, 0.3), fontSize: 17.sp),
-                                        ),
-                                        textInputAction: TextInputAction.send,
-                                        onSubmitted: (_) { _sendMessage(); setSheetState(() {}); },
+                          SizedBox(height: 16.h),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24.w),
+                            child: Row(
+                              children: [
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: widget.showActivity,
+                                  builder: (context, active, _) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        final newVal = !active;
+                                        widget.showActivity.value = newVal;
+                                        if (newVal) {
+                                          widget.selectedPlatform.value = null;
+                                          widget.showServiceCard.value = true;
+                                        } else {
+                                          widget.showServiceCard.value =
+                                              widget.titleSelected.value;
+                                        }
+                                        setState(() {});
+                                        setSheetState(() {});
+                                      },
+                                      child: pillButton(
+                                        "Activity",
+                                        isActive: active,
+                                        assetPath: 'assets/images/line.png',
                                       ),
+                                    );
+                                  },
+                                ),
+                                SizedBox(width: 12.w),
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: widget.titleSelected,
+                                  builder: (context, val, _) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        final newVal = !val;
+                                        widget.titleSelected.value = newVal;
+                                        widget.showServiceCard.value =
+                                            newVal || widget.showActivity.value;
+                                        setState(() {});
+                                        setSheetState(() {});
+                                      },
+                                      child: pillButton(
+                                        "Title",
+                                        isActive: val,
+                                        assetPath: 'assets/images/magic.png',
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const Spacer(),
+                                SizedBox(width: 12.w),
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: SizedBox(
+                                    height: 36.h,
+                                    width: 36.w,
+                                    child: Image.asset(
+                                      'assets/images/expand.png',
+                                      color: Colors.yellow,
                                     ),
-                                    Icon(Icons.sentiment_satisfied_sharp, color: Colors.white, size: 24.sp),
-                                    SizedBox(width: 12.w),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 16.h),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              child: ValueListenableBuilder<String?>(
+                                valueListenable: widget.chatFilter,
+                                builder: (context, filter, child) {
+                                  final filteredList = _getFilteredComments(
+                                    filter,
+                                  );
+                                  return ListView.builder(
+                                    key: ValueKey(
+                                      'expanded_chat_${_comments.length}_${filter ?? 'all'}',
+                                    ),
+                                    controller: _expandedScrollController,
+                                    padding: EdgeInsets.only(bottom: 16.h),
+                                    itemCount: filteredList.length,
+                                    itemBuilder: (context, index) {
+                                      final item = filteredList[index];
+                                      // Use consistent color based on name hash for stability
+                                      final nameHash = item['name'].hashCode;
+                                      final nameColor =
+                                          nameColors[nameHash.abs() %
+                                              nameColors.length];
+                                      return _chatItem(
+                                        item['platform'],
+                                        item['name'],
+                                        item['message'],
+                                        nameColor,
+                                        key: ValueKey(
+                                          'expanded_${item['name']}_$index',
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(25.r),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10,
+                                  sigmaY: 10,
+                                ),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 16.w,
+                                  ),
+                                  height: 55.h,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(25.r),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.1),
+                                      width: 0.5.w,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _messageController,
+                                          focusNode: _focusNode,
+                                          style: sfProText400(
+                                            17.sp,
+                                            Colors.white,
+                                          ),
+                                          decoration: InputDecoration(
+                                            border: InputBorder.none,
+                                            hintText: 'Text',
+                                            hintStyle: TextStyle(
+                                              color: const Color.fromRGBO(
+                                                235,
+                                                235,
+                                                245,
+                                                0.3,
+                                              ),
+                                              fontSize: 17.sp,
+                                            ),
+                                          ),
+                                          textInputAction: TextInputAction.send,
+                                          onSubmitted: (_) {
+                                            _sendMessage();
+                                            // Don't rebuild sheet, just update comments
+                                          },
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.sentiment_satisfied_sharp,
+                                        color: Colors.white,
+                                        size: 24.sp,
+                                      ),
+                                      SizedBox(width: 12.w),
 
-                                    _buildPlatformSelector(setSheetState),
+                                      _buildPlatformSelector(setSheetState),
 
-                                    SizedBox(width: 8.w),
-                                  ],
+                                      SizedBox(width: 8.w),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -401,135 +559,196 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
   @override
   Widget build(BuildContext context) {
-    final random = Random();
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
-      ),
-      child: Column(
-        children: [
-          SizedBox(height: 10.h),
-          Container(
-            width: 40.w, height: 4.h,
-            decoration: BoxDecoration(color: Colors.grey.shade700, borderRadius: BorderRadius.circular(2.r)),
-          ),
-          SizedBox(height: 16.h),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24.w),
-            child: Row(
-              children: [
-                ValueListenableBuilder<bool>(
-                  valueListenable: widget.showActivity,
-                  builder: (context, active, _) {
-                    return GestureDetector(
-                      onTap: () {
-                        final newVal = !active;
-                        widget.showActivity.value = newVal;
-                        if (newVal) {
-                          widget.selectedPlatform.value = null;
-                          widget.showServiceCard.value = true;
-                        } else {
-                          widget.showServiceCard.value = widget.titleSelected.value;
-                        }
-                      },
-                      child: pillButton("Activity", isActive: active, assetPath: 'assets/images/line.png'),
-                    );
-                  },
-                ),
-                SizedBox(width: 12.w),
-                ValueListenableBuilder<bool>(
-                  valueListenable: widget.titleSelected,
-                  builder: (context, val, _) {
-                    return GestureDetector(
-                      onTap: () {
-                        final newVal = !val;
-                        widget.titleSelected.value = newVal;
-                        widget.showServiceCard.value = newVal || widget.showActivity.value;
-                      },
-                      child: pillButton("Title", isActive: val, assetPath: 'assets/images/magic.png'),
-                    );
-                  },
-                ),
-                const Spacer(),
-                SizedBox(width: 12.w),
-                GestureDetector(
-                  onTap: () => _openExpandedChat(context),
-                  child: SizedBox(height: 36.h, width: 36.w, child: Image.asset('assets/images/expand.png')),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside
+        _focusNode.unfocus();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade900,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: 10.h),
+            Container(
+              width: 40.w,
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade700,
+                borderRadius: BorderRadius.circular(2.r),
+              ),
             ),
-          ),
-          SizedBox(height: 16.h),
-          Expanded(
-            child: Stack(
-              children: [
-                ValueListenableBuilder<String?>(
-                  valueListenable: widget.chatFilter,
-                  builder: (context, filter, child) {
-                    final filteredList = _getFilteredComments(filter);
-                    return ListView.builder(
-                      controller: _mainScrollController,
-                      padding: EdgeInsets.only(
-                        left: 16.w, right: 16.w, bottom: 80.h + MediaQuery.of(context).viewInsets.bottom,
-                      ),
-                      itemCount: filteredList.length,
-                      itemBuilder: (context, index) {
-                        final item = filteredList[index];
-                        final nameColor = nameColors[random.nextInt(nameColors.length)];
-                        return _chatItem(item['platform'], item['name'], item['message'], nameColor);
-                      },
-                    );
-                  },
-                ),
-                Positioned(
-                  bottom: 16.h + MediaQuery.of(context).viewInsets.bottom,
-                  left: 10.w, right: 10.w,
-                  child: GestureDetector(
+            SizedBox(height: 16.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.w),
+              child: Row(
+                children: [
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.showActivity,
+                    builder: (context, active, _) {
+                      return GestureDetector(
+                        onTap: () {
+                          final newVal = !active;
+                          widget.showActivity.value = newVal;
+                          if (newVal) {
+                            widget.selectedPlatform.value = null;
+                            widget.showServiceCard.value = true;
+                          } else {
+                            widget.showServiceCard.value =
+                                widget.titleSelected.value;
+                          }
+                        },
+                        child: pillButton(
+                          "Activity",
+                          isActive: active,
+                          assetPath: 'assets/images/line.png',
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 12.w),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.titleSelected,
+                    builder: (context, val, _) {
+                      return GestureDetector(
+                        onTap: () {
+                          final newVal = !val;
+                          widget.titleSelected.value = newVal;
+                          widget.showServiceCard.value =
+                              newVal || widget.showActivity.value;
+                        },
+                        child: pillButton(
+                          "Title",
+                          isActive: val,
+                          assetPath: 'assets/images/magic.png',
+                        ),
+                      );
+                    },
+                  ),
+                  const Spacer(),
+                  SizedBox(width: 12.w),
+                  GestureDetector(
                     onTap: () => _openExpandedChat(context),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(25.r),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          height: 55.h,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(25.r),
-                            border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5.w),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Text',
-                                  style: TextStyle(color: const Color.fromRGBO(235, 235, 245, 0.3), fontSize: 17.sp),
-                                ),
+                    child: SizedBox(
+                      height: 36.h,
+                      width: 36.w,
+                      child: Image.asset('assets/images/expand.png'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Expanded(
+              child: Stack(
+                children: [
+                  ValueListenableBuilder<String?>(
+                    valueListenable: widget.chatFilter,
+                    builder: (context, filter, child) {
+                      final filteredList = _getFilteredComments(filter);
+                      return ListView.builder(
+                        key: ValueKey(
+                          'main_chat_${_comments.length}_${filter ?? 'all'}',
+                        ),
+                        controller: _mainScrollController,
+                        padding: EdgeInsets.only(
+                          left: 16.w,
+                          right: 16.w,
+                          bottom:
+                              80.h + MediaQuery.of(context).viewInsets.bottom,
+                        ),
+                        itemCount: filteredList.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredList[index];
+                          // Use consistent color based on name hash for stability
+                          final nameHash = item['name'].hashCode;
+                          final nameColor =
+                              nameColors[nameHash.abs() % nameColors.length];
+                          return _chatItem(
+                            item['platform'],
+                            item['name'],
+                            item['message'],
+                            nameColor,
+                            key: ValueKey('main_${item['name']}_$index'),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  Positioned(
+                    bottom: 16.h + MediaQuery.of(context).viewInsets.bottom,
+                    left: 10.w,
+                    right: 10.w,
+                    child: GestureDetector(
+                      onTap: () => _openExpandedChat(context),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(25.r),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 16.w),
+                            height: 55.h,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(25.r),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                                width: 0.5.w,
                               ),
-                              Icon(Icons.sentiment_satisfied_alt_outlined, color: Colors.white, size: 24.sp),
-                              SizedBox(width: 12.w),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Text',
+                                    style: TextStyle(
+                                      color: const Color.fromRGBO(
+                                        235,
+                                        235,
+                                        245,
+                                        0.3,
+                                      ),
+                                      fontSize: 17.sp,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.sentiment_satisfied_alt_outlined,
+                                  color: Colors.white,
+                                  size: 24.sp,
+                                ),
+                                SizedBox(width: 12.w),
 
-                              _buildPlatformSelector(null),
-
-                            ],
+                                _buildPlatformSelector(null),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   // Included _chatItem method
-  Widget _chatItem(String platform, String name, String message, Color nameColor) {
+  Widget _chatItem(
+    String platform,
+    String name,
+    String message,
+    Color nameColor, {
+    Key? key,
+  }) {
     return Padding(
+      key: key,
       padding: EdgeInsets.only(bottom: 12.h),
       child: RichText(
         text: TextSpan(
@@ -538,7 +757,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
               alignment: PlaceholderAlignment.middle,
               child: Padding(
                 padding: EdgeInsets.only(right: 6.w),
-                child: Image.asset(platform, width: 14.sp, height: 14.sp, fit: BoxFit.contain),
+                child: Image.asset(
+                  platform,
+                  width: 14.sp,
+                  height: 14.sp,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             TextSpan(text: "$name: ", style: sfProText500(12.sp, nameColor)),
