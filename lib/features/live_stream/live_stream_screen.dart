@@ -21,13 +21,105 @@ class _LivestreamingState extends State<Livestreaming> {
   final ValueNotifier<bool> _showActivity = ValueNotifier<bool>(false);
   final ValueNotifier<bool> _titleSelected = ValueNotifier<bool>(false);
 
+  // 1. Notifier for background image
+  final ValueNotifier<String> _topBarImage = ValueNotifier<String>('assets/images/topbarshade.png');
+
+  // 2. Notifier for Chat Filtering
+  final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
+
+  @override
+  void initState() {
+    super.initState();
+    // 3. LISTEN TO FILTER CHANGES (The Missing Link)
+    // This ensures if you change filter from Chat Input, the Top Image updates too.
+    _chatFilter.addListener(_updateImageBasedOnFilter);
+  }
+
+  void _updateImageBasedOnFilter() {
+    switch (_chatFilter.value) {
+      case 'twitch':
+        _topBarImage.value = 'assets/images/twitchshade.png';
+        break;
+      case 'kick':
+        _topBarImage.value = 'assets/images/youtubeshade.png';
+        break;
+      case 'youtube':
+        _topBarImage.value = 'assets/images/kickshade.png';
+        break;
+      default: // null or 'all'
+        _topBarImage.value = 'assets/images/topbarshade.png';
+        break;
+    }
+  }
+
   @override
   void dispose() {
+    _chatFilter.removeListener(_updateImageBasedOnFilter); // Clean up listener
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
     _showActivity.dispose();
     _titleSelected.dispose();
+    _topBarImage.dispose();
+    _chatFilter.dispose();
     super.dispose();
+  }
+
+  // 4. Simplified Toggle Logic
+  void _handleFilterTap(String platformKey) {
+    if (_chatFilter.value == platformKey) {
+      _chatFilter.value = null; // Toggle OFF
+    } else {
+      _chatFilter.value = platformKey; // Toggle ON
+    }
+    // No need to set image here manually, the listener above does it!
+  }
+
+  Widget _buildInteractiveCounterRow() {
+    return Container(
+      width: 297.w,
+      height: 59.4.h,
+      decoration: BoxDecoration(
+        color: const Color.fromRGBO(30, 29, 32, 1),
+        borderRadius: BorderRadius.circular(33.r),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Twitch
+          GestureDetector(
+            onTap: () => _handleFilterTap('twitch'),
+            child: counterPill(
+              asset: 'assets/images/twitch.png',
+              count: '11202',
+              color: const Color.fromRGBO(185, 80, 239, 1),
+              bgColor: const Color.fromRGBO(185, 80, 239, 0.25),
+            ),
+          ),
+          SizedBox(width: 13.2.w),
+          // Kick
+          GestureDetector(
+            onTap: () => _handleFilterTap('kick'),
+            child: counterPill(
+              asset: 'assets/images/kick.png',
+              count: '1256',
+              color: const Color.fromRGBO(83, 252, 24, 1),
+              bgColor: const Color.fromRGBO(83, 252, 24, 0.25),
+            ),
+          ),
+          SizedBox(width: 13.2.w),
+          // Youtube
+          GestureDetector(
+            onTap: () => _handleFilterTap('youtube'),
+            child: counterPill(
+              asset: 'assets/images/youtube.png',
+              count: '256',
+              color: const Color.fromRGBO(221, 44, 40, 1),
+              bgColor: const Color.fromRGBO(221, 44, 40, 0.25),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -37,19 +129,25 @@ class _LivestreamingState extends State<Livestreaming> {
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         children: [
-          // 🔹 Top Background Image
+          // Background Image
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             height: 300.h,
-            child: Image.asset(
-              'assets/images/topbarshade.png',
-              fit: BoxFit.cover,
+            child: ValueListenableBuilder<String>(
+              valueListenable: _topBarImage,
+              builder: (context, imagePath, child) {
+                return Image.asset(
+                  imagePath,
+                  fit: BoxFit.cover,
+                  key: ValueKey(imagePath),
+                );
+              },
             ),
           ),
 
-          // 🔹 Gradient Overlay
+          // Gradient Overlay
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -62,21 +160,18 @@ class _LivestreamingState extends State<Livestreaming> {
             ),
           ),
 
-          // 🔹 Header (Image Buttons)
+          // Header
           SafeArea(
             child: Padding(
               padding: EdgeInsets.only(left: 16.w, right: 16.w, top: 28.h),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Offline Button
                   buildImageButton(
                     'assets/images/streak_icon.png',
                     width: 72.w,
                     height: 36.w,
                   ),
-
-                  // Right Buttons
                   Row(
                     children: [
                       SizedBox(width: 6.w),
@@ -138,7 +233,7 @@ class _LivestreamingState extends State<Livestreaming> {
             ),
           ),
 
-          // 🔹 Center Content
+          // Center Content
           Center(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -161,93 +256,24 @@ class _LivestreamingState extends State<Livestreaming> {
                                   vertical: 12.h,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Color.fromRGBO(22, 21, 24, 1),
+                                  color: const Color.fromRGBO(22, 21, 24, 1),
                                   borderRadius: BorderRadius.circular(20.r),
                                 ),
                                 child: Column(
                                   children: [
                                     SizedBox(height: 12.h),
-
-                                    activityRow(
-                                      'assets/images/kick.png',
-                                      'New Follower',
-                                      '19:41',
-                                      '',
-                                    ),
+                                    activityRow('assets/images/kick.png', 'New Follower', '19:41', ''),
                                     SizedBox(height: 12.h),
-                                    activityRow(
-                                      'assets/images/kick.png',
-                                      'Mega Supporter',
-                                      '19:49',
-                                      '\$50',
-                                    ),
+                                    activityRow('assets/images/kick.png', 'Mega Supporter', '19:49', '\$50'),
                                     SizedBox(height: 12.h),
-                                    activityRow(
-                                      'assets/images/youtube1.png',
-                                      'Fun',
-                                      '19:49',
-                                      'Subscribed',
-                                    ),
+                                    activityRow('assets/images/youtube1.png', 'Fun', '19:49', 'Subscribed'),
                                     SizedBox(height: 12.h),
-                                    activityRow(
-                                      'assets/images/twitch1.png',
-                                      'Ranen',
-                                      '19:49',
-                                      'Subscribed',
-                                    ),
+                                    activityRow('assets/images/twitch1.png', 'Ranen', '19:49', 'Subscribed'),
                                   ],
                                 ),
                               ),
                               SizedBox(height: 16.h),
-
-                              Container(
-                                width: 297.w,
-                                height: 59.4.h,
-                                decoration: BoxDecoration(
-                                  color: Color.fromRGBO(30, 29, 32, 1),
-                                  borderRadius: BorderRadius.circular(33.r),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    counterPill(
-                                      asset: 'assets/images/twitch.png',
-                                      count: '11202',
-                                      color: Color.fromRGBO(185, 80, 239, 1),
-                                      bgColor: Color.fromRGBO(
-                                        185,
-                                        80,
-                                        239,
-                                        0.25,
-                                      ),
-                                    ),
-                                    SizedBox(width: 13.2.w),
-                                    counterPill(
-                                      asset: 'assets/images/kick.png',
-                                      count: '1256',
-                                      color: Color.fromRGBO(83, 252, 24, 1),
-                                      bgColor: Color.fromRGBO(
-                                        83,
-                                        252,
-                                        24,
-                                        0.25,
-                                      ),
-                                    ),
-                                    SizedBox(width: 13.2.w),
-                                    counterPill(
-                                      asset: 'assets/images/youtube.png',
-                                      count: '256',
-                                      color: Color.fromRGBO(221, 44, 40, 1),
-                                      bgColor: Color.fromRGBO(
-                                        221,
-                                        44,
-                                        40,
-                                        0.25,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              _buildInteractiveCounterRow(),
                             ],
                           );
                         }
@@ -261,7 +287,6 @@ class _LivestreamingState extends State<Livestreaming> {
                                   ? 'assets/images/kick.png'
                                   : 'assets/images/youtube1.png';
 
-                              // Platform panel (matches attached design)
                               return Column(
                                 children: [
                                   Container(
@@ -271,24 +296,19 @@ class _LivestreamingState extends State<Livestreaming> {
                                       vertical: 12.h,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Color.fromRGBO(22, 21, 24, 1),
+                                      color: const Color.fromRGBO(22, 21, 24, 1),
                                       borderRadius: BorderRadius.circular(20.r),
                                     ),
                                     child: Column(
                                       children: [
-                                        // top bar with back and centered logo
                                         Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 8.w,
-                                          ),
+                                          padding: EdgeInsets.symmetric(horizontal: 8.w),
                                           child: Row(
                                             children: [
                                               GestureDetector(
                                                 onTap: () {
-                                                  _selectedPlatform.value =
-                                                      null;
-                                                  _showServiceCard.value =
-                                                      false;
+                                                  _selectedPlatform.value = null;
+                                                  _showServiceCard.value = false;
                                                   _titleSelected.value = false;
                                                   _showActivity.value = false;
                                                 },
@@ -299,35 +319,21 @@ class _LivestreamingState extends State<Livestreaming> {
                                                     shape: BoxShape.circle,
                                                   ),
                                                   child: Transform.translate(
-                                                    offset: const Offset(
-                                                      2,
-                                                      0,
-                                                    ), // fine-tune if needed
-                                                    child: Icon(
-                                                      Icons.arrow_back_ios,
-                                                      color: Colors.white,
-                                                      size: 16.sp,
-                                                    ),
+                                                    offset: const Offset(2, 0),
+                                                    child: Icon(Icons.arrow_back_ios, color: Colors.white, size: 16.sp),
                                                   ),
                                                 ),
                                               ),
                                               const Spacer(),
                                               Center(
-                                                child: Image.asset(
-                                                  asset,
-                                                  width: 22.w,
-                                                  height: 22.h,
-                                                ),
+                                                child: Image.asset(asset, width: 22.w, height: 22.h),
                                               ),
-
                                               const Spacer(),
                                               SizedBox(width: 40.w),
                                             ],
                                           ),
                                         ),
                                         SizedBox(height: 16.h),
-
-                                        // Two large rows: Title Example & Name Category
                                         panelRow('Title Example'),
                                         SizedBox(height: 12.h),
                                         panelRow(
@@ -337,87 +343,54 @@ class _LivestreamingState extends State<Livestreaming> {
                                             showModalBottomSheet(
                                               context: context,
                                               isScrollControlled: true,
-                                              backgroundColor:
-                                                  Colors.transparent,
+                                              backgroundColor: Colors.transparent,
                                               builder: (ctx) {
                                                 return Padding(
                                                   padding: EdgeInsets.only(
-                                                    bottom: MediaQuery.of(
-                                                      ctx,
-                                                    ).viewInsets.bottom,
+                                                    bottom: MediaQuery.of(ctx).viewInsets.bottom,
                                                   ),
                                                   child: FractionallySizedBox(
                                                     heightFactor: 0.8,
                                                     child: AnimatedPadding(
                                                       padding: EdgeInsets.only(
-                                                        bottom: MediaQuery.of(
-                                                          ctx,
-                                                        ).viewInsets.bottom,
+                                                        bottom: MediaQuery.of(ctx).viewInsets.bottom,
                                                       ),
-                                                      duration: Duration(
-                                                        milliseconds: 250,
-                                                      ),
+                                                      duration: Duration(milliseconds: 250),
                                                       curve: Curves.easeOut,
                                                       child: Container(
                                                         decoration: BoxDecoration(
-                                                          color: Color.fromRGBO(
-                                                            20,
-                                                            18,
-                                                            18,
-                                                            1,
+                                                          color: Color.fromRGBO(20, 18, 18, 1),
+                                                          borderRadius: BorderRadius.vertical(
+                                                            top: Radius.circular(38.r),
                                                           ),
-                                                          borderRadius:
-                                                              BorderRadius.vertical(
-                                                                top:
-                                                                    Radius.circular(
-                                                                      38.r,
-                                                                    ),
-                                                              ),
                                                         ),
                                                         child: Stack(
                                                           children: [
                                                             Column(
                                                               children: [
-                                                                SizedBox(
-                                                                  height: 10.h,
-                                                                ),
+                                                                SizedBox(height: 10.h),
                                                                 // Top handle + header
                                                                 Padding(
                                                                   padding: EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        18.w,
-                                                                    vertical:
-                                                                        10,
+                                                                    horizontal: 18.w,
+                                                                    vertical: 10,
                                                                   ),
                                                                   child: Row(
                                                                     children: [
                                                                       GestureDetector(
-                                                                        onTap: () => Navigator.of(
-                                                                          ctx,
-                                                                        ).pop(),
+                                                                        onTap: () => Navigator.of(ctx).pop(),
                                                                         child: Container(
-                                                                          padding: EdgeInsets.all(
-                                                                            8.w,
-                                                                          ),
+                                                                          padding: EdgeInsets.all(8.w),
                                                                           decoration: const BoxDecoration(
-                                                                            color: Color.fromRGBO(
-                                                                              120,
-                                                                              120,
-                                                                              128,
-                                                                              0.16,
-                                                                            ), // background
-                                                                            shape:
-                                                                                BoxShape.circle,
+                                                                            color: Color.fromRGBO(120, 120, 128, 0.16),
+                                                                            shape: BoxShape.circle,
                                                                           ),
                                                                           child: Center(
                                                                             child: Transform.translate(
-                                                                              offset: const Offset(
-                                                                                2.5,
-                                                                                0,
-                                                                              ), // required for arrow_back_ios
+                                                                              offset: const Offset(2.5, 0),
                                                                               child: Icon(
                                                                                 Icons.arrow_back_ios,
-                                                                                color: Colors.white, // icon color
+                                                                                color: Colors.white,
                                                                                 size: 18,
                                                                               ),
                                                                             ),
@@ -427,66 +400,37 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                       const Spacer(),
                                                                       Text(
                                                                         'Category',
-                                                                        style: sfProText600(
-                                                                          18.sp,
-                                                                          Colors
-                                                                              .white,
-                                                                        ),
+                                                                        style: sfProText600(18.sp, Colors.white),
                                                                       ),
                                                                       const Spacer(),
-                                                                      SizedBox(
-                                                                        width:
-                                                                            40.w,
-                                                                      ),
+                                                                      SizedBox(width: 40.w),
                                                                     ],
                                                                   ),
                                                                 ),
-                                                                SizedBox(
-                                                                  height: 12.h,
-                                                                ),
+                                                                SizedBox(height: 12.h),
                                                                 Expanded(
                                                                   child: ListView.separated(
-                                                                    padding: EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          16.w,
-                                                                      vertical:
-                                                                          8.h,
+                                                                    // CHANGED: Increased bottom padding to 100.h
+                                                                    padding: EdgeInsets.only(
+                                                                      left: 16.w,
+                                                                      right: 16.w,
+                                                                      top: 8.h,
+                                                                      bottom: 100.h,
                                                                     ),
-                                                                    itemCount:
-                                                                        14,
-                                                                    separatorBuilder:
-                                                                        (
-                                                                          _,
-                                                                          __,
-                                                                        ) => SizedBox(
-                                                                          height:
-                                                                              12.h,
-                                                                        ),
+                                                                    itemCount: 14,
+                                                                    separatorBuilder: (_, __) => SizedBox(height: 12.h),
                                                                     itemBuilder: (c, i) {
                                                                       return InkWell(
-                                                                        onTap:
-                                                                            () {},
-                                                                        borderRadius:
-                                                                            BorderRadius.circular(
-                                                                              32.r,
-                                                                            ),
+                                                                        onTap: () {},
+                                                                        borderRadius: BorderRadius.circular(32.r),
                                                                         child: Container(
                                                                           padding: EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                20.w,
-                                                                            vertical:
-                                                                                13.h,
+                                                                            horizontal: 20.w,
+                                                                            vertical: 13.h,
                                                                           ),
                                                                           decoration: BoxDecoration(
-                                                                            color: Color.fromRGBO(
-                                                                              37,
-                                                                              37,
-                                                                              37,
-                                                                              1,
-                                                                            ),
-                                                                            borderRadius: BorderRadius.circular(
-                                                                              28.r,
-                                                                            ),
+                                                                            color: Color.fromRGBO(37, 37, 37, 1),
+                                                                            borderRadius: BorderRadius.circular(28.r),
                                                                           ),
                                                                           child: Row(
                                                                             children: [
@@ -503,9 +447,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                 height: 25.w,
                                                                                 decoration: BoxDecoration(
                                                                                   color: Colors.grey.shade900,
-                                                                                  borderRadius: BorderRadius.circular(
-                                                                                    18.r,
-                                                                                  ),
+                                                                                  borderRadius: BorderRadius.circular(18.r),
                                                                                 ),
                                                                                 child: Icon(
                                                                                   Icons.arrow_forward_ios,
@@ -528,54 +470,33 @@ class _LivestreamingState extends State<Livestreaming> {
                                                               right: 74.w,
                                                               child: Container(
                                                                 height: 56.h,
-                                                                padding:
-                                                                    EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          16.w,
-                                                                    ),
+                                                                padding: EdgeInsets.symmetric(horizontal: 16.w),
                                                                 decoration: BoxDecoration(
-                                                                  color: Colors
-                                                                      .black,
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        28.r,
-                                                                      ),
+                                                                  color: Colors.black,
+                                                                  borderRadius: BorderRadius.circular(28.r),
                                                                 ),
                                                                 child: Row(
                                                                   children: [
                                                                     Icon(
-                                                                      Icons
-                                                                          .search,
-                                                                      color: Colors
-                                                                          .white,
-                                                                      size:
-                                                                          22.sp,
+                                                                      Icons.search,
+                                                                      color: Colors.white,
+                                                                      size: 22.sp,
                                                                     ),
-                                                                    SizedBox(
-                                                                      width:
-                                                                          12.w,
-                                                                    ),
+                                                                    SizedBox(width: 12.w),
                                                                     Expanded(
                                                                       child: Text(
                                                                         'Search',
                                                                         style: sfProText400(
                                                                           18.sp,
-                                                                          Colors.white.withOpacity(
-                                                                            0.6,
-                                                                          ),
+                                                                          Colors.white.withOpacity(0.6),
                                                                         ),
                                                                       ),
                                                                     ),
-                                                                    SizedBox(
-                                                                      width:
-                                                                          8.w,
-                                                                    ),
+                                                                    SizedBox(width: 8.w),
                                                                     Icon(
                                                                       Icons.mic,
-                                                                      color: Colors
-                                                                          .white,
-                                                                      size:
-                                                                          22.sp,
+                                                                      color: Colors.white,
+                                                                      size: 22.sp,
                                                                     ),
                                                                   ],
                                                                 ),
@@ -590,71 +511,15 @@ class _LivestreamingState extends State<Livestreaming> {
                                               },
                                             );
                                           },
-                                        ),
-                                      ],
+                                        ),                                      ],
                                     ),
                                   ),
                                   SizedBox(height: 16.h),
-                                  // counters
-                                  Container(
-                                    width: 297.w,
-                                    height: 59.4.h,
-                                    decoration: BoxDecoration(
-                                      color: Color.fromRGBO(30, 29, 32, 1),
-                                      borderRadius: BorderRadius.circular(33.r),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        counterPill(
-                                          asset: 'assets/images/twitch.png',
-                                          count: '11202',
-                                          color: Color.fromRGBO(
-                                            185,
-                                            80,
-                                            239,
-                                            1,
-                                          ),
-                                          bgColor: Color.fromRGBO(
-                                            185,
-                                            80,
-                                            239,
-                                            0.25,
-                                          ),
-                                        ),
-                                        SizedBox(width: 13.2.w),
-                                        counterPill(
-                                          asset: 'assets/images/kick.png',
-                                          count: '1256',
-                                          color: Color.fromRGBO(83, 252, 24, 1),
-                                          bgColor: Color.fromRGBO(
-                                            83,
-                                            252,
-                                            24,
-                                            0.25,
-                                          ),
-                                        ),
-                                        SizedBox(width: 13.2.w),
-                                        counterPill(
-                                          asset: 'assets/images/youtube.png',
-                                          count: '256',
-                                          color: Color.fromRGBO(221, 44, 40, 1),
-                                          bgColor: Color.fromRGBO(
-                                            221,
-                                            44,
-                                            40,
-                                            0.25,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  _buildInteractiveCounterRow(),
                                 ],
                               );
                             }
 
-                            // no platform selected: show service list
                             return Column(
                               children: [
                                 Stack(
@@ -662,15 +527,10 @@ class _LivestreamingState extends State<Livestreaming> {
                                   children: [
                                     Container(
                                       width: double.infinity,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 14.w,
-                                        vertical: 14.h,
-                                      ),
+                                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
                                       decoration: BoxDecoration(
-                                        color: Color.fromRGBO(22, 21, 24, 1),
-                                        borderRadius: BorderRadius.circular(
-                                          20.r,
-                                        ),
+                                        color: const Color.fromRGBO(22, 21, 24, 1),
+                                        borderRadius: BorderRadius.circular(20.r),
                                       ),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -680,8 +540,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                             title: 'Title',
                                             subtitle: 'Category',
                                             onTap: () {
-                                              _selectedPlatform.value =
-                                                  'twitch';
+                                              _selectedPlatform.value = 'twitch';
                                               _titleSelected.value = true;
                                               _showServiceCard.value = true;
                                             },
@@ -703,8 +562,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                             title: 'Title',
                                             subtitle: 'Category',
                                             onTap: () {
-                                              _selectedPlatform.value =
-                                                  'youtube';
+                                              _selectedPlatform.value = 'youtube';
                                               _titleSelected.value = true;
                                               _showServiceCard.value = true;
                                             },
@@ -716,141 +574,43 @@ class _LivestreamingState extends State<Livestreaming> {
                                     Positioned(
                                       bottom: 6.h,
                                       child: Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 20.w,
-                                          vertical: 8.h,
-                                        ),
+                                        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
                                         decoration: BoxDecoration(
-                                          color: Color.fromRGBO(20, 18, 20, 1),
-                                          borderRadius: BorderRadius.circular(
-                                            20.r,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.white10,
-                                            width: 1.w,
-                                          ),
+                                          color: const Color.fromRGBO(20, 18, 20, 1),
+                                          borderRadius: BorderRadius.circular(20.r),
+                                          border: Border.all(color: Colors.white10, width: 1.w),
                                         ),
                                         child: Text(
                                           'Update All',
-                                          style: sfProText400(
-                                            14.sp,
-                                            Color.fromRGBO(238, 218, 172, 1),
-                                          ),
+                                          style: sfProText400(14.sp, const Color.fromRGBO(238, 218, 172, 1)),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 SizedBox(height: 12.h),
-                                Container(
-                                  width: 297.w,
-                                  height: 59.4.h,
-                                  decoration: BoxDecoration(
-                                    color: Color.fromRGBO(30, 29, 32, 1),
-                                    borderRadius: BorderRadius.circular(33.r),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      counterPill(
-                                        asset: 'assets/images/twitch.png',
-                                        count: '11202',
-                                        color: Color.fromRGBO(185, 80, 239, 1),
-                                        bgColor: Color.fromRGBO(
-                                          185,
-                                          80,
-                                          239,
-                                          0.25,
-                                        ),
-                                      ),
-                                      SizedBox(width: 13.2.w),
-                                      counterPill(
-                                        asset: 'assets/images/kick.png',
-                                        count: '1256',
-                                        color: Color.fromRGBO(83, 252, 24, 1),
-                                        bgColor: Color.fromRGBO(
-                                          83,
-                                          252,
-                                          24,
-                                          0.25,
-                                        ),
-                                      ),
-                                      SizedBox(width: 13.2.w),
-                                      counterPill(
-                                        asset: 'assets/images/youtube.png',
-                                        count: '256',
-                                        color: Color.fromRGBO(221, 44, 40, 1),
-                                        bgColor: Color.fromRGBO(
-                                          221,
-                                          44,
-                                          40,
-                                          0.25,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                _buildInteractiveCounterRow(),
                               ],
                             );
                           },
                         );
                       }
 
-                      // default: image placeholder
                       return Column(
                         children: [
                           Container(
                             height: 236.h,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24.r),
-                            ),
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(24.r)),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(24.r),
                               child: Opacity(
                                 opacity: 1,
-                                child: Image.asset(
-                                  'assets/images/streaming.png', // replace with your placeholder image path
-                                  fit: BoxFit.cover,
-                                ),
+                                child: Image.asset('assets/images/streaming.png', fit: BoxFit.cover),
                               ),
                             ),
                           ),
                           SizedBox(height: 12.h),
-
-                          // counters under the display image (restored)
-                          Container(
-                            width: 297.w,
-                            height: 59.4.h,
-                            decoration: BoxDecoration(
-                              color: Color.fromRGBO(30, 29, 32, 1),
-                              borderRadius: BorderRadius.circular(33.r),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                counterPill(
-                                  asset: 'assets/images/twitch.png',
-                                  count: '11202',
-                                  color: Color.fromRGBO(185, 80, 239, 1),
-                                  bgColor: Color.fromRGBO(185, 80, 239, 0.25),
-                                ),
-                                SizedBox(width: 13.2.w),
-                                counterPill(
-                                  asset: 'assets/images/kick.png',
-                                  count: '1256',
-                                  color: Color.fromRGBO(83, 252, 24, 1),
-                                  bgColor: Color.fromRGBO(83, 252, 24, 0.25),
-                                ),
-                                SizedBox(width: 13.2.w),
-                                counterPill(
-                                  asset: 'assets/images/youtube.png',
-                                  count: '256',
-                                  color: Color.fromRGBO(221, 44, 40, 1),
-                                  bgColor: Color.fromRGBO(221, 44, 40, 0.25),
-                                ),
-                              ],
-                            ),
-                          ),
+                          _buildInteractiveCounterRow(),
                         ],
                       );
                     },
@@ -863,6 +623,7 @@ class _LivestreamingState extends State<Livestreaming> {
                       showActivity: _showActivity,
                       selectedPlatform: _selectedPlatform,
                       titleSelected: _titleSelected,
+                      chatFilter: _chatFilter,
                     ),
                   ),
                 ],

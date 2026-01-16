@@ -7,6 +7,7 @@ import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/features/intro/intro_screen3.dart';
 import 'package:second_chat/features/intro/intro_screen4.dart';
 import 'package:second_chat/features/intro/intro_screen5.dart';
+import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/features/main_section/stream/StreamStreak1.dart';
 import 'controllers/Main Section Controllers/settings_controller.dart';
@@ -160,7 +161,7 @@ class MyApp extends StatelessWidget {
           ),
 
           // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
-          home: IntroScreen1(),
+          home: Livestreaming(),
 
           // Navigation settings
           defaultTransition: Transition.cupertino,

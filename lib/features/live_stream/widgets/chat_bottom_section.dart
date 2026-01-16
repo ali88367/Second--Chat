@@ -12,6 +12,7 @@ class ChatBottomSection extends StatefulWidget {
   final ValueNotifier<bool> showActivity;
   final ValueNotifier<String?> selectedPlatform;
   final ValueNotifier<bool> titleSelected;
+  final ValueNotifier<String?> chatFilter;
 
   const ChatBottomSection({
     super.key,
@@ -19,6 +20,7 @@ class ChatBottomSection extends StatefulWidget {
     required this.showActivity,
     required this.selectedPlatform,
     required this.titleSelected,
+    required this.chatFilter,
   });
 
   @override
@@ -33,15 +35,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   ];
 
   static const List<Color> nameColors = [
-    Colors.green,
-    Colors.blue,
-    Colors.purple,
-    Colors.orange,
-    Colors.red,
-    Colors.teal,
-    Colors.yellow,
-    Colors.pink,
+    Colors.green, Colors.blue, Colors.purple, Colors.orange,
+    Colors.red, Colors.teal, Colors.yellow, Colors.pink,
   ];
+
+  static const Color twitchColor = Color.fromRGBO(185, 80, 239, 1);
+  static const Color kickColor = Color.fromRGBO(83, 252, 24, 1);
+  static const Color youtubeColor = Color.fromRGBO(221, 44, 40, 1);
 
   late List<Map<String, dynamic>> _comments;
   final TextEditingController _messageController = TextEditingController();
@@ -54,31 +54,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     _comments = [
       {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan1', 'message': 'Amazing play!'},
       {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan2', 'message': 'Wow, insane!'},
-      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan3', 'message': 'Cant believe this!'},
-      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan4', 'message': 'Go go go!'},
-      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan5', 'message': 'Lol that was funny!'},
-      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan6', 'message': 'Best stream ever!'},
       {'platform': 'assets/images/kick.png', 'name': 'KickFan1', 'message': 'Lets goooo!'},
       {'platform': 'assets/images/kick.png', 'name': 'KickFan2', 'message': 'Hyped for this!'},
-      {'platform': 'assets/images/kick.png', 'name': 'KickFan3', 'message': 'No way!'},
-      {'platform': 'assets/images/kick.png', 'name': 'KickFan4', 'message': 'This is epic!'},
-      {'platform': 'assets/images/kick.png', 'name': 'KickFan5', 'message': 'Lol amazing!'},
-      {'platform': 'assets/images/kick.png', 'name': 'KickFan6', 'message': 'Cant stop watching!'},
       {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer1', 'message': 'Nice content!'},
       {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer2', 'message': 'Love this!'},
-      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer3', 'message': 'Subscribed!'},
-      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer4', 'message': 'This is lit!'},
-      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer5', 'message': 'Great job!'},
-      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer6', 'message': 'Keep it up!'},
     ];
-
+    for(int i=0; i<10; i++) {
+      _comments.add({'platform': 'assets/images/twitch1.png', 'name': 'User$i', 'message': 'Hello $i'});
+    }
     _comments.shuffle();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_mainScrollController.hasClients) {
-        _mainScrollController.jumpTo(_mainScrollController.position.maxScrollExtent);
-      }
-    });
   }
 
   @override
@@ -99,15 +83,32 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     }
   }
 
+  List<Map<String, dynamic>> _getFilteredComments(String? filter) {
+    if (filter == null) return _comments;
+    return _comments.where((item) {
+      final platformPath = item['platform'].toString().toLowerCase();
+      final filterKey = filter.toLowerCase();
+      return platformPath.contains(filterKey);
+    }).toList();
+  }
+
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-    final platformAsset = _getPlatformAsset(widget.selectedPlatform.value);
+
+    String currentPlatform = widget.chatFilter.value ?? 'twitch';
+    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!;
+    }
+
+    final platformAsset = _getPlatformAsset(currentPlatform);
     final item = {'platform': platformAsset, 'name': 'You', 'message': text};
+
     setState(() {
       _comments.add(item);
     });
     _messageController.clear();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_mainScrollController.hasClients) {
         _mainScrollController.jumpTo(_mainScrollController.position.maxScrollExtent + 100);
@@ -118,157 +119,281 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     });
   }
 
+  Widget _buildPlatformSelector(StateSetter? setSheetState) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: widget.chatFilter,
+      builder: (context, filter, _) {
+        String label = "All";
+        Color labelColor = Colors.white; // Default color for "All"
+
+        if (filter != null) {
+          label = "${filter[0].toUpperCase()}${filter.substring(1)}";
+          // Change color based on selection
+          switch (filter) {
+            case 'twitch':
+              labelColor = twitchColor;
+              break;
+            case 'kick':
+              labelColor = kickColor;
+              break;
+            case 'youtube':
+              labelColor = youtubeColor;
+              break;
+          }
+        }
+
+        return Theme(
+          data: Theme.of(context).copyWith(
+            popupMenuTheme: PopupMenuThemeData(
+              color: const Color(0xFF141414),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+            ),
+          ),
+          child: PopupMenuButton<String>(
+            offset: Offset(0, -220.h),
+            constraints: BoxConstraints(minWidth: 140.w, maxWidth: 140.w),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+            color: const Color(0xFF141414),
+            elevation: 8,
+            onSelected: (String value) {
+              if (value == 'all') {
+                widget.chatFilter.value = null;
+              } else {
+                widget.chatFilter.value = value;
+              }
+              setState(() {});
+              if (setSheetState != null) setSheetState(() {});
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'all',
+                height: 48.h,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (filter == null) ...[
+                        Icon(Icons.check, color: Colors.white, size: 18.sp),
+                        SizedBox(width: 8.w),
+                      ],
+                      Text('All', style: sfProText500(18.sp, Colors.white)),
+                    ],
+                  ),
+                ),
+              ),
+              PopupMenuDivider(height: 1.h),
+              PopupMenuItem<String>(
+                value: 'twitch',
+                height: 48.h,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (filter == 'twitch') ...[
+                        Icon(Icons.check, color: twitchColor, size: 18.sp),
+                        SizedBox(width: 6.w),
+                      ],
+                      Text('Twitch', style: sfProText500(18.sp, twitchColor)),
+                    ],
+                  ),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'kick',
+                height: 48.h,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (filter == 'kick') ...[
+                        Icon(Icons.check, color: kickColor, size: 18.sp),
+                        SizedBox(width: 6.w),
+                      ],
+                      Text('Kick', style: sfProText500(18.sp, kickColor)),
+                    ],
+                  ),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'youtube',
+                height: 48.h,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (filter == 'youtube') ...[
+                        Icon(Icons.check, color: youtubeColor, size: 18.sp),
+                        SizedBox(width: 6.w),
+                      ],
+                      Text('YouTube', style: sfProText500(18.sp, youtubeColor)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            // Updated Child with Dynamic Color
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4.h),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: TextStyle(color: labelColor, fontSize: 16.sp)),
+                  Icon(Icons.unfold_more, color: Colors.white.withOpacity(0.6), size: 16.sp),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
   void _openExpandedChat(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return FractionallySizedBox(
-          heightFactor: 0.94,
-          child: AnimatedPadding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade900,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
-              ),
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    SizedBox(height: 10.h),
-                    Container(
-                      width: 40.w,
-                      height: 4.h,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade700,
-                        borderRadius: BorderRadius.circular(2.r),
-                      ),
-                    ),
-                    SizedBox(height: 16.h),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24.w),
-                      child: Row(
-                        children: [
-                          ValueListenableBuilder<bool>(
-                            valueListenable: widget.showActivity,
-                            builder: (context, active, _) {
-                              return GestureDetector(
-                                onTap: () {
-                                  final newVal = !active;
-                                  widget.showActivity.value = newVal;
-                                  if (newVal) {
-                                    widget.selectedPlatform.value = null;
-                                    widget.showServiceCard.value = true;
-                                  } else {
-                                    widget.showServiceCard.value = widget.titleSelected.value;
-                                  }
-                                  setState(() {});
-                                },
-                                child: pillButton("Activity", isActive: active, assetPath: 'assets/images/line.png'),
-                              );
-                            },
-                          ),
-                          SizedBox(width: 12.w),
-                          ValueListenableBuilder<bool>(
-                            valueListenable: widget.titleSelected,
-                            builder: (context, val, _) {
-                              return GestureDetector(
-                                onTap: () {
-                                  final newVal = !val;
-                                  widget.titleSelected.value = newVal;
-                                  widget.showServiceCard.value = newVal || widget.showActivity.value;
-                                  setState(() {});
-                                },
-                                child: pillButton("Title", isActive: val, assetPath: 'assets/images/magic.png'),
-                              );
-                            },
-                          ),
-                          const Spacer(),
-                          SizedBox(width: 12.w),
-                          SizedBox(
-                            height: 36.h,
-                            width: 36.w,
-                            child: Image.asset('assets/images/expand.png', color: Colors.yellow),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 16.h),
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w),
-                        child: ListView.builder(
-                          controller: _expandedScrollController,
-                          padding: EdgeInsets.only(bottom: 16.h),
-                          itemCount: _comments.length,
-                          itemBuilder: (context, index) {
-                            final item = _comments[index];
-                            final nameColor = nameColors[Random().nextInt(nameColors.length)];
-                            return _chatItem(item['platform'], item['name'], item['message'], nameColor);
-                          },
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            return FractionallySizedBox(
+              heightFactor: 0.94,
+              child: AnimatedPadding(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade900,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+                  ),
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        SizedBox(height: 10.h),
+                        Container(
+                          width: 40.w, height: 4.h,
+                          decoration: BoxDecoration(color: Colors.grey.shade700, borderRadius: BorderRadius.circular(2.r)),
                         ),
-                      ),
-                    ),
-
-                    // Input area (expanded chat) - RE-ALIGNED AS PER SCREENSHOT
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(25.r),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
+                        SizedBox(height: 16.h),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w),
+                          child: Row(
+                            children: [
+                              ValueListenableBuilder<bool>(
+                                valueListenable: widget.showActivity,
+                                builder: (context, active, _) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      final newVal = !active;
+                                      widget.showActivity.value = newVal;
+                                      if (newVal) {
+                                        widget.selectedPlatform.value = null;
+                                        widget.showServiceCard.value = true;
+                                      } else {
+                                        widget.showServiceCard.value = widget.titleSelected.value;
+                                      }
+                                      setState(() {});
+                                      setSheetState(() {});
+                                    },
+                                    child: pillButton("Activity", isActive: active, assetPath: 'assets/images/line.png'),
+                                  );
+                                },
+                              ),
+                              SizedBox(width: 12.w),
+                              ValueListenableBuilder<bool>(
+                                valueListenable: widget.titleSelected,
+                                builder: (context, val, _) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      final newVal = !val;
+                                      widget.titleSelected.value = newVal;
+                                      widget.showServiceCard.value = newVal || widget.showActivity.value;
+                                      setState(() {});
+                                      setSheetState(() {});
+                                    },
+                                    child: pillButton("Title", isActive: val, assetPath: 'assets/images/magic.png'),
+                                  );
+                                },
+                              ),
+                              const Spacer(),
+                              SizedBox(width: 12.w),
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: SizedBox(height: 36.h, width: 36.w, child: Image.asset('assets/images/expand.png', color: Colors.yellow)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
+                        Expanded(
+                          child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            height: 55.h,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(25.r),
-                              border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5.w),
+                            child: ValueListenableBuilder<String?>(
+                              valueListenable: widget.chatFilter,
+                              builder: (context, filter, child) {
+                                final filteredList = _getFilteredComments(filter);
+                                return ListView.builder(
+                                  controller: _expandedScrollController,
+                                  padding: EdgeInsets.only(bottom: 16.h),
+                                  itemCount: filteredList.length,
+                                  itemBuilder: (context, index) {
+                                    final item = filteredList[index];
+                                    final nameColor = nameColors[Random().nextInt(nameColors.length)];
+                                    return _chatItem(item['platform'], item['name'], item['message'], nameColor);
+                                  },
+                                );
+                              },
                             ),
-                            child: Row(
-                              children: [
-                                // Left Side: Text Input
-                                Expanded(
-                                  child: TextField(
-                                    controller: _messageController,
-                                    style: sfProText400(17.sp, Colors.white),
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: 'Text', // Matches image_9ae694.png
-                                      hintStyle: TextStyle(
-                                        color: const Color.fromRGBO(235, 235, 245, 0.3),
-                                        fontSize: 17.sp,
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(25.r),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                height: 55.h,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(25.r),
+                                  border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5.w),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _messageController,
+                                        style: sfProText400(17.sp, Colors.white),
+                                        decoration: InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: 'Text',
+                                          hintStyle: TextStyle(color: const Color.fromRGBO(235, 235, 245, 0.3), fontSize: 17.sp),
+                                        ),
+                                        textInputAction: TextInputAction.send,
+                                        onSubmitted: (_) { _sendMessage(); setSheetState(() {}); },
                                       ),
                                     ),
-                                    textInputAction: TextInputAction.send,
-                                    onSubmitted: (_) => _sendMessage(),
-                                  ),
-                                ),
-                                // Right Side: Icons Grouped
-                                Icon(Icons.sentiment_satisfied_sharp, color: Colors.white, size: 24.sp),
-                                SizedBox(width: 12.w),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text("All", style: TextStyle(color: Colors.white, fontSize: 16.sp)),
-                                    Icon(Icons.unfold_more, color: Colors.white.withOpacity(0.6), size: 16.sp),
+                                    Icon(Icons.sentiment_satisfied_sharp, color: Colors.white, size: 24.sp),
+                                    SizedBox(width: 12.w),
+
+                                    _buildPlatformSelector(setSheetState),
+
+                                    SizedBox(width: 8.w),
                                   ],
                                 ),
-                                SizedBox(width: 8.w),
-                              ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -286,12 +411,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         children: [
           SizedBox(height: 10.h),
           Container(
-            width: 40.w,
-            height: 4.h,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade700,
-              borderRadius: BorderRadius.circular(2.r),
-            ),
+            width: 40.w, height: 4.h,
+            decoration: BoxDecoration(color: Colors.grey.shade700, borderRadius: BorderRadius.circular(2.r)),
           ),
           SizedBox(height: 16.h),
           Padding(
@@ -334,11 +455,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                 SizedBox(width: 12.w),
                 GestureDetector(
                   onTap: () => _openExpandedChat(context),
-                  child: SizedBox(
-                    height: 36.h,
-                    width: 36.w,
-                    child: Image.asset('assets/images/expand.png'),
-                  ),
+                  child: SizedBox(height: 36.h, width: 36.w, child: Image.asset('assets/images/expand.png')),
                 ),
               ],
             ),
@@ -347,26 +464,27 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
           Expanded(
             child: Stack(
               children: [
-                ListView.builder(
-                  controller: _mainScrollController,
-                  padding: EdgeInsets.only(
-                    left: 16.w,
-                    right: 16.w,
-                    bottom: 80.h + MediaQuery.of(context).viewInsets.bottom,
-                  ),
-                  itemCount: _comments.length,
-                  itemBuilder: (context, index) {
-                    final item = _comments[index];
-                    final nameColor = nameColors[random.nextInt(nameColors.length)];
-                    return _chatItem(item['platform'], item['name'], item['message'], nameColor);
+                ValueListenableBuilder<String?>(
+                  valueListenable: widget.chatFilter,
+                  builder: (context, filter, child) {
+                    final filteredList = _getFilteredComments(filter);
+                    return ListView.builder(
+                      controller: _mainScrollController,
+                      padding: EdgeInsets.only(
+                        left: 16.w, right: 16.w, bottom: 80.h + MediaQuery.of(context).viewInsets.bottom,
+                      ),
+                      itemCount: filteredList.length,
+                      itemBuilder: (context, index) {
+                        final item = filteredList[index];
+                        final nameColor = nameColors[random.nextInt(nameColors.length)];
+                        return _chatItem(item['platform'], item['name'], item['message'], nameColor);
+                      },
+                    );
                   },
                 ),
-
-                // Floating Input Button - RE-ALIGNED AS PER SCREENSHOT
                 Positioned(
                   bottom: 16.h + MediaQuery.of(context).viewInsets.bottom,
-                  left: 10.w,
-                  right: 10.w,
+                  left: 10.w, right: 10.w,
                   child: GestureDetector(
                     onTap: () => _openExpandedChat(context),
                     child: ClipRRect(
@@ -383,26 +501,17 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                           ),
                           child: Row(
                             children: [
-                              // Left: Hint Text
                               Expanded(
                                 child: Text(
-                                  'Text', // Matches image_9ae694.png
-                                  style: TextStyle(
-                                    color: const Color.fromRGBO(235, 235, 245, 0.3),
-                                    fontSize: 17.sp,
-                                  ),
+                                  'Text',
+                                  style: TextStyle(color: const Color.fromRGBO(235, 235, 245, 0.3), fontSize: 17.sp),
                                 ),
                               ),
-                              // Right: Icons Grouped
                               Icon(Icons.sentiment_satisfied_alt_outlined, color: Colors.white, size: 24.sp),
                               SizedBox(width: 12.w),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text("All", style: TextStyle(color: Colors.white, fontSize: 16.sp)),
-                                  Icon(Icons.unfold_more, color: Colors.white.withOpacity(0.6), size: 16.sp),
-                                ],
-                              ),
+
+                              _buildPlatformSelector(null),
+
                             ],
                           ),
                         ),
@@ -418,6 +527,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     );
   }
 
+  // Included _chatItem method
   Widget _chatItem(String platform, String name, String message, Color nameColor) {
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h),
