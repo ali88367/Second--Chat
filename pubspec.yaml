@@ -40,6 +40,7 @@ dependencies:
   animate_do: ^3.3.4
   toggle_switch:
   ios_color_picker:
+  glassmorphism: ^3.0.0
 
 dev_dependencies:
   flutter_test:

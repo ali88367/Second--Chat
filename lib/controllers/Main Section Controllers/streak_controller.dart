@@ -19,11 +19,8 @@ class StreamStreaksController extends GetxController {
     'Sun': false,
   }.obs;
 
-  var threeTimesWeek = false.obs;
-  var isSelectingThreeDays = false.obs;
 
   /// Interactive menu numbers
-  var selectedMenuNumbers = <int>[].obs;
 
   int get selectedCount => selectedMenuNumbers.length;
 
@@ -51,6 +48,15 @@ class StreamStreaksController extends GetxController {
 
   final lastTappedRow = RxnInt();
   final lastTappedCol = RxnInt();
+
+
+  RxBool threeTimesWeek = false.obs;
+  RxBool isSelectingThreeDays = false.obs;
+
+  // Example: selected menu numbers (1–7 or days)
+  RxList<int> selectedMenuNumbers = <int>[].obs;
+
+
 
   // --- EXISTING LOGIC ---
 

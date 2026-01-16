@@ -163,89 +163,13 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                     children: [
                       Positioned(
                         bottom:
-                            145.h, // Positioned right above the "3-times" bar
-                        left: 40.w, // Aligned with the indicator icon
-                        child: Container(
-                          width: 96.w,
-                          padding: EdgeInsets.symmetric(vertical: 14.h),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1C1C1E),
-                            borderRadius: BorderRadius.circular(22.r),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.4),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.12),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ...controller.selectedMenuNumbers.map(
-                                (n) => GestureDetector(
-                                  onTap: () => controller.toggleMenuNumber(n),
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 6.h,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.check,
-                                          size: 18.sp,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 6.w),
-                                        Text(
-                                          "$n",
-                                          style: TextStyle(
-                                            fontSize: 20.sp,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (controller
-                                  .selectedMenuNumbers
-                                  .isNotEmpty) ...[
-                                SizedBox(height: 12.h),
-                                Container(
-                                  height: 1,
-                                  width: 40.w,
-                                  color: Colors.white.withOpacity(0.15),
-                                ),
-                                SizedBox(height: 12.h),
-                              ],
-                              ...controller.availableMenuNumbers.map(
-                                (n) => GestureDetector(
-                                  onTap: () => controller.toggleMenuNumber(n),
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 6.h,
-                                    ),
-                                    child: Text(
-                                      "$n",
-                                      style: TextStyle(
-                                        fontSize: 18.sp,
-                                        color: const Color(0xFF8E8E93),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                            125.h, // Positioned right above the "3-times" bar
+                        left: 20.w, // Aligned with the indicator icon
+                        child: SizedBox(
+
+                            height: 358.h,
+
+                            child: Image.asset('assets/images/s2.png'))
                       ),
                     ],
                   ),

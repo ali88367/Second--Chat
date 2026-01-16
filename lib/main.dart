@@ -13,6 +13,7 @@ import 'package:second_chat/features/main_section/stream/StreamStreak1.dart';
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
 import 'core/constants/constants.dart';
+import 'features/test.dart';
 import 'notifications.dart';
 
 void main() async {
@@ -161,7 +162,7 @@ class MyApp extends StatelessWidget {
           ),
 
           // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
-          home: IntroScreen1(),
+          home: HomeScreen2(),
 
           // Navigation settings
           defaultTransition: Transition.cupertino,
