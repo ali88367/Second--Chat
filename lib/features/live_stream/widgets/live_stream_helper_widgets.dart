@@ -159,7 +159,7 @@ Widget pillButton(String text, {required bool isActive, String? assetPath}) {
       color: isActive ? const Color(0xFF1E1E1E) : Colors.transparent,
       borderRadius: BorderRadius.circular(20.r),
       border: Border.all(
-        color: isActive ? Colors.yellow : Colors.grey.shade800,
+        color: isActive ? Color.fromRGBO(255, 230, 167, 1) : Colors.grey.shade800,
       ),
     ),
     child: Row(
@@ -170,14 +170,14 @@ Widget pillButton(String text, {required bool isActive, String? assetPath}) {
             assetPath,
             width: 16.w,
             height: 16.h,
-            color: isActive ? Colors.yellow : Colors.grey.shade600,
+            color: isActive ? Color.fromRGBO(255, 230, 167, 1) : Colors.grey.shade600,
           ),
           SizedBox(width: 6.w),
         ],
         Text(
           text,
           style: TextStyle(
-            color: isActive ? Colors.yellow : Colors.grey.shade600,
+            color: isActive ? Color.fromRGBO(255, 230, 167, 1): Colors.grey.shade600,
             fontSize: 12.sp,
             fontWeight: FontWeight.w500,
           ),

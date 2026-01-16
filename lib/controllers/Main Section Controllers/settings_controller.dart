@@ -6,6 +6,7 @@ class SettingsController extends GetxController {
   var notifications = true.obs;
   var ledNotifications = true.obs;
   var connectOtherPlatforms = false.obs;
+  RxString selectedPlatform = "All".obs;
   var showSubscribersOnly = false.obs;
   var showVipsOnly = false.obs;
   var viewerCount = true.obs;

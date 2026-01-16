@@ -44,6 +44,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "suffixText": "M",
         "isForward": true,
         "nextPage": "/font-size",
+        "customForwardIcon": "assets/images/changer.png",
       },
       {
         "prefixImageAsset": subscribers_icon,
@@ -182,7 +183,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
               int sectionIndex = index - 1;
               String sectionTitle = settingsData.keys.elementAt(sectionIndex);
               List<Map<String, dynamic>> tiles = settingsData[sectionTitle]!;
-              print(sectionTitle);
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -202,11 +203,14 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     SizedBox(height: 6.h)
                   else
                     SizedBox(height: 2.h),
+
                   if (sectionTitle == "CHAT")
                     Padding(
                       padding: EdgeInsets.only(bottom: 12.h),
                       child: const ChatPlatformTabs(),
                     ),
+
+                  // Container background is STATIC here (Grey)
                   Container(
                     decoration: BoxDecoration(
                       color: onBottomSheetGrey,
@@ -216,7 +220,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       children: tiles.asMap().entries.map((entry) {
                         int index = entry.key;
                         Map<String, dynamic> tile = entry.value;
-                        return _buildTile(tile, controller, index);
+                        // Passing sectionTitle to handle CHAT logic
+                        return _buildTile(tile, controller, index, sectionTitle);
                       }).toList(),
                     ),
                   ),
@@ -230,15 +235,17 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   }
 
   Widget _buildTile(
-    Map<String, dynamic> tile,
-    SettingsController controller,
-    int index,
-  ) {
+      Map<String, dynamic> tile,
+      SettingsController controller,
+      int index,
+      String sectionTitle,
+      ) {
     final bool isSwitch = tile["isSwitch"] ?? false;
     final bool isForward = tile["isForward"] ?? false;
     final bool isLocked = tile["isLocked"] ?? false;
     final String? switchKey = tile["switchKey"];
     final String? openAsBottomSheet = tile["openAsBottomSheet"];
+    final String? customForwardIcon = tile["customForwardIcon"];
 
     RxBool? switchObs;
     if (isSwitch && switchKey != null) {
@@ -264,6 +271,20 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       }
     }
 
+    final double opacity = isLocked ? 0.4 : 1.0;
+
+    Color getBaseColor() {
+      if (sectionTitle != "CHAT") {
+        return const Color.fromRGBO(255, 230, 167, 1);
+      }
+      switch (controller.selectedPlatform.value) {
+        case "Twitch": return twitchPurple;
+        case "Kick": return kickGreen;
+        case "YouTube": return youtubeRed;
+        default: return const Color.fromRGBO(255, 230, 167, 1);
+      }
+    }
+
     return Stack(
       children: [
         Container(
@@ -271,83 +292,136 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           decoration: index > 0
               ? BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      width: 0.5.w,
-                      color: const Color.fromRGBO(120, 120, 128, 0.36),
-                    ),
-                  ),
-                )
+            border: Border(
+              top: BorderSide(
+                width: 0.5.w,
+                color: const Color.fromRGBO(120, 120, 128, 0.36),
+              ),
+            ),
+          )
               : null,
           child: InkWell(
-            onTap: isLocked
-                ? null
-                : () {
-                    if (tile["title"] == "LED Notifications" ||
-                        openAsBottomSheet != null) {
-                      if (openAsBottomSheet != null) Get.back();
-
-                      Get.bottomSheet(
-                        isDismissible: true,
-                        isScrollControlled: true,
-                        enableDrag: true,
-                        backgroundColor:
-                            Colors.transparent, // REQUIRED FOR FLOATING GAP
-                        enterBottomSheetDuration: const Duration(
-                          milliseconds: 300,
+            // Logic updated here
+            onTap: () {
+              // 1. Handle Locked Tiles (Premium Popup)
+              if (isLocked) {
+                Get.bottomSheet(
+                  // The Widget to display
+                  Padding(
+                    padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 25.h),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        // Adjust constraints if necessary
+                        constraints: BoxConstraints(maxHeight: 600.h),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(36.r),
                         ),
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: 12.w,
-                            right: 12.w,
-                            bottom: 15.h, // Space at the very bottom
-                          ),
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Container(
-                              // Updated dimensions
-                              width: 361.w,
-                              height: 586.h,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2C2C2E),
-                                borderRadius: BorderRadius.circular(
-                                  36.r,
-                                ), // Rounds bottom corners too
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(36.r),
-                                child: tile["title"] == "LED Notifications"
-                                    ? const LedSettingsBottomSheet()
-                                    : (openAsBottomSheet == "connect"
-                                          ? ConnectPlatformSetting()
-                                          : PlatformColorSettings()),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Handle bar
+
+                            // The Premium Image
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(36.r),
+                              child: Image.asset(
+                                "assets/images/premium.png", // Ensure this path is correct
+                                fit: BoxFit.contain,
+                                width: double.infinity,
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                      return;
-                    }
 
-                    if (isForward && tile["nextPage"] != null) {
-                      Get.toNamed(tile["nextPage"]!);
-                    } else if (isSwitch && switchObs != null) {
-                      switchObs.toggle();
-                    }
-                  },
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Configuration arguments
+                  isDismissible: true,
+                  enableDrag: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  enterBottomSheetDuration: const Duration(milliseconds: 300),
+                );
+                return; // Stop here if locked
+              }
+
+              // 2. Standard Logic (Existing code)
+              if (tile["title"] == "LED Notifications" ||
+                  openAsBottomSheet != null) {
+                if (openAsBottomSheet != null) Get.back();
+
+                Get.bottomSheet(
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: 12.w,
+                      right: 12.w,
+                      bottom: 15.h,
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: 361.w,
+                        height: 586.h,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2C2C2E),
+                          borderRadius: BorderRadius.circular(36.r),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(36.r),
+                          child: tile["title"] == "LED Notifications"
+                              ? const LedSettingsBottomSheet()
+                              : (openAsBottomSheet == "connect"
+                              ? ConnectPlatformSetting()
+                              : PlatformColorSettings()),
+                        ),
+                      ),
+                    ),
+                  ),
+                  isDismissible: true,
+                  isScrollControlled: true,
+                  enableDrag: true,
+                  backgroundColor: Colors.transparent,
+                  enterBottomSheetDuration: const Duration(
+                    milliseconds: 300,
+                  ),
+                );
+                return;
+              }
+
+              if (isForward && tile["nextPage"] != null) {
+                Get.toNamed(tile["nextPage"]!);
+              } else if (isSwitch && switchObs != null) {
+                switchObs.toggle();
+              }
+            },
             child: Row(
               children: [
-                Image.asset(
-                  tile["prefixImageAsset"],
-                  width: 24.w,
-                  height: 24.h,
-                  color: beige,
-                ),
+                if (sectionTitle == "CHAT")
+                  Obx(() => Image.asset(
+                    tile["prefixImageAsset"],
+                    width: 24.w,
+                    height: 24.h,
+                    color: getBaseColor().withOpacity(opacity),
+                  ))
+                else
+                  Image.asset(
+                    tile["prefixImageAsset"],
+                    width: 24.w,
+                    height: 24.h,
+                    color: const Color.fromRGBO(255, 230, 167, 1)
+                        .withOpacity(opacity),
+                  ),
                 SizedBox(width: 12.w),
                 Expanded(
                   child: Text(
                     tile["title"],
-                    style: sfProText400(16.sp, Colors.white),
+                    style: sfProText400(
+                      16.sp,
+                      Colors.white.withOpacity(opacity),
+                    ),
                   ),
                 ),
                 Row(
@@ -359,24 +433,35 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         child: Text(
                           tile["suffixText"],
                           style: TextStyle(
-                            color: const Color.fromRGBO(235, 235, 245, 0.6),
+                            color: Color.fromRGBO(235, 235, 245, 0.6 * opacity),
                             fontSize: 15.sp,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     if (isSwitch && switchObs != null)
-                      Obx(
-                        () => CustomSwitch(
-                          value: switchObs!.value,
-                          onChanged: (val) => switchObs!.value = val,
+                      if (sectionTitle == "CHAT")
+                        Obx(
+                              () => CustomSwitch(
+                            value: switchObs!.value,
+                            onChanged: (val) => switchObs!.value = val,
+                            activeColor: getBaseColor(),
+                          ),
+                        )
+                      else
+                        Obx(
+                              () => CustomSwitch(
+                            value: switchObs!.value,
+                            onChanged: (val) => switchObs!.value = val,
+                            activeColor: const Color.fromRGBO(255, 230, 167, 1),
+                          ),
                         ),
-                      ),
                     if (isForward || openAsBottomSheet != null)
                       Padding(
                         padding: EdgeInsets.only(left: 4.w),
                         child: Image.asset(forward_arrow_icon, height: 28.h),
                       ),
+
                     if (isLocked)
                       Padding(
                         padding: EdgeInsets.only(left: 8.w),
@@ -390,8 +475,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         ),
       ],
     );
-  }
-}
+  }}
 
 class FreePlanWidget extends StatelessWidget {
   const FreePlanWidget({super.key});
@@ -440,18 +524,14 @@ class FreePlanWidget extends StatelessWidget {
   }
 }
 
-class ChatPlatformTabs extends StatefulWidget {
+class ChatPlatformTabs extends StatelessWidget {
   const ChatPlatformTabs({super.key});
-  @override
-  State<ChatPlatformTabs> createState() => _ChatPlatformTabsState();
-}
-
-class _ChatPlatformTabsState extends State<ChatPlatformTabs> {
-  String selected = "All";
-  final List<String> tabs = ["All", "Twitch", "Kick", "YouTube"];
 
   @override
   Widget build(BuildContext context) {
+    final SettingsController controller = Get.find<SettingsController>();
+    final List<String> tabs = ["All", "Twitch", "Kick", "YouTube"];
+
     return Container(
       height: 36.h,
       width: double.infinity,
@@ -460,31 +540,86 @@ class _ChatPlatformTabsState extends State<ChatPlatformTabs> {
         borderRadius: BorderRadius.circular(16.r),
       ),
       padding: EdgeInsets.all(3.w),
-      child: Row(
-        children: tabs.map((tab) {
-          final bool isSelected = selected == tab;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => selected = tab),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.black : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16.r),
-                ),
-                child: Text(
-                  tab,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey,
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+      child: Obx(() {
+        final selected = controller.selectedPlatform.value;
+
+        return Row(
+          children: [
+            for (int i = 0; i < tabs.length; i++) ...[
+              Expanded(
+                child: Builder(builder: (context) {
+                  final String tab = tabs[i];
+                  final bool isSelected = selected == tab;
+
+                  Color getTextColor() {
+                    if (isSelected) return Colors.white;
+                    switch (tab) {
+                      case "Twitch":
+                        return twitchPurple;
+                      case "Kick":
+                        return kickGreen;
+                      case "YouTube":
+                        return youtubeRed;
+                      default:
+                        return Colors.grey;
+                    }
+                  }
+
+                  Color getBackgroundColor() {
+                    if (!isSelected) return Colors.transparent;
+                    switch (tab) {
+                      case "Twitch":
+                        return twitchPurple;
+                      case "Kick":
+                        return kickGreen;
+                      case "YouTube":
+                        return youtubeRed;
+                      default:
+                        return Colors.black;
+                    }
+                  }
+
+                  return GestureDetector(
+                    onTap: () => controller.selectedPlatform.value = tab,
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: getBackgroundColor(),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      child: Text(
+                        tab,
+                        style: TextStyle(
+                          color: getTextColor(),
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ),
-            ),
-          );
-        }).toList(),
-      ),
+              if (i != tabs.length - 1)
+                Builder(
+                  builder: (context) {
+                    final bool leftIsSelected = selected == tabs[i];
+                    final bool rightIsSelected = selected == tabs[i + 1];
+                    final bool hideDivider = leftIsSelected || rightIsSelected;
+
+                    return Container(
+                      width: 1.w,
+                      height: 18.h,
+                      color: hideDivider
+                          ? Colors.transparent
+                          : Colors.grey.withOpacity(0.3),
+                      margin: EdgeInsets.symmetric(horizontal: 2.w),
+                    );
+                  },
+                ),
+            ],
+          ],
+        );
+      }),
     );
   }
 }

@@ -142,7 +142,7 @@ class StreamStreaksScreen extends StatelessWidget {
   Widget _buildTitle() {
     return Text(
       'Build a long-term habit',
-      style: sfProDisplay600(28.sp, Colors.white),
+      style: sfProDisplay600(22.sp, Colors.white),
       textAlign: TextAlign.center,
     );
   }
@@ -150,7 +150,7 @@ class StreamStreaksScreen extends StatelessWidget {
   Widget _buildSubtitle() {
     return Text(
       'Settings a streak goals  helps you stay consistent',
-      style: sfProText400(15.sp, const Color(0xFF8E8E93)),
+      style: sfProDisplay400(15.sp, const Color(0xFF8E8E93)),
       textAlign: TextAlign.center,
     );
   }

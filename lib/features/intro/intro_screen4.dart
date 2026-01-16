@@ -176,6 +176,11 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         true,
                                       ),
                                       _buildFeatureRow(
+                                        'Advanced Chat Filters',
+                                        false,
+                                        true,
+                                      ),
+                                      _buildFeatureRow(
                                         'Custom Notification',
                                         false,
                                         true,
@@ -359,6 +364,78 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                           isInfo: true,
                                         ),
                                       ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/checkInfo.png',
+                                          isInfo: true,
+                                        ),
+                                      ),
+                                      SizedBox(height: 48.h),
+                                      // Ninth badge
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 10.w),
+                                        child: _buildBadgeIcon(
+                                          imagePath:
+                                          'assets/images/24-7.png',
+                                          isInfo: true,
+                                        ),
+
+                                      ),
+                                      SizedBox(height: 48.h),
                                     ],
                                   ),
                                 ),
@@ -494,20 +571,20 @@ class _IntroScreen4State extends State<IntroScreen4> {
                 flex: 1,
                 child: Center(
                   child: Container(
-                    width: 24.w,
-                    height: 24.w,
+                    width: 28.w,
+                    height: 28.w,
                     decoration: BoxDecoration(
-                      color: isFree
-                          ? Colors.white.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.15),
                       shape: BoxShape.circle,
+                      image: DecorationImage(
+                        image: AssetImage(
+                          isFree
+                              ? 'assets/images/checkintro.png'  // Replace with your asset path
+                              : 'assets/images/closeicon.png', // Replace with your asset path
+                        ),
+                        fit: BoxFit.cover, // Or BoxFit.contain depending on your image
+                      ),
                     ),
-                    child: Icon(
-                      isFree ? Icons.check : Icons.close,
-                      color: isFree ? Colors.white : Colors.white,
-                      size: 16.sp,
-                    ),
-                  ),
+                  )
                 ),
               ),
             ],

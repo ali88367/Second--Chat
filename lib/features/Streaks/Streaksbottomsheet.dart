@@ -50,7 +50,11 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                     ),
                     Text(
                       "Stream Streaks",
-                      style: sfProText600(17.sp, Colors.white),
+                      style:TextStyle(
+                        fontSize: 17.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
                     SizedBox(width: 44.w),
                   ],
@@ -125,7 +129,6 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
             ],
           ),
 
-          /// INTERACTIVE MENU OVERLAY (NOW POPS UPWARDS FROM THE BOTTOM BAR)
           Obx(() {
             if (!controller.isSelectingThreeDays.value) {
               return const SizedBox.shrink();

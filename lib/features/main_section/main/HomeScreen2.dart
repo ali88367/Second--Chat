@@ -77,7 +77,7 @@ class HomeScreen2 extends StatelessWidget {
                             isScrollControlled: true,
                             enableDrag: true,
                             Container(
-                              height: Get.height * .9,
+                              height: Get.height * .8,
                               decoration: BoxDecoration(
                                 color: bottomSheetGrey,
                                 borderRadius: BorderRadius.only(
@@ -122,7 +122,7 @@ class HomeScreen2 extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 6.w),
-                      InkWell(
+                      GestureDetector(
                         onTap: () {
                           Get.bottomSheet(
                             isDismissible: true,
