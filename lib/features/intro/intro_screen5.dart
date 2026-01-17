@@ -68,125 +68,133 @@ class IntroScreen5 extends StatelessWidget {
 
                 // Swipeable Content
                 Expanded(
-                  child: Column(
-                    children: [
-                      // PageView Images
-                      SizedBox(
-                        height: 280.h,
-                        child: PageView(
-                          controller: controller.pageController,
-                          onPageChanged: controller.onPageChanged,
-                          children: [
-                            Center(
-                              child: OverflowBox(
-                                maxHeight: 330.h, // bigger than 280.h
-                                maxWidth: 420.w,
-                                child: Image.asset(
-                                  'assets/images/secondGlow.png',
-                                  width: 420.w,
-                                  height: 360.h,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) =>
-                                      SizedBox(width: 280.w, height: 200.h),
+                  child: SingleChildScrollView(
+                    clipBehavior: Clip.none,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // PageView Images
+                        SizedBox(
+                          height: 280.h,
+                          child: PageView(
+                            controller: controller.pageController,
+                            onPageChanged: controller.onPageChanged,
+                            children: [
+                              Center(
+                                child: OverflowBox(
+                                  maxHeight: 330.h, // bigger than 280.h
+                                  maxWidth: 420.w,
+                                  child: Image.asset(
+                                    'assets/images/secondGlow.png',
+                                    width: 420.w,
+                                    height: 360.h,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) =>
+                                        SizedBox(width: 280.w, height: 200.h),
+                                  ),
                                 ),
                               ),
-                            ),
-                            Center(
-                              child: Image.asset(
-                                'assets/images/bunnyGlow.png',
-                                width: 280.w,
-                                height: 280.h,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Container(
+                              Center(
+                                child: Image.asset(
+                                  'assets/images/bunnyGlow.png',
                                   width: 280.w,
                                   height: 280.h,
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(20.r),
-                                  ),
-                                  child: Icon(
-                                    Icons.pets,
-                                    size: 100.sp,
-                                    color: Colors.orange.withOpacity(0.5),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 280.w,
+                                    height: 280.h,
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Icon(
+                                      Icons.pets,
+                                      size: 100.sp,
+                                      color: Colors.orange.withOpacity(0.5),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
 
-                      Container(
-                        //  height: 280.h,
-                        width: double.infinity,
-                        margin: EdgeInsets.symmetric(horizontal: 16.w),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16.w,
-                          vertical: 20.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Color.fromRGBO(30, 29, 32, 1),
-                          borderRadius: BorderRadius.circular(24.r),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Page Indicators
-                            Obx(
-                              () => Row(
+                        Container(
+                          //  height: 280.h,
+                          width: double.infinity,
+                          margin: EdgeInsets.symmetric(horizontal: 16.w),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 20.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Color.fromRGBO(30, 29, 32, 1),
+                            borderRadius: BorderRadius.circular(24.r),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Page Indicators
+                              Obx(
+                                () => Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildDot(
+                                      controller.currentPage.value == 0,
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    _buildDot(
+                                      controller.currentPage.value == 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              SizedBox(height: 16.h),
+
+                              // Animated Content
+                              Obx(
+                                () => AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: controller.currentPage.value == 0
+                                      ? _buildSubscriptionContent(controller)
+                                      : _buildReferralContent(controller),
+                                ),
+                              ),
+
+                              Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  _buildDot(controller.currentPage.value == 0),
-                                  SizedBox(width: 8.w),
-                                  _buildDot(controller.currentPage.value == 1),
+                                  GestureDetector(
+                                    onTap: () =>
+                                        print('Terms of Service tapped'),
+                                    child: Text(
+                                      'Terms of Service',
+                                      style: sfProText400(
+                                        12.sp,
+                                        Color.fromRGBO(235, 235, 245, 0.6),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 20.w),
+                                  GestureDetector(
+                                    onTap: () =>
+                                        print('Restore Purchase tapped'),
+                                    child: Text(
+                                      'Restore Purchase',
+                                      style: sfProText400(
+                                        12.sp,
+                                        Color.fromRGBO(235, 235, 245, 0.6),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
-                            ),
-
-                            SizedBox(height: 16.h),
-
-                            // Animated Content
-                            Obx(
-                              () => AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 300),
-                                child: controller.currentPage.value == 0
-                                    ? _buildSubscriptionContent(controller)
-                                    : _buildReferralContent(controller),
-                              ),
-                            ),
-
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                GestureDetector(
-                                  onTap: () => print('Terms of Service tapped'),
-                                  child: Text(
-                                    'Terms of Service',
-                                    style: sfProText400(
-                                      12.sp,
-                                      Color.fromRGBO(235, 235, 245, 0.6),
-
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 20.w),
-                                GestureDetector(
-                                  onTap: () => print('Restore Purchase tapped'),
-                                  child: Text(
-                                    'Restore Purchase',
-                                    style: sfProText400(
-                                      12.sp,
-                                      Color.fromRGBO(235, 235, 245, 0.6),
-
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -296,30 +304,34 @@ class IntroScreen5 extends StatelessWidget {
               child: Center(
                 child: c.isLoading.value
                     ? SizedBox(
-                  width: 24.w,
-                  height: 24.w,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        width: 24.w,
+                        height: 24.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
                     : RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Start Free Trial\n',
-                        style: sfProText600(17.sp, Colors.white),
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Start Free Trial\n',
+                              style: sfProText600(17.sp, Colors.white),
+                            ),
+                            TextSpan(
+                              text: 'then £52.99/year',
+                              style: sfProText400(
+                                12.sp,
+                                Color.fromRGBO(0, 0, 0, 0.6),
+                              ), // different color & style
+                            ),
+                          ],
+                        ),
                       ),
-                      TextSpan(
-                        text: 'then £52.99/year',
-                        style: sfProText400(12.sp, Color.fromRGBO(0, 0, 0, 0.6)), // different color & style
-                      ),
-                    ],
-                  ),
-                ),
-              )
-
+              ),
             ),
           ),
         ),
@@ -360,7 +372,7 @@ class IntroScreen5 extends StatelessWidget {
   Widget _buildReferralContent(IntroScreen5Controller c) {
     return Padding(
       key: const ValueKey('referral'),
-      padding: EdgeInsets.symmetric(horizontal: 16.w,vertical: 20.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -370,17 +382,15 @@ class IntroScreen5 extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 16.h),
-          Container(
-            height: 1.h,
-            color: const Color(0xFF2C2C2E),
-          ),
+          Container(height: 1.h, color: const Color(0xFF2C2C2E)),
           SizedBox(height: 16.h),
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               SizedBox(
-                  height: 20.h,
-                  child: Image.asset('assets/images/clap.png')),
+                height: 20.h,
+                child: Image.asset('assets/images/clap.png'),
+              ),
               SizedBox(width: 12.w),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,8 +412,10 @@ class IntroScreen5 extends StatelessWidget {
                 ],
               ),
               Spacer(),
-              Text('1 time', style: sfProText600(17.sp, Color.fromRGBO(235, 235, 245, 0.3))),
-
+              Text(
+                '1 time',
+                style: sfProText600(17.sp, Color.fromRGBO(235, 235, 245, 0.3)),
+              ),
             ],
           ),
           SizedBox(height: 30.h),
@@ -464,9 +476,13 @@ class IntroScreen5Controller extends GetxController {
     print('Trial started with plan: $plan');
 
     // Navigate to Home Screen
-    Get.offAll(() => const HomeScreen2());
+    Get.offAll(
+      () => const HomeScreen2(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.fastOutSlowIn,
+    );
   }
-
 
   void copyLink() {
     print('Link copied to clipboard');

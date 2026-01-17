@@ -162,11 +162,11 @@ class MyApp extends StatelessWidget {
           ),
 
           // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
-          home: HomeScreen2(),
+          home: IntroScreen1(),
 
-          // Navigation settings
+          // Navigation settings - Smooth and elegant transitions
           defaultTransition: Transition.cupertino,
-          transitionDuration: const Duration(milliseconds: 300),
+          transitionDuration: const Duration(milliseconds: 250),
 
           // Locale settings (optional)
           locale: const Locale('en', 'US'),

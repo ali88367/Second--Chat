@@ -58,7 +58,12 @@ class HomeScreen2 extends StatelessWidget {
                   // Offline Button
                   GestureDetector(
                     onTap: () {
-                      Get.to(Livestreaming());
+                      Get.to(
+                        () => Livestreaming(),
+                        transition: Transition.cupertino,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.fastOutSlowIn,
+                      );
                     },
                     child: _buildImageButton(
                       'assets/images/offline.png',
@@ -73,9 +78,6 @@ class HomeScreen2 extends StatelessWidget {
                       InkWell(
                         onTap: () {
                           Get.bottomSheet(
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
                             Container(
                               height: Get.height * .8,
                               decoration: BoxDecoration(
@@ -87,6 +89,11 @@ class HomeScreen2 extends StatelessWidget {
                               ),
                               child: StreamStreakSetupBottomSheet(),
                             ),
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            enterBottomSheetDuration: const Duration(milliseconds: 300),
+                            exitBottomSheetDuration: const Duration(milliseconds: 250),
                           );
                         },
                         child: _buildImageButton(
@@ -99,9 +106,6 @@ class HomeScreen2 extends StatelessWidget {
             InkWell(
               onTap: () {
                 Get.bottomSheet(
-                  isDismissible: true,
-                  isScrollControlled: true,
-                  enableDrag: true,
                   Container(
                     height: Get.height * .9,
                     decoration: BoxDecoration(
@@ -113,6 +117,11 @@ class HomeScreen2 extends StatelessWidget {
                     ),
                     child: InviteBottomSheet(),
                   ),
+                  isDismissible: true,
+                  isScrollControlled: true,
+                  enableDrag: true,
+                  enterBottomSheetDuration: const Duration(milliseconds: 300),
+                  exitBottomSheetDuration: const Duration(milliseconds: 250),
                 );
               },
               child: _buildImageButton(
@@ -125,9 +134,6 @@ class HomeScreen2 extends StatelessWidget {
                       GestureDetector(
                         onTap: () {
                           Get.bottomSheet(
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
                             Container(
                               height: Get.height * .9,
                               decoration: BoxDecoration(
@@ -139,6 +145,11 @@ class HomeScreen2 extends StatelessWidget {
                               ),
                               child: SettingsBottomsheetColumn(),
                             ),
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            enterBottomSheetDuration: const Duration(milliseconds: 300),
+                            exitBottomSheetDuration: const Duration(milliseconds: 250),
                           );
                         },
                         child: _buildImageButton(
@@ -166,7 +177,12 @@ class HomeScreen2 extends StatelessWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Get.to(HomeScreen());
+                        Get.to(
+                          () => HomeScreen(),
+                          transition: Transition.cupertino,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.fastOutSlowIn,
+                        );
                       },
                       child: Image.asset(
                         'assets/images/stream.png',
@@ -300,9 +316,6 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                 InkWell(
                   onTap: () {
                     Get.bottomSheet(
-                      isDismissible: true,
-                      isScrollControlled: true,
-                      enableDrag: true,
                       Container(
                         height: Get.height * .9,
                         decoration: BoxDecoration(
@@ -314,6 +327,11 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         ),
                         child: InviteBottomSheet(),
                       ),
+                      isDismissible: true,
+                      isScrollControlled: true,
+                      enableDrag: true,
+                      enterBottomSheetDuration: const Duration(milliseconds: 300),
+                      exitBottomSheetDuration: const Duration(milliseconds: 250),
                     );
                   },
                   child: _buildMenuItem(
@@ -326,9 +344,6 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                 InkWell(
                   onTap: () {
                     Get.bottomSheet(
-                      isDismissible: true,
-                      isScrollControlled: true,
-                      enableDrag: true,
                       Container(
                         height: Get.height * .9,
                         decoration: BoxDecoration(
@@ -340,6 +355,11 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         ),
                         child: SettingsBottomsheetColumn(),
                       ),
+                      isDismissible: true,
+                      isScrollControlled: true,
+                      enableDrag: true,
+                      enterBottomSheetDuration: const Duration(milliseconds: 300),
+                      exitBottomSheetDuration: const Duration(milliseconds: 250),
                     );
                   },
                   child: _buildMenuItem(
@@ -352,9 +372,6 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                 InkWell(
                   onTap: () {
                     Get.bottomSheet(
-                      isDismissible: true,
-                      isScrollControlled: true,
-                      enableDrag: true,
                       Container(
                         height: Get.height * .9,
                         decoration: BoxDecoration(
@@ -366,6 +383,11 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         ),
                         child: StreamStreakSetupBottomSheet(),
                       ),
+                      isDismissible: true,
+                      isScrollControlled: true,
+                      enableDrag: true,
+                      enterBottomSheetDuration: const Duration(milliseconds: 300),
+                      exitBottomSheetDuration: const Duration(milliseconds: 250),
                     );
                   },
                   child: _buildMenuItem(

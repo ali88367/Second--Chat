@@ -11,7 +11,12 @@ class IntroScreenNotification2 extends StatelessWidget {
     return Scaffold(
       body: GestureDetector(
         onTap: () {
-          Get.to(IntroScreen3());
+          Get.to(
+            () => IntroScreen3(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.fastOutSlowIn,
+          );
         },
         child: Image.asset(
           'assets/images/notification.jpg',

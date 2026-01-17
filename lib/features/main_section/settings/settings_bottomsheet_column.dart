@@ -359,6 +359,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
                   enterBottomSheetDuration: const Duration(milliseconds: 300),
+                  exitBottomSheetDuration: const Duration(milliseconds: 250),
                 );
                 return; // Stop here if locked
               }
@@ -402,6 +403,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                   enableDrag: true,
                   backgroundColor: Colors.transparent,
                   enterBottomSheetDuration: const Duration(milliseconds: 300),
+                  exitBottomSheetDuration: const Duration(milliseconds: 250),
                 );
                 return;
               }

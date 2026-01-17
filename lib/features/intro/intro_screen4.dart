@@ -20,8 +20,13 @@ class IntroScreen4Controller extends GetxController {
 
     isLoading.value = false;
 
-    // Navigate to IntroScreen4 using GetX
-    Get.to(() => const IntroScreen5());
+    // Navigate to IntroScreen5 using GetX
+    Get.to(
+      () => const IntroScreen5(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.fastOutSlowIn,
+    );
   }
 }
 
@@ -370,7 +375,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
                                           imagePath:
-                                          'assets/images/checkInfo.png',
+                                              'assets/images/checkInfo.png',
                                           isInfo: true,
                                         ),
                                       ),
@@ -380,7 +385,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
                                           imagePath:
-                                          'assets/images/checkInfo.png',
+                                              'assets/images/checkInfo.png',
                                           isInfo: true,
                                         ),
                                       ),
@@ -390,7 +395,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
                                           imagePath:
-                                          'assets/images/checkInfo.png',
+                                              'assets/images/checkInfo.png',
                                           isInfo: true,
                                         ),
                                       ),
@@ -400,7 +405,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
                                           imagePath:
-                                          'assets/images/checkInfo.png',
+                                              'assets/images/checkInfo.png',
                                           isInfo: true,
                                         ),
                                       ),
@@ -410,7 +415,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
                                           imagePath:
-                                          'assets/images/checkInfo.png',
+                                              'assets/images/checkInfo.png',
                                           isInfo: true,
                                         ),
                                       ),
@@ -420,7 +425,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
                                           imagePath:
-                                          'assets/images/checkInfo.png',
+                                              'assets/images/checkInfo.png',
                                           isInfo: true,
                                         ),
                                       ),
@@ -429,11 +434,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                       Padding(
                                         padding: EdgeInsets.only(left: 10.w),
                                         child: _buildBadgeIcon(
-                                          imagePath:
-                                          'assets/images/24-7.png',
+                                          imagePath: 'assets/images/24-7.png',
                                           isInfo: true,
                                         ),
-
                                       ),
                                       SizedBox(height: 48.h),
                                     ],
@@ -578,13 +581,14 @@ class _IntroScreen4State extends State<IntroScreen4> {
                       image: DecorationImage(
                         image: AssetImage(
                           isFree
-                              ? 'assets/images/checkintro.png'  // Replace with your asset path
+                              ? 'assets/images/checkintro.png' // Replace with your asset path
                               : 'assets/images/closeicon.png', // Replace with your asset path
                         ),
-                        fit: BoxFit.cover, // Or BoxFit.contain depending on your image
+                        fit: BoxFit
+                            .cover, // Or BoxFit.contain depending on your image
                       ),
                     ),
-                  )
+                  ),
                 ),
               ),
             ],

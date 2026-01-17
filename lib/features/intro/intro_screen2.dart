@@ -139,7 +139,12 @@ class IntroScreen2 extends StatelessWidget {
                     children: [
                       GestureDetector(
                         onTap: () {
-                          Get.to(IntroScreenNotification2());
+                          Get.to(
+                            () => IntroScreenNotification2(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.fastOutSlowIn,
+                          );
                         },
                         child: Text(
                           'Enjoy Better Streaming',

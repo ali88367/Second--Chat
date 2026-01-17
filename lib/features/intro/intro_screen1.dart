@@ -68,7 +68,12 @@ class IntroScreen1 extends StatelessWidget {
             right: 16.w,
             child: GestureDetector(
               onTap: () {
-                Get.to(IntroScreen2());
+                Get.to(
+                  () => IntroScreen2(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.fastOutSlowIn,
+                );
               },
               child: Container(
                 height: 52.h,

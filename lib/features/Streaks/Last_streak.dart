@@ -333,12 +333,17 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25.r),
                             ),
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
                           ),
                           child: Text(
                             "Ignore",
                             style: sfProText600(
                               17.sp,
                               Colors.white.withOpacity(0.8),
+                            ),
+                            textHeightBehavior: TextHeightBehavior(
+                              applyHeightToFirstAscent: false,
+                              applyHeightToLastDescent: false,
                             ),
                           ),
                         ),

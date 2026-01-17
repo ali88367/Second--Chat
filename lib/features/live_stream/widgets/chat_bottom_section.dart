@@ -189,6 +189,313 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     });
   }
 
+  static const List<String> _emojis = [
+    '😀',
+    '😃',
+    '😄',
+    '😁',
+    '😆',
+    '😅',
+    '🤣',
+    '😂',
+    '🙂',
+    '🙃',
+    '😉',
+    '😊',
+    '😇',
+    '🥰',
+    '😍',
+    '🤩',
+    '😘',
+    '😗',
+    '😚',
+    '😙',
+    '😋',
+    '😛',
+    '😜',
+    '🤪',
+    '😝',
+    '🤑',
+    '🤗',
+    '🤭',
+    '🤫',
+    '🤔',
+    '🤐',
+    '🤨',
+    '😐',
+    '😑',
+    '😶',
+    '😏',
+    '😒',
+    '🙄',
+    '😬',
+    '🤥',
+    '😌',
+    '😔',
+    '😪',
+    '🤤',
+    '😴',
+    '😷',
+    '🤒',
+    '🤕',
+    '🤢',
+    '🤮',
+    '👍',
+    '👎',
+    '👌',
+    '✌️',
+    '🤞',
+    '🤟',
+    '🤘',
+    '👏',
+    '🙌',
+    '👐',
+    '❤️',
+    '💛',
+    '💚',
+    '💙',
+    '💜',
+    '🖤',
+    '🤍',
+    '🤎',
+    '💔',
+    '❣️',
+    '💕',
+    '💞',
+    '💓',
+    '💗',
+    '💖',
+    '💘',
+    '💝',
+    '💟',
+    '☮️',
+    '✝️',
+  ];
+
+  void _showEmojiPicker(BuildContext context, StateSetter? setSheetState) {
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final double screenWidth = mediaQuery.size.width * 0.8;
+    final double keyboardHeight = mediaQuery.viewInsets.bottom;
+
+    // Position above text input (accounting for keyboard)
+    final double emojiPickerHeight = 250.h;
+
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: '',
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: keyboardHeight + 75.h),
+            child: ScaleTransition(
+              scale: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              child: FadeTransition(
+                opacity: animation,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20.r),
+                    bottom: Radius.circular(20.r),
+                  ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      width: screenWidth,
+                      constraints: BoxConstraints(maxHeight: emojiPickerHeight),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.black.withOpacity(0.4),
+                            Colors.black.withOpacity(0.2),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20.r),
+                          bottom: Radius.circular(20.r),
+                        ),
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.white.withOpacity(0.18),
+                            width: 1.0.w,
+                          ),
+                          left: BorderSide(
+                            color: Colors.white.withOpacity(0.18),
+                            width: 1.0.w,
+                          ),
+                          right: BorderSide(
+                            color: Colors.white.withOpacity(0.18),
+                            width: 1.0.w,
+                          ),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: 16.w,
+                          right: 16.w,
+                          top: 6.h,
+                          bottom: 10.h,
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            const int cols = 7;
+                            final int rows = (_emojis.length / cols).ceil();
+
+                            Widget emojiCell(String emoji) {
+                              return GestureDetector(
+                                onTap: () {
+                                  final currentText = _messageController.text;
+                                  final newText = currentText + emoji;
+                                  _messageController.value = TextEditingValue(
+                                    text: newText,
+                                    selection: TextSelection.collapsed(
+                                      offset: newText.length,
+                                    ),
+                                  );
+                                  Navigator.of(context).pop();
+                                  _focusNode.requestFocus();
+                                },
+                                child: SizedBox(
+                                  height: 38.h,
+                                  child: Center(
+                                    child: Text(
+                                      emoji,
+                                      style: TextStyle(
+                                        fontSize: 28.sp,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                      textHeightBehavior:
+                                          const TextHeightBehavior(
+                                            applyHeightToFirstAscent: false,
+                                            applyHeightToLastDescent: false,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            Widget rowDivider() {
+                              // "Glass" divider: thin, subtle, semi-transparent line
+                              return Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 10.w,
+                                  vertical: 8.h,
+                                ),
+                                child: ClipRect(
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(
+                                      sigmaX: 8,
+                                      sigmaY: 8,
+                                    ),
+                                    child: Container(
+                                      height: 1.h,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return ListView.separated(
+                              physics: const BouncingScrollPhysics(),
+                              padding: EdgeInsets.zero,
+                              itemCount: rows,
+                              separatorBuilder: (context, index) =>
+                                  rowDivider(),
+                              itemBuilder: (context, rowIndex) {
+                                return Row(
+                                  children: List.generate(cols, (colIndex) {
+                                    final idx = rowIndex * cols + colIndex;
+                                    return Expanded(
+                                      child: idx < _emojis.length
+                                          ? emojiCell(_emojis[idx])
+                                          : const SizedBox.shrink(),
+                                    );
+                                  }),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGlassmorphicPopupMenu(
+    BuildContext context,
+    String? currentFilter,
+    StateSetter? setSheetState,
+  ) {
+    final RenderBox? overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final RenderBox? button = context.findRenderObject() as RenderBox?;
+
+    if (button == null || overlay == null) return;
+
+    final Offset buttonPosition = button.localToGlobal(Offset.zero);
+
+    // Position image right above the button with small gap
+    final double imageTop = buttonPosition.dy - 148.h - 8.h;
+    final double imageLeft = buttonPosition.dx - 20.w;
+
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: '',
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Padding(
+            padding: EdgeInsets.only(left: imageLeft, top: imageTop),
+            child: ScaleTransition(
+              scale: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              child: FadeTransition(
+                opacity: animation,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: SizedBox(
+                    width: 90.w,
+                    height: 208.h,
+                    child: Image.asset(
+                      'assets/images/Frame (1).png',
+                      width: 90.w,
+                      height: 208.h,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildPlatformSelector(StateSetter? setSheetState) {
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,
@@ -212,116 +519,25 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
           }
         }
 
-        return Theme(
-          data: Theme.of(context).copyWith(
-            popupMenuTheme: PopupMenuThemeData(
-              color: const Color(0xFF141414),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24.r),
-              ),
-            ),
-          ),
-          child: PopupMenuButton<String>(
-            offset: Offset(0, -220.h),
-            constraints: BoxConstraints(minWidth: 140.w, maxWidth: 140.w),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24.r),
-            ),
-            color: const Color(0xFF141414),
-            elevation: 8,
-            onSelected: (String value) {
-              if (value == 'all') {
-                widget.chatFilter.value = null;
-              } else {
-                widget.chatFilter.value = value;
-              }
-              setState(() {});
-              if (setSheetState != null) setSheetState(() {});
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'all',
-                height: 48.h,
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (filter == null) ...[
-                        Icon(Icons.check, color: Colors.white, size: 18.sp),
-                        SizedBox(width: 8.w),
-                      ],
-                      Text('All', style: sfProText500(18.sp, Colors.white)),
-                    ],
-                  ),
+        return GestureDetector(
+          onTap: () {
+            _showGlassmorphicPopupMenu(context, filter, setSheetState);
+          },
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 4.h),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(color: labelColor, fontSize: 16.sp),
                 ),
-              ),
-              PopupMenuDivider(height: 1.h),
-              PopupMenuItem<String>(
-                value: 'twitch',
-                height: 48.h,
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (filter == 'twitch') ...[
-                        Icon(Icons.check, color: twitchColor, size: 18.sp),
-                        SizedBox(width: 6.w),
-                      ],
-                      Text('Twitch', style: sfProText500(18.sp, twitchColor)),
-                    ],
-                  ),
+                Icon(
+                  Icons.unfold_more,
+                  color: Colors.white.withOpacity(0.6),
+                  size: 16.sp,
                 ),
-              ),
-              PopupMenuItem<String>(
-                value: 'kick',
-                height: 48.h,
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (filter == 'kick') ...[
-                        Icon(Icons.check, color: kickColor, size: 18.sp),
-                        SizedBox(width: 6.w),
-                      ],
-                      Text('Kick', style: sfProText500(18.sp, kickColor)),
-                    ],
-                  ),
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'youtube',
-                height: 48.h,
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (filter == 'youtube') ...[
-                        Icon(Icons.check, color: youtubeColor, size: 18.sp),
-                        SizedBox(width: 6.w),
-                      ],
-                      Text('YouTube', style: sfProText500(18.sp, youtubeColor)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            // Updated Child with Dynamic Color
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4.h),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(color: labelColor, fontSize: 16.sp),
-                  ),
-                  Icon(
-                    Icons.unfold_more,
-                    color: Colors.white.withOpacity(0.6),
-                    size: 16.sp,
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         );
@@ -334,6 +550,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      transitionAnimationController: null,
+      useSafeArea: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
@@ -482,8 +700,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                               borderRadius: BorderRadius.circular(25.r),
                               child: BackdropFilter(
                                 filter: ImageFilter.blur(
-                                  sigmaX: 10,
-                                  sigmaY: 10,
+                                  sigmaX: 15,
+                                  sigmaY: 15,
                                 ),
                                 child: Container(
                                   padding: EdgeInsets.symmetric(
@@ -491,12 +709,26 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                   ),
                                   height: 55.h,
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.5),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.black.withOpacity(0.4),
+                                        Colors.black.withOpacity(0.2),
+                                      ],
+                                    ),
                                     borderRadius: BorderRadius.circular(25.r),
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.1),
-                                      width: 0.5.w,
+                                      color: Colors.white.withOpacity(0.18),
+                                      width: 1.0.w,
                                     ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
                                   child: Row(
                                     children: [
@@ -510,6 +742,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                           ),
                                           decoration: InputDecoration(
                                             border: InputBorder.none,
+                                            enabledBorder: InputBorder.none,
+                                            focusedBorder: InputBorder.none,
+                                            disabledBorder: InputBorder.none,
+                                            filled: true,
+                                            fillColor: Colors.transparent,
+                                            contentPadding: EdgeInsets.zero,
                                             hintText: 'Text',
                                             hintStyle: TextStyle(
                                               color: const Color.fromRGBO(
@@ -528,10 +766,18 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                           },
                                         ),
                                       ),
-                                      Icon(
-                                        Icons.sentiment_satisfied_sharp,
-                                        color: Colors.white,
-                                        size: 24.sp,
+                                      GestureDetector(
+                                        onTap: () {
+                                          _showEmojiPicker(
+                                            context,
+                                            setSheetState,
+                                          );
+                                        },
+                                        child: Icon(
+                                          Icons.sentiment_satisfied_sharp,
+                                          color: Colors.white,
+                                          size: 24.sp,
+                                        ),
                                       ),
                                       SizedBox(width: 12.w),
 
@@ -687,17 +933,31 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(25.r),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
                             height: 55.h,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.black.withOpacity(0.4),
+                                  Colors.black.withOpacity(0.2),
+                                ],
+                              ),
                               borderRadius: BorderRadius.circular(25.r),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
-                                width: 0.5.w,
+                                color: Colors.white.withOpacity(0.18),
+                                width: 1.0.w,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Row(
                               children: [
@@ -715,10 +975,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                     ),
                                   ),
                                 ),
-                                Icon(
-                                  Icons.sentiment_satisfied_alt_outlined,
-                                  color: Colors.white,
-                                  size: 24.sp,
+                                GestureDetector(
+                                  onTap: () {
+                                    _showEmojiPicker(context, null);
+                                  },
+                                  child: Icon(
+                                    Icons.sentiment_satisfied_alt_outlined,
+                                    color: Colors.white,
+                                    size: 24.sp,
+                                  ),
                                 ),
                                 SizedBox(width: 12.w),
 
@@ -747,29 +1012,48 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     Color nameColor, {
     Key? key,
   }) {
-    return Padding(
+    return TweenAnimationBuilder<double>(
       key: key,
-      padding: EdgeInsets.only(bottom: 12.h),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: Padding(
-                padding: EdgeInsets.only(right: 6.w),
-                child: Image.asset(
-                  platform,
-                  width: 14.sp,
-                  height: 14.sp,
-                  fit: BoxFit.contain,
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 10 * (1 - value)),
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 6.w),
+                        child: Image.asset(
+                          platform,
+                          width: 14.sp,
+                          height: 14.sp,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    TextSpan(
+                      text: "$name: ",
+                      style: sfProText500(12.sp, nameColor),
+                    ),
+                    TextSpan(
+                      text: message,
+                      style: sfProText400(12.sp, Colors.white),
+                    ),
+                  ],
                 ),
               ),
             ),
-            TextSpan(text: "$name: ", style: sfProText500(12.sp, nameColor)),
-            TextSpan(text: message, style: sfProText400(12.sp, Colors.white)),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

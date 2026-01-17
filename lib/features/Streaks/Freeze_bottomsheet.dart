@@ -322,10 +322,15 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(36.r),
                       ),
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
                     ),
                     child: Text(
                       "Let's go",
                       style: sfProText600(17.sp, Colors.black),
+                      textHeightBehavior: TextHeightBehavior(
+                        applyHeightToFirstAscent: false,
+                        applyHeightToLastDescent: false,
+                      ),
                     ),
                   ),
                 ),
