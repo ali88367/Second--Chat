@@ -41,6 +41,7 @@ dependencies:
   toggle_switch:
   ios_color_picker:
   glassmorphism: ^3.0.0
+  gradient_borders: ^1.0.2
 
 dev_dependencies:
   flutter_test:

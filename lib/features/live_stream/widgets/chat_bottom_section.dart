@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/themes/textstyles.dart';
+import '../../../core/widgets/custom_black_glass_widget.dart';
 import 'live_stream_helper_widgets.dart';
 
 class ChatBottomSection extends StatefulWidget {
@@ -444,58 +445,61 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   }
 
   void _showGlassmorphicPopupMenu(
-    BuildContext context,
-    String? currentFilter,
-    StateSetter? setSheetState,
-  ) {
+      BuildContext context,
+      String? currentFilter,
+      StateSetter? setSheetState,
+      ) {
     final RenderBox? overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    Overlay.of(context).context.findRenderObject() as RenderBox?;
     final RenderBox? button = context.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
 
     final Offset buttonPosition = button.localToGlobal(Offset.zero);
 
-    // Position image right above the button with small gap
-    final double imageTop = buttonPosition.dy - 148.h - 8.h;
+    // Position calculation provided by you
+    final double imageTop = buttonPosition.dy - 136.h - 8.h;
     final double imageLeft = buttonPosition.dx - 20.w;
 
     showGeneralDialog(
       context: context,
-      barrierColor: Colors.transparent,
-      barrierDismissible: true,
-      barrierLabel: '',
+      barrierColor: Colors.transparent, // Keeps the background visible
+      barrierDismissible: true, // Allows clicking outside to close
+      barrierLabel: 'Dismiss',
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Padding(
-            padding: EdgeInsets.only(left: imageLeft, top: imageTop),
-            child: ScaleTransition(
-              scale: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-              child: FadeTransition(
-                opacity: animation,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: SizedBox(
-                    width: 90.w,
-                    height: 208.h,
-                    child: Image.asset(
-                      'assets/images/Frame (1).png',
-                      width: 90.w,
-                      height: 208.h,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+        // 1. Wrap in a Stack to allow free positioning
+        return Stack(
+          children: [
+            // 2. Use Positioned to place it exactly where you calculated
+            Positioned(
+              top: imageTop,
+              left: imageLeft,
+              // 3. Wrap in Material to fix text rendering and underlines
+              child: Material(
+                color: Colors.transparent,
+                child: CustomBlackGlassWidget(
+                  items: const ["Twitch", "Kick", "YouTube"],
                 ),
               ),
             ),
+          ],
+        );
+      },
+      // Optional: Add a nice fade/scale animation
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            ),
+            child: child,
           ),
         );
       },
     );
   }
-
   Widget _buildPlatformSelector(StateSetter? setSheetState) {
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,

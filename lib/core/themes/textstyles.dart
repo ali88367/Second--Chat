@@ -10,6 +10,7 @@ TextStyle sfProText400(double size, Color color) {
     fontWeight: FontWeight.w400,
     fontSize: size,
     color: color,
+    decoration: TextDecoration.none
   );
 }
 
@@ -28,6 +29,7 @@ TextStyle sfProText600(double size, Color color) {
     fontWeight: FontWeight.w600,
     fontSize: size,
     color: color,
+    decoration: TextDecoration.none
   );
 }
 
