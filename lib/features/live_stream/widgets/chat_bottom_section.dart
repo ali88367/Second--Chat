@@ -456,37 +456,50 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     if (button == null || overlay == null) return;
 
     final Offset buttonPosition = button.localToGlobal(Offset.zero);
-
-    // Position calculation provided by you
-    final double imageTop = buttonPosition.dy - 136.h - 8.h;
-    final double imageLeft = buttonPosition.dx - 20.w;
+    final Size buttonSize = button.size;
 
     showGeneralDialog(
       context: context,
-      barrierColor: Colors.transparent, // Keeps the background visible
-      barrierDismissible: true, // Allows clicking outside to close
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
       barrierLabel: 'Dismiss',
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) {
-        // 1. Wrap in a Stack to allow free positioning
         return Stack(
           children: [
-            // 2. Use Positioned to place it exactly where you calculated
             Positioned(
-              top: imageTop,
-              left: imageLeft,
-              // 3. Wrap in Material to fix text rendering and underlines
+              top: buttonPosition.dy - 136.h - 8.h,
+              right: overlay.size.width - buttonPosition.dx - 60.w,
               child: Material(
                 color: Colors.transparent,
-                child: CustomBlackGlassWidget(
-                  items: const ["Twitch", "Kick", "YouTube"],
+                child: IntrinsicWidth(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      // Minimum width to match button
+                      minWidth: buttonSize.width,
+                      // Maximum width to prevent going off-screen on the left
+                      maxWidth: buttonPosition.dx + buttonSize.width - 20.w,
+                    ),
+                    child: CustomBlackGlassWidget(
+                      items: const ["All", "Twitch", "Kick", "YouTube"],
+                      isWeek: false,
+                      onItemSelected: (selected) {
+                        // Handle selection
+                        Navigator.of(context).pop();
+                        if (setSheetState != null) {
+                          setSheetState(() {
+                            currentFilter = selected;
+                          });
+                        }
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
         );
       },
-      // Optional: Add a nice fade/scale animation
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
           opacity: animation,
@@ -500,6 +513,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       },
     );
   }
+
   Widget _buildPlatformSelector(StateSetter? setSheetState) {
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,

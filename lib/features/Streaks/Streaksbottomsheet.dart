@@ -6,6 +6,7 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/widgets/custom_switch.dart';
 
 import '../../controllers/Main Section Controllers/streak_controller.dart';
+import '../../core/widgets/custom_black_glass_widget.dart';
 import 'Freeze_bottomsheet.dart';
 
 class StreamStreakSetupBottomSheet extends StatelessWidget {
@@ -88,7 +89,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                       SizedBox(height: 14.h),
                       _buildDivider(),
                       SizedBox(height: 10.h),
-                      _buildThreeTimesOption(controller),
+                      _buildThreeTimesOption(controller, context),
                       SizedBox(height: 100.h), // Extra space for scrolling
                     ],
                   ),
@@ -148,35 +149,35 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
             ),
           ),
 
-          Obx(() {
-            if (!controller.isSelectingThreeDays.value) {
-              return const SizedBox.shrink();
-            }
-
-            return Positioned.fill(
-              child: GestureDetector(
-                onTap: () => controller.isSelectingThreeDays.value = false,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  color: Colors.transparent, // Capture taps to close
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        bottom:
-                            125.h, // Positioned right above the "3-times" bar
-                        left: 20.w, // Aligned with the indicator icon
-                        child: SizedBox(
-
-                            height: 358.h,
-
-                            child: Image.asset('assets/images/s2.png'))
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
+          // Obx(() {
+          //   if (!controller.isSelectingThreeDays.value) {
+          //     return const SizedBox.shrink();
+          //   }
+          //
+          //   return Positioned.fill(
+          //     child: GestureDetector(
+          //       onTap: () => controller.isSelectingThreeDays.value = false,
+          //       behavior: HitTestBehavior.opaque,
+          //       child: Container(
+          //         color: Colors.transparent, // Capture taps to close
+          //         child: Stack(
+          //           children: [
+          //             Positioned(
+          //                 bottom:
+          //                 125.h, // Positioned right above the "3-times" bar
+          //                 left: 20.w, // Aligned with the indicator icon
+          //                 child: SizedBox(
+          //
+          //                     height: 358.h,
+          //
+          //                     child: Image.asset('assets/images/s2.png'))
+          //             ),
+          //           ],
+          //         ),
+          //       ),
+          //     ),
+          //   );
+          // }),
         ],
       ),
     );
@@ -259,7 +260,10 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildThreeTimesOption(StreamStreaksController controller) {
+  Widget _buildThreeTimesOption(StreamStreaksController controller, BuildContext context) {
+    // GlobalKey to get the position of the indicator icon
+    final indicatorKey = GlobalKey();
+
     return Obx(() {
       final selected = controller.threeTimesWeek.value;
       return GestureDetector(
@@ -268,6 +272,10 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
           // Toggle menu visibility when clicking the row
           if (!selected) {
             controller.isSelectingThreeDays.value = true;
+            // Show the glassmorphic popup
+            Future.delayed(Duration(milliseconds: 50), () {
+              _showGlassmorphicPopupMenu(context, indicatorKey, controller);
+            });
           }
         },
         child: Container(
@@ -281,7 +289,10 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Image.asset('assets/images/Pop-up Menu Indicator.png'),
+                  Image.asset(
+                    'assets/images/Pop-up Menu Indicator.png',
+                    key: indicatorKey,
+                  ),
                   SizedBox(width: 12.w),
                   Text(
                     '3-times a week',
@@ -295,8 +306,18 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
               CustomSwitch(
                 value: selected,
                 onChanged: (val) {
-                  controller.toggleThreeTimesWeek(val);
-                  if (val) controller.isSelectingThreeDays.value = true;
+                   controller.toggleThreeTimesWeek(val);
+                  // if (val) {
+                  //   // controller.isSelectingThreeDays.value = true;
+                  //   // Show the glassmorphic popup
+                  //   Future.delayed(Duration(milliseconds: 50), () {
+                  //     _showGlassmorphicPopupMenu(context, indicatorKey, controller);
+                  //   });
+                  // }
+                   if(val)
+                  Future.delayed(Duration(milliseconds: 50), () {
+                    _showGlassmorphicPopupMenu(context, indicatorKey, controller);
+                  });
                 },
               ),
             ],
@@ -304,5 +325,68 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
         ),
       );
     });
+  }
+
+  void _showGlassmorphicPopupMenu(
+      BuildContext context,
+      GlobalKey indicatorKey,
+      StreamStreaksController controller,
+      ) {
+    final RenderBox? overlay =
+    Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final RenderBox? button =
+    indicatorKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (button == null || overlay == null) return;
+
+    final Offset buttonPosition = button.localToGlobal(Offset.zero);
+    final Size buttonSize = button.size;
+
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Stack(
+          children: [
+            Positioned(
+              top: buttonPosition.dy - 305.h - 8.h,
+              // Align to the right edge of the button/indicator
+              right: overlay.size.width - buttonPosition.dx - 64.w,
+              child: Material(
+                color: Colors.transparent,
+                child: CustomBlackGlassWidget(
+                  isWeek: true,
+                  items: List.generate(7, (i) => '${i + 1}'),
+                  onItemSelected: (selected) {
+                    final selectedNumber = int.parse(selected);
+                    controller.toggleMenuNumber(selectedNumber);
+
+                    // Don't close immediately, let user select up to 3
+                    if (controller.selectedMenuNumbers.length >= 3) {
+                      Navigator.of(context).pop();
+                      controller.isSelectingThreeDays.value = false;
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 }
