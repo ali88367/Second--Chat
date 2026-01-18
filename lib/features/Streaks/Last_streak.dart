@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
 class StreakFreezeUseBottomSheet extends StatelessWidget {
@@ -353,7 +354,9 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         height: 50.h,
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: Get.back,
+                          onPressed: (){
+                            Get.to(HomeScreen2());
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7EDDE4),
                             elevation: 0,

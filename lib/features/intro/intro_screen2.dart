@@ -139,12 +139,7 @@ class IntroScreen2 extends StatelessWidget {
                     children: [
                       GestureDetector(
                         onTap: () {
-                          Get.to(
-                            () => IntroScreenNotification2(),
-                            transition: Transition.cupertino,
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.fastOutSlowIn,
-                          );
+
                         },
                         child: Text(
                           'Enjoy Better Streaming',
@@ -237,7 +232,14 @@ class PlatformButton extends StatelessWidget {
                 : [],
           ),
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              Get.to(
+                    () => IntroScreenNotification2(),
+                transition: Transition.cupertino,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.fastOutSlowIn,
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,

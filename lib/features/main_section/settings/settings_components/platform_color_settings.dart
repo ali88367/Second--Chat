@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:ios_color_picker/show_ios_color_picker.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
@@ -49,7 +50,7 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
     final Color displayColor = selectedColor.withOpacity(opacity);
 
     return Container(
-      color: const Color.fromRGBO(20, 18, 18, 1),
+      color:  Color.fromRGBO(20, 18, 18, 1),
       child: Column(
         children: [
           SizedBox(height: 10.h),
@@ -59,7 +60,12 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Image.asset(back_arrow_icon, height: 44.h),
+                GestureDetector(
+                  onTap:(){
+            Get.back();
+          },
+
+                    child: Image.asset(back_arrow_icon, height: 44.h)),
                 Text("Platform Color", style: sfProDisplay600(17.sp, onDark)),
                 SizedBox(width: 44.w),
               ],
