@@ -79,7 +79,7 @@ Widget counterPill({
 }
 
 Widget panelRow(String text, {bool showChevron = false, VoidCallback? onTap}) {
-  return Container(
+  final container = Container(
     width: double.infinity,
     padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
     decoration: BoxDecoration(
@@ -89,38 +89,46 @@ Widget panelRow(String text, {bool showChevron = false, VoidCallback? onTap}) {
     child: Row(
       children: [
         Expanded(
-          child: GestureDetector(
-            onTap: onTap,
-            child: Row(
-              children: [
-                Text(text, style: sfProText600(13.sp, Colors.white)),
-                const Spacer(),
-                if (showChevron)
-                  Container(
-                    height: 20,
-                    width: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade900,
-                      borderRadius: BorderRadius.circular(18.r),
-                    ),
-                    child: Center(
-                      child: Transform.translate(
-                        offset: const Offset(1.2, 0), // shift left
-                        child: Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white,
-                          size: 13.sp,
-                        ),
+          child: Row(
+            children: [
+              Text(text, style: sfProText600(13.sp, Colors.white)),
+              const Spacer(),
+              if (showChevron)
+                Container(
+                  height: 20,
+                  width: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade900,
+                    borderRadius: BorderRadius.circular(18.r),
+                  ),
+                  child: Center(
+                    child: Transform.translate(
+                      offset: const Offset(1.2, 0), // shift left
+                      child: Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white,
+                        size: 13.sp,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ],
     ),
   );
+  
+  // Wrap entire container with GestureDetector if onTap is provided
+  if (onTap != null) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: container,
+    );
+  }
+  
+  return container;
 }
 
 Widget activityRow(String asset, String name, String time, String message) {

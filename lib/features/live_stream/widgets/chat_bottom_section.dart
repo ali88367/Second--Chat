@@ -54,6 +54,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   final ScrollController _mainScrollController = ScrollController();
   final ScrollController _expandedScrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  StateSetter? _expandedSheetStateSetter;
 
   @override
   void initState() {
@@ -118,22 +119,32 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   void _scrollToBottom(ScrollController controller, {bool animate = true}) {
     if (!controller.hasClients) {
       // If not ready, schedule for next frame
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom(controller, animate: animate);
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (controller.hasClients) {
+          _scrollToBottom(controller, animate: animate);
+        }
       });
       return;
     }
 
-    if (animate) {
-      // Use a shorter duration for instant feel
-      controller.animateTo(
-        controller.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-      );
-    } else {
-      controller.jumpTo(controller.position.maxScrollExtent);
-    }
+    // Wait for layout to update, then scroll
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!controller.hasClients) return;
+
+      final maxScroll = controller.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        if (animate) {
+          // Smooth animation for better feel
+          controller.animateTo(
+            maxScroll,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        } else {
+          controller.jumpTo(maxScroll);
+        }
+      }
+    });
   }
 
   String _getPlatformAsset(String? platformName) {
@@ -177,17 +188,64 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       _comments.add(item);
     });
 
+    // Also trigger rebuild in expanded sheet if it's open
+    if (_expandedSheetStateSetter != null) {
+      _expandedSheetStateSetter!(() {
+        // Rebuild expanded sheet
+      });
+    }
+
     // Clear text field but keep keyboard open
     _messageController.clear();
 
     // Keep focus on text field (keyboard stays open)
     _focusNode.requestFocus();
 
-    // Scroll to bottom immediately after frame renders
+    // Force scroll after multiple frames to ensure keyboard layout is accounted for
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom(_mainScrollController, animate: true);
-      _scrollToBottom(_expandedScrollController, animate: true);
+      // First attempt - immediate scroll
+      Future.microtask(() {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
+
+      // Second attempt - after layout phase
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
+
+      // Third attempt - after keyboard insets stabilize
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
     });
+  }
+
+  void _scrollToBottomImmediate(ScrollController controller) {
+    if (!controller.hasClients) return;
+
+    try {
+      final maxScroll = controller.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        // Use jumpTo for immediate scroll, then animate for smoothness
+        controller.jumpTo(maxScroll);
+        // Smooth scroll after jump
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (controller.hasClients &&
+              controller.position.maxScrollExtent > 0) {
+            controller.animateTo(
+              controller.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      // Silent fail if scroll position is invalid
+    }
   }
 
   static const List<String> _emojis = [
@@ -445,12 +503,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   }
 
   void _showGlassmorphicPopupMenu(
-      BuildContext context,
-      String? currentFilter,
-      StateSetter? setSheetState,
-      ) {
+    BuildContext context,
+    String? currentFilter,
+    StateSetter? setSheetState,
+  ) {
     final RenderBox? overlay =
-    Overlay.of(context).context.findRenderObject() as RenderBox?;
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     final RenderBox? button = context.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
@@ -573,6 +631,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
+            // Store reference to setSheetState so _sendMessage can trigger rebuild
+            _expandedSheetStateSetter = setSheetState;
+
             return FractionallySizedBox(
               heightFactor: 0.94,
               child: AnimatedPadding(
@@ -618,7 +679,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                       onTap: () {
                                         final newVal = !active;
                                         widget.showActivity.value = newVal;
+                                        // If Activity is turned on, turn off Title
                                         if (newVal) {
+                                          widget.titleSelected.value = false;
                                           widget.selectedPlatform.value = null;
                                           widget.showServiceCard.value = true;
                                         } else {
@@ -644,6 +707,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                       onTap: () {
                                         final newVal = !val;
                                         widget.titleSelected.value = newVal;
+                                        // If Title is turned on, turn off Activity
+                                        if (newVal) {
+                                          widget.showActivity.value = false;
+                                        }
                                         widget.showServiceCard.value =
                                             newVal || widget.showActivity.value;
                                         setState(() {});
@@ -688,8 +755,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                       'expanded_chat_${_comments.length}_${filter ?? 'all'}',
                                     ),
                                     controller: _expandedScrollController,
-                                    padding: EdgeInsets.only(bottom: 16.h),
+                                    padding: EdgeInsets.only(
+                                      bottom: 16.h + 20.h,
+                                    ),
                                     itemCount: filteredList.length,
+                                    reverse: false,
+                                    addAutomaticKeepAlives: false,
+                                    addRepaintBoundaries: false,
                                     itemBuilder: (context, index) {
                                       final item = filteredList[index];
                                       // Use consistent color based on name hash for stability
@@ -703,7 +775,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                         item['message'],
                                         nameColor,
                                         key: ValueKey(
-                                          'expanded_${item['name']}_$index',
+                                          'expanded_${item['name']}_${index}_${item['message']}',
                                         ),
                                       );
                                     },
@@ -818,7 +890,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // Clear reference when sheet is dismissed
+      _expandedSheetStateSetter = null;
+    });
   }
 
   @override
@@ -857,7 +932,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                         onTap: () {
                           final newVal = !active;
                           widget.showActivity.value = newVal;
+                          // If Activity is turned on, turn off Title
                           if (newVal) {
+                            widget.titleSelected.value = false;
                             widget.selectedPlatform.value = null;
                             widget.showServiceCard.value = true;
                           } else {
@@ -881,6 +958,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                         onTap: () {
                           final newVal = !val;
                           widget.titleSelected.value = newVal;
+                          // If Title is turned on, turn off Activity
+                          if (newVal) {
+                            widget.showActivity.value = false;
+                          }
                           widget.showServiceCard.value =
                               newVal || widget.showActivity.value;
                         },
@@ -913,32 +994,44 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                     valueListenable: widget.chatFilter,
                     builder: (context, filter, child) {
                       final filteredList = _getFilteredComments(filter);
-                      return ListView.builder(
-                        key: ValueKey(
-                          'main_chat_${_comments.length}_${filter ?? 'all'}',
+                      final keyboardHeight = MediaQuery.of(
+                        context,
+                      ).viewInsets.bottom;
+                      return AnimatedPadding(
+                        padding: EdgeInsets.only(bottom: keyboardHeight),
+                        duration: const Duration(milliseconds: 100),
+                        child: ListView.builder(
+                          key: ValueKey(
+                            'main_chat_${_comments.length}_${filter ?? 'all'}',
+                          ),
+                          controller: _mainScrollController,
+                          padding: EdgeInsets.only(
+                            left: 16.w,
+                            right: 16.w,
+                            bottom: 80.h + 20.h,
+                          ),
+                          itemCount: filteredList.length,
+                          reverse: false,
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: false,
+                          shrinkWrap: false,
+                          itemBuilder: (context, index) {
+                            final item = filteredList[index];
+                            // Use consistent color based on name hash for stability
+                            final nameHash = item['name'].hashCode;
+                            final nameColor =
+                                nameColors[nameHash.abs() % nameColors.length];
+                            return _chatItem(
+                              item['platform'],
+                              item['name'],
+                              item['message'],
+                              nameColor,
+                              key: ValueKey(
+                                'main_${item['name']}_${index}_${item['message']}',
+                              ),
+                            );
+                          },
                         ),
-                        controller: _mainScrollController,
-                        padding: EdgeInsets.only(
-                          left: 16.w,
-                          right: 16.w,
-                          bottom:
-                              80.h + MediaQuery.of(context).viewInsets.bottom,
-                        ),
-                        itemCount: filteredList.length,
-                        itemBuilder: (context, index) {
-                          final item = filteredList[index];
-                          // Use consistent color based on name hash for stability
-                          final nameHash = item['name'].hashCode;
-                          final nameColor =
-                              nameColors[nameHash.abs() % nameColors.length];
-                          return _chatItem(
-                            item['platform'],
-                            item['name'],
-                            item['message'],
-                            nameColor,
-                            key: ValueKey('main_${item['name']}_$index'),
-                          );
-                        },
                       );
                     },
                   ),
@@ -1033,13 +1126,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     return TweenAnimationBuilder<double>(
       key: key,
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
       builder: (context, value, child) {
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, 10 * (1 - value)),
+            offset: Offset(0, 8 * (1 - value)),
             child: Padding(
               padding: EdgeInsets.only(bottom: 12.h),
               child: RichText(

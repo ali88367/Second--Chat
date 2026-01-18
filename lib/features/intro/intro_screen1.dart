@@ -5,8 +5,30 @@ import 'package:get/get.dart';
 import '../../core/constants/app_images/app_images.dart';
 import 'intro_screen2.dart';
 
-class IntroScreen1 extends StatelessWidget {
+class IntroScreen1 extends StatefulWidget {
   const IntroScreen1({super.key});
+
+  @override
+  State<IntroScreen1> createState() => _IntroScreen1State();
+}
+
+class _IntroScreen1State extends State<IntroScreen1> {
+  @override
+  void initState() {
+    super.initState();
+    // Preload Screen 3 images in background
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadScreen3Images(context);
+    });
+  }
+
+  void _preloadScreen3Images(BuildContext context) {
+    // Preload all images used in Screen 3
+    precacheImage(const AssetImage('assets/images/Background.png'), context);
+    precacheImage(const AssetImage('assets/images/topbarshade.png'), context);
+    precacheImage(const AssetImage('assets/images/glowintro.png'), context);
+    precacheImage(const AssetImage('assets/images/trial.png'), context);
+  }
 
   @override
   Widget build(BuildContext context) {

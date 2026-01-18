@@ -6,8 +6,30 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import '../../core/themes/textstyles.dart';
 
-class IntroScreen2 extends StatelessWidget {
+class IntroScreen2 extends StatefulWidget {
   const IntroScreen2({super.key});
+
+  @override
+  State<IntroScreen2> createState() => _IntroScreen2State();
+}
+
+class _IntroScreen2State extends State<IntroScreen2> {
+  @override
+  void initState() {
+    super.initState();
+    // Preload Screen 3 images in background
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadScreen3Images(context);
+    });
+  }
+
+  void _preloadScreen3Images(BuildContext context) {
+    // Preload all images used in Screen 3
+    precacheImage(const AssetImage('assets/images/Background.png'), context);
+    precacheImage(const AssetImage('assets/images/topbarshade.png'), context);
+    precacheImage(const AssetImage('assets/images/glowintro.png'), context);
+    precacheImage(const AssetImage('assets/images/trial.png'), context);
+  }
 
   @override
   Widget build(BuildContext context) {
