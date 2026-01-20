@@ -7,6 +7,7 @@ import '../Invite/Invite_screen.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
+import '../../../controllers/Main Section Controllers/settings_controller.dart';
 
 class Livestreaming extends StatefulWidget {
   const Livestreaming({super.key});
@@ -21,19 +22,18 @@ class _LivestreamingState extends State<Livestreaming> {
   final ValueNotifier<bool> _showActivity = ValueNotifier<bool>(false);
   final ValueNotifier<bool> _titleSelected = ValueNotifier<bool>(false);
 
-  // 1. Notifier for background image
   final ValueNotifier<String> _topBarImage = ValueNotifier<String>(
     'assets/images/topbarshade.png',
   );
 
-  // 2. Notifier for Chat Filtering
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
+
+  late final SettingsController _settingsCtrl;
 
   @override
   void initState() {
     super.initState();
-    // 3. LISTEN TO FILTER CHANGES (The Missing Link)
-    // This ensures if you change filter from Chat Input, the Top Image updates too.
+    _settingsCtrl = Get.find<SettingsController>();
     _chatFilter.addListener(_updateImageBasedOnFilter);
   }
 
@@ -43,12 +43,12 @@ class _LivestreamingState extends State<Livestreaming> {
         _topBarImage.value = 'assets/images/twitchshade.png';
         break;
       case 'kick':
-        _topBarImage.value = 'assets/images/youtubeshade.png';
-        break;
-      case 'youtube':
         _topBarImage.value = 'assets/images/kickshade.png';
         break;
-      default: // null or 'all'
+      case 'youtube':
+        _topBarImage.value = 'assets/images/youtubeshade.png';
+        break;
+      default:
         _topBarImage.value = 'assets/images/topbarshade.png';
         break;
     }
@@ -56,7 +56,7 @@ class _LivestreamingState extends State<Livestreaming> {
 
   @override
   void dispose() {
-    _chatFilter.removeListener(_updateImageBasedOnFilter); // Clean up listener
+    _chatFilter.removeListener(_updateImageBasedOnFilter);
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
     _showActivity.dispose();
@@ -66,62 +66,63 @@ class _LivestreamingState extends State<Livestreaming> {
     super.dispose();
   }
 
-  // 4. Simplified Toggle Logic
   void _handleFilterTap(String platformKey) {
     if (_chatFilter.value == platformKey) {
-      _chatFilter.value = null; // Toggle OFF
+      _chatFilter.value = null;
     } else {
-      _chatFilter.value = platformKey; // Toggle ON
+      _chatFilter.value = platformKey;
     }
-    // No need to set image here manually, the listener above does it!
   }
 
   Widget _buildInteractiveCounterRow() {
-    return Container(
-      width: 297.w,
-      height: 59.4.h,
-      decoration: BoxDecoration(
-        color: const Color.fromRGBO(30, 29, 32, 1),
-        borderRadius: BorderRadius.circular(33.r),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Twitch
-          GestureDetector(
-            onTap: () => _handleFilterTap('twitch'),
-            child: counterPill(
-              asset: 'assets/images/twitch.png',
-              count: '11202',
-              color: const Color.fromRGBO(185, 80, 239, 1),
-              bgColor: const Color.fromRGBO(185, 80, 239, 0.25),
+    return Obx(() {
+      if (!_settingsCtrl.viewerCount.value) {
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        width: 297.w,
+        height: 59.4.h,
+        decoration: BoxDecoration(
+          color: const Color.fromRGBO(30, 29, 32, 1),
+          borderRadius: BorderRadius.circular(33.r),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => _handleFilterTap('twitch'),
+              child: counterPill(
+                asset: 'assets/images/twitch.png',
+                count: '11202',
+                color: const Color.fromRGBO(185, 80, 239, 1),
+                bgColor: const Color.fromRGBO(185, 80, 239, 0.25),
+              ),
             ),
-          ),
-          SizedBox(width: 13.2.w),
-          // Kick
-          GestureDetector(
-            onTap: () => _handleFilterTap('kick'),
-            child: counterPill(
-              asset: 'assets/images/kick.png',
-              count: '1256',
-              color: const Color.fromRGBO(83, 252, 24, 1),
-              bgColor: const Color.fromRGBO(83, 252, 24, 0.25),
+            SizedBox(width: 13.2.w),
+            GestureDetector(
+              onTap: () => _handleFilterTap('kick'),
+              child: counterPill(
+                asset: 'assets/images/kick.png',
+                count: '1256',
+                color: const Color.fromRGBO(83, 252, 24, 1),
+                bgColor: const Color.fromRGBO(83, 252, 24, 0.25),
+              ),
             ),
-          ),
-          SizedBox(width: 13.2.w),
-          // Youtube
-          GestureDetector(
-            onTap: () => _handleFilterTap('youtube'),
-            child: counterPill(
-              asset: 'assets/images/youtube.png',
-              count: '256',
-              color: const Color.fromRGBO(221, 44, 40, 1),
-              bgColor: const Color.fromRGBO(221, 44, 40, 0.25),
+            SizedBox(width: 13.2.w),
+            GestureDetector(
+              onTap: () => _handleFilterTap('youtube'),
+              child: counterPill(
+                asset: 'assets/images/youtube.png',
+                count: '256',
+                color: const Color.fromRGBO(221, 44, 40, 1),
+                bgColor: const Color.fromRGBO(221, 44, 40, 0.25),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 
   @override
@@ -131,7 +132,6 @@ class _LivestreamingState extends State<Livestreaming> {
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         children: [
-          // Background Image
           Positioned(
             top: 0,
             left: 0,
@@ -148,8 +148,6 @@ class _LivestreamingState extends State<Livestreaming> {
               },
             ),
           ),
-
-          // Gradient Overlay
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -161,8 +159,6 @@ class _LivestreamingState extends State<Livestreaming> {
               ),
             ),
           ),
-
-          // Header
           SafeArea(
             child: Padding(
               padding: EdgeInsets.only(left: 16.w, right: 16.w, top: 28.h),
@@ -194,12 +190,8 @@ class _LivestreamingState extends State<Livestreaming> {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
+                            enterBottomSheetDuration: const Duration(milliseconds: 300),
+                            exitBottomSheetDuration: const Duration(milliseconds: 250),
                           );
                         },
                         child: buildImageButton(
@@ -226,12 +218,8 @@ class _LivestreamingState extends State<Livestreaming> {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
+                            enterBottomSheetDuration: const Duration(milliseconds: 300),
+                            exitBottomSheetDuration: const Duration(milliseconds: 250),
                           );
                         },
                         child: buildImageButton(
@@ -246,8 +234,6 @@ class _LivestreamingState extends State<Livestreaming> {
               ),
             ),
           ),
-
-          // Center Content
           Center(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -255,33 +241,52 @@ class _LivestreamingState extends State<Livestreaming> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(height: 122.h),
-
                   ValueListenableBuilder<bool>(
                     valueListenable: _showServiceCard,
                     builder: (context, showCard, child) {
-                      if (showCard) {
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: _showActivity,
-                          builder: (context, showActivity, _) {
-                            // Show Activity section only if Activity is ON
-                            if (showActivity) {
-                              return Column(
-                                children: [
-                                  Container(
-                                    width: double.infinity,
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 12.w,
-                                      vertical: 12.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color.fromRGBO(
-                                        22,
-                                        21,
-                                        24,
-                                        1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20.r),
-                                    ),
+                      if (!showCard) {
+                        return Column(
+                          children: [
+                            Container(
+                              height: 236.h,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(24.r),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24.r),
+                                child: Opacity(
+                                  opacity: 1,
+                                  child: Image.asset(
+                                    'assets/images/streaming.png',
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 12.h),
+                            _buildInteractiveCounterRow(),
+                          ],
+                        );
+                      }
+
+                      return ValueListenableBuilder<bool>(
+                        valueListenable: _showActivity,
+                        builder: (context, showActivity, _) {
+                          if (showActivity) {
+                            return Column(
+                              children: [
+                                Container(
+                                  height: Get.height * .3,
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 12.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color.fromRGBO(22, 21, 24, 1),
+                                    borderRadius: BorderRadius.circular(20.r),
+                                  ),
+                                  child: SingleChildScrollView(
                                     child: Column(
                                       children: [
                                         SizedBox(height: 12.h),
@@ -289,6 +294,13 @@ class _LivestreamingState extends State<Livestreaming> {
                                           'assets/images/kick.png',
                                           'New Follower',
                                           '19:41',
+                                          '',
+                                        ),
+                                        SizedBox(height: 12.h),
+                                        activityRow(
+                                          'assets/images/kick.png',
+                                          'New Follower',
+                                          '22:41',
                                           '',
                                         ),
                                         SizedBox(height: 12.h),
@@ -307,6 +319,13 @@ class _LivestreamingState extends State<Livestreaming> {
                                         ),
                                         SizedBox(height: 12.h),
                                         activityRow(
+                                          'assets/images/youtube1.png',
+                                          'Fun',
+                                          '19:49',
+                                          'Subscribed',
+                                        ),
+                                        SizedBox(height: 12.h),
+                                        activityRow(
                                           'assets/images/twitch1.png',
                                           'Ranen',
                                           '19:49',
@@ -315,540 +334,336 @@ class _LivestreamingState extends State<Livestreaming> {
                                       ],
                                     ),
                                   ),
-                                  SizedBox(height: 16.h),
-                                  _buildInteractiveCounterRow(),
-                                ],
-                              );
-                            }
-                            // Show Title section only if Title is ON
-                            return ValueListenableBuilder<bool>(
-                              valueListenable: _titleSelected,
-                              builder: (context, titleSelected, _) {
-                                if (titleSelected) {
-                                  return ValueListenableBuilder<String?>(
-                                    valueListenable: _selectedPlatform,
-                                    builder: (context, platform, _) {
-                                      if (platform != null) {
-                                        final asset = platform == 'twitch'
-                                            ? 'assets/images/twitch1.png'
-                                            : platform == 'kick'
-                                            ? 'assets/images/kick.png'
-                                            : 'assets/images/youtube1.png';
+                                ),
+                                SizedBox(height: 16.h),
+                                _buildInteractiveCounterRow(),
+                              ],
+                            );
+                          }
 
-                                        return Column(
-                                          children: [
-                                            Container(
-                                              width: double.infinity,
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 12.w,
-                                                vertical: 12.h,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: const Color.fromRGBO(
-                                                  22,
-                                                  21,
-                                                  24,
-                                                  1,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(20.r),
-                                              ),
-                                              child: Column(
-                                                children: [
-                                                  Padding(
-                                                    padding:
-                                                        EdgeInsets.symmetric(
-                                                          horizontal: 8.w,
-                                                        ),
-                                                    child: Row(
-                                                      children: [
-                                                        GestureDetector(
-                                                          onTap: () {
-                                                            _selectedPlatform
-                                                                    .value =
-                                                                null;
-                                                            _showServiceCard
-                                                                    .value =
-                                                                false;
-                                                            _titleSelected
-                                                                    .value =
-                                                                false;
-                                                            _showActivity
-                                                                    .value =
-                                                                false;
-                                                          },
-                                                          child: Container(
-                                                            padding:
-                                                                EdgeInsets.all(
-                                                                  8.w,
-                                                                ),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                                  color: Colors
-                                                                      .grey
-                                                                      .shade900,
-                                                                  shape: BoxShape
-                                                                      .circle,
-                                                                ),
-                                                            child: Transform.translate(
-                                                              offset:
-                                                                  const Offset(
-                                                                    2,
-                                                                    0,
-                                                                  ),
-                                                              child: Icon(
-                                                                Icons
-                                                                    .arrow_back_ios,
-                                                                color: Colors
-                                                                    .white,
-                                                                size: 16.sp,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        const Spacer(),
-                                                        Center(
-                                                          child: Image.asset(
-                                                            asset,
-                                                            width: 22.w,
-                                                            height: 22.h,
-                                                          ),
-                                                        ),
-                                                        const Spacer(),
-                                                        SizedBox(width: 40.w),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 16.h),
-                                                  panelRow('Title Example'),
-                                                  SizedBox(height: 12.h),
-                                                  panelRow(
-                                                    'Name Category',
-                                                    showChevron: true,
-                                                    onTap: () {
-                                                      showModalBottomSheet(
-                                                        context: context,
-                                                        isScrollControlled:
-                                                            true,
-                                                        backgroundColor:
-                                                            Colors.transparent,
-                                                        builder: (ctx) {
-                                                          return Padding(
-                                                            padding: EdgeInsets.only(
-                                                              bottom:
-                                                                  MediaQuery.of(
-                                                                        ctx,
-                                                                      )
-                                                                      .viewInsets
-                                                                      .bottom,
-                                                            ),
-                                                            child: FractionallySizedBox(
-                                                              heightFactor: 0.8,
-                                                              child: AnimatedPadding(
-                                                                padding: EdgeInsets.only(
-                                                                  bottom:
-                                                                      MediaQuery.of(
-                                                                            ctx,
-                                                                          )
-                                                                          .viewInsets
-                                                                          .bottom,
-                                                                ),
-                                                                duration: Duration(
-                                                                  milliseconds:
-                                                                      250,
-                                                                ),
-                                                                curve: Curves
-                                                                    .easeOut,
-                                                                child: Container(
-                                                                  decoration: BoxDecoration(
-                                                                    color:
-                                                                        Color.fromRGBO(
-                                                                          20,
-                                                                          18,
-                                                                          18,
-                                                                          1,
-                                                                        ),
-                                                                    borderRadius:
-                                                                        BorderRadius.vertical(
-                                                                          top: Radius.circular(
-                                                                            38.r,
-                                                                          ),
-                                                                        ),
-                                                                  ),
-                                                                  child: Stack(
-                                                                    children: [
-                                                                      Column(
-                                                                        children: [
-                                                                          SizedBox(
-                                                                            height:
-                                                                                10.h,
-                                                                          ),
-                                                                          // Top handle + header
-                                                                          Padding(
-                                                                            padding: EdgeInsets.symmetric(
-                                                                              horizontal: 18.w,
-                                                                              vertical: 10,
-                                                                            ),
-                                                                            child: Row(
-                                                                              children: [
-                                                                                GestureDetector(
-                                                                                  onTap: () => Navigator.of(
-                                                                                    ctx,
-                                                                                  ).pop(),
-                                                                                  child: Container(
-                                                                                    padding: EdgeInsets.all(
-                                                                                      8.w,
-                                                                                    ),
-                                                                                    decoration: const BoxDecoration(
-                                                                                      color: Color.fromRGBO(
-                                                                                        120,
-                                                                                        120,
-                                                                                        128,
-                                                                                        0.16,
-                                                                                      ),
-                                                                                      shape: BoxShape.circle,
-                                                                                    ),
-                                                                                    child: Center(
-                                                                                      child: Transform.translate(
-                                                                                        offset: const Offset(
-                                                                                          2.5,
-                                                                                          0,
-                                                                                        ),
-                                                                                        child: Icon(
-                                                                                          Icons.arrow_back_ios,
-                                                                                          color: Colors.white,
-                                                                                          size: 18,
-                                                                                        ),
-                                                                                      ),
-                                                                                    ),
-                                                                                  ),
-                                                                                ),
-                                                                                const Spacer(),
-                                                                                Text(
-                                                                                  'Category',
-                                                                                  style: sfProText600(
-                                                                                    18.sp,
-                                                                                    Colors.white,
-                                                                                  ),
-                                                                                ),
-                                                                                const Spacer(),
-                                                                                SizedBox(
-                                                                                  width: 40.w,
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                          ),
-                                                                          SizedBox(
-                                                                            height:
-                                                                                12.h,
-                                                                          ),
-                                                                          Expanded(
-                                                                            child: ListView.separated(
-                                                                              // CHANGED: Increased bottom padding to 100.h
-                                                                              padding: EdgeInsets.only(
-                                                                                left: 16.w,
-                                                                                right: 16.w,
-                                                                                top: 8.h,
-                                                                                bottom: 100.h,
-                                                                              ),
-                                                                              itemCount: 14,
-                                                                              separatorBuilder:
-                                                                                  (
-                                                                                    _,
-                                                                                    __,
-                                                                                  ) => SizedBox(
-                                                                                    height: 12.h,
-                                                                                  ),
-                                                                              itemBuilder:
-                                                                                  (
-                                                                                    c,
-                                                                                    i,
-                                                                                  ) {
-                                                                                    return InkWell(
-                                                                                      onTap: () {},
-                                                                                      borderRadius: BorderRadius.circular(
-                                                                                        32.r,
-                                                                                      ),
-                                                                                      child: Container(
-                                                                                        padding: EdgeInsets.symmetric(
-                                                                                          horizontal: 20.w,
-                                                                                          vertical: 13.h,
-                                                                                        ),
-                                                                                        decoration: BoxDecoration(
-                                                                                          color: Color.fromRGBO(
-                                                                                            37,
-                                                                                            37,
-                                                                                            37,
-                                                                                            1,
-                                                                                          ),
-                                                                                          borderRadius: BorderRadius.circular(
-                                                                                            28.r,
-                                                                                          ),
-                                                                                        ),
-                                                                                        child: Row(
-                                                                                          children: [
-                                                                                            Text(
-                                                                                              'Name Category',
-                                                                                              style: sfProText400(
-                                                                                                13.sp,
-                                                                                                Colors.white,
-                                                                                              ),
-                                                                                            ),
-                                                                                            const Spacer(),
-                                                                                            Container(
-                                                                                              width: 25.w,
-                                                                                              height: 25.w,
-                                                                                              decoration: BoxDecoration(
-                                                                                                color: Colors.grey.shade900,
-                                                                                                borderRadius: BorderRadius.circular(
-                                                                                                  18.r,
-                                                                                                ),
-                                                                                              ),
-                                                                                              child: Icon(
-                                                                                                Icons.arrow_forward_ios,
-                                                                                                color: Colors.grey.shade500,
-                                                                                                size: 10.sp,
-                                                                                              ),
-                                                                                            ),
-                                                                                          ],
-                                                                                        ),
-                                                                                      ),
-                                                                                    );
-                                                                                  },
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                      Positioned(
-                                                                        bottom:
-                                                                            18.h,
-                                                                        left: 74
-                                                                            .w,
-                                                                        right:
-                                                                            74.w,
-                                                                        child: Container(
-                                                                          height:
-                                                                              56.h,
-                                                                          padding: EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                16.w,
-                                                                          ),
-                                                                          decoration: BoxDecoration(
-                                                                            color:
-                                                                                Colors.black,
-                                                                            borderRadius: BorderRadius.circular(
-                                                                              28.r,
-                                                                            ),
-                                                                          ),
-                                                                          child: Row(
-                                                                            children: [
-                                                                              Icon(
-                                                                                Icons.search,
-                                                                                color: Colors.white,
-                                                                                size: 22.sp,
-                                                                              ),
-                                                                              SizedBox(
-                                                                                width: 12.w,
-                                                                              ),
-                                                                              Expanded(
-                                                                                child: Text(
-                                                                                  'Search',
-                                                                                  style: sfProText400(
-                                                                                    18.sp,
-                                                                                    Colors.white.withOpacity(
-                                                                                      0.6,
-                                                                                    ),
-                                                                                  ),
-                                                                                ),
-                                                                              ),
-                                                                              SizedBox(
-                                                                                width: 8.w,
-                                                                              ),
-                                                                              Icon(
-                                                                                Icons.mic,
-                                                                                color: Colors.white,
-                                                                                size: 22.sp,
-                                                                              ),
-                                                                            ],
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          );
-                                                        },
-                                                      );
-                                                    },
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            SizedBox(height: 16.h),
-                                            _buildInteractiveCounterRow(),
-                                          ],
-                                        );
-                                      }
+                          return ValueListenableBuilder<bool>(
+                            valueListenable: _titleSelected,
+                            builder: (context, titleSelected, _) {
+                              if (titleSelected) {
+                                return ValueListenableBuilder<String?>(
+                                  valueListenable: _selectedPlatform,
+                                  builder: (context, platform, _) {
+                                    if (platform != null) {
+                                      final asset = platform == 'twitch'
+                                          ? 'assets/images/twitch1.png'
+                                          : platform == 'kick'
+                                          ? 'assets/images/kick.png'
+                                          : 'assets/images/youtube1.png';
 
                                       return Column(
                                         children: [
-                                          Stack(
-                                            alignment: Alignment.center,
-                                            children: [
-                                              Container(
-                                                width: double.infinity,
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: 14.w,
-                                                  vertical: 14.h,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color.fromRGBO(
-                                                    22,
-                                                    21,
-                                                    24,
-                                                    1,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        20.r,
-                                                      ),
-                                                ),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    serviceRow(
-                                                      asset:
-                                                          'assets/images/twitch1.png',
-                                                      title: 'Title',
-                                                      subtitle: 'Category',
-                                                      onTap: () {
-                                                        _selectedPlatform
-                                                                .value =
-                                                            'twitch';
-                                                        _titleSelected.value =
-                                                            true;
-                                                        _showServiceCard.value =
-                                                            true;
-                                                      },
-                                                    ),
-                                                    SizedBox(height: 10.h),
-                                                    serviceRow(
-                                                      asset:
-                                                          'assets/images/kick.png',
-                                                      title: 'Title',
-                                                      subtitle: 'Category',
-                                                      onTap: () {
-                                                        _selectedPlatform
-                                                                .value =
-                                                            'kick';
-                                                        _titleSelected.value =
-                                                            true;
-                                                        _showServiceCard.value =
-                                                            true;
-                                                      },
-                                                    ),
-                                                    SizedBox(height: 10.h),
-                                                    serviceRow(
-                                                      asset:
-                                                          'assets/images/youtube1.png',
-                                                      title: 'Title',
-                                                      subtitle: 'Category',
-                                                      onTap: () {
-                                                        _selectedPlatform
-                                                                .value =
-                                                            'youtube';
-                                                        _titleSelected.value =
-                                                            true;
-                                                        _showServiceCard.value =
-                                                            true;
-                                                      },
-                                                    ),
-                                                    SizedBox(height: 36.h),
-                                                  ],
-                                                ),
-                                              ),
-                                              Positioned(
-                                                bottom: 6.h,
-                                                child: Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 20.w,
-                                                    vertical: 8.h,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color.fromRGBO(
-                                                      20,
-                                                      18,
-                                                      20,
-                                                      1,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          20.r,
+                                          Container(
+                                            width: double.infinity,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 12.w,
+                                              vertical: 12.h,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color.fromRGBO(22, 21, 24, 1),
+                                              borderRadius: BorderRadius.circular(20.r),
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Padding(
+                                                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                                                  child: Row(
+                                                    children: [
+                                                      GestureDetector(
+                                                        onTap: () {
+                                                          _selectedPlatform.value = null;
+                                                          _showServiceCard.value = false;
+                                                          _titleSelected.value = false;
+                                                          _showActivity.value = false;
+                                                        },
+                                                        child: Container(
+                                                          padding: EdgeInsets.all(8.w),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.grey.shade900,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: Transform.translate(
+                                                            offset: const Offset(2, 0),
+                                                            child: Icon(
+                                                              Icons.arrow_back_ios,
+                                                              color: Colors.white,
+                                                              size: 16.sp,
+                                                            ),
+                                                          ),
                                                         ),
-                                                    border: Border.all(
-                                                      color: Colors.white10,
-                                                      width: 1.w,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    'Update All',
-                                                    style: sfProText400(
-                                                      14.sp,
-                                                      const Color.fromRGBO(
-                                                        238,
-                                                        218,
-                                                        172,
-                                                        1,
                                                       ),
-                                                    ),
+                                                      const Spacer(),
+                                                      Center(
+                                                        child: Image.asset(
+                                                          asset,
+                                                          width: 22.w,
+                                                          height: 22.h,
+                                                        ),
+                                                      ),
+                                                      const Spacer(),
+                                                      SizedBox(width: 40.w),
+                                                    ],
                                                   ),
                                                 ),
-                                              ),
-                                            ],
+                                                SizedBox(height: 16.h),
+                                                panelRow('Title Example'),
+                                                SizedBox(height: 12.h),
+                                                panelRow(
+                                                  'Name Category',
+                                                  showChevron: true,
+                                                  onTap: () {
+                                                    showModalBottomSheet(
+                                                      context: context,
+                                                      isScrollControlled: true,
+                                                      backgroundColor: Colors.transparent,
+                                                      builder: (ctx) {
+                                                        return Padding(
+                                                          padding: EdgeInsets.only(
+                                                            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                                                          ),
+                                                          child: FractionallySizedBox(
+                                                            heightFactor: 0.8,
+                                                            child: AnimatedPadding(
+                                                              padding: EdgeInsets.only(
+                                                                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                                                              ),
+                                                              duration: const Duration(milliseconds: 250),
+                                                              curve: Curves.easeOut,
+                                                              child: Container(
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color.fromRGBO(20, 18, 18, 1),
+                                                                  borderRadius: const BorderRadius.vertical(
+                                                                    top: Radius.circular(38),
+                                                                  ),
+                                                                ),
+                                                                child: Stack(
+                                                                  children: [
+                                                                    Column(
+                                                                      children: [
+                                                                        SizedBox(height: 10.h),
+                                                                        Padding(
+                                                                          padding: EdgeInsets.symmetric(
+                                                                            horizontal: 18.w,
+                                                                            vertical: 10,
+                                                                          ),
+                                                                          child: Row(
+                                                                            children: [
+                                                                              GestureDetector(
+                                                                                onTap: () => Navigator.of(ctx).pop(),
+                                                                                child: Container(
+                                                                                  padding: EdgeInsets.all(8.w),
+                                                                                  decoration: const BoxDecoration(
+                                                                                    color: Color.fromRGBO(120, 120, 128, 0.16),
+                                                                                    shape: BoxShape.circle,
+                                                                                  ),
+                                                                                  child: Center(
+                                                                                    child: Transform.translate(
+                                                                                      offset: const Offset(2.5, 0),
+                                                                                      child: Icon(
+                                                                                        Icons.arrow_back_ios,
+                                                                                        color: Colors.white,
+                                                                                        size: 18,
+                                                                                      ),
+                                                                                    ),
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                              const Spacer(),
+                                                                              Text(
+                                                                                'Category',
+                                                                                style: sfProText600(18.sp, Colors.white),
+                                                                              ),
+                                                                              const Spacer(),
+                                                                              SizedBox(width: 40.w),
+                                                                            ],
+                                                                          ),
+                                                                        ),
+                                                                        SizedBox(height: 12.h),
+                                                                        Expanded(
+                                                                          child: ListView.separated(
+                                                                            padding: EdgeInsets.only(
+                                                                              left: 16.w,
+                                                                              right: 16.w,
+                                                                              top: 8.h,
+                                                                              bottom: 100.h,
+                                                                            ),
+                                                                            itemCount: 14,
+                                                                            separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                                                                            itemBuilder: (c, i) {
+                                                                              return InkWell(
+                                                                                onTap: () {},
+                                                                                borderRadius: BorderRadius.circular(32.r),
+                                                                                child: Container(
+                                                                                  padding: EdgeInsets.symmetric(
+                                                                                    horizontal: 20.w,
+                                                                                    vertical: 13.h,
+                                                                                  ),
+                                                                                  decoration: BoxDecoration(
+                                                                                    color: const Color.fromRGBO(37, 37, 37, 1),
+                                                                                    borderRadius: BorderRadius.circular(28.r),
+                                                                                  ),
+                                                                                  child: Row(
+                                                                                    children: [
+                                                                                      Text(
+                                                                                        'Name Category',
+                                                                                        style: sfProText400(13.sp, Colors.white),
+                                                                                      ),
+                                                                                      const Spacer(),
+                                                                                      Container(
+                                                                                        width: 25.w,
+                                                                                        height: 25.w,
+                                                                                        decoration: BoxDecoration(
+                                                                                          color: Colors.grey.shade900,
+                                                                                          borderRadius: BorderRadius.circular(18.r),
+                                                                                        ),
+                                                                                        child: Icon(
+                                                                                          Icons.arrow_forward_ios,
+                                                                                          color: Colors.grey.shade500,
+                                                                                          size: 10.sp,
+                                                                                        ),
+                                                                                      ),
+                                                                                    ],
+                                                                                  ),
+                                                                                ),
+                                                                              );
+                                                                            },
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                    Positioned(
+                                                                      bottom: 18.h,
+                                                                      left: 74.w,
+                                                                      right: 74.w,
+                                                                      child: Container(
+                                                                        height: 56.h,
+                                                                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                                                        decoration: BoxDecoration(
+                                                                          color: Colors.black,
+                                                                          borderRadius: BorderRadius.circular(28.r),
+                                                                        ),
+                                                                        child: Row(
+                                                                          children: [
+                                                                            Icon(Icons.search, color: Colors.white, size: 22.sp),
+                                                                            SizedBox(width: 12.w),
+                                                                            Expanded(
+                                                                              child: Text(
+                                                                                'Search',
+                                                                                style: sfProText400(18.sp, Colors.white.withOpacity(0.6)),
+                                                                              ),
+                                                                            ),
+                                                                            SizedBox(width: 8.w),
+                                                                            Icon(Icons.mic, color: Colors.white, size: 22.sp),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                          SizedBox(height: 12.h),
+                                          SizedBox(height: 16.h),
                                           _buildInteractiveCounterRow(),
                                         ],
                                       );
-                                    },
-                                  );
-                                }
-                                // If showCard is true but neither Activity nor Title is selected, return empty
-                                return const SizedBox.shrink();
-                              },
-                            );
-                          },
-                        );
-                      }
+                                    }
 
-                      return Column(
-                        children: [
-                          Container(
-                            height: 236.h,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24.r),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24.r),
-                              child: Opacity(
-                                opacity: 1,
-                                child: Image.asset(
-                                  'assets/images/streaming.png',
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 12.h),
-                          _buildInteractiveCounterRow(),
-                        ],
+                                    return Column(
+                                      children: [
+                                        Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            Container(
+                                              width: double.infinity,
+                                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+                                              decoration: BoxDecoration(
+                                                color: const Color.fromRGBO(22, 21, 24, 1),
+                                                borderRadius: BorderRadius.circular(20.r),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  serviceRow(
+                                                    asset: 'assets/images/twitch1.png',
+                                                    title: 'Title',
+                                                    subtitle: 'Category',
+                                                    onTap: () {
+                                                      _selectedPlatform.value = 'twitch';
+                                                      _titleSelected.value = true;
+                                                      _showServiceCard.value = true;
+                                                    },
+                                                  ),
+                                                  SizedBox(height: 10.h),
+                                                  serviceRow(
+                                                    asset: 'assets/images/kick.png',
+                                                    title: 'Title',
+                                                    subtitle: 'Category',
+                                                    onTap: () {
+                                                      _selectedPlatform.value = 'kick';
+                                                      _titleSelected.value = true;
+                                                      _showServiceCard.value = true;
+                                                    },
+                                                  ),
+                                                  SizedBox(height: 10.h),
+                                                  serviceRow(
+                                                    asset: 'assets/images/youtube1.png',
+                                                    title: 'Title',
+                                                    subtitle: 'Category',
+                                                    onTap: () {
+                                                      _selectedPlatform.value = 'youtube';
+                                                      _titleSelected.value = true;
+                                                      _showServiceCard.value = true;
+                                                    },
+                                                  ),
+                                                  SizedBox(height: 36.h),
+                                                ],
+                                              ),
+                                            ),
+                                            Positioned(
+                                              bottom: 6.h,
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromRGBO(20, 18, 20, 1),
+                                                  borderRadius: BorderRadius.circular(20.r),
+                                                  border: Border.all(color: Colors.white10, width: 1.w),
+                                                ),
+                                                child: Text(
+                                                  'Update All',
+                                                  style: sfProText400(14.sp, const Color.fromRGBO(238, 218, 172, 1)),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(height: 12.h),
+                                        _buildInteractiveCounterRow(),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }
+
+                              return const SizedBox.shrink();
+                            },
+                          );
+                        },
                       );
                     },
                   ),
-
                   SizedBox(height: 12.h),
                   Expanded(
                     child: ChatBottomSection(

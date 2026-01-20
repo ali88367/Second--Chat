@@ -23,24 +23,73 @@ class CustomBlackGlassWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(isWeek ? 30 : 35);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive radius based on estimated height
+        final radiusValue = _calculateResponsiveRadius();
+        final radius = BorderRadius.circular(radiusValue);
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: isWeek
-          ? BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: _content(),
-      )
-          : _content(),
+        return ClipRRect(
+          borderRadius: radius,
+          child: isWeek
+              ? BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: _content(radiusValue),
+          )
+              : _content(radiusValue),
+        );
+      },
     );
   }
 
-  Widget _content() {
+  double _calculateResponsiveRadius() {
+    if (isWeek) return 30.0;
+
+    // Calculate estimated height based on content
+    final itemCount = items.length;
+
+    // Base heights (approximate)
+    const double headerHeight = 21.0; // checkmark + text
+    const double dividerHeight = 17.0; // divider with padding
+    const double itemHeight = 31.0; // text + padding (16 top padding + ~15 text height)
+    const double verticalPadding = 40.0; // top + bottom padding (20 each)
+
+    // Calculate total estimated height
+    final estimatedHeight = headerHeight +
+        dividerHeight +
+        (itemHeight * (itemCount - 1)) + // -1 because selected item is hidden
+        verticalPadding;
+
+    // Calculate radius as a percentage of height
+    // For optimal pill shape: radius should be ~15-20% of height for taller widgets
+    // and can go up to ~30-35% for shorter widgets
+    double radiusPercentage;
+
+    if (estimatedHeight <= 150) {
+      // Short widget (2-3 items): use larger radius percentage
+      radiusPercentage = 0.30; // 30%
+    } else if (estimatedHeight <= 200) {
+      // Medium widget (4-5 items): balanced radius
+      radiusPercentage = 0.22; // 22%
+    } else if (estimatedHeight <= 280) {
+      // Tall widget (6-7 items): smaller radius percentage
+      radiusPercentage = 0.17; // 17%
+    } else {
+      // Very tall widget (8+ items): minimal radius percentage
+      radiusPercentage = 0.13; // 13%
+    }
+
+    final calculatedRadius = (estimatedHeight * radiusPercentage) / 2;
+
+    // Clamp between reasonable min/max values
+    return calculatedRadius.clamp(22.0, 35.0);
+  }
+
+  Widget _content(double radiusValue) {
     return Container(
       width: isWeek ? 90.w : null,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-      decoration: _decoration(),
+      decoration: _decoration(radiusValue),
       child: Obx(() {
         final selected = controller.selectedIndex.value;
 
@@ -115,9 +164,9 @@ class CustomBlackGlassWidget extends StatelessWidget {
     onItemSelected?.call(items[index]);
   }
 
-  BoxDecoration _decoration() {
+  BoxDecoration _decoration(double radiusValue) {
     return BoxDecoration(
-      borderRadius: BorderRadius.circular(isWeek ? 38 : 35),
+      borderRadius: BorderRadius.circular(radiusValue),
       border: GradientBoxBorder(
         width: 1.2,
         gradient: SweepGradient(

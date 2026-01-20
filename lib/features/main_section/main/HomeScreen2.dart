@@ -60,7 +60,7 @@ class HomeScreen2 extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       Get.to(
-                        () => Livestreaming(),
+                            () => Livestreaming(),
                         transition: Transition.cupertino,
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.fastOutSlowIn,
@@ -104,28 +104,28 @@ class HomeScreen2 extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 6.w),
-            InkWell(
-              onTap: () {
-                Get.bottomSheet(
-                  Container(
-                    height: Get.height * .9,
-                    decoration: BoxDecoration(
-                      color: bottomSheetGrey,
-                      borderRadius: BorderRadius.only(
-                        topRight: Radius.circular(18.r),
-                        topLeft: Radius.circular(18.r),
-                      ),
-                    ),
-                    child: InviteBottomSheet(),
-                  ),
-                  isDismissible: true,
-                  isScrollControlled: true,
-                  enableDrag: true,
-                  enterBottomSheetDuration: const Duration(milliseconds: 300),
-                  exitBottomSheetDuration: const Duration(milliseconds: 250),
-                );
-              },
-              child: _buildImageButton(
+                      InkWell(
+                        onTap: () {
+                          Get.bottomSheet(
+                            Container(
+                              height: Get.height * .9,
+                              decoration: BoxDecoration(
+                                color: bottomSheetGrey,
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(18.r),
+                                  topLeft: Radius.circular(18.r),
+                                ),
+                              ),
+                              child: InviteBottomSheet(),
+                            ),
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            enterBottomSheetDuration: const Duration(milliseconds: 300),
+                            exitBottomSheetDuration: const Duration(milliseconds: 250),
+                          );
+                        },
+                        child: _buildImageButton(
                           'assets/images/gift.png',
                           width: 36.w,
                           height: 36.w,
@@ -179,7 +179,7 @@ class HomeScreen2 extends StatelessWidget {
                     GestureDetector(
                       onTap: () {
                         Get.to(
-                          () => HomeScreen(),
+                              () => HomeScreen(),
                           transition: Transition.cupertino,
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.fastOutSlowIn,
@@ -218,7 +218,7 @@ class HomeScreen2 extends StatelessWidget {
             ),
           ),
 
-          // 🔹 Getting Started Card (New Widget)
+          // 🔹 Getting Started Card
           Positioned(
             bottom: 110.h,
             left: 16.w,
@@ -232,10 +232,10 @@ class HomeScreen2 extends StatelessWidget {
 
   /// 🔹 Reusable Image Button
   static Widget _buildImageButton(
-    String assetPath, {
-    required double width,
-    required double height,
-  }) {
+      String assetPath, {
+        required double width,
+        required double height,
+      }) {
     return SizedBox(
       width: width,
       height: height,
@@ -252,43 +252,67 @@ class GettingStartedCard extends StatefulWidget {
 }
 
 class _GettingStartedCardState extends State<GettingStartedCard> {
-  bool isNotificationChecked = false;
+  bool _notificationsEnabled = false;
+  bool _streamServiceAdded = false;
+  bool _settingsOpened = false;
+  bool _streaksCustomized = false;
+
+  // Count completed steps
+  int get _completedCount {
+    int count = 0;
+    if (_notificationsEnabled) count++;
+    if (_streamServiceAdded) count++;
+    if (_settingsOpened) count++;
+    if (_streaksCustomized) count++;
+    return count;
+  }
+
+  // Percentage (0–100)
+  int get _progressPercentage => _completedCount * 25;
+
+  // All done check
+  bool get _isAllCompleted => _completedCount == 4;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(bottom: 1.h),
       decoration: BoxDecoration(
-        color: Color.fromRGBO(30, 29, 32, 1),
-
+        color: const Color.fromRGBO(30, 29, 32, 1),
         borderRadius: BorderRadius.circular(22.r),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          /// Header
+          /// Header with progress percentage + indicator
           Padding(
             padding: EdgeInsets.all(8.w),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Center(
-                  child: Text(
-                    'Getting Started',
-                    style: sfProText600(
-                      17.sp,
-                      Color.fromRGBO(235, 235, 245, 0.3),
-                    ),
+                Text(
+                  'Getting Started',
+                  style: sfProText600(
+                    17.sp,
+                    _isAllCompleted
+                        ? Colors.white
+                        : Color.fromRGBO(235, 235, 245, 0.3),
                   ),
                 ),
                 SizedBox(width: 10.w),
                 SizedBox(
-                  width: 18.w,
-                  height: 18.w,
-                  child: Image.asset(
-                    'assets/images/circle.png',
-
+                  width: 20.w,
+                  height: 20.w,
+                  child: _isAllCompleted
+                      ? Image.asset(
+                    'assets/images/check.png',
                     fit: BoxFit.contain,
+                  )
+                      : CircularProgressIndicator(
+                    value: _completedCount / 4.0,
+                    strokeWidth: 3.0,
+                    color: const Color.fromRGBO(176, 218, 200, 1),
+                    backgroundColor: const Color.fromRGBO(120, 120, 128, 0.36),
                   ),
                 ),
               ],
@@ -297,7 +321,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
 
           Container(
             decoration: BoxDecoration(
-              color: Color.fromRGBO(47, 46, 51, 1),
+              color: const Color.fromRGBO(47, 46, 51, 1),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(18.r),
                 topRight: Radius.circular(18.r),
@@ -308,40 +332,68 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // 1. Enable notifications (checkbox style - no circle/arrow when unfinished)
                 _buildMenuItem(
                   imagePath: 'assets/images/notification.png',
                   title: 'Enable notifications',
                   hasCheckbox: true,
+                  isChecked: _notificationsEnabled,
+                  onTap: () {
+                    setState(() {
+                      _notificationsEnabled = true;
+                    });
+                  },
                 ),
                 _buildDivider(),
+
+                // 2. Add new stream service
                 InkWell(
                   onTap: () {
                     Get.bottomSheet(
-                      Container(
-                        height: Get.height * .9,
-                        decoration: BoxDecoration(
-                          color: bottomSheetGrey,
-                          borderRadius: BorderRadius.only(
-                            topRight: Radius.circular(18.r),
-                            topLeft: Radius.circular(18.r),
+                      Padding(
+                        padding: EdgeInsets.only(
+                          left: 12.w,
+                          right: 12.w,
+                          bottom: 15.h,
+                        ),
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Container(
+                            width: 361.w,
+                            height: 730.h,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2C2C2E),
+                              borderRadius: BorderRadius.circular(36.r),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(36.r),
+                              child: ConnectPlatformSetting(),
+                            ),
                           ),
                         ),
-                        child: ConnectPlatformSetting(),
                       ),
                       isDismissible: true,
                       isScrollControlled: true,
                       enableDrag: true,
+                      backgroundColor: Colors.transparent,
                       enterBottomSheetDuration: const Duration(milliseconds: 300),
                       exitBottomSheetDuration: const Duration(milliseconds: 250),
-                    );
+                    ).then((_) {
+                      setState(() {
+                        _streamServiceAdded = true;
+                      });
+                    });
                   },
                   child: _buildMenuItem(
                     imagePath: 'assets/images/signals.png',
                     title: 'Add new stream service',
                     hasArrow: true,
+                    isChecked: _streamServiceAdded,
                   ),
                 ),
                 _buildDivider(),
+
+                // 3. Open settings
                 InkWell(
                   onTap: () {
                     Get.bottomSheet(
@@ -361,15 +413,22 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                       enableDrag: true,
                       enterBottomSheetDuration: const Duration(milliseconds: 300),
                       exitBottomSheetDuration: const Duration(milliseconds: 250),
-                    );
+                    ).then((_) {
+                      setState(() {
+                        _settingsOpened = true;
+                      });
+                    });
                   },
                   child: _buildMenuItem(
                     imagePath: 'assets/images/settingHome.png',
                     title: 'Open settings',
                     hasArrow: true,
+                    isChecked: _settingsOpened,
                   ),
                 ),
                 _buildDivider(),
+
+                // 4. Customisable streaks
                 InkWell(
                   onTap: () {
                     Get.bottomSheet(
@@ -389,14 +448,44 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                       enableDrag: true,
                       enterBottomSheetDuration: const Duration(milliseconds: 300),
                       exitBottomSheetDuration: const Duration(milliseconds: 250),
-                    );
+                    ).then((_) {
+                      setState(() {
+                        _streaksCustomized = true;
+                      });
+                    });
                   },
                   child: _buildMenuItem(
                     imagePath: 'assets/images/calendar.png',
                     title: 'Customisable streaks',
                     hasArrow: true,
+                    isChecked: _streaksCustomized,
                   ),
                 ),
+
+                GestureDetector(
+                  onTap: () {
+                    // Your next action
+                  },
+                  child: Container(
+                    margin: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
+                    height: 52.h,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(36),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Next',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontFamily: 'SFProText',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                )
               ],
             ),
           ),
@@ -404,70 +493,68 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
       ),
     );
   }
-}
 
-Widget _buildMenuItem({
-  required String imagePath,
-  required String title,
-  bool hasCheckbox = false,
-  bool isChecked = false,
-  VoidCallback? onTap,
-  bool hasArrow = false,
-}) {
-  return InkWell(
-    onTap: onTap,
-    child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      child: Row(
-        children: [
-          // Image with its own background
-          Image.asset(
-            imagePath,
-            width: 42.w,
-            height: 42.w,
-            fit: BoxFit.contain,
-          ),
-
-          SizedBox(width: 12.w),
-
-          // Title
-          Expanded(
-            child: Text(title, style: sfProText400(16.sp, Colors.white)),
-          ),
-
-          // Dotted Circle Checkbox or Arrow
-          if (hasCheckbox)
-            SizedBox(
-              height: 28.h,
-              width: 28.w,
-              child: Image.asset('assets/images/check.png'),
-            ),
-
-          if (hasArrow) ...[
+  Widget _buildMenuItem({
+    required String imagePath,
+    required String title,
+    bool hasCheckbox = false,
+    bool isChecked = false,
+    bool hasArrow = false,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        child: Row(
+          children: [
             Image.asset(
-              'assets/icons/loader_icon.png',
-              width: 28.w,
-              height: 28.w,
+              imagePath,
+              width: 42.w,
+              height: 42.w,
               fit: BoxFit.contain,
             ),
-
             SizedBox(width: 12.w),
-            Image.asset(
-              'assets/images/arrowRight.png',
-              width: 28.w,
-              height: 28.w,
-              fit: BoxFit.contain,
+            Expanded(
+              child: Text(
+                title,
+                style: sfProText400(16.sp, Colors.white),
+              ),
             ),
-          ],
-        ],
-      ),
-    ),
-  );
-}
 
-Widget _buildDivider() {
-  return Padding(
-    padding: EdgeInsets.only(left: 18.w, right: 18.w),
-    child: Container(height: 0.5.h, color: const Color(0xFF38383A)),
-  );
+            // Right side: circle + arrow when unfinished (for hasArrow items), tick when done
+            if (isChecked)
+              Image.asset(
+                'assets/images/check.png',
+                width: 28.w,
+                height: 28.w,
+                fit: BoxFit.contain,
+              )
+            else if (hasArrow) ...[
+              Image.asset(
+                'assets/icons/loader_icon.png',
+                width: 28.w,
+                height: 28.w,
+                fit: BoxFit.contain,
+              ),],
+              SizedBox(width: 8.w),
+              Image.asset(
+                'assets/images/arrowRight.png',
+                width: 28.w,
+                height: 28.w,
+                fit: BoxFit.contain,
+              ),
+            // For notifications (hasCheckbox && !isChecked) → no icon on right (clean UI)
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Padding(
+      padding: EdgeInsets.only(left: 18.w, right: 18.w),
+      child: Container(height: 0.5.h, color: const Color(0xFF38383A)),
+    );
+  }
 }

@@ -8,6 +8,7 @@ import 'package:second_chat/features/main_section/settings/Led_settings.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart';
 import '../../../core/constants/app_colors/app_colors.dart';
+import '../../../core/widgets/custom_black_glass_widget.dart';
 import '../../../core/widgets/custom_switch.dart';
 
 class SettingsBottomsheetColumn extends StatelessWidget {
@@ -43,7 +44,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "title": "Font Size",
         "suffixText": "M",
         "isForward": true,
-        "nextPage": "/font-size",
         "customForwardIcon": "assets/images/changer.png",
       },
       {
@@ -90,7 +90,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "suffixText": "English",
         "isForward": true,
         "customForwardIcon": "assets/images/changer.png",
-        "nextPage": "/language",
       },
       {
         "prefixImageAsset": time_zone_icon,
@@ -103,7 +102,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "title": "Clock",
         "suffixText": "12h",
         "isForward": true,
-        "nextPage": "/clock",
         "customForwardIcon": "assets/images/changer.png",
       },
     ],
@@ -112,13 +110,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "prefixImageAsset": screen_icon,
         "title": "Multi-Screen Preview",
         "isLocked": true,
-        "nextPage": "/multi-screen",
       },
       {
         "prefixImageAsset": animation_icon,
         "title": "Animations",
         "isLocked": true,
-        "nextPage": "/animations",
       },
       {
         "prefixImageAsset": low_battery_icon,
@@ -130,13 +126,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "prefixImageAsset": filter_icon,
         "title": "Full Activity Filters",
         "isLocked": true,
-        "nextPage": "/activity-filters",
       },
       {
         "prefixImageAsset": speaker_icon,
         "title": "TTS Advanced settings",
         "isLocked": true,
-        "nextPage": "/tts-settings",
       },
     ],
   };
@@ -189,16 +183,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (sectionTitle.isNotEmpty &&
-                      sectionTitle != "Notifications")
+                  if (sectionTitle.isNotEmpty && sectionTitle != "Notifications")
                     Padding(
                       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
                       child: Text(
                         sectionTitle.toUpperCase(),
-                        style: sfProDisplay400(
-                          13.sp,
-                          const Color.fromRGBO(235, 235, 245, 0.6),
-                        ),
+                        style: sfProDisplay400(13.sp, const Color.fromRGBO(235, 235, 245, 0.6)),
                       ),
                     )
                   else if (sectionTitle.isEmpty)
@@ -212,7 +202,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       child: const ChatPlatformTabs(),
                     ),
 
-                  // Container background is STATIC here (Grey)
                   Container(
                     decoration: BoxDecoration(
                       color: onBottomSheetGrey,
@@ -220,15 +209,9 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     ),
                     child: Column(
                       children: tiles.asMap().entries.map((entry) {
-                        int index = entry.key;
+                        int tileIndex = entry.key;
                         Map<String, dynamic> tile = entry.value;
-                        // Passing sectionTitle to handle CHAT logic
-                        return _buildTile(
-                          tile,
-                          controller,
-                          index,
-                          sectionTitle,
-                        );
+                        return _buildTile(tile, controller, tileIndex, sectionTitle, context);
                       }).toList(),
                     ),
                   ),
@@ -242,11 +225,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   }
 
   Widget _buildTile(
-    Map<String, dynamic> tile,
-    SettingsController controller,
-    int index,
-    String sectionTitle,
-  ) {
+      Map<String, dynamic> tile,
+      SettingsController controller,
+      int index,
+      String sectionTitle,
+      BuildContext context,
+      ) {
     final bool isSwitch = tile["isSwitch"] ?? false;
     final bool isForward = tile["isForward"] ?? false;
     final bool isLocked = tile["isLocked"] ?? false;
@@ -254,26 +238,38 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     final String? openAsBottomSheet = tile["openAsBottomSheet"];
     final String? customForwardIcon = tile["customForwardIcon"];
 
-    RxBool? switchObs;
+    // Declare key here — each tile gets its own unique key
+    final GlobalKey iconKey = GlobalKey();
+
+    RxBool? switchValue;
     if (isSwitch && switchKey != null) {
       switch (switchKey) {
         case "notifications":
-          switchObs = controller.notifications;
+          switchValue = controller.notifications;
           break;
         case "ledNotifications":
-          switchObs = controller.ledNotifications;
+          switchValue = controller.ledNotifications;
           break;
         case "viewerCount":
-          switchObs = controller.viewerCount;
+          switchValue = controller.viewerCount;
           break;
         case "hideViewerNames":
-          switchObs = controller.hideViewerNames;
+          switchValue = controller.hideViewerNames;
           break;
         case "lowPowerMode":
-          switchObs = controller.lowPowerMode;
+          switchValue = controller.lowPowerMode;
           break;
         case "timeZoneDetection":
-          switchObs = true.obs;
+          switchValue = controller.timeZoneDetection;
+          break;
+        case "showSubscribersOnly":
+          switchValue = controller.showSubscribersOnly;
+          break;
+        case "showVipsOnly":
+          switchValue = controller.showVipsOnly;
+          break;
+        case "multiChatMergedMode":
+          switchValue = controller.multiChatMergedMode;
           break;
       }
     }
@@ -281,9 +277,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     final double opacity = isLocked ? 0.4 : 1.0;
 
     Color getBaseColor() {
-      if (sectionTitle != "CHAT") {
-        return const Color.fromRGBO(255, 230, 167, 1);
-      }
+      if (sectionTitle != "CHAT") return const Color.fromRGBO(255, 230, 167, 1);
       switch (controller.selectedPlatform.value) {
         case "Twitch":
           return twitchPurple;
@@ -296,210 +290,200 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       }
     }
 
-    return Stack(
-      children: [
-        Container(
-          height: 56.h,
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
-          decoration: BoxDecoration(
-            color: isLocked ? const Color.fromRGBO(20, 18, 18, 1) : null,
-            border: index > 0
-                ? Border(
-                    top: BorderSide(
-                      width: 0.5.w,
-                      color: const Color.fromRGBO(120, 120, 128, 0.36),
-                    ),
-                  )
-                : null,
-          ),
-          child: InkWell(
-            // Logic updated here
-            onTap: () {
-              // 1. Handle Locked Tiles (Premium Popup)
-              if (isLocked) {
-                Get.bottomSheet(
-                  // The Widget to display
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: 12.w,
-                      right: 12.w,
-                      bottom: 25.h,
-                    ),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        // Adjust constraints if necessary
-                        constraints: BoxConstraints(maxHeight: 600.h),
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(36.r),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Handle bar
+    void showGlassSelector() {
+      final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+      final RenderBox? iconBox = iconKey.currentContext?.findRenderObject() as RenderBox?;
 
-                            // The Premium Image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(36.r),
-                              child: Image.asset(
-                                "assets/images/premium.png", // Ensure this path is correct
-                                fit: BoxFit.contain,
-                                width: double.infinity,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+      if (iconBox == null || overlay == null) return;
+
+      final Offset iconPosition = iconBox.localToGlobal(Offset.zero);
+      final Size iconSize = iconBox.size;
+
+      List<String> options = [];
+      switch (tile["title"]) {
+        case "Font Size":
+          options = ["S", "M", "L", "XL"];
+          break;
+        case "App Language":
+          options = ["English", "Spanish", "French", "German", "Urdu", "Arabic"];
+          break;
+        case "Clock":
+          options = ["12h", "24h"];
+          break;
+        default:
+          return;
+      }
+
+      showGeneralDialog(
+        context: context,
+        barrierColor: Colors.transparent,
+        barrierDismissible: true,
+        barrierLabel: 'Dismiss',
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return Stack(
+            children: [
+              Positioned(
+                bottom: overlay.size.height - iconPosition.dy - 15.h,
+                right: overlay.size.width - (iconPosition.dx + iconSize.width) - 20.w,
+                child: Material(
+                  color: Colors.transparent,
+                  child: CustomBlackGlassWidget(
+                    isWeek: false,
+                    items: options,
+                    onItemSelected: (selected) {
+                      switch (tile["title"]) {
+                        case "Font Size":
+                          controller.fontSize.value = selected;
+                          break;
+                        case "App Language":
+                          controller.appLanguage.value = selected;
+                          break;
+                        case "Clock":
+                          controller.clockFormat.value = selected;
+                          break;
+                      }
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              ),
+              child: child,
+            ),
+          );
+        },
+      );
+    }
+
+    return Container(
+      height: 56.h,
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      decoration: BoxDecoration(
+        color: isLocked ? const Color.fromRGBO(20, 18, 18, 1) : null,
+        border: index > 0
+            ? Border(top: BorderSide(width: 0.5.w, color: const Color.fromRGBO(120, 120, 128, 0.36)))
+            : null,
+      ),
+      child: InkWell(
+        onTap: () {
+          if (isLocked) {
+            Get.bottomSheet(
+              Padding(
+                padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 25.h),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    constraints: BoxConstraints(maxHeight: 600.h),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(36.r),
+                      child: Image.asset("assets/images/premium.png", fit: BoxFit.contain),
                     ),
                   ),
-                  // Configuration arguments
-                  isDismissible: true,
-                  enableDrag: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  enterBottomSheetDuration: const Duration(milliseconds: 300),
-                  exitBottomSheetDuration: const Duration(milliseconds: 250),
-                );
-                return; // Stop here if locked
-              }
+                ),
+              ),
+              isDismissible: true,
+              enableDrag: true,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+            );
+            return;
+          }
 
-              // 2. Standard Logic (Existing code)
-              if (tile["title"] == "LED Notifications" ||
-                  openAsBottomSheet != null) {
-                if (openAsBottomSheet != null) Get.back();
+          if (customForwardIcon == "assets/images/changer.png") {
+            showGlassSelector();
+            return;
+          }
 
-                Get.bottomSheet(
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: 12.w,
-                      right: 12.w,
-                      bottom: 15.h,
-                    ),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        width: 361.w,
-                        height: tile["title"] == "LED Notifications"
-                            ? 386.h
-                            : 730.h,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2C2C2E),
-                          borderRadius: BorderRadius.circular(36.r),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(36.r),
-                          child: tile["title"] == "LED Notifications"
-                              ? const LedSettingsBottomSheet()
-                              : (openAsBottomSheet == "connect"
-                                    ? ConnectPlatformSetting()
-                                    : PlatformColorSettings()),
-                        ),
-                      ),
+          if (tile["title"] == "LED Notifications" || openAsBottomSheet != null) {
+            if (openAsBottomSheet != null) Get.back();
+            Get.bottomSheet(
+              Padding(
+                padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 15.h),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    width: 361.w,
+                    height: tile["title"] == "LED Notifications" ? 386.h : 730.h,
+                    decoration: BoxDecoration(color: const Color(0xFF2C2C2E), borderRadius: BorderRadius.circular(36.r)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(36.r),
+                      child: tile["title"] == "LED Notifications"
+                          ? const LedSettingsBottomSheet()
+                          : openAsBottomSheet == "connect"
+                          ? ConnectPlatformSetting()
+                          : PlatformColorSettings(),
                     ),
                   ),
-                  isDismissible: true,
-                  isScrollControlled: true,
-                  enableDrag: true,
-                  backgroundColor: Colors.transparent,
-                  enterBottomSheetDuration: const Duration(milliseconds: 300),
-                  exitBottomSheetDuration: const Duration(milliseconds: 250),
-                );
-                return;
-              }
+                ),
+              ),
+              isDismissible: true,
+              isScrollControlled: true,
+              enableDrag: true,
+              backgroundColor: Colors.transparent,
+            );
+            return;
+          }
 
-              if (isForward && tile["nextPage"] != null) {
-                Get.toNamed(tile["nextPage"]!);
-              } else if (isSwitch && switchObs != null) {
-                switchObs.toggle();
-              }
-            },
-            child: Row(
+          if (isForward && tile["nextPage"] != null) {
+            Get.toNamed(tile["nextPage"]);
+          }
+        },
+        child: Row(
+          children: [
+            if (sectionTitle == "CHAT")
+              Obx(() => Image.asset(tile["prefixImageAsset"], width: 24.w, height: 24.h, color: getBaseColor().withOpacity(opacity)))
+            else
+              Image.asset(tile["prefixImageAsset"], width: 24.w, height: 24.h, color: const Color.fromRGBO(255, 230, 167, 1).withOpacity(opacity)),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(tile["title"], style: sfProText400(16.sp, Colors.white.withOpacity(opacity))),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (sectionTitle == "CHAT")
-                  Obx(
-                    () => Image.asset(
-                      tile["prefixImageAsset"],
-                      width: 24.w,
-                      height: 24.h,
-                      color: getBaseColor().withOpacity(opacity),
-                    ),
-                  )
-                else
-                  Image.asset(
-                    tile["prefixImageAsset"],
-                    width: 24.w,
-                    height: 24.h,
-                    color: const Color.fromRGBO(
-                      255,
-                      230,
-                      167,
-                      1,
-                    ).withOpacity(opacity),
+                if (tile["suffixText"] != null)
+                  Padding(
+                    padding: EdgeInsets.only(right: 8.w),
+                    child: Obx(() {
+                      String display = tile["suffixText"];
+                      if (tile["title"] == "Font Size") display = controller.fontSize.value;
+                      if (tile["title"] == "App Language") display = controller.appLanguage.value;
+                      if (tile["title"] == "Clock") display = controller.clockFormat.value;
+                      return Text(display, style: TextStyle(color: Color.fromRGBO(235, 235, 245, 0.6 * opacity), fontSize: 15.sp, fontWeight: FontWeight.w600));
+                    }),
                   ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Text(
-                    tile["title"],
-                    style: sfProText400(
-                      16.sp,
-                      Colors.white.withOpacity(opacity),
+                if (isSwitch && switchValue != null)
+                  Obx(() => CustomSwitch(
+                    value: switchValue!.value,
+                    onChanged: (val) => switchValue!.value = val,
+                    activeColor: sectionTitle == "CHAT" ? getBaseColor() : const Color.fromRGBO(255, 230, 167, 1),
+                  )),
+                if (isForward || openAsBottomSheet != null)
+                  Padding(
+                    padding: EdgeInsets.only(left: 4.w),
+                    child: GestureDetector(
+                      key: iconKey,  // ← Key is attached here
+                      onTap: customForwardIcon == "assets/images/changer.png" ? showGlassSelector : null,
+                      child: Image.asset(customForwardIcon ?? forward_arrow_icon, height: customForwardIcon != null ? 12.h : 28.h),
                     ),
                   ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (tile["suffixText"] != null)
-                      Padding(
-                        padding: EdgeInsets.only(right: 8.w),
-                        child: Text(
-                          tile["suffixText"],
-                          style: TextStyle(
-                            color: Color.fromRGBO(235, 235, 245, 0.6 * opacity),
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    if (isSwitch && switchObs != null)
-                      if (sectionTitle == "CHAT")
-                        Obx(
-                          () => CustomSwitch(
-                            value: switchObs!.value,
-                            onChanged: (val) => switchObs!.value = val,
-                            activeColor: getBaseColor(),
-                          ),
-                        )
-                      else
-                        Obx(
-                          () => CustomSwitch(
-                            value: switchObs!.value,
-                            onChanged: (val) => switchObs!.value = val,
-                            activeColor: const Color.fromRGBO(255, 230, 167, 1),
-                          ),
-                        ),
-                    if (isForward || openAsBottomSheet != null)
-                      Padding(
-                        padding: EdgeInsets.only(left: 4.w),
-                        child: Image.asset(
-                          customForwardIcon ?? forward_arrow_icon,
-                          height: customForwardIcon != null ? 12.h : 28.h,
-                        ),
-                      ),
-
-                    if (isLocked)
-                      Padding(
-                        padding: EdgeInsets.only(left: 8.w),
-                        child: Image.asset(key_icon_2, height: 28.h),
-                      ),
-                  ],
-                ),
+                if (isLocked)
+                  Padding(padding: EdgeInsets.only(left: 8.w), child: Image.asset(key_icon_2, height: 28.h)),
               ],
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -512,33 +496,20 @@ class FreePlanWidget extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
       margin: EdgeInsets.only(bottom: 12.h),
-      decoration: BoxDecoration(
-        color: onBottomSheetGrey,
-        borderRadius: BorderRadius.circular(24.r),
-      ),
+      decoration: BoxDecoration(color: onBottomSheetGrey, borderRadius: BorderRadius.circular(24.r)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "£4.99 per month",
-                style: sfProDisplay400(13.sp, Colors.white.withOpacity(0.5)),
-              ),
+              Text("£4.99 per month", style: sfProDisplay400(13.sp, Colors.white.withOpacity(0.5))),
               SizedBox(height: 4.h),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    "Your Plan",
-                    style: sfProDisplay600(
-                      17.sp,
-                      Colors.white.withOpacity(0.6),
-                    ),
-                  ),
-
+                  Text("Your Plan", style: sfProDisplay600(17.sp, Colors.white.withOpacity(0.6))),
                   Text("Free", style: sfProDisplay600(20.sp, Colors.white)),
                 ],
               ),
@@ -562,93 +533,53 @@ class ChatPlatformTabs extends StatelessWidget {
     return Container(
       height: 36.h,
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: onBottomSheetGrey,
-        borderRadius: BorderRadius.circular(16.r),
-      ),
+      decoration: BoxDecoration(color: onBottomSheetGrey, borderRadius: BorderRadius.circular(16.r)),
       padding: EdgeInsets.all(3.w),
       child: Obx(() {
         final selected = controller.selectedPlatform.value;
-
         return Row(
           children: [
             for (int i = 0; i < tabs.length; i++) ...[
               Expanded(
-                child: Builder(
-                  builder: (context) {
-                    final String tab = tabs[i];
-                    final bool isSelected = selected == tab;
-
-                    Color getTextColor() {
-                      if (isSelected) return Colors.white;
-                      switch (tab) {
-                        case "Twitch":
-                          return twitchPurple;
-                        case "Kick":
-                          return kickGreen;
-                        case "YouTube":
-                          return youtubeRed;
-                        default:
-                          return Colors.grey;
-                      }
-                    }
-
-                    Color getBackgroundColor() {
-                      if (!isSelected) return Colors.transparent;
-                      switch (tab) {
-                        case "Twitch":
-                          return twitchPurple;
-                        case "Kick":
-                          return kickGreen;
-                        case "YouTube":
-                          return youtubeRed;
-                        default:
-                          return Colors.black;
-                      }
-                    }
-
-                    return GestureDetector(
-                      onTap: () => controller.selectedPlatform.value = tab,
-                      child: Container(
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: getBackgroundColor(),
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                        child: Text(
-                          tab,
-                          style: TextStyle(
-                            color: getTextColor(),
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                child: GestureDetector(
+                  onTap: () => controller.selectedPlatform.value = tabs[i],
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selected == tabs[i] ? _color(tabs[i]) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                    child: Text(
+                      tabs[i],
+                      style: TextStyle(color: selected == tabs[i] ? Colors.white : _color(tabs[i]), fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ),
               ),
               if (i != tabs.length - 1)
-                Builder(
-                  builder: (context) {
-                    final bool leftIsSelected = selected == tabs[i];
-                    final bool rightIsSelected = selected == tabs[i + 1];
-                    final bool hideDivider = leftIsSelected || rightIsSelected;
-
-                    return Container(
-                      width: 1.w,
-                      height: 18.h,
-                      color: hideDivider
-                          ? Colors.transparent
-                          : Colors.grey.withOpacity(0.3),
-                      margin: EdgeInsets.symmetric(horizontal: 2.w),
-                    );
-                  },
+                Container(
+                  width: 1.w,
+                  height: 18.h,
+                  color: selected == tabs[i] || selected == tabs[i + 1] ? Colors.transparent : Colors.grey.withOpacity(0.3),
+                  margin: EdgeInsets.symmetric(horizontal: 2.w),
                 ),
             ],
           ],
         );
       }),
     );
+  }
+
+  Color _color(String tab) {
+    switch (tab) {
+      case "Twitch":
+        return twitchPurple;
+      case "Kick":
+        return kickGreen;
+      case "YouTube":
+        return youtubeRed;
+      default:
+        return Colors.black;
+    }
   }
 }
