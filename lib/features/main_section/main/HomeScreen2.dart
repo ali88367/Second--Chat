@@ -9,6 +9,7 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
 import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
+import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/features/main_section/stream/StreamStreak1.dart';
 import 'package:second_chat/features/main_section/stream/stream_screen.dart';
 
@@ -325,7 +326,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                             topLeft: Radius.circular(18.r),
                           ),
                         ),
-                        child: InviteBottomSheet(),
+                        child: ConnectPlatformSetting(),
                       ),
                       isDismissible: true,
                       isScrollControlled: true,
@@ -392,7 +393,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                   },
                   child: _buildMenuItem(
                     imagePath: 'assets/images/calendar.png',
-                    title: 'Customizable Streaks',
+                    title: 'Customisable streaks',
                     hasArrow: true,
                   ),
                 ),

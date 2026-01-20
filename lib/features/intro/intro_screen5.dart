@@ -322,7 +322,7 @@ class IntroScreen5 extends StatelessWidget {
                               style: sfProText600(17.sp, Colors.white),
                             ),
                             TextSpan(
-                              text: 'then £52.99/year',
+                              text: 'Then £52.99/year',
                               style: sfProText400(
                                 12.sp,
                                 Color.fromRGBO(0, 0, 0, 0.6),

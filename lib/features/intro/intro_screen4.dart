@@ -61,7 +61,6 @@ class _IntroScreen4State extends State<IntroScreen4> {
             ),
           ),
           Image.asset('assets/images/topbarshade.png', fit: BoxFit.cover),
-
           // Content
           SafeArea(
             child: Column(
@@ -211,7 +210,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         false,
                                       ),
                                       _buildFeatureRow(
-                                        'AI Title/Category',
+                                        'All Title/Category',
                                         false,
                                         false,
                                       ),
@@ -246,7 +245,6 @@ class _IntroScreen4State extends State<IntroScreen4> {
                           ),
                         ),
                       ),
-
                       // 30% - Premium Badge
                       Expanded(
                         flex: 2,
@@ -549,7 +547,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Feature's", style: sfProText600(17.sp, Colors.white)),
+              Text("Features", style: sfProText600(17.sp, Colors.white)),
               Text('Free', style: sfProText600(17.sp, Colors.white)),
             ],
           ),

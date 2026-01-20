@@ -37,7 +37,6 @@ class ConnectPlatformSetting extends StatelessWidget {
           // Large logo on top
           Image.asset(largeLogoAsset, width: 76.w, height: 76.h),
           SizedBox(height: 24.h),
-
           // Connect button
           Material(
             color: Colors.transparent,

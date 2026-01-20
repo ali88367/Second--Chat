@@ -66,7 +66,7 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
           },
 
                     child: Image.asset(back_arrow_icon, height: 44.h)),
-                Text("Platform Color", style: sfProDisplay600(17.sp, onDark)),
+                Text("Platform Colours", style: sfProDisplay600(17.sp, onDark)),
                 SizedBox(width: 44.w),
               ],
             ),
@@ -115,7 +115,7 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Colors',
+                'Colours',
                 style: TextStyle(
                   fontFamily: 'SFProDisplay',
                   fontSize: 28.sp,
@@ -159,7 +159,7 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
                   ),
                   SizedBox(height: 20.h),
                   Text(
-                    'Tap to select color',
+                    'Tap to select colours',
                     style: TextStyle(
                       fontFamily: 'SFProText',
                       fontSize: 16.sp,
