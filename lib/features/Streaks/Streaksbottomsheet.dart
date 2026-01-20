@@ -352,7 +352,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
         return Stack(
           children: [
             Positioned(
-              top: buttonPosition.dy - 305.h - 8.h,
+              top: buttonPosition.dy - 290.h - 8.h,
               // Align to the right edge of the button/indicator
               right: overlay.size.width - buttonPosition.dx - 64.w,
               child: Material(

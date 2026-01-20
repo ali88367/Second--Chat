@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../core/widgets/custom_black_glass_widget.dart';
@@ -55,6 +56,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   final ScrollController _expandedScrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   StateSetter? _expandedSheetStateSetter;
+  final filterController = Get.put(FilterController());
 
   @override
   void initState() {
@@ -526,8 +528,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         return Stack(
           children: [
             Positioned(
-              top: buttonPosition.dy - 136.h - 8.h,
-              right: overlay.size.width - buttonPosition.dx - 60.w,
+              top: buttonPosition.dy - 166.h - 8.h,
+              right: overlay.size.width - buttonPosition.dx - 50.w,
               child: Material(
                 color: Colors.transparent,
                 child: IntrinsicWidth(
@@ -537,20 +539,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       minWidth: buttonSize.width,
                       // Maximum width to prevent going off-screen on the left
                       maxWidth: buttonPosition.dx + buttonSize.width - 20.w,
+
                     ),
                     child: CustomBlackGlassWidget(
                       items: const ["All", "Twitch", "Kick", "YouTube"],
                       isWeek: false,
                       onItemSelected: (selected) {
-                        // Handle selection
-                        Navigator.of(context).pop();
-                        if (setSheetState != null) {
-                          setSheetState(() {
-                            currentFilter = selected;
-                          });
-                        }
+                        filterController.setFilter(selected);
                       },
                     ),
+
                   ),
                 ),
               ),
@@ -1166,5 +1164,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         );
       },
     );
+  }
+}
+class FilterController extends GetxController {
+  final RxString currentFilter = 'All'.obs;
+
+  void setFilter(String value) {
+    currentFilter.value = value;
+    Get.back(); // closes bottom sheet / dialog safely
   }
 }
