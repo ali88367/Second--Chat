@@ -1,21 +1,44 @@
-// controllers/settings_controller.dart
 import 'package:get/get.dart';
 
 class SettingsController extends GetxController {
-  // Switch states (based on your screenshot)
-  var notifications = true.obs;
-  var ledNotifications = true.obs;
-  var connectOtherPlatforms = false.obs;
-  RxString selectedPlatform = "All".obs;
-  var showSubscribersOnly = false.obs;
-  var showVipsOnly = false.obs;
-  var viewerCount = true.obs;
-  var hideViewerNames = false.obs;
-  var multiChatMergedMode = false.obs;
-  var lowPowerMode = false.obs;
+  // General toggles
+  RxBool notifications = true.obs;
+  RxBool ledNotifications = false.obs;
+  RxBool lowPowerMode = false.obs;
+  RxBool timeZoneDetection = true.obs;
 
-  // You can add methods to toggle if needed
+  // Chat / Viewer related toggles
+  RxBool viewerCount = true.obs;
+  RxBool hideViewerNames = false.obs;
+  RxBool showSubscribersOnly = false.obs;   // locked in UI
+  RxBool showVipsOnly = false.obs;          // locked in UI
+  RxBool multiChatMergedMode = false.obs;   // locked in UI
+
+  // Platform selection (used in CHAT section tabs)
+  RxString selectedPlatform = "All".obs;    // All, Twitch, Kick, YouTube
+
+  // Optional future settings (placeholders)
+  RxString fontSize = "M".obs;
+  RxString clockFormat = "12h".obs;
+  RxString appLanguage = "English".obs;
+
+  // Helper methods
+  void toggleNotifications() => notifications.toggle();
   void toggleLedNotifications() => ledNotifications.toggle();
-  void toggleConnectPlatforms() => connectOtherPlatforms.toggle();
-// ... add others as needed
+  void toggleLowPowerMode() => lowPowerMode.toggle();
+  void toggleTimeZoneDetection() => timeZoneDetection.toggle();
+  void toggleViewerCount() => viewerCount.toggle();
+  void toggleHideViewerNames() => hideViewerNames.toggle();
+
+  void setPlatform(String platform) {
+    selectedPlatform.value = platform;
+  }
+
+// You can add persistence later (shared_preferences / hive)
+// Example:
+// @override
+// void onInit() {
+//   super.onInit();
+//   // load from storage
+// }
 }
