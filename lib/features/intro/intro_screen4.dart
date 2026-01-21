@@ -292,9 +292,8 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 38.h),
                                             _buildBadgeIcon(
                                               imagePath:
-                                                  'assets/images/xmark.circle.fill.png',
-                                              width: 28.w,
-                                              height: 28.h,
+                                                  'assets/images/checkInfo.png',
+                                          
                                               isInfo: false,
                                             ),
                                             SizedBox(height: 48.h),

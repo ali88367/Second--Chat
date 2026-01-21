@@ -462,30 +462,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                   ),
                 ),
 
-                GestureDetector(
-                  onTap: () {
-                    // Your next action
-                  },
-                  child: Container(
-                    margin: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
-                    height: 52.h,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(36),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      'Next',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontFamily: 'SFProText',
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                )
+
               ],
             ),
           ),

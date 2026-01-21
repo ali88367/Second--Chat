@@ -53,10 +53,10 @@ class _LivestreamingState extends State<Livestreaming> {
         _topBarImage.value = 'assets/images/twitchshade.png';
         break;
       case 'kick':
-        _topBarImage.value = 'assets/images/kickshade.png';
+        _topBarImage.value = 'assets/images/youtubeshade.png';
         break;
       case 'youtube':
-        _topBarImage.value = 'assets/images/youtubeshade.png';
+        _topBarImage.value = 'assets/images/kickshade.png';
         break;
       default:
         _topBarImage.value = 'assets/images/topbarshade.png';
