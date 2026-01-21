@@ -154,10 +154,13 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatelessWidget {
               child: SizedBox(
                 height: 50.h,
                 child: ElevatedButton(
-                  onPressed: () => Get.bottomSheet(
-                    const StreakFreezeUseBottomSheet(),
-                    isScrollControlled: true,
-                  ),
+                  onPressed: (){
+                    Get.back();
+                    Get.bottomSheet(
+                      const StreakFreezeUseBottomSheet(),
+                      isScrollControlled: true,
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(

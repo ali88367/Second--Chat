@@ -45,6 +45,7 @@ class InviteBottomSheet extends StatelessWidget {
               // 2. Razor/Ticket Image (Layered on top of background)
               Positioned(
                 top: 60.h,
+                left: 30.h,
                 child: Image.asset(
                   "assets/images/ChatGPT Image 14 дек. 2025 г., 12_53_51 1.png",
                   width: 299.w,

@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:second_chat/core/constants/app_colors/app_colors.dart';
-import 'package:second_chat/core/themes/textstyles.dart';
-import 'package:second_chat/core/widgets/custom_switch.dart';
 
-/// Added CellType for Calendar logic
 enum CellType { tick, cross, dot, freeze }
 
 class StreamStreaksController extends GetxController {
@@ -19,9 +14,7 @@ class StreamStreaksController extends GetxController {
     'Sun': false,
   }.obs;
 
-
-  /// Interactive menu numbers
-
+  // --- INTERACTIVE MENU NUMBERS ---
   int get selectedCount => selectedMenuNumbers.length;
 
   List<int> get availableMenuNumbers => List.generate(7, (i) => i + 1)
@@ -30,18 +23,14 @@ class StreamStreaksController extends GetxController {
 
   bool get areDaysDisabled => threeTimesWeek.value;
 
-  // --- NEW CALENDAR STATE FOR ALL SCREENS ---
-
-  /// Multi-row state (Screen 1)
+  // --- CALENDAR STATE ---
   final calendarRows = <RxList<CellType>>[
     RxList.of([CellType.tick, CellType.cross, CellType.tick, CellType.tick, CellType.cross, CellType.freeze, CellType.cross]),
     RxList.of([CellType.cross, CellType.cross, CellType.cross, CellType.tick, CellType.tick, CellType.tick, CellType.cross]),
     RxList.of(List.generate(7, (_) => CellType.tick)),
     RxList.of([CellType.tick, CellType.tick, CellType.tick, CellType.dot, CellType.dot, CellType.dot, CellType.dot]),
-    RxList.of(List.generate(7, (_) => CellType.dot)),
   ];
 
-  /// Single-row state (Screens 2 & 3)
   final singleRowCells = RxList<CellType>.of([
     CellType.tick, CellType.cross, CellType.tick, CellType.tick, CellType.tick, CellType.cross, CellType.cross,
   ]);
@@ -49,17 +38,28 @@ class StreamStreaksController extends GetxController {
   final lastTappedRow = RxnInt();
   final lastTappedCol = RxnInt();
 
+  // Track active freezes
+  RxInt manualFreezeCount = 0.obs;
 
   RxBool threeTimesWeek = false.obs;
   RxBool isSelectingThreeDays = false.obs;
-
-  // Example: selected menu numbers (1–7 or days)
   RxList<int> selectedMenuNumbers = <int>[].obs;
 
+  @override
+  void onInit() {
+    super.onInit();
+    _calculateInitialFreezes();
+  }
 
+  void _calculateInitialFreezes() {
+    int count = 0;
+    for (var row in calendarRows) {
+      count += row.where((cell) => cell == CellType.freeze).length;
+    }
+    manualFreezeCount.value = count;
+  }
 
-  // --- EXISTING LOGIC ---
-
+  // --- SELECTION LOGIC ---
   void toggleMenuNumber(int number) {
     if (selectedMenuNumbers.contains(number)) {
       selectedMenuNumbers.remove(number);
@@ -68,7 +68,6 @@ class StreamStreaksController extends GetxController {
         selectedMenuNumbers.add(number);
       }
     }
-
     if (selectedMenuNumbers.length == 3) {
       isSelectingThreeDays.value = false;
       threeTimesWeek.value = true;
@@ -84,7 +83,6 @@ class StreamStreaksController extends GetxController {
 
   void toggleThreeTimesWeek(bool value) {
     threeTimesWeek.value = value;
-
     if (value) {
       isSelectingThreeDays.value = true;
       selectedMenuNumbers.clear();
@@ -97,40 +95,62 @@ class StreamStreaksController extends GetxController {
 
   void syncMenuToDays() {
     if (!threeTimesWeek.value) return;
-
     final days = selectedDays.keys.toList();
     selectedDays.updateAll((key, value) => false);
-
     for (final n in selectedMenuNumbers) {
       selectedDays[days[n - 1]] = true;
     }
-
     selectedDays.refresh();
   }
 
-  // --- NEW CALENDAR ACTIONS ---
-
+  // --- UPDATED CALENDAR LOGIC ---
   void toggleCalendarCell(int rowIdx, int colIdx, {bool isSingleRow = false}) {
-    final targetRow = isSingleRow ? singleRowCells : calendarRows[rowIdx];
-    final current = targetRow[colIdx];
+    final RxList<CellType> targetRow = isSingleRow ? singleRowCells : calendarRows[rowIdx];
+    final CellType current = targetRow[colIdx];
 
-    if (current == CellType.cross) {
-      targetRow[colIdx] = CellType.tick;
-      lastTappedRow.value = rowIdx;
-      lastTappedCol.value = colIdx;
-    } else if (current == CellType.tick) {
+    // 1. FREEZE -> CROSS (Revert and refund count)
+    if (current == CellType.freeze) {
       targetRow[colIdx] = CellType.cross;
+      manualFreezeCount.value--;
+
       if (lastTappedRow.value == rowIdx && lastTappedCol.value == colIdx) {
         lastTappedCol.value = null;
       }
+
+      targetRow.refresh();
+      return;
+    }
+
+    // 2. TICK, CROSS or DOT -> FREEZE (Max 3)
+    // Now including CellType.tick in the trigger logic
+    if (current == CellType.tick || current == CellType.cross || current == CellType.dot) {
+      if (manualFreezeCount.value < 3) {
+        targetRow[colIdx] = CellType.freeze;
+        manualFreezeCount.value++;
+
+        lastTappedRow.value = rowIdx;
+        lastTappedCol.value = colIdx;
+
+        targetRow.refresh();
+      } else {
+        Get.snackbar(
+          "Limit Reached",
+          "Only 3 freezes allowed.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.black,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 1),
+        );
+      }
+      return;
     }
   }
 
-  /// Unified Grouping Logic for Highlighting
+  // Highlighting Logic: Only looks for CellType.tick.
+  // Freezes will now break the golden highlight line.
   List<List<int>> getTickGroups(List<CellType> row) {
     final groups = <List<int>>[];
     int start = -1;
-
     for (int i = 0; i < row.length; i++) {
       if (row[i] == CellType.tick) {
         if (start == -1) start = i;

@@ -14,7 +14,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StreamStreaksController());
+    final controller = Get.put(StreamStreaksController(),permanent: true);
 
     return Container(
       height: Get.height * 0.9,
@@ -80,7 +80,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                       ),
                       SizedBox(height: 4.h),
                       Text(
-                        "Settings a streak goals  helps you stay consistent",
+                        "Setting a streak goals  helps you stay consistent",
                         style: sfProDisplay400(15.sp, Color(0xFFB0B3B8)),
                         textAlign: TextAlign.center,
                       ),
@@ -102,6 +102,7 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
+                      Get.back();
                       Get.bottomSheet(
                         const StreakFreezePreviewBottomSheet(),
                         isScrollControlled: true,

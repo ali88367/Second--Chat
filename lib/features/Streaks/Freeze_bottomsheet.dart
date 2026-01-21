@@ -34,8 +34,7 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _cross() =>
-      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
 
   Widget _freeze() => Image.asset('assets/images/Privacy & Security - SVG.png');
 
@@ -59,7 +58,6 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(22.r),
       );
     } else if (count == 1) {
-      // Perfect circle for single selection
       decoration = BoxDecoration(
         color: const Color(0xFF3C3C43).withOpacity(0.6),
         shape: BoxShape.circle,
@@ -77,10 +75,7 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
       top: 0,
       bottom: 0,
       child: Container(
-        // Remove horizontal margin for circles to keep them centered
-        margin: count == 1
-            ? EdgeInsets.zero
-            : EdgeInsets.symmetric(horizontal: 2.w),
+        margin: count == 1 ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
         decoration: decoration,
       ),
     );
@@ -99,11 +94,13 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
             Row(
               children: List.generate(days, (i) {
                 final cell = rowData[i];
-                final isLast =
-                    c.lastTappedRow.value == rowIndex &&
-                    c.lastTappedCol.value == i;
-                final tappable =
-                    cell == CellType.tick || cell == CellType.cross;
+                final isLast = c.lastTappedRow.value == rowIndex && c.lastTappedCol.value == i;
+
+                // UPDATED: Now Ticks are also tappable to be replaced by Freezes
+                final tappable = cell == CellType.tick ||
+                    cell == CellType.cross ||
+                    cell == CellType.freeze ||
+                    cell == CellType.dot;
 
                 Widget icon;
                 switch (cell) {
@@ -124,9 +121,7 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                 return Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: tappable
-                        ? () => c.toggleCalendarCell(rowIndex, i)
-                        : null,
+                    onTap: tappable ? () => c.toggleCalendarCell(rowIndex, i) : null,
                     child: Center(child: icon),
                   ),
                 );
@@ -167,15 +162,9 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                         children: [
                           InkWell(
                             onTap: Get.back,
-                            child: Image.asset(
-                              'assets/icons/x_icon.png',
-                              height: 44.h,
-                            ),
+                            child: Image.asset('assets/icons/x_icon.png', height: 44.h),
                           ),
-                          Text(
-                            "Stream Streaks",
-                            style: sfProText600(17.sp, Colors.white),
-                          ),
+                          Text("Stream Streaks", style: sfProText600(17.sp, Colors.white)),
                           SizedBox(width: 44.w),
                         ],
                       ),
@@ -202,41 +191,22 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                     ),
                     SizedBox(height: 6.h),
                     Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 14.w,
-                        vertical: 4.h,
-                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
                       decoration: BoxDecoration(
                         color: const Color(0xFF32393D),
                         borderRadius: BorderRadius.circular(40.r),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
-                          width: 1,
-                        ),
+                        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            "assets/images/checkmark.circle.fill.png",
-                            width: 19.w,
-                            height: 24.h,
-                          ),
+                          Image.asset("assets/images/checkmark.circle.fill.png", width: 19.w, height: 24.h),
                           SizedBox(width: 8.w),
                           RichText(
                             text: TextSpan(
                               children: [
-                                TextSpan(
-                                  text: '3 ',
-                                  style: sfProDisplay400(15.sp, Colors.white),
-                                ),
-                                TextSpan(
-                                  text: 'freezes per month',
-                                  style: sfProDisplay400(
-                                    15.sp,
-                                    const Color(0xFFB0B3B8),
-                                  ),
-                                ),
+                                TextSpan(text: '3 ', style: sfProDisplay400(15.sp, Colors.white)),
+                                TextSpan(text: 'freeze per month', style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))),
                               ],
                             ),
                           ),
@@ -244,14 +214,9 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 20.h),
-
-                    // --- CALENDAR CARD ---
                     Container(
                       width: 361.w,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding.w,
-                        vertical: 16.h,
-                      ),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E1D20),
                         borderRadius: BorderRadius.circular(24.r),
@@ -263,39 +228,14 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Row(
-                                children:
-                                    [
-                                      'Mon',
-                                      'Tue',
-                                      'Wed',
-                                      'Thur',
-                                      'Fri',
-                                      'Sat',
-                                      'Sun',
-                                    ].map((d) {
-                                      return Expanded(
-                                        child: Center(
-                                          child: Text(
-                                            d,
-                                            maxLines: 1,
-                                            style: TextStyle(
-                                              color: const Color(0xFF8E8E93),
-                                              fontSize: 13.sp,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
+                                children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((d) {
+                                  return Expanded(child: Center(child: Text(d, maxLines: 1, style: TextStyle(color: const Color(0xFF8E8E93), fontSize: 13.sp))));
+                                }).toList(),
                               ),
                               SizedBox(height: 16.h),
-                              for (
-                                int i = 0;
-                                i < controller.calendarRows.length;
-                                i++
-                              ) ...[
+                              for (int i = 0; i < controller.calendarRows.length; i++) ...[
                                 _row(i, controller, totalWidth),
-                                if (i != controller.calendarRows.length - 1)
-                                  SizedBox(height: 12.h),
+                                if (i != controller.calendarRows.length - 1) SizedBox(height: 12.h),
                               ],
                             ],
                           );
@@ -313,25 +253,20 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                 child: SizedBox(
                   height: 50.h,
                   child: ElevatedButton(
-                    onPressed: () => Get.bottomSheet(
-                      const StreakFreezeSingleRowPreviewBottomSheet(),
-                      isScrollControlled: true,
-                    ),
-                    style: ElevatedButton.styleFrom(
+                    onPressed: () {
+                      // Closes the current StreakStreakSetupBottomSheet
+                      Get.back();
+
+                      // Opens the new single row preview sheet
+                      Get.bottomSheet(
+                        const StreakFreezeSingleRowPreviewBottomSheet(),
+                        isScrollControlled: true,
+                      );
+                    },                    style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(36.r),
-                      ),
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(36.r)),
                     ),
-                    child: Text(
-                      "Let's go",
-                      style: sfProText600(17.sp, Colors.black),
-                      textHeightBehavior: TextHeightBehavior(
-                        applyHeightToFirstAscent: false,
-                        applyHeightToLastDescent: false,
-                      ),
-                    ),
+                    child: Text("Let's go", style: sfProText600(17.sp, Colors.black)),
                   ),
                 ),
               ),

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -68,132 +69,145 @@ class IntroScreen5 extends StatelessWidget {
 
                 // Swipeable Content
                 Expanded(
-                  child: SingleChildScrollView(
-                    clipBehavior: Clip.none,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // PageView Images
-                        SizedBox(
-                          height: 280.h,
-                          child: PageView(
-                            controller: controller.pageController,
-                            onPageChanged: controller.onPageChanged,
-                            children: [
-                              Center(
-                                child: OverflowBox(
-                                  maxHeight: 330.h, // bigger than 280.h
-                                  maxWidth: 420.w,
-                                  child: Image.asset(
-                                    'assets/images/secondGlow.png',
-                                    width: 420.w,
-                                    height: 360.h,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) =>
-                                        SizedBox(width: 280.w, height: 200.h),
+                  child: GestureDetector(
+                    // DETECTION FOR VERTICAL SLIDE TO SWITCH TABS
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity! > 0) {
+                        // Swiped Down
+                        controller.switchPage(0);
+                      } else if (details.primaryVelocity! < 0) {
+                        // Swiped Up
+                        controller.switchPage(1);
+                      }
+                    },
+                    child: SingleChildScrollView(
+                      clipBehavior: Clip.none,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // PageView Images
+                          SizedBox(
+                            height: 280.h,
+                            child: PageView(
+                              controller: controller.pageController,
+                              onPageChanged: controller.onPageChanged,
+                              children: [
+                                Center(
+                                  child: OverflowBox(
+                                    maxHeight: 330.h,
+                                    maxWidth: 420.w,
+                                    child: Image.asset(
+                                      'assets/images/secondGlow.png',
+                                      width: 420.w,
+                                      height: 360.h,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) =>
+                                          SizedBox(width: 280.w, height: 200.h),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Center(
-                                child: Image.asset(
-                                  'assets/images/bunnyGlow.png',
-                                  width: 280.w,
-                                  height: 280.h,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => Container(
+                                Center(
+                                  child: Image.asset(
+                                    'assets/images/bunnyGlow.png',
                                     width: 280.w,
                                     height: 280.h,
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(20.r),
-                                    ),
-                                    child: Icon(
-                                      Icons.pets,
-                                      size: 100.sp,
-                                      color: Colors.orange.withOpacity(0.5),
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 280.w,
+                                      height: 280.h,
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(20.r),
+                                      ),
+                                      child: Icon(
+                                        Icons.pets,
+                                        size: 100.sp,
+                                        color: Colors.orange.withOpacity(0.5),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
 
-                        Container(
-                          //  height: 280.h,
-                          width: double.infinity,
-                          margin: EdgeInsets.symmetric(horizontal: 16.w),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16.w,
-                            vertical: 20.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Color.fromRGBO(30, 29, 32, 1),
-                            borderRadius: BorderRadius.circular(24.r),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Page Indicators
-                              Obx(
-                                () => Row(
+                          Container(
+                            width: double.infinity,
+                            margin: EdgeInsets.symmetric(horizontal: 16.w),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 20.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color.fromRGBO(30, 29, 32, 1),
+                              borderRadius: BorderRadius.circular(24.r),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Page Indicators
+                                Obx(
+                                      () => Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildDot(
+                                        controller.currentPage.value == 0,
+                                      ),
+                                      SizedBox(width: 8.w),
+                                      _buildDot(
+                                        controller.currentPage.value == 1,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                SizedBox(height: 16.h),
+
+                                // Animated Content
+                                Obx(
+                                      () => AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    child: controller.currentPage.value == 0
+                                        ? _buildSubscriptionContent(controller)
+                                        : _buildReferralContent(controller),
+                                  ),
+                                ),
+
+                                Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    _buildDot(
-                                      controller.currentPage.value == 0,
+                                    GestureDetector(
+                                      onTap: () =>
+                                          print('Terms of Service tapped'),
+                                      child: Text(
+                                        'Terms of Service',
+                                        style: sfProText400(
+                                          12.sp,
+                                          const Color.fromRGBO(
+                                              235, 235, 245, 0.6),
+                                        ),
+                                      ),
                                     ),
-                                    SizedBox(width: 8.w),
-                                    _buildDot(
-                                      controller.currentPage.value == 1,
+                                    SizedBox(width: 20.w),
+                                    GestureDetector(
+                                      onTap: () =>
+                                          print('Restore Purchase tapped'),
+                                      child: Text(
+                                        'Restore Purchase',
+                                        style: sfProText400(
+                                          12.sp,
+                                          const Color.fromRGBO(
+                                              235, 235, 245, 0.6),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-
-                              SizedBox(height: 16.h),
-
-                              // Animated Content
-                              Obx(
-                                () => AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  child: controller.currentPage.value == 0
-                                      ? _buildSubscriptionContent(controller)
-                                      : _buildReferralContent(controller),
-                                ),
-                              ),
-
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () =>
-                                        print('Terms of Service tapped'),
-                                    child: Text(
-                                      'Terms of Service',
-                                      style: sfProText400(
-                                        12.sp,
-                                        Color.fromRGBO(235, 235, 245, 0.6),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 20.w),
-                                  GestureDetector(
-                                    onTap: () =>
-                                        print('Restore Purchase tapped'),
-                                    child: Text(
-                                      'Restore Purchase',
-                                      style: sfProText400(
-                                        12.sp,
-                                        Color.fromRGBO(235, 235, 245, 0.6),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -224,11 +238,10 @@ class IntroScreen5 extends StatelessWidget {
         GestureDetector(
           onTap: () => c.selectPlan(0),
           child: Obx(
-            () => _planCard(
+                () => _planCard(
               isSelected: c.selectedPlan.value == 0,
               title: 'Monthly',
               price: '£4.99/month',
-              showCheck: c.selectedPlan.value == 0,
             ),
           ),
         ),
@@ -236,52 +249,60 @@ class IntroScreen5 extends StatelessWidget {
         SizedBox(height: 13.h),
 
         // Yearly Plan (Most Popular)
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              padding: EdgeInsets.only(
-                left: 16.w,
-                top: 35.h,
-                right: 16.w,
-                bottom: 20.h,
-              ),
-              decoration: BoxDecoration(
-                color: Color.fromRGBO(47, 46, 51, 1),
-                borderRadius: BorderRadius.circular(18.r),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    height: 21.h,
-                    width: 21.w,
-                    child: Image.asset('assets/images/tick.png'),
+        GestureDetector(
+          onTap: () => c.selectPlan(1),
+          child: Obx(
+                () => Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: EdgeInsets.only(
+                    left: 16.w,
+                    top: 35.h,
+                    right: 16.w,
+                    bottom: 20.h,
                   ),
-                  SizedBox(width: 12.w),
-                  Text('Year', style: sfProText600(17.sp, Colors.white)),
-                  const Spacer(),
-                  Text('£2.99/month', style: sfProText600(17.sp, Colors.white)),
-                ],
-              ),
+                  decoration: BoxDecoration(
+                    color: const Color.fromRGBO(47, 46, 51, 1),
+                    borderRadius: BorderRadius.circular(18.r),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        height: 21.h,
+                        width: 21.w,
+                        child: Image.asset(
+                          c.selectedPlan.value == 1
+                              ? 'assets/images/tick.png'
+                              : 'assets/icons/loader_icon.png',
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Text('Year', style: sfProText600(17.sp, Colors.white)),
+                      const Spacer(),
+                      Text('£2.99/month',
+                          style: sfProText600(17.sp, Colors.white)),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: -2.h,
+                  child: SizedBox(
+                    height: 29.h,
+                    width: 110.w,
+                    child: Image.asset('assets/images/mostPopular.png'),
+                  ),
+                ),
+              ],
             ),
-            Positioned(
-              top: -2.h,
-
-              child: Container(
-                height: 29.h,
-                width: 110.w,
-
-                child: Image.asset('assets/images/mostPopular.png'),
-              ),
-            ),
-          ],
+          ),
         ),
 
         SizedBox(height: 14.h),
 
         // Start Trial Button
         Obx(
-          () => GestureDetector(
+              () => GestureDetector(
             onTap: c.isLoading.value ? null : c.startTrial,
             child: Container(
               width: double.infinity,
@@ -304,33 +325,35 @@ class IntroScreen5 extends StatelessWidget {
               child: Center(
                 child: c.isLoading.value
                     ? SizedBox(
-                        width: 24.w,
-                        height: 24.w,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                      )
+                  width: 24.w,
+                  height: 24.w,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                  ),
+                )
                     : RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Start Free Trial\n',
-                              style: sfProText600(17.sp, Colors.white),
-                            ),
-                            TextSpan(
-                              text: 'Then £52.99/year',
-                              style: sfProText400(
-                                12.sp,
-                                Color.fromRGBO(0, 0, 0, 0.6),
-                              ), // different color & style
-                            ),
-                          ],
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Start Free Trial\n',
+                        style: sfProText600(17.sp, Colors.white),
+                      ),
+                      TextSpan(
+                        text: c.selectedPlan.value == 1
+                            ? 'Then £52.99/year'
+                            : 'Then £4.99/month',
+                        style: sfProText400(
+                          12.sp,
+                          const Color.fromRGBO(0, 0, 0, 0.6),
                         ),
                       ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -344,13 +367,11 @@ class IntroScreen5 extends StatelessWidget {
     required bool isSelected,
     required String title,
     required String price,
-    required bool showCheck,
-    bool isYearly = false,
   }) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 15.h),
       decoration: BoxDecoration(
-        color: Color.fromRGBO(47, 46, 51, 1),
+        color: const Color.fromRGBO(47, 46, 51, 1),
         borderRadius: BorderRadius.circular(18.r),
       ),
       child: Row(
@@ -358,7 +379,11 @@ class IntroScreen5 extends StatelessWidget {
           SizedBox(
             height: 21.h,
             width: 21.w,
-            child: Image.asset('assets/icons/loader_icon.png'),
+            child: Image.asset(
+              isSelected
+                  ? 'assets/images/tick.png'
+                  : 'assets/icons/loader_icon.png',
+            ),
           ),
           SizedBox(width: 12.w),
           Text(title, style: sfProText600(17.sp, Colors.white)),
@@ -411,10 +436,10 @@ class IntroScreen5 extends StatelessWidget {
                   ),
                 ],
               ),
-              Spacer(),
+              const Spacer(),
               Text(
                 '1 time',
-                style: sfProText600(17.sp, Color.fromRGBO(235, 235, 245, 0.3)),
+                style: sfProText600(17.sp, const Color.fromRGBO(235, 235, 245, 0.3)),
               ),
             ],
           ),
@@ -456,7 +481,6 @@ class IntroScreen5 extends StatelessWidget {
 }
 
 class IntroScreen5Controller extends GetxController {
-  // Observable variables
   var isLoading = false.obs;
   var selectedPlan = 1.obs; // 0 = Monthly, 1 = Yearly
   var currentPage = 0.obs;
@@ -464,20 +488,13 @@ class IntroScreen5Controller extends GetxController {
   final PageController pageController = PageController(initialPage: 0);
 
   void startTrial() async {
-    if (isLoading.value) return; // Prevent double tap
-
+    if (isLoading.value) return;
     isLoading(true);
-
     await Future.delayed(const Duration(milliseconds: 100));
-
     isLoading(false);
 
-    String plan = selectedPlan.value == 0 ? "Monthly" : "Yearly";
-    print('Trial started with plan: $plan');
-
-    // Navigate to Home Screen
     Get.offAll(
-      () => const HomeScreen2(),
+          () => const HomeScreen2(),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 300),
       curve: Curves.fastOutSlowIn,
@@ -485,7 +502,6 @@ class IntroScreen5Controller extends GetxController {
   }
 
   void copyLink() {
-    print('Link copied to clipboard');
     Get.snackbar(
       'Success',
       'Link copied to clipboard!',
@@ -499,6 +515,17 @@ class IntroScreen5Controller extends GetxController {
 
   void selectPlan(int plan) {
     selectedPlan.value = plan;
+  }
+
+  void switchPage(int index) {
+    if (currentPage.value != index) {
+      currentPage.value = index;
+      pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void onPageChanged(int index) {

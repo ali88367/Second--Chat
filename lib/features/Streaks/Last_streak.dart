@@ -32,6 +32,13 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
   Widget _cross() =>
       Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
 
+  Widget _freeze() => Image.asset('assets/images/Privacy & Security - SVG.png');
+
+  Widget _dot() => Opacity(
+    opacity: 0.3,
+    child: Icon(Icons.circle, size: 10.sp, color: Colors.white),
+  );
+
   // ---------------- LAYOUT HELPERS ----------------
 
   Widget _highlight(int start, int end, double totalWidth) {
@@ -47,7 +54,6 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(22.r),
       );
     } else if (count == 1) {
-      // Perfect circle for single selection
       decoration = BoxDecoration(
         color: const Color(0xFF3C3C43).withOpacity(0.6),
         shape: BoxShape.circle,
@@ -65,7 +71,6 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
       top: 0,
       bottom: 0,
       child: Container(
-        // Remove horizontal margin for circles to keep them centered
         margin: count == 1
             ? EdgeInsets.zero
             : EdgeInsets.symmetric(horizontal: 2.w),
@@ -115,10 +120,8 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                       Stack(
                         alignment: Alignment.center,
                         children: [
-                          // 1. Adjusted Glow Effect
                           Container(
-                            width: 300
-                                .w, // Narrower than height to match the flame's vertical profile
+                            width: 300.w,
                             height: 240.h,
                             decoration: BoxDecoration(
                               shape: BoxShape.rectangle,
@@ -127,31 +130,22 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF7EDDE4,
-                                  ).withOpacity(0.35), // Soft pale yellow
-                                  blurRadius: 200, // Spread the glow out
+                                  color: const Color(0xFF7EDDE4).withOpacity(0.35),
+                                  blurRadius: 200,
                                   spreadRadius: 10,
                                 ),
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFFC5F3F1,
-                                  ).withOpacity(0.2), // Inner warm glow
+                                  color: const Color(0xFFC5F3F1).withOpacity(0.2),
                                   blurRadius: 40,
                                   spreadRadius: -10,
                                 ),
                               ],
                             ),
                           ),
-
-                          // 2. The Flame Image
                           Image.asset(
                             'assets/images/hello.png',
                             height: 250.h,
-                            // Ensure fit is contain to keep original proportions
                           ),
-
-                          // 3. The Number Image
                           Positioned(
                             bottom: 0.h,
                             child: Image.asset(
@@ -168,7 +162,9 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                       SizedBox(height: 12.h),
-                      Container(
+
+                      // --- FREEZE COUNTER ---
+                      Obx(() => Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 14.w,
                           vertical: 4.h,
@@ -194,7 +190,7 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                               text: TextSpan(
                                 children: [
                                   TextSpan(
-                                    text: '3 ',
+                                    text: '${3 - controller.manualFreezeCount.value} ',
                                     style: sfProDisplay400(15.sp, Colors.white),
                                   ),
                                   TextSpan(
@@ -209,7 +205,7 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ),
+                      )),
 
                       SizedBox(height: 20.h),
 
@@ -228,34 +224,23 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Row(
-                              children:
-                                  [
-                                    'Mon',
-                                    'Tue',
-                                    'Wed',
-                                    'Thur',
-                                    'Fri',
-                                    'Sat',
-                                    'Sun',
-                                  ].map((day) {
-                                    return Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          day,
-                                          maxLines: 1,
-                                          softWrap: false,
-                                          overflow: TextOverflow.visible,
-                                          style: TextStyle(
-                                            color: const Color(0xFF8E8E93),
-                                            fontSize: 13.sp,
-                                          ),
-                                        ),
+                              children: [
+                                'Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun',
+                              ].map((day) {
+                                return Expanded(
+                                  child: Center(
+                                    child: Text(
+                                      day,
+                                      style: TextStyle(
+                                        color: const Color(0xFF8E8E93),
+                                        fontSize: 13.sp,
                                       ),
-                                    );
-                                  }).toList(),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                             SizedBox(height: 16.h),
-
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 final totalWidth = constraints.maxWidth;
@@ -263,9 +248,7 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                                   height: rowHeight.h,
                                   child: Obx(() {
                                     final rowData = controller.singleRowCells;
-                                    final groups = controller.getTickGroups(
-                                      rowData,
-                                    );
+                                    final groups = controller.getTickGroups(rowData);
                                     return Stack(
                                       children: [
                                         for (final g in groups)
@@ -273,28 +256,33 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                                         Row(
                                           children: List.generate(days, (i) {
                                             final cell = rowData[i];
-                                            final isLatest =
-                                                controller
-                                                    .lastTappedCol
-                                                    .value ==
-                                                i;
+                                            final isLatest = controller.lastTappedCol.value == i;
+
+                                            Widget icon;
+                                            switch (cell) {
+                                              case CellType.tick:
+                                                icon = _tick(highlighted: isLatest);
+                                                break;
+                                              case CellType.cross:
+                                                icon = _cross();
+                                                break;
+                                              case CellType.freeze:
+                                                icon = _freeze();
+                                                break;
+                                              case CellType.dot:
+                                                icon = _dot();
+                                                break;
+                                            }
+
                                             return Expanded(
                                               child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.opaque,
-                                                onTap: () => controller
-                                                    .toggleCalendarCell(
-                                                      0,
-                                                      i,
-                                                      isSingleRow: true,
-                                                    ),
-                                                child: Center(
-                                                  child: cell == CellType.tick
-                                                      ? _tick(
-                                                          highlighted: isLatest,
-                                                        )
-                                                      : _cross(),
+                                                behavior: HitTestBehavior.opaque,
+                                                onTap: () => controller.toggleCalendarCell(
+                                                  0,
+                                                  i,
+                                                  isSingleRow: true,
                                                 ),
+                                                child: Center(child: icon),
                                               ),
                                             );
                                           }),
@@ -334,17 +322,12 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25.r),
                             ),
-                            padding: EdgeInsets.symmetric(vertical: 12.h),
                           ),
                           child: Text(
                             "Ignore",
                             style: sfProText600(
                               17.sp,
                               Colors.white.withOpacity(0.8),
-                            ),
-                            textHeightBehavior: TextHeightBehavior(
-                              applyHeightToFirstAscent: false,
-                              applyHeightToLastDescent: false,
                             ),
                           ),
                         ),
@@ -354,8 +337,8 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         height: 50.h,
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: (){
-                            Get.to(HomeScreen2());
+                          onPressed: () {
+                            Get.to(const HomeScreen2());
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7EDDE4),
