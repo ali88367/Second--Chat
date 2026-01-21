@@ -6,12 +6,44 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Streaks/Last_streak.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
-class StreakFreezeSingleRowPreviewBottomSheet extends StatelessWidget {
+class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
   const StreakFreezeSingleRowPreviewBottomSheet({super.key});
+
+  @override
+  State<StreakFreezeSingleRowPreviewBottomSheet> createState() => _StreakFreezeSingleRowPreviewBottomSheetState();
+}
+
+class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSingleRowPreviewBottomSheet> with SingleTickerProviderStateMixin {
+  late AnimationController _fireController;
+  late Animation<double> _glowPulse;
+  late Animation<double> _fireJitter;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
   static const double rowHeight = 32;
+
+  @override
+  void initState() {
+    super.initState();
+    _fireController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _glowPulse = Tween<double>(begin: 0.2, end: 0.45).animate(
+      CurvedAnimation(parent: _fireController, curve: Curves.easeInOutSine),
+    );
+
+    _fireJitter = Tween<double>(begin: 0.0, end: -8.h).animate(
+      CurvedAnimation(parent: _fireController, curve: Curves.bounceIn),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fireController.dispose();
+    super.dispose();
+  }
 
   // ---------------- ICONS ----------------
 
@@ -45,7 +77,6 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatelessWidget {
     final int count = end - start + 1;
     final double cellWidth = totalWidth / days;
 
-    // Logic for perfect circle vs rounded bar
     Decoration decoration;
     if (count >= 3) {
       decoration = BoxDecoration(
@@ -55,7 +86,6 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(22.r),
       );
     } else if (count == 1) {
-      // Perfect circle for single selection
       decoration = BoxDecoration(
         color: const Color(0xFF3C3C43).withOpacity(0.6),
         shape: BoxShape.circle,
@@ -194,58 +224,64 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // 1. Adjusted Glow Effect
-                    Container(
-                      width: 200
-                          .w, // Narrower than height to match the flame's vertical profile
-                      height: 240.h,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.rectangle,
-                        borderRadius: BorderRadius.all(
-                          Radius.elliptical(70.w, 110.h),
+
+                // --- ANIMATED FIRE SECTION ---
+                AnimatedBuilder(
+                  animation: _fireController,
+                  builder: (context, child) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Glow Effect
+                        Container(
+                          width: 200.w,
+                          height: 240.h,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.rectangle,
+                            borderRadius: BorderRadius.all(
+                              Radius.elliptical(70.w, 110.h),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFF9C4).withOpacity(_glowPulse.value),
+                                blurRadius: 180,
+                                spreadRadius: 10,
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFFFDEBB2).withOpacity(_glowPulse.value * 0.6),
+                                blurRadius: 40,
+                                spreadRadius: -5,
+                              ),
+                            ],
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFFFFF9C4,
-                            ).withOpacity(0.35), // Soft pale yellow
-                            blurRadius: 200, // Spread the glow out
-                            spreadRadius: 10,
-                          ),
-                          BoxShadow(
-                            color: const Color(
-                              0xFFFDEBB2,
-                            ).withOpacity(0.2), // Inner warm glow
-                            blurRadius: 40,
-                            spreadRadius: -10,
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    // 2. The Flame Image
-                    Image.asset(
-                      'assets/images/foire.png',
-                      height: 255.h,
-                      // Ensure fit is contain to keep original proportions
-                      fit: BoxFit.contain,
-                    ),
+                        // The Flame Image with Jitter
+                        Transform.translate(
+                          offset: Offset(0, _fireJitter.value),
+                          child: Image.asset(
+                            'assets/images/foire.png',
+                            height: 255.h,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
 
-                    // 3. The Number Image
-                    Positioned(
-                      bottom: 0.h,
-                      child: Image.asset(
-                        'assets/images/Streak number.png',
-                        width: 155.w,
-                        height: 100.h,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ],
+                        // The Number Image
+                        Positioned(
+                          bottom: 0.h,
+                          child: Image.asset(
+                            'assets/images/Streak number.png',
+                            width: 155.w,
+                            height: 100.h,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
+                // -----------------------------
+
                 Text("Day Streak", style: sfProDisplay600(34.sp, Colors.white)),
                 Text(
                   "You’ve never been hotter, keep the streak burning!",
@@ -273,28 +309,28 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatelessWidget {
                         children: [
                           Row(
                             children:
-                                [
-                                  'Mon',
-                                  'Tue',
-                                  'Wed',
-                                  'Thur',
-                                  'Fri',
-                                  'Sat',
-                                  'Sun',
-                                ].map((d) {
-                                  return Expanded(
-                                    child: Center(
-                                      child: Text(
-                                        d,
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          color: const Color(0xFF8E8E93),
-                                          fontSize: 13.sp,
-                                        ),
-                                      ),
+                            [
+                              'Mon',
+                              'Tue',
+                              'Wed',
+                              'Thur',
+                              'Fri',
+                              'Sat',
+                              'Sun',
+                            ].map((d) {
+                              return Expanded(
+                                child: Center(
+                                  child: Text(
+                                    d,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      color: const Color(0xFF8E8E93),
+                                      fontSize: 13.sp,
                                     ),
-                                  );
-                                }).toList(),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
                           SizedBox(height: 16.h),
                           _row(controller, totalWidth),
