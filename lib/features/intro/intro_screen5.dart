@@ -70,7 +70,7 @@ class IntroScreen5 extends StatelessWidget {
                 // Swipeable Content
                 Expanded(
                   child: GestureDetector(
-                    // DETECTION FOR VERTICAL SLIDE TO SWITCH TABS
+                    behavior: HitTestBehavior.opaque, // Ensures the whole area detects the swipe
                     onVerticalDragEnd: (details) {
                       if (details.primaryVelocity! > 0) {
                         // Swiped Down
@@ -81,6 +81,7 @@ class IntroScreen5 extends StatelessWidget {
                       }
                     },
                     child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(), // Prevents scroll conflict with swipe
                       clipBehavior: Clip.none,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -91,6 +92,7 @@ class IntroScreen5 extends StatelessWidget {
                             child: PageView(
                               controller: controller.pageController,
                               onPageChanged: controller.onPageChanged,
+                              physics: const NeverScrollableScrollPhysics(), // Managed by vertical drag
                               children: [
                                 Center(
                                   child: OverflowBox(
