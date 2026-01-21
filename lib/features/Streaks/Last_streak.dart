@@ -6,12 +6,44 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
-class StreakFreezeUseBottomSheet extends StatelessWidget {
+class StreakFreezeUseBottomSheet extends StatefulWidget {
   const StreakFreezeUseBottomSheet({super.key});
+
+  @override
+  State<StreakFreezeUseBottomSheet> createState() => _StreakFreezeUseBottomSheetState();
+}
+
+class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet> with SingleTickerProviderStateMixin {
+  late AnimationController _freezeController;
+  late Animation<double> _glowAnimation;
+  late Animation<double> _floatAnimation;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
   static const double rowHeight = 32;
+
+  @override
+  void initState() {
+    super.initState();
+    _freezeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    )..repeat(reverse: true);
+
+    _glowAnimation = Tween<double>(begin: 0.15, end: 0.4).animate(
+      CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutSine),
+    );
+
+    _floatAnimation = Tween<double>(begin: 0, end: -10.h).animate(
+      CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutQuad),
+    );
+  }
+
+  @override
+  void dispose() {
+    _freezeController.dispose();
+    super.dispose();
+  }
 
   // ---------------- ICONS ----------------
 
@@ -117,45 +149,61 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 300.w,
-                            height: 240.h,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.rectangle,
-                              borderRadius: BorderRadius.all(
-                                Radius.elliptical(70.w, 110.h),
+
+                      // --- ANIMATED ICE SECTION ---
+                      AnimatedBuilder(
+                        animation: _freezeController,
+                        builder: (context, child) {
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Pulsing Ice Glow
+                              Container(
+                                width: 300.w,
+                                height: 240.h,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.rectangle,
+                                  borderRadius: BorderRadius.all(
+                                    Radius.elliptical(70.w, 110.h),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF7EDDE4).withOpacity(_glowAnimation.value),
+                                      blurRadius: 180,
+                                      spreadRadius: 10,
+                                    ),
+                                    BoxShadow(
+                                      color: const Color(0xFFC5F3F1).withOpacity(_glowAnimation.value * 0.5),
+                                      blurRadius: 40,
+                                      spreadRadius: -10,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF7EDDE4).withOpacity(0.35),
-                                  blurRadius: 200,
-                                  spreadRadius: 10,
+
+                              // Floating Ice Character
+                              Transform.translate(
+                                offset: Offset(0, _floatAnimation.value),
+                                child: Image.asset(
+                                  'assets/images/hello.png',
+                                  height: 250.h,
                                 ),
-                                BoxShadow(
-                                  color: const Color(0xFFC5F3F1).withOpacity(0.2),
-                                  blurRadius: 40,
-                                  spreadRadius: -10,
+                              ),
+
+                              Positioned(
+                                bottom: 0.h,
+                                child: Image.asset(
+                                  'assets/images/Streak number.png',
+                                  width: 155.w,
+                                  height: 90.h,
                                 ),
-                              ],
-                            ),
-                          ),
-                          Image.asset(
-                            'assets/images/hello.png',
-                            height: 250.h,
-                          ),
-                          Positioned(
-                            bottom: 0.h,
-                            child: Image.asset(
-                              'assets/images/Streak number.png',
-                              width: 155.w,
-                              height: 90.h,
-                            ),
-                          ),
-                        ],
+                              ),
+                            ],
+                          );
+                        },
                       ),
+                      // ----------------------------
+
                       Text(
                         "Go ahead, freeze it. Commitment is \noverrated anyway.",
                         style: sfProDisplay600(22.sp, Colors.white),
@@ -275,15 +323,7 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                                             }
 
                                             return Expanded(
-                                              child: GestureDetector(
-                                                behavior: HitTestBehavior.opaque,
-                                                onTap: () => controller.toggleCalendarCell(
-                                                  0,
-                                                  i,
-                                                  isSingleRow: true,
-                                                ),
-                                                child: Center(child: icon),
-                                              ),
+                                              child: Center(child: icon),
                                             );
                                           }),
                                         ),
@@ -338,7 +378,7 @@ class StreakFreezeUseBottomSheet extends StatelessWidget {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            Get.to(const HomeScreen2());
+                            Get.offAll(const HomeScreen2());
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7EDDE4),

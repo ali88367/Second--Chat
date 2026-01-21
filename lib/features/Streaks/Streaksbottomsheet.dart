@@ -9,12 +9,44 @@ import '../../controllers/Main Section Controllers/streak_controller.dart';
 import '../../core/widgets/custom_black_glass_widget.dart';
 import 'Freeze_bottomsheet.dart';
 
-class StreamStreakSetupBottomSheet extends StatelessWidget {
+class StreamStreakSetupBottomSheet extends StatefulWidget {
   const StreamStreakSetupBottomSheet({super.key});
 
   @override
+  State<StreamStreakSetupBottomSheet> createState() => _StreamStreakSetupBottomSheetState();
+}
+
+class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSheet> with SingleTickerProviderStateMixin {
+  late AnimationController _glowController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOutSine),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 0.15, end: 0.35).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StreamStreaksController(),permanent: true);
+    final controller = Get.put(StreamStreaksController(), permanent: true);
 
     return Container(
       height: Get.height * 0.9,
@@ -25,160 +57,134 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
           topRight: Radius.circular(18),
         ),
       ),
-      child: Stack(
+      child: Column(
         children: [
-          Column(
-            children: [
-              SizedBox(height: 12.h),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    InkWell(
-                      onTap: () {
-                        controller.isSelectingThreeDays.value = false;
-                        controller.threeTimesWeek.value = false;
-                        controller.selectedMenuNumbers.clear();
-                        Get.back();
-                      },
-                      child: Image.asset(
-                        'assets/icons/x_icon.png',
-                        height: 44.h,
-                        errorBuilder: (_, __, ___) =>
-                            Icon(Icons.close, color: Colors.white, size: 44.h),
-                      ),
-                    ),
-                    Text(
-                      "Stream Streaks",
-                      style: TextStyle(
-                        fontSize: 17.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(width: 44.w),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w),
-                  child: Column(
-                    children: [
-                      SizedBox(height: 10.h),
-                      Container(
-                        child: Image.asset(
-                          'assets/images/abc.png',
-                          height: 177.h,
-                        ),
-                      ),
-                      SizedBox(height: 6.h),
-                      Text(
-                        "Build a long-term habit",
-                        style: sfProDisplay600(22.sp, Colors.white),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        "Setting a streak goals  helps you stay consistent",
-                        style: sfProDisplay400(15.sp, Color(0xFFB0B3B8)),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 14.h),
-                      _buildDayToggles(controller),
-                      SizedBox(height: 14.h),
-                      _buildDivider(),
-                      SizedBox(height: 10.h),
-                      _buildThreeTimesOption(controller, context),
-                      SizedBox(height: 100.h), // Extra space for scrolling
-                    ],
+          SizedBox(height: 12.h),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: () {
+                    controller.isSelectingThreeDays.value = false;
+                    controller.threeTimesWeek.value = false;
+                    controller.selectedMenuNumbers.clear();
+                    Get.back();
+                  },
+                  child: Image.asset(
+                    'assets/icons/x_icon.png',
+                    height: 44.h,
+                    errorBuilder: (_, __, ___) =>
+                        Icon(Icons.close, color: Colors.white, size: 44.h),
                   ),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.all(16.w),
-                child: SizedBox(
-                  height: 50.h,
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Get.back();
-                      Get.bottomSheet(
-                        const StreakFreezePreviewBottomSheet(),
-                        isScrollControlled: true,
-                        ignoreSafeArea: false,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(36.r),
-                      ),
-                    ),
-                    child: Text(
-                      "Next",
-                      style: sfProText600(17.sp, Colors.black),
-                    ),
+                Text(
+                  "Stream Streaks",
+                  style: TextStyle(
+                    fontSize: 17.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
-              ),
-            ],
+                SizedBox(width: 44.w),
+              ],
+            ),
           ),
-
-          // Glow effect above the header text - positioned to extend upward
-          Positioned(
-            top: 0.h + 4.h + 0.h + 68.5.h, // Center of image position
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Center(
-                child: Container(
-                  width: 177.h, // Match image width
-                  height: 177.h, // Match image height
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0XFFFFE6A7).withOpacity(0.2),
-                        blurRadius: 40,
-                        spreadRadius: 10,
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: Column(
+                children: [
+                  SizedBox(height: 10.h),
+                  // Glow and Image Stack moved here to scroll together
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // ANIMATED FIRE GLOW
+                      AnimatedBuilder(
+                        animation: _glowController,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _scaleAnimation.value,
+                            child: Container(
+                              width: 150.h,
+                              height: 150.h,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0XFFFFE6A7).withOpacity(_opacityAnimation.value),
+                                    blurRadius: 50,
+                                    spreadRadius: 20,
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0XFFF2B269).withOpacity(_opacityAnimation.value * 0.5),
+                                    blurRadius: 30,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // FIRE IMAGE
+                      Image.asset(
+                        'assets/images/abc.png',
+                        height: 177.h,
                       ),
                     ],
                   ),
+                  SizedBox(height: 6.h),
+                  Text(
+                    "Build a long-term habit",
+                    style: sfProDisplay600(22.sp, Colors.white),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    "Setting a streak goals  helps you stay consistent",
+                    style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 14.h),
+                  _buildDayToggles(controller),
+                  SizedBox(height: 14.h),
+                  _buildDivider(),
+                  SizedBox(height: 10.h),
+                  _buildThreeTimesOption(controller, context),
+                  SizedBox(height: 100.h),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16.w),
+            child: SizedBox(
+              height: 50.h,
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Get.back();
+                  Get.bottomSheet(
+                    const StreakFreezePreviewBottomSheet(),
+                    isScrollControlled: true,
+                    ignoreSafeArea: false,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(36.r),
+                  ),
+                ),
+                child: Text(
+                  "Next",
+                  style: sfProText600(17.sp, Colors.black),
                 ),
               ),
             ),
           ),
-
-          // Obx(() {
-          //   if (!controller.isSelectingThreeDays.value) {
-          //     return const SizedBox.shrink();
-          //   }
-          //
-          //   return Positioned.fill(
-          //     child: GestureDetector(
-          //       onTap: () => controller.isSelectingThreeDays.value = false,
-          //       behavior: HitTestBehavior.opaque,
-          //       child: Container(
-          //         color: Colors.transparent, // Capture taps to close
-          //         child: Stack(
-          //           children: [
-          //             Positioned(
-          //                 bottom:
-          //                 125.h, // Positioned right above the "3-times" bar
-          //                 left: 20.w, // Aligned with the indicator icon
-          //                 child: SizedBox(
-          //
-          //                     height: 358.h,
-          //
-          //                     child: Image.asset('assets/images/s2.png'))
-          //             ),
-          //           ],
-          //         ),
-          //       ),
-          //     ),
-          //   );
-          // }),
         ],
       ),
     );
@@ -262,7 +268,6 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
   }
 
   Widget _buildThreeTimesOption(StreamStreaksController controller, BuildContext context) {
-    // GlobalKey to get the position of the indicator icon
     final indicatorKey = GlobalKey();
 
     return Obx(() {
@@ -270,11 +275,9 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
       return GestureDetector(
         onTap: () {
           controller.toggleThreeTimesWeek(!selected);
-          // Toggle menu visibility when clicking the row
           if (!selected) {
             controller.isSelectingThreeDays.value = true;
-            // Show the glassmorphic popup
-            Future.delayed(Duration(milliseconds: 50), () {
+            Future.delayed(const Duration(milliseconds: 50), () {
               _showGlassmorphicPopupMenu(context, indicatorKey, controller);
             });
           }
@@ -307,18 +310,12 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
               CustomSwitch(
                 value: selected,
                 onChanged: (val) {
-                   controller.toggleThreeTimesWeek(val);
-                  // if (val) {
-                  //   // controller.isSelectingThreeDays.value = true;
-                  //   // Show the glassmorphic popup
-                  //   Future.delayed(Duration(milliseconds: 50), () {
-                  //     _showGlassmorphicPopupMenu(context, indicatorKey, controller);
-                  //   });
-                  // }
-                   if(val)
-                  Future.delayed(Duration(milliseconds: 50), () {
-                    _showGlassmorphicPopupMenu(context, indicatorKey, controller);
-                  });
+                  controller.toggleThreeTimesWeek(val);
+                  if (val) {
+                    Future.delayed(const Duration(milliseconds: 50), () {
+                      _showGlassmorphicPopupMenu(context, indicatorKey, controller);
+                    });
+                  }
                 },
               ),
             ],
@@ -333,15 +330,12 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
       GlobalKey indicatorKey,
       StreamStreaksController controller,
       ) {
-    final RenderBox? overlay =
-    Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final RenderBox? button =
-    indicatorKey.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final RenderBox? button = indicatorKey.currentContext?.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
 
     final Offset buttonPosition = button.localToGlobal(Offset.zero);
-    final Size buttonSize = button.size;
 
     showGeneralDialog(
       context: context,
@@ -354,7 +348,6 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
           children: [
             Positioned(
               top: buttonPosition.dy - 290.h - 8.h,
-              // Align to the right edge of the button/indicator
               right: overlay.size.width - buttonPosition.dx - 64.w,
               child: Material(
                 color: Colors.transparent,
@@ -364,8 +357,6 @@ class StreamStreakSetupBottomSheet extends StatelessWidget {
                   onItemSelected: (selected) {
                     final selectedNumber = int.parse(selected);
                     controller.toggleMenuNumber(selectedNumber);
-
-                    // Don't close immediately, let user select up to 3
                     if (controller.selectedMenuNumbers.length >= 3) {
                       Navigator.of(context).pop();
                       controller.isSelectingThreeDays.value = false;

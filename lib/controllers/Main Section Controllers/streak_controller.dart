@@ -103,7 +103,7 @@ class StreamStreaksController extends GetxController {
     selectedDays.refresh();
   }
 
-  // --- UPDATED CALENDAR LOGIC ---
+  // --- UPDATED CALENDAR LOGIC (SNACKBAR REMOVED) ---
   void toggleCalendarCell(int rowIdx, int colIdx, {bool isSingleRow = false}) {
     final RxList<CellType> targetRow = isSingleRow ? singleRowCells : calendarRows[rowIdx];
     final CellType current = targetRow[colIdx];
@@ -121,9 +121,9 @@ class StreamStreaksController extends GetxController {
       return;
     }
 
-    // 2. TICK, CROSS or DOT -> FREEZE (Max 3)
-    // Now including CellType.tick in the trigger logic
+    // 2. TICK, CROSS or DOT -> FREEZE
     if (current == CellType.tick || current == CellType.cross || current == CellType.dot) {
+      // Only proceed if we haven't hit the 3-freeze limit
       if (manualFreezeCount.value < 3) {
         targetRow[colIdx] = CellType.freeze;
         manualFreezeCount.value++;
@@ -132,22 +132,13 @@ class StreamStreaksController extends GetxController {
         lastTappedCol.value = colIdx;
 
         targetRow.refresh();
-      } else {
-        Get.snackbar(
-          "Limit Reached",
-          "Only 3 freezes allowed.",
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.black,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 1),
-        );
       }
+      // Snackbar removed from here. If limit is hit, nothing happens.
       return;
     }
   }
 
   // Highlighting Logic: Only looks for CellType.tick.
-  // Freezes will now break the golden highlight line.
   List<List<int>> getTickGroups(List<CellType> row) {
     final groups = <List<int>>[];
     int start = -1;

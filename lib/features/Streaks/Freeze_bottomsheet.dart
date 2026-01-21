@@ -6,12 +6,44 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Streaks/Compact_freeze.dart' hide CellType;
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
-class StreakFreezePreviewBottomSheet extends StatelessWidget {
+class StreakFreezePreviewBottomSheet extends StatefulWidget {
   const StreakFreezePreviewBottomSheet({super.key});
+
+  @override
+  State<StreakFreezePreviewBottomSheet> createState() => _StreakFreezePreviewBottomSheetState();
+}
+
+class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBottomSheet> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
   static const double rowHeight = 32;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 0.1, end: 0.3).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   // ---------------- ICONS ----------------
 
@@ -96,7 +128,6 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                 final cell = rowData[i];
                 final isLast = c.lastTappedRow.value == rowIndex && c.lastTappedCol.value == i;
 
-                // UPDATED: Now Ticks are also tappable to be replaced by Freezes
                 final tappable = cell == CellType.tick ||
                     cell == CellType.cross ||
                     cell == CellType.freeze ||
@@ -170,19 +201,43 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 10.h),
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0XFF84DEE4).withOpacity(0.2),
-                            blurRadius: 60,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: Image.asset('assets/images/a1.png', height: 177.h),
+
+                    // --- ANIMATED ICE GLOW & IMAGE ---
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _scaleAnimation.value,
+                              child: Container(
+                                width: 140.h,
+                                height: 140.h,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0XFF84DEE4).withOpacity(_opacityAnimation.value),
+                                      blurRadius: 55,
+                                      spreadRadius: 15,
+                                    ),
+                                    BoxShadow(
+                                      color: const Color(0XFF5AC8FA).withOpacity(_opacityAnimation.value * 0.5),
+                                      blurRadius: 30,
+                                      spreadRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        Image.asset('assets/images/a1.png', height: 177.h),
+                      ],
                     ),
+                    // ---------------------------------
+
                     SizedBox(height: 6.h),
                     Text(
                       "Streak in danger?\nHit the Freeze button!",
@@ -254,15 +309,13 @@ class StreakFreezePreviewBottomSheet extends StatelessWidget {
                   height: 50.h,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Closes the current StreakStreakSetupBottomSheet
                       Get.back();
-
-                      // Opens the new single row preview sheet
                       Get.bottomSheet(
                         const StreakFreezeSingleRowPreviewBottomSheet(),
                         isScrollControlled: true,
                       );
-                    },                    style: ElevatedButton.styleFrom(
+                    },
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(36.r)),
                     ),
