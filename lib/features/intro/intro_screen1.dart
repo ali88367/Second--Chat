@@ -34,6 +34,7 @@ class _IntroScreen1State extends State<IntroScreen1> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
+        top: false,
         child: Stack(
           children: [
             Container(

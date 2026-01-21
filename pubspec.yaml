@@ -42,6 +42,12 @@ dependencies:
   ios_color_picker:
   glassmorphism: ^3.0.0
   gradient_borders: ^1.0.2
+  carousel_slider:
+  cached_network_image: ^3.3.1
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+  sqflite: ^2.3.2
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:

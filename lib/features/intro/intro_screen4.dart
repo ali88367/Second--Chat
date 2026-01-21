@@ -259,7 +259,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
-                            borderRadius: BorderRadius.circular(30.r),
+                            borderRadius: BorderRadius.circular(40.r),
                             boxShadow: [
                               BoxShadow(
                                 color: const Color(0xFFE8B87E).withOpacity(0.4),
@@ -272,196 +272,195 @@ class _IntroScreen4State extends State<IntroScreen4> {
                             children: [
                               // Scrollable Badge Content
                               Positioned.fill(
-                                child: SingleChildScrollView(
-                                  controller: _scrollController,
-                                  // Same padding as features list to align
-                                  padding: EdgeInsets.only(top: 82.h),
-                                  child: Column(
-                                    children: [
-                                      // First badge (xmark) - aligns with first feature
-                                      SizedBox(height: 0.h),
-                                      _buildBadgeIcon(
-                                        imagePath:
-                                            'assets/images/xmark.circle.fill.png',
-                                        width: 23.91.w,
-                                        height: 23.91.h,
-                                        isInfo: false,
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Second badge - aligns with second feature
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
+                                child: Column(
+                                  children: [
+                                    SizedBox(height: 20.h,),
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        controller: _scrollController,
+                                        // Same padding as features list to align
+                                        child: Column(
+                                          children: [
+                                            SizedBox(
+                                              height: 31.h,
+                                              width: 31.w,
+                                              child: Image.asset(
+                                                'assets/images/crown.png',
+                                              ),
+                                            ),
+                                            // First badge (xmark) - aligns with first feature
+                                            SizedBox(height: 38.h),
+                                            _buildBadgeIcon(
+                                              imagePath:
+                                                  'assets/images/xmark.circle.fill.png',
+                                              width: 28.w,
+                                              height: 28.h,
+                                              isInfo: false,
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Second badge - aligns with second feature
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Third badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkPlus.png',
+                                                isInfo: false,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Fourth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Fifth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Sixth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Seventh badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Eighth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                    'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                            // Ninth badge
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 3.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath: 'assets/images/24-7.png',
+                                                isInfo: true,
+                                              ),
+                                            ),
+                                            SizedBox(height: 48.h),
+                                          ],
                                         ),
                                       ),
-                                      SizedBox(height: 48.h),
-                                      // Third badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkPlus.png',
-                                          isInfo: false,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Fourth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Fifth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Sixth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Seventh badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Eighth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath:
-                                              'assets/images/checkInfo.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                      // Ninth badge
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 10.w),
-                                        child: _buildBadgeIcon(
-                                          imagePath: 'assets/images/24-7.png',
-                                          isInfo: true,
-                                        ),
-                                      ),
-                                      SizedBox(height: 48.h),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               // Sticky Crown at top
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(vertical: 16.h),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        height: 32.h,
-                                        width: 32.w,
-                                        child: Image.asset(
-                                          'assets/images/crown.png',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                              // Positioned(
+                              //   top: 0,
+                              //   left: 0,
+                              //   right: 0,
+                              //   child: ,
+                              // ),
                             ],
                           ),
                         ),
