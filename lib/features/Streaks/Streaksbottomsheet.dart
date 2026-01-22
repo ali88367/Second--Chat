@@ -6,6 +6,7 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/widgets/custom_switch.dart';
 
+import '../../3timewidget.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 import '../../core/widgets/custom_black_glass_widget.dart';
 import 'Freeze_bottomsheet.dart';
@@ -372,7 +373,7 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
               left: buttonPosition.dx - 20.w,
               child: Material(
                 color: Colors.transparent,
-                child: CustomBlackGlassWidget(
+                child: CCustomBlackGlassWidget(
                   isWeek: true,
                   items: List.generate(7, (i) => '${i + 1}'),
                   onItemSelected: (selected) {
