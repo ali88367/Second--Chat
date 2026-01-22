@@ -378,7 +378,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            Get.offAll(const HomeScreen2());
+                            Get.back();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7EDDE4),

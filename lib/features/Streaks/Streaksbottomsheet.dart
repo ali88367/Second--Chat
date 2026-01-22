@@ -93,7 +93,7 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              padding: EdgeInsets.symmetric(horizontal: 20.w,vertical: 60.h),
               child: Column(
                 children: [
                   SizedBox(height: 10.h),

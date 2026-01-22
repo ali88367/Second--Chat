@@ -33,6 +33,7 @@ class _IntroScreen1State extends State<IntroScreen1> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: SafeArea(
         top: false,
         child: Stack(
@@ -40,8 +41,8 @@ class _IntroScreen1State extends State<IntroScreen1> {
             Container(
               decoration: const BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage('assets/images/intro1.png'),
-                  fit: BoxFit.cover,
+                  image: AssetImage('assets/images/ani.gif'),
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
