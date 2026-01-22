@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -46,7 +47,7 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StreamStreaksController(), permanent: true);
+    final controller = Get.put(StreamStreaksController());
 
     return Container(
       height: Get.height * 0.9,
@@ -97,11 +98,9 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
               child: Column(
                 children: [
                   SizedBox(height: 10.h),
-                  // Glow and Image Stack moved here to scroll together
                   Stack(
                     alignment: Alignment.center,
                     children: [
-                      // ANIMATED FIRE GLOW
                       AnimatedBuilder(
                         animation: _glowController,
                         builder: (context, child) {
@@ -129,7 +128,6 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
                           );
                         },
                       ),
-                      // FIRE IMAGE
                       Image.asset(
                         'assets/images/abc.png',
                         height: 177.h,
@@ -274,12 +272,13 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
       final selected = controller.threeTimesWeek.value;
       return GestureDetector(
         onTap: () {
-          controller.toggleThreeTimesWeek(!selected);
           if (!selected) {
-            controller.isSelectingThreeDays.value = true;
+            controller.toggleThreeTimesWeek(true);
             Future.delayed(const Duration(milliseconds: 50), () {
               _showGlassmorphicPopupMenu(context, indicatorKey, controller);
             });
+          } else {
+            controller.toggleThreeTimesWeek(false);
           }
         },
         child: Container(
@@ -296,6 +295,7 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
                   Image.asset(
                     'assets/images/Pop-up Menu Indicator.png',
                     key: indicatorKey,
+                    color: selected ? Colors.white : Colors.grey,
                   ),
                   SizedBox(width: 12.w),
                   Text(
@@ -347,19 +347,22 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
         return Stack(
           children: [
             Positioned(
-              top: buttonPosition.dy - 290.h - 8.h,
-              right: overlay.size.width - buttonPosition.dx - 64.w,
+              top: buttonPosition.dy - 340.h,
+              left: buttonPosition.dx - 20.w,
               child: Material(
                 color: Colors.transparent,
                 child: CustomBlackGlassWidget(
                   isWeek: true,
                   items: List.generate(7, (i) => '${i + 1}'),
                   onItemSelected: (selected) {
-                    final selectedNumber = int.parse(selected);
-                    controller.toggleMenuNumber(selectedNumber);
-                    if (controller.selectedMenuNumbers.length >= 3) {
-                      Navigator.of(context).pop();
-                      controller.isSelectingThreeDays.value = false;
+                    // This function is still passed, but the logic
+                    // is primarily driven by the internal Obx in the widget
+                    if (controller.selectedMenuNumbers.length == 3) {
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      });
                     }
                   },
                 ),
@@ -372,8 +375,8 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
         return FadeTransition(
           opacity: animation,
           child: ScaleTransition(
-            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
             ),
             child: child,
           ),

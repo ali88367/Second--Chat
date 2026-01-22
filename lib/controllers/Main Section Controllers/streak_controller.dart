@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 enum CellType { tick, cross, dot, freeze }
 
 class StreamStreaksController extends GetxController {
+  // --- SELECTION STATE ---
   var selectedDays = <String, bool>{
     'Mon': false,
     'Tue': false,
@@ -14,13 +15,24 @@ class StreamStreaksController extends GetxController {
     'Sun': false,
   }.obs;
 
-  // --- INTERACTIVE MENU NUMBERS ---
+  RxBool threeTimesWeek = false.obs;
+  RxBool isSelectingThreeDays = false.obs;
+
+  // Logic tracking for the glass menu
+  // These are the numbers that have been tapped and moved "UP"
+  RxList<int> selectedMenuNumbers = <int>[].obs;
+
+  // The master list of all possible numbers (1-7)
+  final List<int> _fullNumberList = [1, 2, 3, 4, 5, 6, 7];
+
+  // --- GETTERS ---
+
+  // Numbers that are NOT selected (to be shown in the bottom section of the menu)
+  // This updates automatically whenever selectedMenuNumbers changes
+  List<int> get availableNumbers =>
+      _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
+
   int get selectedCount => selectedMenuNumbers.length;
-
-  List<int> get availableMenuNumbers => List.generate(7, (i) => i + 1)
-      .where((n) => !selectedMenuNumbers.contains(n))
-      .toList();
-
   bool get areDaysDisabled => threeTimesWeek.value;
 
   // --- CALENDAR STATE ---
@@ -37,13 +49,7 @@ class StreamStreaksController extends GetxController {
 
   final lastTappedRow = RxnInt();
   final lastTappedCol = RxnInt();
-
-  // Track active freezes
   RxInt manualFreezeCount = 0.obs;
-
-  RxBool threeTimesWeek = false.obs;
-  RxBool isSelectingThreeDays = false.obs;
-  RxList<int> selectedMenuNumbers = <int>[].obs;
 
   @override
   void onInit() {
@@ -59,20 +65,31 @@ class StreamStreaksController extends GetxController {
     manualFreezeCount.value = count;
   }
 
-  // --- SELECTION LOGIC ---
+  // --- UPDATED SELECTION LOGIC ---
+
+  /// Handles moving numbers between the top and bottom sections of the menu
   void toggleMenuNumber(int number) {
     if (selectedMenuNumbers.contains(number)) {
+      // If already selected, remove it (it moves back down)
       selectedMenuNumbers.remove(number);
     } else {
+      // If not selected, move it to the top (limit to 3)
       if (selectedMenuNumbers.length < 3) {
         selectedMenuNumbers.add(number);
       }
     }
+
+    // Set main switch state based on whether we hit the goal of 3 selections
     if (selectedMenuNumbers.length == 3) {
-      isSelectingThreeDays.value = false;
       threeTimesWeek.value = true;
-      syncMenuToDays();
+      isSelectingThreeDays.value = false;
+      syncMenuToDays(); // Map 1,2,3... to Mon,Tue,Wed...
+    } else {
+      threeTimesWeek.value = false;
     }
+
+    // Refresh the lists to ensure the UI rebuilds
+    selectedMenuNumbers.refresh();
   }
 
   void toggleDay(String day) {
@@ -93,52 +110,42 @@ class StreamStreaksController extends GetxController {
     }
   }
 
+  /// Synchronizes the selected numbers (1-7) to the actual day keys (Mon-Sun)
   void syncMenuToDays() {
     if (!threeTimesWeek.value) return;
-    final days = selectedDays.keys.toList();
+    final dayKeys = selectedDays.keys.toList();
+
+    // Reset all days first
     selectedDays.updateAll((key, value) => false);
+
+    // Turn on the days corresponding to the selected numbers
     for (final n in selectedMenuNumbers) {
-      selectedDays[days[n - 1]] = true;
+      if (n > 0 && n <= dayKeys.length) {
+        selectedDays[dayKeys[n - 1]] = true;
+      }
     }
     selectedDays.refresh();
   }
 
-  // --- UPDATED CALENDAR LOGIC (SNACKBAR REMOVED) ---
+  // --- CALENDAR LOGIC ---
   void toggleCalendarCell(int rowIdx, int colIdx, {bool isSingleRow = false}) {
     final RxList<CellType> targetRow = isSingleRow ? singleRowCells : calendarRows[rowIdx];
     final CellType current = targetRow[colIdx];
 
-    // 1. FREEZE -> CROSS (Revert and refund count)
     if (current == CellType.freeze) {
       targetRow[colIdx] = CellType.cross;
       manualFreezeCount.value--;
-
-      if (lastTappedRow.value == rowIdx && lastTappedCol.value == colIdx) {
-        lastTappedCol.value = null;
-      }
-
       targetRow.refresh();
       return;
     }
 
-    // 2. TICK, CROSS or DOT -> FREEZE
-    if (current == CellType.tick || current == CellType.cross || current == CellType.dot) {
-      // Only proceed if we haven't hit the 3-freeze limit
-      if (manualFreezeCount.value < 3) {
-        targetRow[colIdx] = CellType.freeze;
-        manualFreezeCount.value++;
-
-        lastTappedRow.value = rowIdx;
-        lastTappedCol.value = colIdx;
-
-        targetRow.refresh();
-      }
-      // Snackbar removed from here. If limit is hit, nothing happens.
-      return;
+    if (manualFreezeCount.value < 3) {
+      targetRow[colIdx] = CellType.freeze;
+      manualFreezeCount.value++;
+      targetRow.refresh();
     }
   }
 
-  // Highlighting Logic: Only looks for CellType.tick.
   List<List<int>> getTickGroups(List<CellType> row) {
     final groups = <List<int>>[];
     int start = -1;
