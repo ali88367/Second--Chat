@@ -3,9 +3,14 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 
 import '../../../../core/themes/textstyles.dart';
+import '../../../core/helper/emote_parser.dart';
 import '../../../core/widgets/custom_black_glass_widget.dart';
+
+import '../../../services/emote_service.dart';
 import 'live_stream_helper_widgets.dart';
 
 class ChatBottomSection extends StatefulWidget {
@@ -29,6 +34,7 @@ class ChatBottomSection extends StatefulWidget {
 }
 
 class _ChatBottomSectionState extends State<ChatBottomSection> {
+  // Platform assets and colors
   static const List<String> platforms = [
     'assets/images/twitch1.png',
     'assets/images/kick.png',
@@ -50,6 +56,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   static const Color kickColor = Color.fromRGBO(83, 252, 24, 1);
   static const Color youtubeColor = Color.fromRGBO(221, 44, 40, 1);
 
+  // Controllers and state
   late List<Map<String, dynamic>> _comments;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _mainScrollController = ScrollController();
@@ -58,55 +65,75 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   StateSetter? _expandedSheetStateSetter;
   final filterController = Get.put(FilterController());
 
+  // Emote service - initialized lazily
+  late final EmoteService _emoteService;
+  EmoteParser? _emoteParser;
+
+  // Flag to prevent emoji picker from showing multiple times
+  bool _emojiPickerScheduled = false;
+
+  // Unicode emojis list
+  static const List<String> _emojis = [
+    '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',
+    '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙',
+    '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
+    '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥',
+    '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮',
+    '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '👏', '🙌', '👐',
+    '❤️', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️',
+    '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️',
+  ];
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize or get existing EmoteService
+    _emoteService = Get.put(EmoteService());
+
+    // Initialize sample comments
     _comments = [
-      {
-        'platform': 'assets/images/twitch1.png',
-        'name': 'TwitchFan1',
-        'message': 'Amazing play!',
-      },
-      {
-        'platform': 'assets/images/twitch1.png',
-        'name': 'TwitchFan2',
-        'message': 'Wow, insane!',
-      },
-      {
-        'platform': 'assets/images/kick.png',
-        'name': 'KickFan1',
-        'message': 'Lets goooo!',
-      },
-      {
-        'platform': 'assets/images/kick.png',
-        'name': 'KickFan2',
-        'message': 'Hyped for this!',
-      },
-      {
-        'platform': 'assets/images/youtube1.png',
-        'name': 'YTViewer1',
-        'message': 'Nice content!',
-      },
-      {
-        'platform': 'assets/images/youtube1.png',
-        'name': 'YTViewer2',
-        'message': 'Love this!',
-      },
+      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan1', 'message': 'KEKW Amazing play!'},
+      {'platform': 'assets/images/twitch1.png', 'name': 'TwitchFan2', 'message': 'Wow, insane! catJAM'},
+      {'platform': 'assets/images/kick.png', 'name': 'KickFan1', 'message': 'Lets goooo! POGGERS'},
+      {'platform': 'assets/images/kick.png', 'name': 'KickFan2', 'message': 'Hyped for this! monkaS'},
+      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer1', 'message': 'Nice content! PepeLaugh'},
+      {'platform': 'assets/images/youtube1.png', 'name': 'YTViewer2', 'message': 'Love this! Sadge'},
     ];
+
     for (int i = 0; i < 10; i++) {
       _comments.add({
         'platform': 'assets/images/twitch1.png',
         'name': 'User$i',
-        'message': 'Hello $i',
+        'message': 'Hello $i KEKW!',
       });
     }
     _comments.shuffle();
+
+    // Listen for emote changes to update parser
+    ever(_emoteService.emoteList, (_) {
+      _updateEmoteParser();
+    });
+
+    // Initial parser setup
+    _updateEmoteParser();
 
     // Auto-scroll to bottom on initial load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom(_mainScrollController, animate: false);
       _scrollToBottom(_expandedScrollController, animate: false);
     });
+  }
+
+  /// Update the emote parser when emotes change
+  void _updateEmoteParser() {
+    _emoteParser = EmoteParser(
+      emoteUrlMap: _emoteService.emoteUrlMap,
+      textStyle: sfProText400(12.sp, Colors.white),
+      emoteSize: 28, // Increased size for better visibility
+    );
+    // Trigger rebuild to update existing messages
+    if (mounted) setState(() {});
   }
 
   @override
@@ -120,7 +147,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
   void _scrollToBottom(ScrollController controller, {bool animate = true}) {
     if (!controller.hasClients) {
-      // If not ready, schedule for next frame
       Future.delayed(const Duration(milliseconds: 50), () {
         if (controller.hasClients) {
           _scrollToBottom(controller, animate: animate);
@@ -129,14 +155,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       return;
     }
 
-    // Wait for layout to update, then scroll
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!controller.hasClients) return;
 
       final maxScroll = controller.position.maxScrollExtent;
       if (maxScroll > 0) {
         if (animate) {
-          // Smooth animation for better feel
           controller.animateTo(
             maxScroll,
             duration: const Duration(milliseconds: 200),
@@ -177,48 +201,71 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     if (text.isEmpty) return;
 
     String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
+    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!;
     }
 
     final platformAsset = _getPlatformAsset(currentPlatform);
     final item = {'platform': platformAsset, 'name': 'You', 'message': text};
 
-    // Add comment and trigger rebuild immediately
     setState(() {
       _comments.add(item);
     });
 
-    // Also trigger rebuild in expanded sheet if it's open
     if (_expandedSheetStateSetter != null) {
-      _expandedSheetStateSetter!(() {
-        // Rebuild expanded sheet
-      });
+      _expandedSheetStateSetter!(() {});
     }
 
-    // Clear text field but keep keyboard open
     _messageController.clear();
-
-    // Keep focus on text field (keyboard stays open)
     _focusNode.requestFocus();
 
-    // Force scroll after multiple frames to ensure keyboard layout is accounted for
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // First attempt - immediate scroll
       Future.microtask(() {
         _scrollToBottomImmediate(_mainScrollController);
         _scrollToBottomImmediate(_expandedScrollController);
       });
 
-      // Second attempt - after layout phase
       Future.delayed(const Duration(milliseconds: 100), () {
         _scrollToBottomImmediate(_mainScrollController);
         _scrollToBottomImmediate(_expandedScrollController);
       });
 
-      // Third attempt - after keyboard insets stabilize
       Future.delayed(const Duration(milliseconds: 300), () {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
+    });
+  }
+
+  /// Send emote directly to chat (not to text field)
+  void _sendEmoteDirectly(String emoteName) {
+    String currentPlatform = widget.chatFilter.value ?? 'twitch';
+    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!;
+    }
+
+    final platformAsset = _getPlatformAsset(currentPlatform);
+    final item = {'platform': platformAsset, 'name': 'You', 'message': emoteName};
+
+    setState(() {
+      _comments.add(item);
+    });
+
+    if (_expandedSheetStateSetter != null) {
+      _expandedSheetStateSetter!(() {});
+    }
+
+    // Track recently used
+    _emoteService.addToRecentlyUsed(emoteName);
+
+    // Scroll to bottom
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.microtask(() {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
+
+      Future.delayed(const Duration(milliseconds: 100), () {
         _scrollToBottomImmediate(_mainScrollController);
         _scrollToBottomImmediate(_expandedScrollController);
       });
@@ -231,12 +278,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     try {
       final maxScroll = controller.position.maxScrollExtent;
       if (maxScroll > 0) {
-        // Use jumpTo for immediate scroll, then animate for smoothness
         controller.jumpTo(maxScroll);
-        // Smooth scroll after jump
         Future.delayed(const Duration(milliseconds: 50), () {
-          if (controller.hasClients &&
-              controller.position.maxScrollExtent > 0) {
+          if (controller.hasClients && controller.position.maxScrollExtent > 0) {
             controller.animateTo(
               controller.position.maxScrollExtent,
               duration: const Duration(milliseconds: 150),
@@ -250,96 +294,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     }
   }
 
-  static const List<String> _emojis = [
-    '😀',
-    '😃',
-    '😄',
-    '😁',
-    '😆',
-    '😅',
-    '🤣',
-    '😂',
-    '🙂',
-    '🙃',
-    '😉',
-    '😊',
-    '😇',
-    '🥰',
-    '😍',
-    '🤩',
-    '😘',
-    '😗',
-    '😚',
-    '😙',
-    '😋',
-    '😛',
-    '😜',
-    '🤪',
-    '😝',
-    '🤑',
-    '🤗',
-    '🤭',
-    '🤫',
-    '🤔',
-    '🤐',
-    '🤨',
-    '😐',
-    '😑',
-    '😶',
-    '😏',
-    '😒',
-    '🙄',
-    '😬',
-    '🤥',
-    '😌',
-    '😔',
-    '😪',
-    '🤤',
-    '😴',
-    '😷',
-    '🤒',
-    '🤕',
-    '🤢',
-    '🤮',
-    '👍',
-    '👎',
-    '👌',
-    '✌️',
-    '🤞',
-    '🤟',
-    '🤘',
-    '👏',
-    '🙌',
-    '👐',
-    '❤️',
-    '💛',
-    '💚',
-    '💙',
-    '💜',
-    '🖤',
-    '🤍',
-    '🤎',
-    '💔',
-    '❣️',
-    '💕',
-    '💞',
-    '💓',
-    '💗',
-    '💖',
-    '💘',
-    '💝',
-    '💟',
-    '☮️',
-    '✝️',
-  ];
-
-  void _showEmojiPicker(BuildContext context, StateSetter? setSheetState) {
-    final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final double screenWidth = mediaQuery.size.width * 0.8;
-    final double keyboardHeight = mediaQuery.viewInsets.bottom;
-
-    // Position above text input (accounting for keyboard)
-    final double emojiPickerHeight = 250.h;
+  /// Show the tabbed emoji/emote picker
+  void _showEmojiEmotePicker(BuildContext context, StateSetter? setSheetState) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width * 0.9;
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final pickerHeight = 320.h;
 
     showGeneralDialog(
       context: context,
@@ -347,154 +307,37 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       barrierDismissible: true,
       barrierLabel: '',
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, animation, secondaryAnimation) {
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
         return Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: EdgeInsets.only(bottom: keyboardHeight + 75.h),
+            padding: EdgeInsets.only(bottom: keyboardHeight + 70.h),
             child: ScaleTransition(
               scale: CurvedAnimation(parent: animation, curve: Curves.easeOut),
               child: FadeTransition(
                 opacity: animation,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(20.r),
-                    bottom: Radius.circular(20.r),
-                  ),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(
-                      width: screenWidth,
-                      constraints: BoxConstraints(maxHeight: emojiPickerHeight),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.black.withOpacity(0.4),
-                            Colors.black.withOpacity(0.2),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20.r),
-                          bottom: Radius.circular(20.r),
-                        ),
-                        border: Border(
-                          top: BorderSide(
-                            color: Colors.white.withOpacity(0.18),
-                            width: 1.0.w,
-                          ),
-                          left: BorderSide(
-                            color: Colors.white.withOpacity(0.18),
-                            width: 1.0.w,
-                          ),
-                          right: BorderSide(
-                            color: Colors.white.withOpacity(0.18),
-                            width: 1.0.w,
-                          ),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                child: _EmojiEmotePickerDialog(
+                  width: screenWidth,
+                  height: pickerHeight,
+                  emojis: _emojis,
+                  emoteService: _emoteService,
+                  onEmojiSelected: (emoji) {
+                    // Emoji still goes to text field
+                    final currentText = _messageController.text;
+                    _messageController.value = TextEditingValue(
+                      text: currentText + emoji,
+                      selection: TextSelection.collapsed(
+                        offset: currentText.length + emoji.length,
                       ),
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          left: 16.w,
-                          right: 16.w,
-                          top: 6.h,
-                          bottom: 10.h,
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            const int cols = 7;
-                            final int rows = (_emojis.length / cols).ceil();
-
-                            Widget emojiCell(String emoji) {
-                              return GestureDetector(
-                                onTap: () {
-                                  final currentText = _messageController.text;
-                                  final newText = currentText + emoji;
-                                  _messageController.value = TextEditingValue(
-                                    text: newText,
-                                    selection: TextSelection.collapsed(
-                                      offset: newText.length,
-                                    ),
-                                  );
-                                  Navigator.of(context).pop();
-                                  _focusNode.requestFocus();
-                                },
-                                child: SizedBox(
-                                  height: 38.h,
-                                  child: Center(
-                                    child: Text(
-                                      emoji,
-                                      style: TextStyle(
-                                        fontSize: 28.sp,
-                                        decoration: TextDecoration.none,
-                                      ),
-                                      textHeightBehavior:
-                                          const TextHeightBehavior(
-                                            applyHeightToFirstAscent: false,
-                                            applyHeightToLastDescent: false,
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            Widget rowDivider() {
-                              // "Glass" divider: thin, subtle, semi-transparent line
-                              return Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 10.w,
-                                  vertical: 8.h,
-                                ),
-                                child: ClipRect(
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                      sigmaX: 8,
-                                      sigmaY: 8,
-                                    ),
-                                    child: Container(
-                                      height: 1.h,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.12),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            return ListView.separated(
-                              physics: const BouncingScrollPhysics(),
-                              padding: EdgeInsets.zero,
-                              itemCount: rows,
-                              separatorBuilder: (context, index) =>
-                                  rowDivider(),
-                              itemBuilder: (context, rowIndex) {
-                                return Row(
-                                  children: List.generate(cols, (colIndex) {
-                                    final idx = rowIndex * cols + colIndex;
-                                    return Expanded(
-                                      child: idx < _emojis.length
-                                          ? emojiCell(_emojis[idx])
-                                          : const SizedBox.shrink(),
-                                    );
-                                  }),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
+                    );
+                    Navigator.of(dialogContext).pop();
+                    _focusNode.requestFocus();
+                  },
+                  onEmoteSelected: (emoteName) {
+                    // Emote goes directly to chat
+                    Navigator.of(dialogContext).pop();
+                    _sendEmoteDirectly(emoteName);
+                  },
                 ),
               ),
             ),
@@ -505,12 +348,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   }
 
   void _showGlassmorphicPopupMenu(
-    BuildContext context,
-    String? currentFilter,
-    StateSetter? setSheetState,
-  ) {
+      BuildContext context,
+      String? currentFilter,
+      StateSetter? setSheetState,
+      ) {
     final RenderBox? overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    Overlay.of(context).context.findRenderObject() as RenderBox?;
     final RenderBox? button = context.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
@@ -528,27 +371,44 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         return Stack(
           children: [
             Positioned(
-              top: buttonPosition.dy - 166.h - 8.h,
-              right: overlay.size.width - buttonPosition.dx - 50.w,
+              bottom: overlay.size.height - buttonPosition.dy - 25.h,
+              right: overlay.size.width - (buttonPosition.dx + buttonSize.width) - 28.w,
               child: Material(
                 color: Colors.transparent,
-                child: IntrinsicWidth(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      // Minimum width to match button
-                      minWidth: buttonSize.width,
-                      // Maximum width to prevent going off-screen on the left
-                      maxWidth: buttonPosition.dx + buttonSize.width - 20.w,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: buttonSize.width + 40.w,
+                    maxWidth: 200.w,
+                  ),
+                  child: CustomBlackGlassWidget(
+                    items: const ["All", "Twitch", "Kick", "YouTube"],
+                    isWeek: false,
+                    onItemSelected: (selected) {
+                      // Convert selection to filter value
+                      String? filterValue;
 
-                    ),
-                    child: CustomBlackGlassWidget(
-                      items: const ["All", "Twitch", "Kick", "YouTube"],
-                      isWeek: false,
-                      onItemSelected: (selected) {
-                        filterController.setFilter(selected);
-                      },
-                    ),
+                      if (selected.toLowerCase() == 'all') {
+                        filterValue = null; // null means show all
+                      } else {
+                        filterValue = selected.toLowerCase(); // 'twitch', 'kick', 'youtube'
+                      }
 
+                      // Update the ValueNotifier's value
+                      widget.chatFilter.value = filterValue;
+
+                      // Update filter controller if needed
+                      filterController.setFilter(selected);
+
+                      // Trigger rebuild if sheet is open
+                      if (setSheetState != null) {
+                        setSheetState(() {});
+                      }
+
+                      // Also rebuild main widget
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
                   ),
                 ),
               ),
@@ -571,15 +431,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   }
 
   Widget _buildPlatformSelector(StateSetter? setSheetState) {
+    final bool isExpanded = setSheetState != null;
+
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,
       builder: (context, filter, _) {
         String label = "All";
-        Color labelColor = Colors.white; // Default color for "All"
+        Color labelColor = Colors.white;
 
         if (filter != null) {
           label = "${filter[0].toUpperCase()}${filter.substring(1)}";
-          // Change color based on selection
           switch (filter) {
             case 'twitch':
               labelColor = twitchColor;
@@ -595,7 +456,18 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
         return GestureDetector(
           onTap: () {
-            _showGlassmorphicPopupMenu(context, filter, setSheetState);
+            if (isExpanded) {
+              // Expanded view: dismiss keyboard first, then show menu
+              FocusScope.of(context).unfocus();
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (context.mounted) {
+                  _showGlassmorphicPopupMenu(context, filter, setSheetState);
+                }
+              });
+            } else {
+              // Collapsed/main view: show menu immediately
+              _showGlassmorphicPopupMenu(context, filter, null);
+            }
           },
           child: Padding(
             padding: EdgeInsets.symmetric(vertical: 4.h),
@@ -619,6 +491,64 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     );
   }
 
+  /// Build chat message with emote parsing
+  Widget _chatItem(
+      String platform,
+      String name,
+      String message,
+      Color nameColor, {
+        Key? key,
+      }) {
+    // Parse message for emotes
+    final List<InlineSpan> messageSpans = _emoteParser?.parse(message) ??
+        [TextSpan(text: message, style: sfProText400(12.sp, Colors.white))];
+
+    return TweenAnimationBuilder<double>(
+      key: key,
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 8 * (1 - value)),
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    // Platform icon
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 6.w),
+                        child: Image.asset(
+                          platform,
+                          width: 14.sp,
+                          height: 14.sp,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    // Username
+                    TextSpan(
+                      text: "$name: ",
+                      style: sfProText500(12.sp, nameColor),
+                    ),
+                    // Message with emotes
+                    ...messageSpans,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Opens expanded chat normally (without emoji picker)
   void _openExpandedChat(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -629,276 +559,288 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
-            // Store reference to setSheetState so _sendMessage can trigger rebuild
             _expandedSheetStateSetter = setSheetState;
-
-            return FractionallySizedBox(
-              heightFactor: 0.94,
-              child: AnimatedPadding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                ),
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade900,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30.r),
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: GestureDetector(
-                      onTap: () {
-                        // Dismiss keyboard when tapping outside in expanded view
-                        _focusNode.unfocus();
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        children: [
-                          SizedBox(height: 10.h),
-                          Container(
-                            width: 40.w,
-                            height: 4.h,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade700,
-                              borderRadius: BorderRadius.circular(2.r),
-                            ),
-                          ),
-                          SizedBox(height: 16.h),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 24.w),
-                            child: Row(
-                              children: [
-                                ValueListenableBuilder<bool>(
-                                  valueListenable: widget.showActivity,
-                                  builder: (context, active, _) {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        final newVal = !active;
-                                        widget.showActivity.value = newVal;
-                                        // If Activity is turned on, turn off Title
-                                        if (newVal) {
-                                          widget.titleSelected.value = false;
-                                          widget.selectedPlatform.value = null;
-                                          widget.showServiceCard.value = true;
-                                        } else {
-                                          widget.showServiceCard.value =
-                                              widget.titleSelected.value;
-                                        }
-                                        setState(() {});
-                                        setSheetState(() {});
-                                      },
-                                      child: pillButton(
-                                        "Activity",
-                                        isActive: active,
-                                        assetPath: 'assets/images/line.png',
-                                      ),
-                                    );
-                                  },
-                                ),
-                                SizedBox(width: 12.w),
-                                ValueListenableBuilder<bool>(
-                                  valueListenable: widget.titleSelected,
-                                  builder: (context, val, _) {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        final newVal = !val;
-                                        widget.titleSelected.value = newVal;
-                                        // If Title is turned on, turn off Activity
-                                        if (newVal) {
-                                          widget.showActivity.value = false;
-                                        }
-                                        widget.showServiceCard.value =
-                                            newVal || widget.showActivity.value;
-                                        setState(() {});
-                                        setSheetState(() {});
-                                      },
-                                      child: pillButton(
-                                        "Title",
-                                        isActive: val,
-                                        assetPath: 'assets/images/magic.png',
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const Spacer(),
-                                SizedBox(width: 12.w),
-                                GestureDetector(
-                                  onTap: () => Navigator.pop(context),
-                                  child: SizedBox(
-                                    height: 36.h,
-                                    width: 36.w,
-                                    child: Image.asset(
-                                      'assets/images/expand.png',
-                                      color: Colors.yellow,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 16.h),
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w),
-                              child: ValueListenableBuilder<String?>(
-                                valueListenable: widget.chatFilter,
-                                builder: (context, filter, child) {
-                                  final filteredList = _getFilteredComments(
-                                    filter,
-                                  );
-                                  return ListView.builder(
-                                    key: ValueKey(
-                                      'expanded_chat_${_comments.length}_${filter ?? 'all'}',
-                                    ),
-                                    controller: _expandedScrollController,
-                                    padding: EdgeInsets.only(
-                                      bottom: 16.h + 20.h,
-                                    ),
-                                    itemCount: filteredList.length,
-                                    reverse: false,
-                                    addAutomaticKeepAlives: false,
-                                    addRepaintBoundaries: false,
-                                    itemBuilder: (context, index) {
-                                      final item = filteredList[index];
-                                      // Use consistent color based on name hash for stability
-                                      final nameHash = item['name'].hashCode;
-                                      final nameColor =
-                                          nameColors[nameHash.abs() %
-                                              nameColors.length];
-                                      return _chatItem(
-                                        item['platform'],
-                                        item['name'],
-                                        item['message'],
-                                        nameColor,
-                                        key: ValueKey(
-                                          'expanded_${item['name']}_${index}_${item['message']}',
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(25.r),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: 15,
-                                  sigmaY: 15,
-                                ),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 16.w,
-                                  ),
-                                  height: 55.h,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        Colors.black.withOpacity(0.4),
-                                        Colors.black.withOpacity(0.2),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(25.r),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.18),
-                                      width: 1.0.w,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.3),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextField(
-                                          controller: _messageController,
-                                          focusNode: _focusNode,
-                                          style: sfProText400(
-                                            17.sp,
-                                            Colors.white,
-                                          ),
-                                          decoration: InputDecoration(
-                                            border: InputBorder.none,
-                                            enabledBorder: InputBorder.none,
-                                            focusedBorder: InputBorder.none,
-                                            disabledBorder: InputBorder.none,
-                                            filled: true,
-                                            fillColor: Colors.transparent,
-                                            contentPadding: EdgeInsets.zero,
-                                            hintText: 'Text',
-                                            hintStyle: TextStyle(
-                                              color: const Color.fromRGBO(
-                                                235,
-                                                235,
-                                                245,
-                                                0.3,
-                                              ),
-                                              fontSize: 17.sp,
-                                            ),
-                                          ),
-                                          textInputAction: TextInputAction.send,
-                                          onSubmitted: (_) {
-                                            _sendMessage();
-                                            // Don't rebuild sheet, just update comments
-                                          },
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          _showEmojiPicker(
-                                            context,
-                                            setSheetState,
-                                          );
-                                        },
-                                        child: Icon(
-                                          Icons.sentiment_satisfied_sharp,
-                                          color: Colors.white,
-                                          size: 24.sp,
-                                        ),
-                                      ),
-                                      SizedBox(width: 12.w),
-
-                                      _buildPlatformSelector(setSheetState),
-
-                                      SizedBox(width: 8.w),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
+            return _buildExpandedChatContent(context, setSheetState);
           },
         );
       },
     ).whenComplete(() {
-      // Clear reference when sheet is dismissed
       _expandedSheetStateSetter = null;
     });
+  }
+
+  /// Opens expanded chat and automatically shows emoji picker (only once)
+  void _openExpandedChatWithEmoji(BuildContext context) {
+    // Reset the flag before opening
+    _emojiPickerScheduled = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      transitionAnimationController: null,
+      useSafeArea: true,
+      builder: (ctx) {
+        // Schedule emoji picker ONCE here, outside of StatefulBuilder
+        if (!_emojiPickerScheduled) {
+          _emojiPickerScheduled = true;
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (ctx.mounted && _expandedSheetStateSetter != null) {
+              _showEmojiEmotePicker(ctx, _expandedSheetStateSetter);
+            }
+          });
+        }
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            _expandedSheetStateSetter = setSheetState;
+            return _buildExpandedChatContent(context, setSheetState);
+          },
+        );
+      },
+    ).whenComplete(() {
+      _expandedSheetStateSetter = null;
+      _emojiPickerScheduled = false;
+    });
+  }
+
+  /// Builds the expanded chat content (shared between normal and emoji-trigger open)
+  Widget _buildExpandedChatContent(BuildContext context, StateSetter setSheetState) {
+    return FractionallySizedBox(
+      heightFactor: 0.94,
+      child: AnimatedPadding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(30.r),
+            ),
+          ),
+          child: SafeArea(
+            child: GestureDetector(
+              onTap: () {
+                _focusNode.unfocus();
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                children: [
+                  SizedBox(height: 10.h),
+                  Container(
+                    width: 40.w,
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade700,
+                      borderRadius: BorderRadius.circular(2.r),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  // Header buttons
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+                    child: Row(
+                      children: [
+                        ValueListenableBuilder<bool>(
+                          valueListenable: widget.titleSelected,
+                          builder: (context, val, _) {
+                            return GestureDetector(
+                              onTap: () {
+                                final newVal = !val;
+                                widget.titleSelected.value = newVal;
+                                if (newVal) {
+                                  widget.showActivity.value = false;
+                                }
+                                widget.showServiceCard.value =
+                                    newVal || widget.showActivity.value;
+                                setState(() {});
+                                setSheetState(() {});
+                              },
+                              child: pillButton(
+                                "Title",
+                                isActive: val,
+                                assetPath: 'assets/images/magic.png',
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(width: 12.w),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: widget.showActivity,
+                          builder: (context, active, _) {
+                            return GestureDetector(
+                              onTap: () {
+                                final newVal = !active;
+                                widget.showActivity.value = newVal;
+                                if (newVal) {
+                                  widget.titleSelected.value = false;
+                                  widget.selectedPlatform.value = null;
+                                  widget.showServiceCard.value = true;
+                                } else {
+                                  widget.showServiceCard.value =
+                                      widget.titleSelected.value;
+                                }
+                                setState(() {});
+                                setSheetState(() {});
+                              },
+                              child: pillButton(
+                                "Activity",
+                                isActive: active,
+                                assetPath: 'assets/images/line.png',
+                              ),
+                            );
+                          },
+                        ),
+                        const Spacer(),
+                        SizedBox(width: 12.w),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: SizedBox(
+                            height: 36.h,
+                            width: 36.w,
+                            child: Image.asset(
+                              'assets/images/expand.png',
+                              color: Colors.yellow,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  // Chat list
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: widget.chatFilter,
+                        builder: (context, filter, child) {
+                          final filteredList = _getFilteredComments(filter);
+                          return ListView.builder(
+                            key: ValueKey(
+                              'expanded_chat_${_comments.length}_${filter ?? 'all'}',
+                            ),
+                            controller: _expandedScrollController,
+                            padding: EdgeInsets.only(bottom: 16.h + 20.h),
+                            itemCount: filteredList.length,
+                            reverse: false,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: false,
+                            itemBuilder: (context, index) {
+                              final item = filteredList[index];
+                              final nameHash = item['name'].hashCode;
+                              final nameColor =
+                              nameColors[nameHash.abs() % nameColors.length];
+                              return _chatItem(
+                                item['platform'],
+                                item['name'],
+                                item['message'],
+                                nameColor,
+                                key: ValueKey(
+                                  'expanded_${item['name']}_${index}_${item['message']}',
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Input field
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(25.r),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          height: 55.h,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.black.withOpacity(0.4),
+                                Colors.black.withOpacity(0.2),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(25.r),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.18),
+                              width: 1.0.w,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _messageController,
+                                  focusNode: _focusNode,
+                                  style: sfProText400(17.sp, Colors.white),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    filled: true,
+                                    fillColor: Colors.transparent,
+                                    contentPadding: EdgeInsets.zero,
+                                    hintText: 'Text',
+                                    hintStyle: TextStyle(
+                                      color: const Color.fromRGBO(
+                                        235, 235, 245, 0.3,
+                                      ),
+                                      fontSize: 17.sp,
+                                    ),
+                                  ),
+                                  textInputAction: TextInputAction.send,
+                                  onSubmitted: (_) => _sendMessage(),
+                                ),
+                              ),
+                              // Emoji icon - shows emoji picker when tapped
+                              GestureDetector(
+                                onTap: () {
+                                  _showEmojiEmotePicker(context, setSheetState);
+                                },
+                                child: Icon(
+                                  Icons.sentiment_satisfied_sharp,
+                                  color: Colors.white,
+                                  size: 24.sp,
+                                ),
+                              ),
+                              SizedBox(width: 12.w),
+                              _buildPlatformSelector(setSheetState),
+                              SizedBox(width: 8.w),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Dismiss keyboard when tapping outside
         _focusNode.unfocus();
       },
       behavior: HitTestBehavior.opaque,
@@ -924,13 +866,34 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
               child: Row(
                 children: [
                   ValueListenableBuilder<bool>(
+                    valueListenable: widget.titleSelected,
+                    builder: (context, val, _) {
+                      return GestureDetector(
+                        onTap: () {
+                          final newVal = !val;
+                          widget.titleSelected.value = newVal;
+                          if (newVal) {
+                            widget.showActivity.value = false;
+                          }
+                          widget.showServiceCard.value =
+                              newVal || widget.showActivity.value;
+                        },
+                        child: pillButton(
+                          "Title",
+                          isActive: val,
+                          assetPath: 'assets/images/magic.png',
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 12.w),
+                  ValueListenableBuilder<bool>(
                     valueListenable: widget.showActivity,
                     builder: (context, active, _) {
                       return GestureDetector(
                         onTap: () {
                           final newVal = !active;
                           widget.showActivity.value = newVal;
-                          // If Activity is turned on, turn off Title
                           if (newVal) {
                             widget.titleSelected.value = false;
                             widget.selectedPlatform.value = null;
@@ -944,29 +907,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                           "Activity",
                           isActive: active,
                           assetPath: 'assets/images/line.png',
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(width: 12.w),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: widget.titleSelected,
-                    builder: (context, val, _) {
-                      return GestureDetector(
-                        onTap: () {
-                          final newVal = !val;
-                          widget.titleSelected.value = newVal;
-                          // If Title is turned on, turn off Activity
-                          if (newVal) {
-                            widget.showActivity.value = false;
-                          }
-                          widget.showServiceCard.value =
-                              newVal || widget.showActivity.value;
-                        },
-                        child: pillButton(
-                          "Title",
-                          isActive: val,
-                          assetPath: 'assets/images/magic.png',
                         ),
                       );
                     },
@@ -992,9 +932,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                     valueListenable: widget.chatFilter,
                     builder: (context, filter, child) {
                       final filteredList = _getFilteredComments(filter);
-                      final keyboardHeight = MediaQuery.of(
-                        context,
-                      ).viewInsets.bottom;
+                      final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
                       return AnimatedPadding(
                         padding: EdgeInsets.only(bottom: keyboardHeight),
                         duration: const Duration(milliseconds: 100),
@@ -1015,10 +953,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                           shrinkWrap: false,
                           itemBuilder: (context, index) {
                             final item = filteredList[index];
-                            // Use consistent color based on name hash for stability
                             final nameHash = item['name'].hashCode;
                             final nameColor =
-                                nameColors[nameHash.abs() % nameColors.length];
+                            nameColors[nameHash.abs() % nameColors.length];
                             return _chatItem(
                               item['platform'],
                               item['name'],
@@ -1033,6 +970,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       );
                     },
                   ),
+                  // Main view input bar
                   Positioned(
                     bottom: 16.h + MediaQuery.of(context).viewInsets.bottom,
                     left: 10.w,
@@ -1074,19 +1012,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                   child: Text(
                                     'Text',
                                     style: TextStyle(
-                                      color: const Color.fromRGBO(
-                                        235,
-                                        235,
-                                        245,
-                                        0.3,
-                                      ),
+                                      color: const Color.fromRGBO(235, 235, 245, 0.3),
                                       fontSize: 17.sp,
                                     ),
                                   ),
                                 ),
+                                // Emoji icon - opens expanded chat WITH emoji picker
                                 GestureDetector(
                                   onTap: () {
-                                    _showEmojiPicker(context, null);
+                                    _openExpandedChatWithEmoji(context);
                                   },
                                   child: Icon(
                                     Icons.sentiment_satisfied_alt_outlined,
@@ -1095,7 +1029,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                   ),
                                 ),
                                 SizedBox(width: 12.w),
-
                                 _buildPlatformSelector(null),
                               ],
                             ),
@@ -1112,51 +1045,421 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       ),
     );
   }
+}
 
-  // Included _chatItem method
-  Widget _chatItem(
-    String platform,
-    String name,
-    String message,
-    Color nameColor, {
-    Key? key,
-  }) {
-    return TweenAnimationBuilder<double>(
-      key: key,
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 8 * (1 - value)),
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: RichText(
-                text: TextSpan(
-                  children: [
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: Padding(
-                        padding: EdgeInsets.only(right: 6.w),
-                        child: Image.asset(
-                          platform,
-                          width: 14.sp,
-                          height: 14.sp,
-                          fit: BoxFit.contain,
+/// Tabbed Emoji/Emote Picker Dialog
+class _EmojiEmotePickerDialog extends StatefulWidget {
+  final double width;
+  final double height;
+  final List<String> emojis;
+  final EmoteService emoteService;
+  final Function(String) onEmojiSelected;
+  final Function(String) onEmoteSelected;
+
+  const _EmojiEmotePickerDialog({
+    required this.width,
+    required this.height,
+    required this.emojis,
+    required this.emoteService,
+    required this.onEmojiSelected,
+    required this.onEmoteSelected,
+  });
+
+  @override
+  State<_EmojiEmotePickerDialog> createState() => _EmojiEmotePickerDialogState();
+}
+
+class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20.r),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            width: widget.width,
+            constraints: BoxConstraints(maxHeight: widget.height),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.black.withOpacity(0.6),
+                  Colors.black.withOpacity(0.4),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.18),
+                width: 1.0.w,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Search bar (only show when on emotes tab)
+                AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, child) {
+                    final showSearch = _tabController.index > 0;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      height: showSearch ? 50.h : 0,
+                      child: showSearch
+                          ? Padding(
+                        padding: EdgeInsets.fromLTRB(12.w, 8.h, 12.w, 4.h),
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14.sp,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search emotes...',
+                            hintStyle: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 14.sp,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: Colors.white38,
+                              size: 20.sp,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12.w,
+                              vertical: 8.h,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
                         ),
+                      )
+                          : const SizedBox.shrink(),
+                    );
+                  },
+                ),
+
+                // Tab bar
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1,
                       ),
                     ),
-                    TextSpan(
-                      text: "$name: ",
-                      style: sfProText500(12.sp, nameColor),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorColor: Colors.white,
+                    indicatorWeight: 2,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white54,
+                    dividerColor: Colors.transparent,
+                    labelStyle: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
                     ),
-                    TextSpan(
-                      text: message,
-                      style: sfProText400(12.sp, Colors.white),
+                    tabs: [
+                      const Tab(text: '😀 Emoji'),
+                      const Tab(text: '⭐ Recent'),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/images/twitch1.png',
+                              width: 16.sp,
+                              height: 16.sp,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Twitch',
+                              style: TextStyle(color: twitchPurple),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Tab content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Unicode Emojis tab
+                      _buildEmojiGrid(),
+
+                      // Recent emotes tab
+                      _buildRecentEmotesGrid(),
+
+                      // 7TV Emotes tab
+                      _build7TVEmotesGrid(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmojiGrid() {
+    const int cols = 7;
+    final int rows = (widget.emojis.length / cols).ceil();
+
+    return ListView.separated(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.all(12.w),
+      itemCount: rows,
+      separatorBuilder: (context, index) => SizedBox(height: 8.h),
+      itemBuilder: (context, rowIndex) {
+        return Row(
+          children: List.generate(cols, (colIndex) {
+            final idx = rowIndex * cols + colIndex;
+            if (idx >= widget.emojis.length) {
+              return const Expanded(child: SizedBox.shrink());
+            }
+
+            final emoji = widget.emojis[idx];
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => widget.onEmojiSelected(emoji),
+                child: Container(
+                  height: 38.h,
+                  alignment: Alignment.center,
+                  child: Text(
+                    emoji,
+                    style: TextStyle(fontSize: 24.sp),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecentEmotesGrid() {
+    return Obx(() {
+      final recentEmotes = widget.emoteService.getRecentEmotes();
+
+      if (recentEmotes.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.history,
+                color: Colors.white38,
+                size: 48.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'No recent emotes',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 14.sp,
+                ),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Emotes you use will appear here',
+                style: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 12.sp,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return _buildEmoteGridView(recentEmotes);
+    });
+  }
+
+  Widget _build7TVEmotesGrid() {
+    return Obx(() {
+      if (widget.emoteService.isLoading.value &&
+          widget.emoteService.emoteList.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 32.sp,
+                height: 32.sp,
+                child: const CircularProgressIndicator(
+                  color: Colors.white54,
+                  strokeWidth: 2,
+                ),
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'Loading emotes...',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 14.sp,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (widget.emoteService.hasError.value &&
+          widget.emoteService.emoteList.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: Colors.red.shade300,
+                size: 48.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'Failed to load emotes',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 14.sp,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              GestureDetector(
+                onTap: () => widget.emoteService.fetchEmotes(),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    'Retry',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.sp,
                     ),
-                  ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Filter emotes based on search query
+      final emotes = _searchQuery.isEmpty
+          ? widget.emoteService.emoteList.toList()
+          : widget.emoteService.searchEmotes(_searchQuery);
+
+      if (emotes.isEmpty) {
+        return Center(
+          child: Text(
+            'No emotes found',
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: 14.sp,
+            ),
+          ),
+        );
+      }
+
+      return _buildEmoteGridView(emotes);
+    });
+  }
+
+  Widget _buildEmoteGridView(List<Emote> emotes) {
+    return GridView.builder(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.all(8.w),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 6,
+        crossAxisSpacing: 4.w,
+        mainAxisSpacing: 4.h,
+        childAspectRatio: 1,
+      ),
+      itemCount: emotes.length,
+      itemBuilder: (context, index) {
+        final emote = emotes[index];
+        return Tooltip(
+          message: emote.name,
+          preferBelow: false,
+          waitDuration: const Duration(milliseconds: 500),
+          child: GestureDetector(
+            onTap: () => widget.onEmoteSelected(emote.name),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              padding: EdgeInsets.all(4.w),
+              child: CachedNetworkImage(
+                imageUrl: emote.url,
+                fit: BoxFit.contain,
+                placeholder: (context, url) => Center(
+                  child: SizedBox(
+                    width: 16.sp,
+                    height: 16.sp,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: Colors.white24,
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Center(
+                  child: Text(
+                    emote.name.length > 2 ? emote.name.substring(0, 2) : emote.name,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 10.sp,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1166,11 +1469,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     );
   }
 }
+
+/// Filter controller
 class FilterController extends GetxController {
   final RxString currentFilter = 'All'.obs;
 
   void setFilter(String value) {
     currentFilter.value = value;
-    Get.back(); // closes bottom sheet / dialog safely
+    Get.back();
   }
 }
