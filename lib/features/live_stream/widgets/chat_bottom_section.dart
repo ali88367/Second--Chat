@@ -69,6 +69,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   late final EmoteService _emoteService;
   EmoteParser? _emoteParser;
 
+  // Flag to prevent emoji picker from showing multiple times
+  bool _emojiPickerScheduled = false;
+
   // Unicode emojis list
   static const List<String> _emojis = [
     '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',
@@ -127,7 +130,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     _emoteParser = EmoteParser(
       emoteUrlMap: _emoteService.emoteUrlMap,
       textStyle: sfProText400(12.sp, Colors.white),
-      emoteSize: 18,
+      emoteSize: 28, // Increased size for better visibility
     );
     // Trigger rebuild to update existing messages
     if (mounted) setState(() {});
@@ -234,6 +237,41 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     });
   }
 
+  /// Send emote directly to chat (not to text field)
+  void _sendEmoteDirectly(String emoteName) {
+    String currentPlatform = widget.chatFilter.value ?? 'twitch';
+    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!;
+    }
+
+    final platformAsset = _getPlatformAsset(currentPlatform);
+    final item = {'platform': platformAsset, 'name': 'You', 'message': emoteName};
+
+    setState(() {
+      _comments.add(item);
+    });
+
+    if (_expandedSheetStateSetter != null) {
+      _expandedSheetStateSetter!(() {});
+    }
+
+    // Track recently used
+    _emoteService.addToRecentlyUsed(emoteName);
+
+    // Scroll to bottom
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.microtask(() {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
+
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollToBottomImmediate(_mainScrollController);
+        _scrollToBottomImmediate(_expandedScrollController);
+      });
+    });
+  }
+
   void _scrollToBottomImmediate(ScrollController controller) {
     if (!controller.hasClients) return;
 
@@ -256,45 +294,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     }
   }
 
-  /// Insert emote code into text field
-  void _insertEmote(String emoteName) {
-    final currentText = _messageController.text;
-    final selection = _messageController.selection;
-
-    String newText;
-    int newCursorPos;
-
-    if (selection.isValid && selection.isCollapsed) {
-      // Insert at cursor position
-      final beforeCursor = currentText.substring(0, selection.start);
-      final afterCursor = currentText.substring(selection.start);
-
-      // Add space before if needed
-      final needsSpaceBefore = beforeCursor.isNotEmpty && !beforeCursor.endsWith(' ');
-      // Add space after
-      final emoteWithSpaces = '${needsSpaceBefore ? ' ' : ''}$emoteName ';
-
-      newText = beforeCursor + emoteWithSpaces + afterCursor;
-      newCursorPos = beforeCursor.length + emoteWithSpaces.length;
-    } else {
-      // Append at end
-      final needsSpace = currentText.isNotEmpty && !currentText.endsWith(' ');
-      newText = currentText + (needsSpace ? ' ' : '') + emoteName + ' ';
-      newCursorPos = newText.length;
-    }
-
-    _messageController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newCursorPos),
-    );
-
-    // Track recently used
-    _emoteService.addToRecentlyUsed(emoteName);
-
-    // Keep keyboard open
-    _focusNode.requestFocus();
-  }
-
   /// Show the tabbed emoji/emote picker
   void _showEmojiEmotePicker(BuildContext context, StateSetter? setSheetState) {
     final mediaQuery = MediaQuery.of(context);
@@ -308,7 +307,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       barrierDismissible: true,
       barrierLabel: '',
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, animation, secondaryAnimation) {
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
         return Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
@@ -323,6 +322,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                   emojis: _emojis,
                   emoteService: _emoteService,
                   onEmojiSelected: (emoji) {
+                    // Emoji still goes to text field
                     final currentText = _messageController.text;
                     _messageController.value = TextEditingValue(
                       text: currentText + emoji,
@@ -330,12 +330,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                         offset: currentText.length + emoji.length,
                       ),
                     );
-                    Navigator.of(context).pop();
+                    Navigator.of(dialogContext).pop();
                     _focusNode.requestFocus();
                   },
                   onEmoteSelected: (emoteName) {
-                    _insertEmote(emoteName);
-                    Navigator.of(context).pop();
+                    // Emote goes directly to chat
+                    Navigator.of(dialogContext).pop();
+                    _sendEmoteDirectly(emoteName);
                   },
                 ),
               ),
@@ -383,7 +384,30 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                     items: const ["All", "Twitch", "Kick", "YouTube"],
                     isWeek: false,
                     onItemSelected: (selected) {
+                      // Convert selection to filter value
+                      String? filterValue;
+
+                      if (selected.toLowerCase() == 'all') {
+                        filterValue = null; // null means show all
+                      } else {
+                        filterValue = selected.toLowerCase(); // 'twitch', 'kick', 'youtube'
+                      }
+
+                      // Update the ValueNotifier's value
+                      widget.chatFilter.value = filterValue;
+
+                      // Update filter controller if needed
                       filterController.setFilter(selected);
+
+                      // Trigger rebuild if sheet is open
+                      if (setSheetState != null) {
+                        setSheetState(() {});
+                      }
+
+                      // Also rebuild main widget
+                      if (mounted) {
+                        setState(() {});
+                      }
                     },
                   ),
                 ),
@@ -407,6 +431,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   }
 
   Widget _buildPlatformSelector(StateSetter? setSheetState) {
+    final bool isExpanded = setSheetState != null;
+
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,
       builder: (context, filter, _) {
@@ -430,7 +456,18 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
         return GestureDetector(
           onTap: () {
-            _showGlassmorphicPopupMenu(context, filter, setSheetState);
+            if (isExpanded) {
+              // Expanded view: dismiss keyboard first, then show menu
+              FocusScope.of(context).unfocus();
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (context.mounted) {
+                  _showGlassmorphicPopupMenu(context, filter, setSheetState);
+                }
+              });
+            } else {
+              // Collapsed/main view: show menu immediately
+              _showGlassmorphicPopupMenu(context, filter, null);
+            }
           },
           child: Padding(
             padding: EdgeInsets.symmetric(vertical: 4.h),
@@ -511,6 +548,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     );
   }
 
+  /// Opens expanded chat normally (without emoji picker)
   void _openExpandedChat(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -522,241 +560,281 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
             _expandedSheetStateSetter = setSheetState;
-
-            return FractionallySizedBox(
-              heightFactor: 0.94,
-              child: AnimatedPadding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                ),
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade900,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30.r),
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: GestureDetector(
-                      onTap: () {
-                        _focusNode.unfocus();
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        children: [
-                          SizedBox(height: 10.h),
-                          Container(
-                            width: 40.w,
-                            height: 4.h,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade700,
-                              borderRadius: BorderRadius.circular(2.r),
-                            ),
-                          ),
-                          SizedBox(height: 16.h),
-                          // Header buttons
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 24.w),
-                            child: Row(
-                              children: [
-                                ValueListenableBuilder<bool>(
-                                  valueListenable: widget.titleSelected,
-                                  builder: (context, val, _) {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        final newVal = !val;
-                                        widget.titleSelected.value = newVal;
-                                        if (newVal) {
-                                          widget.showActivity.value = false;
-                                        }
-                                        widget.showServiceCard.value =
-                                            newVal || widget.showActivity.value;
-                                        setState(() {});
-                                        setSheetState(() {});
-                                      },
-                                      child: pillButton(
-                                        "Title",
-                                        isActive: val,
-                                        assetPath: 'assets/images/magic.png',
-                                      ),
-                                    );
-                                  },
-                                ),
-                                SizedBox(width: 12.w),
-                                ValueListenableBuilder<bool>(
-                                  valueListenable: widget.showActivity,
-                                  builder: (context, active, _) {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        final newVal = !active;
-                                        widget.showActivity.value = newVal;
-                                        if (newVal) {
-                                          widget.titleSelected.value = false;
-                                          widget.selectedPlatform.value = null;
-                                          widget.showServiceCard.value = true;
-                                        } else {
-                                          widget.showServiceCard.value =
-                                              widget.titleSelected.value;
-                                        }
-                                        setState(() {});
-                                        setSheetState(() {});
-                                      },
-                                      child: pillButton(
-                                        "Activity",
-                                        isActive: active,
-                                        assetPath: 'assets/images/line.png',
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const Spacer(),
-                                SizedBox(width: 12.w),
-                                GestureDetector(
-                                  onTap: () => Navigator.pop(context),
-                                  child: SizedBox(
-                                    height: 36.h,
-                                    width: 36.w,
-                                    child: Image.asset(
-                                      'assets/images/expand.png',
-                                      color: Colors.yellow,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 16.h),
-                          // Chat list
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w),
-                              child: ValueListenableBuilder<String?>(
-                                valueListenable: widget.chatFilter,
-                                builder: (context, filter, child) {
-                                  final filteredList = _getFilteredComments(filter);
-                                  return ListView.builder(
-                                    key: ValueKey(
-                                      'expanded_chat_${_comments.length}_${filter ?? 'all'}',
-                                    ),
-                                    controller: _expandedScrollController,
-                                    padding: EdgeInsets.only(bottom: 16.h + 20.h),
-                                    itemCount: filteredList.length,
-                                    reverse: false,
-                                    addAutomaticKeepAlives: false,
-                                    addRepaintBoundaries: false,
-                                    itemBuilder: (context, index) {
-                                      final item = filteredList[index];
-                                      final nameHash = item['name'].hashCode;
-                                      final nameColor =
-                                      nameColors[nameHash.abs() % nameColors.length];
-                                      return _chatItem(
-                                        item['platform'],
-                                        item['name'],
-                                        item['message'],
-                                        nameColor,
-                                        key: ValueKey(
-                                          'expanded_${item['name']}_${index}_${item['message']}',
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          // Input field
-                          Padding(
-                            padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(25.r),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                                  height: 55.h,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        Colors.black.withOpacity(0.4),
-                                        Colors.black.withOpacity(0.2),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(25.r),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.18),
-                                      width: 1.0.w,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.3),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextField(
-                                          controller: _messageController,
-                                          focusNode: _focusNode,
-                                          style: sfProText400(17.sp, Colors.white),
-                                          decoration: InputDecoration(
-                                            border: InputBorder.none,
-                                            enabledBorder: InputBorder.none,
-                                            focusedBorder: InputBorder.none,
-                                            disabledBorder: InputBorder.none,
-                                            filled: true,
-                                            fillColor: Colors.transparent,
-                                            contentPadding: EdgeInsets.zero,
-                                            hintText: 'Text',
-                                            hintStyle: TextStyle(
-                                              color: const Color.fromRGBO(
-                                                235, 235, 245, 0.3,
-                                              ),
-                                              fontSize: 17.sp,
-                                            ),
-                                          ),
-                                          textInputAction: TextInputAction.send,
-                                          onSubmitted: (_) => _sendMessage(),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          _showEmojiEmotePicker(context, setSheetState);
-                                        },
-                                        child: Icon(
-                                          Icons.sentiment_satisfied_sharp,
-                                          color: Colors.white,
-                                          size: 24.sp,
-                                        ),
-                                      ),
-                                      SizedBox(width: 12.w),
-                                      _buildPlatformSelector(setSheetState),
-                                      SizedBox(width: 8.w),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
+            return _buildExpandedChatContent(context, setSheetState);
           },
         );
       },
     ).whenComplete(() {
       _expandedSheetStateSetter = null;
     });
+  }
+
+  /// Opens expanded chat and automatically shows emoji picker (only once)
+  void _openExpandedChatWithEmoji(BuildContext context) {
+    // Reset the flag before opening
+    _emojiPickerScheduled = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      transitionAnimationController: null,
+      useSafeArea: true,
+      builder: (ctx) {
+        // Schedule emoji picker ONCE here, outside of StatefulBuilder
+        if (!_emojiPickerScheduled) {
+          _emojiPickerScheduled = true;
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (ctx.mounted && _expandedSheetStateSetter != null) {
+              _showEmojiEmotePicker(ctx, _expandedSheetStateSetter);
+            }
+          });
+        }
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            _expandedSheetStateSetter = setSheetState;
+            return _buildExpandedChatContent(context, setSheetState);
+          },
+        );
+      },
+    ).whenComplete(() {
+      _expandedSheetStateSetter = null;
+      _emojiPickerScheduled = false;
+    });
+  }
+
+  /// Builds the expanded chat content (shared between normal and emoji-trigger open)
+  Widget _buildExpandedChatContent(BuildContext context, StateSetter setSheetState) {
+    return FractionallySizedBox(
+      heightFactor: 0.94,
+      child: AnimatedPadding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(30.r),
+            ),
+          ),
+          child: SafeArea(
+            child: GestureDetector(
+              onTap: () {
+                _focusNode.unfocus();
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                children: [
+                  SizedBox(height: 10.h),
+                  Container(
+                    width: 40.w,
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade700,
+                      borderRadius: BorderRadius.circular(2.r),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  // Header buttons
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+                    child: Row(
+                      children: [
+                        ValueListenableBuilder<bool>(
+                          valueListenable: widget.titleSelected,
+                          builder: (context, val, _) {
+                            return GestureDetector(
+                              onTap: () {
+                                final newVal = !val;
+                                widget.titleSelected.value = newVal;
+                                if (newVal) {
+                                  widget.showActivity.value = false;
+                                }
+                                widget.showServiceCard.value =
+                                    newVal || widget.showActivity.value;
+                                setState(() {});
+                                setSheetState(() {});
+                              },
+                              child: pillButton(
+                                "Title",
+                                isActive: val,
+                                assetPath: 'assets/images/magic.png',
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(width: 12.w),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: widget.showActivity,
+                          builder: (context, active, _) {
+                            return GestureDetector(
+                              onTap: () {
+                                final newVal = !active;
+                                widget.showActivity.value = newVal;
+                                if (newVal) {
+                                  widget.titleSelected.value = false;
+                                  widget.selectedPlatform.value = null;
+                                  widget.showServiceCard.value = true;
+                                } else {
+                                  widget.showServiceCard.value =
+                                      widget.titleSelected.value;
+                                }
+                                setState(() {});
+                                setSheetState(() {});
+                              },
+                              child: pillButton(
+                                "Activity",
+                                isActive: active,
+                                assetPath: 'assets/images/line.png',
+                              ),
+                            );
+                          },
+                        ),
+                        const Spacer(),
+                        SizedBox(width: 12.w),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: SizedBox(
+                            height: 36.h,
+                            width: 36.w,
+                            child: Image.asset(
+                              'assets/images/expand.png',
+                              color: Colors.yellow,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  // Chat list
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: widget.chatFilter,
+                        builder: (context, filter, child) {
+                          final filteredList = _getFilteredComments(filter);
+                          return ListView.builder(
+                            key: ValueKey(
+                              'expanded_chat_${_comments.length}_${filter ?? 'all'}',
+                            ),
+                            controller: _expandedScrollController,
+                            padding: EdgeInsets.only(bottom: 16.h + 20.h),
+                            itemCount: filteredList.length,
+                            reverse: false,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: false,
+                            itemBuilder: (context, index) {
+                              final item = filteredList[index];
+                              final nameHash = item['name'].hashCode;
+                              final nameColor =
+                              nameColors[nameHash.abs() % nameColors.length];
+                              return _chatItem(
+                                item['platform'],
+                                item['name'],
+                                item['message'],
+                                nameColor,
+                                key: ValueKey(
+                                  'expanded_${item['name']}_${index}_${item['message']}',
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Input field
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(25.r),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          height: 55.h,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.black.withOpacity(0.4),
+                                Colors.black.withOpacity(0.2),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(25.r),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.18),
+                              width: 1.0.w,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _messageController,
+                                  focusNode: _focusNode,
+                                  style: sfProText400(17.sp, Colors.white),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    filled: true,
+                                    fillColor: Colors.transparent,
+                                    contentPadding: EdgeInsets.zero,
+                                    hintText: 'Text',
+                                    hintStyle: TextStyle(
+                                      color: const Color.fromRGBO(
+                                        235, 235, 245, 0.3,
+                                      ),
+                                      fontSize: 17.sp,
+                                    ),
+                                  ),
+                                  textInputAction: TextInputAction.send,
+                                  onSubmitted: (_) => _sendMessage(),
+                                ),
+                              ),
+                              // Emoji icon - shows emoji picker when tapped
+                              GestureDetector(
+                                onTap: () {
+                                  _showEmojiEmotePicker(context, setSheetState);
+                                },
+                                child: Icon(
+                                  Icons.sentiment_satisfied_sharp,
+                                  color: Colors.white,
+                                  size: 24.sp,
+                                ),
+                              ),
+                              SizedBox(width: 12.w),
+                              _buildPlatformSelector(setSheetState),
+                              SizedBox(width: 8.w),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -892,6 +970,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       );
                     },
                   ),
+                  // Main view input bar
                   Positioned(
                     bottom: 16.h + MediaQuery.of(context).viewInsets.bottom,
                     left: 10.w,
@@ -933,16 +1012,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                   child: Text(
                                     'Text',
                                     style: TextStyle(
-                                      color: const Color.fromRGBO(
-                                        235, 235, 245, 0.3,
-                                      ),
+                                      color: const Color.fromRGBO(235, 235, 245, 0.3),
                                       fontSize: 17.sp,
                                     ),
                                   ),
                                 ),
+                                // Emoji icon - opens expanded chat WITH emoji picker
                                 GestureDetector(
                                   onTap: () {
-                                    _showEmojiEmotePicker(context, null);
+                                    _openExpandedChatWithEmoji(context);
                                   },
                                   child: Icon(
                                     Icons.sentiment_satisfied_alt_outlined,
@@ -1049,7 +1127,6 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                 AnimatedBuilder(
                   animation: _tabController,
                   builder: (context, child) {
-                    // Show search bar only for 7TV Emotes tab (index 1 or 2)
                     final showSearch = _tabController.index > 0;
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -1113,13 +1190,14 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                     indicatorWeight: 2,
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.white54,
+                    dividerColor: Colors.transparent,
                     labelStyle: TextStyle(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w600,
                     ),
                     tabs: [
-                       Tab(text: '😀 Emoji'),
-                       Tab(text: '⭐ Recent'),
+                      const Tab(text: '😀 Emoji'),
+                      const Tab(text: '⭐ Recent'),
                       Tab(
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1130,10 +1208,9 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                               height: 16.sp,
                             ),
                             SizedBox(width: 4.w),
-                            Text('Twitch',
-                            style: TextStyle(
-                               color: twitchPurple
-                            ),
+                            Text(
+                              'Twitch',
+                              style: TextStyle(color: twitchPurple),
                             ),
                           ],
                         ),
@@ -1377,7 +1454,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                 ),
                 errorWidget: (context, url, error) => Center(
                   child: Text(
-                    emote.name.substring(0, 2),
+                    emote.name.length > 2 ? emote.name.substring(0, 2) : emote.name,
                     style: TextStyle(
                       color: Colors.white54,
                       fontSize: 10.sp,
@@ -1393,7 +1470,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
   }
 }
 
-/// Filter controller (unchanged from original)
+/// Filter controller
 class FilterController extends GetxController {
   final RxString currentFilter = 'All'.obs;
 
