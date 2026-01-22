@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
 class StreakFreezeUseBottomSheet extends StatefulWidget {
@@ -45,8 +44,6 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     super.dispose();
   }
 
-  // ---------------- ICONS ----------------
-
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
@@ -61,17 +58,9 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     );
   }
 
-  Widget _cross() =>
-      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
-
-  Widget _freeze() => Image.asset('assets/images/Privacy & Security - SVG.png');
-
-  Widget _dot() => Opacity(
-    opacity: 0.3,
-    child: Icon(Icons.circle, size: 10.sp, color: Colors.white),
-  );
-
-  // ---------------- LAYOUT HELPERS ----------------
+  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _freeze() => Image.asset('assets/images/Privacy & Security - SVG.png', width: 22.sp);
+  Widget _dot() => Opacity(opacity: 0.3, child: Icon(Icons.circle, size: 10.sp, color: Colors.white));
 
   Widget _highlight(int start, int end, double totalWidth) {
     final int count = end - start + 1;
@@ -80,20 +69,14 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     Decoration decoration;
     if (count >= 3) {
       decoration = BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF7EDDE4), Color(0xFFC5F3F1)],
-        ),
+        gradient: const LinearGradient(colors: [Color(0xFF7EDDE4), Color(0xFFC5F3F1)]),
         borderRadius: BorderRadius.circular(22.r),
-      );
-    } else if (count == 1) {
-      decoration = BoxDecoration(
-        color: const Color(0xFF3C3C43).withOpacity(0.6),
-        shape: BoxShape.circle,
       );
     } else {
       decoration = BoxDecoration(
         color: const Color(0xFF3C3C43).withOpacity(0.6),
         borderRadius: BorderRadius.circular(22.r),
+        shape: count == 1 ? BoxShape.circle : BoxShape.rectangle,
       );
     }
 
@@ -103,9 +86,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       top: 0,
       bottom: 0,
       child: Container(
-        margin: count == 1
-            ? EdgeInsets.zero
-            : EdgeInsets.symmetric(horizontal: 2.w),
+        margin: count == 1 ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
         decoration: decoration,
       ),
     );
@@ -117,10 +98,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
 
     return Container(
       height: Get.height * 0.9,
-      decoration: BoxDecoration(
-        color: bottomSheetGrey,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-      ),
+      decoration: BoxDecoration(color: bottomSheetGrey, borderRadius: const BorderRadius.vertical(top: Radius.circular(18))),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
         child: Scaffold(
@@ -137,155 +115,73 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16.w),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            InkWell(
-                              onTap: Get.back,
-                              child: Image.asset(
-                                'assets/icons/x_icon.png',
-                                height: 44.h,
-                              ),
-                            ),
+                            InkWell(onTap: Get.back, child: Image.asset('assets/icons/x_icon.png', height: 44.h)),
                           ],
                         ),
                       ),
-
-                      // --- ANIMATED ICE SECTION ---
                       AnimatedBuilder(
                         animation: _freezeController,
                         builder: (context, child) {
                           return Stack(
                             alignment: Alignment.center,
                             children: [
-                              // Pulsing Ice Glow
                               Container(
-                                width: 300.w,
-                                height: 240.h,
+                                width: 300.w, height: 240.h,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.rectangle,
-                                  borderRadius: BorderRadius.all(
-                                    Radius.elliptical(70.w, 110.h),
-                                  ),
+                                  borderRadius: BorderRadius.all(Radius.elliptical(70.w, 110.h)),
                                   boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF7EDDE4).withOpacity(_glowAnimation.value),
-                                      blurRadius: 180,
-                                      spreadRadius: 10,
-                                    ),
-                                    BoxShadow(
-                                      color: const Color(0xFFC5F3F1).withOpacity(_glowAnimation.value * 0.5),
-                                      blurRadius: 40,
-                                      spreadRadius: -10,
-                                    ),
+                                    BoxShadow(color: const Color(0xFF7EDDE4).withOpacity(_glowAnimation.value), blurRadius: 180, spreadRadius: 10),
                                   ],
                                 ),
                               ),
-
-                              // Floating Ice Character
-                              Transform.translate(
-                                offset: Offset(0, _floatAnimation.value),
-                                child: Image.asset(
-                                  'assets/images/hello.png',
-                                  height: 250.h,
-                                ),
-                              ),
-
-                              Positioned(
-                                bottom: 0.h,
-                                child: Image.asset(
-                                  'assets/images/Streak number.png',
-                                  width: 155.w,
-                                  height: 90.h,
-                                ),
-                              ),
+                              Transform.translate(offset: Offset(0, _floatAnimation.value), child: Image.asset('assets/images/hello.png', height: 250.h)),
+                              Positioned(bottom: 0.h, child: Image.asset('assets/images/Streak number.png', width: 155.w, height: 90.h)),
                             ],
                           );
                         },
                       ),
-                      // ----------------------------
-
-                      Text(
-                        "Go ahead, freeze it. Commitment is \noverrated anyway.",
-                        style: sfProDisplay600(22.sp, Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text("Go ahead, freeze it. Commitment is \noverrated anyway.", style: sfProDisplay600(22.sp, Colors.white), textAlign: TextAlign.center),
                       SizedBox(height: 12.h),
-
-                      // --- FREEZE COUNTER ---
-                      Obx(() => Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14.w,
-                          vertical: 4.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF32393D),
-                          borderRadius: BorderRadius.circular(40.r),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                            width: 1,
+                      Obx(() {
+                        final available = 3 - controller.manualFreezeCount.value;
+                        return Container(
+                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF32393D),
+                            borderRadius: BorderRadius.circular(40.r),
+                            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              "assets/images/checkmark.circle.fill.png",
-                              width: 19.w,
-                              height: 24.h,
-                            ),
-                            SizedBox(width: 8.w),
-                            RichText(
-                              text: TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: '${3 - controller.manualFreezeCount.value} ',
-                                    style: sfProDisplay400(15.sp, Colors.white),
-                                  ),
-                                  TextSpan(
-                                    text: 'available',
-                                    style: sfProDisplay400(
-                                      15.sp,
-                                      const Color(0xFFB0B3B8),
-                                    ),
-                                  ),
-                                ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset("assets/images/checkmark.circle.fill.png", width: 19.w, height: 24.h),
+                              SizedBox(width: 8.w),
+                              RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(text: '$available ', style: sfProDisplay400(15.sp, Colors.white)),
+                                    TextSpan(text: 'available', style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      )),
-
+                            ],
+                          ),
+                        );
+                      }),
                       SizedBox(height: 20.h),
-
-                      // --- CALENDAR CARD ---
                       Container(
                         width: 361.w,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding.w,
-                          vertical: 16.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1D20),
-                          borderRadius: BorderRadius.circular(24.r),
-                        ),
+                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
+                        decoration: BoxDecoration(color: const Color(0xFF1E1D20), borderRadius: BorderRadius.circular(24.r)),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Row(
-                              children: [
-                                'Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun',
-                              ].map((day) {
-                                return Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      day,
-                                      style: TextStyle(
-                                        color: const Color(0xFF8E8E93),
-                                        fontSize: 13.sp,
-                                      ),
-                                    ),
-                                  ),
-                                );
+                              children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((day) {
+                                return Expanded(child: Center(child: Text(day, style: TextStyle(color: const Color(0xFF8E8E93), fontSize: 13.sp))));
                               }).toList(),
                             ),
                             SizedBox(height: 16.h),
@@ -299,32 +195,19 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                     final groups = controller.getTickGroups(rowData);
                                     return Stack(
                                       children: [
-                                        for (final g in groups)
-                                          _highlight(g[0], g[1], totalWidth),
+                                        for (final g in groups) _highlight(g[0], g[1], totalWidth),
                                         Row(
                                           children: List.generate(days, (i) {
                                             final cell = rowData[i];
                                             final isLatest = controller.lastTappedCol.value == i;
-
                                             Widget icon;
                                             switch (cell) {
-                                              case CellType.tick:
-                                                icon = _tick(highlighted: isLatest);
-                                                break;
-                                              case CellType.cross:
-                                                icon = _cross();
-                                                break;
-                                              case CellType.freeze:
-                                                icon = _freeze();
-                                                break;
-                                              case CellType.dot:
-                                                icon = _dot();
-                                                break;
+                                              case CellType.tick: icon = _tick(highlighted: isLatest); break;
+                                              case CellType.cross: icon = _cross(); break;
+                                              case CellType.freeze: icon = _freeze(); break;
+                                              case CellType.dot: icon = _dot(); break;
                                             }
-
-                                            return Expanded(
-                                              child: Center(child: icon),
-                                            );
+                                            return Expanded(child: Center(child: icon));
                                           }),
                                         ),
                                       ],
@@ -341,8 +224,6 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                   ),
                 ),
               ),
-
-              // --- BOTTOM ACTION AREA ---
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                 color: bottomSheetGrey,
@@ -352,52 +233,40 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        height: 50.h,
-                        width: double.infinity,
+                        height: 50.h, width: double.infinity,
                         child: OutlinedButton(
                           onPressed: Get.back,
                           style: OutlinedButton.styleFrom(
                             backgroundColor: const Color(0xFF2C2C2E),
                             side: BorderSide.none,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25.r),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.r)),
                           ),
-                          child: Text(
-                            "Ignore",
-                            style: sfProText600(
-                              17.sp,
-                              Colors.white.withOpacity(0.8),
-                            ),
-                          ),
+                          child: Text("Ignore", style: sfProText600(17.sp, Colors.white.withOpacity(0.8))),
                         ),
                       ),
                       SizedBox(height: 12.h),
                       SizedBox(
-                        height: 50.h,
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Get.back();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7EDDE4),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25.r),
+                        height: 50.h, width: double.infinity,
+                        child: Obx(() {
+                          final canFreeze = (3 - controller.manualFreezeCount.value) > 0;
+                          return ElevatedButton(
+                            onPressed: canFreeze ? () {
+                              controller.addFreezeAfterStreak();
+                            } : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canFreeze ? const Color(0xFF7EDDE4) : Colors.grey.withOpacity(0.5),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.r)),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                "Use 1 ",
-                                style: sfProText600(17.sp, Colors.white),
-                              ),
-                              Image.asset('assets/images/Mask group.png'),
-                            ],
-                          ),
-                        ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text("Use 1 ", style: sfProText600(17.sp, Colors.white)),
+                                Image.asset('assets/images/Mask group.png'),
+                              ],
+                            ),
+                          );
+                        }),
                       ),
                     ],
                   ),

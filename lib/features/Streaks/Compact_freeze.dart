@@ -125,8 +125,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
               children: List.generate(days, (i) {
                 final cell = rowData[i];
                 final isLast = c.lastTappedCol.value == i;
-                final tappable =
-                    cell == CellType.tick || cell == CellType.cross;
+
+                // Allow interactions for the "best week" row
+                final tappable = cell == CellType.tick || cell == CellType.cross || cell == CellType.freeze;
 
                 Widget icon;
                 switch (cell) {
@@ -163,8 +164,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<StreamStreaksController>();
-
+    final controller = Get.put(StreamStreaksController(),permanent: true);
     return Container(
       height: Get.height * 0.9,
       decoration: BoxDecoration(
@@ -216,7 +216,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                       InkWell(
                         onTap: Get.back,
                         child: Image.asset(
-                          'assets/icons/x_icon.png',
+                          'assets/images/Mask group.png',
                           height: 44.h,
                         ),
                       ),
@@ -232,7 +232,6 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                     return Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Glow Effect
                         Container(
                           width: 200.w,
                           height: 240.h,
@@ -255,8 +254,6 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                             ],
                           ),
                         ),
-
-                        // The Flame Image with Jitter
                         Transform.translate(
                           offset: Offset(0, _fireJitter.value),
                           child: Image.asset(
@@ -265,8 +262,6 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                             fit: BoxFit.contain,
                           ),
                         ),
-
-                        // The Number Image
                         Positioned(
                           bottom: 0.h,
                           child: Image.asset(
@@ -280,7 +275,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                     );
                   },
                 ),
-                // -----------------------------
+                SizedBox(height: 10.h),
 
                 Text("Day Streak", style: sfProDisplay600(34.sp, Colors.white)),
                 Text(
@@ -309,15 +304,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                         children: [
                           Row(
                             children:
-                            [
-                              'Mon',
-                              'Tue',
-                              'Wed',
-                              'Thur',
-                              'Fri',
-                              'Sat',
-                              'Sun',
-                            ].map((d) {
+                            ['Mon','Tue','Wed','Thur','Fri','Sat','Sun'].map((d) {
                               return Expanded(
                                 child: Center(
                                   child: Text(
