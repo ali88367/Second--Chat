@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
-// Ensure this path is correct for your project
 import 'Compact_freeze.dart';
 
 class StreakFreezePreviewBottomSheet extends StatefulWidget {
@@ -27,7 +26,8 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
   void initState() {
     super.initState();
     _pulseController = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 2000),
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
@@ -45,6 +45,8 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
     super.dispose();
   }
 
+  // --- Static UI Components ---
+
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
@@ -60,7 +62,7 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
   Widget _highlight(int start, int end, double totalWidth) {
     final int count = end - start + 1;
     final double cellWidth = totalWidth / days;
-    final bool isCircle = count == 1; // Check if it's a single day
+    final bool isCircle = count == 1;
 
     return Positioned(
       left: start * cellWidth,
@@ -73,7 +75,6 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
           color: count >= 3 ? null : const Color(0xFF3C3C43).withOpacity(0.6),
           gradient: count >= 3 ? const LinearGradient(colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)]) : null,
           shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-          // FIX: BorderRadius MUST be null if shape is BoxShape.circle
           borderRadius: isCircle ? null : BorderRadius.circular(22.r),
         ),
       ),
@@ -83,6 +84,7 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
   Widget _row(int rowIndex, StreamStreaksController c, double totalWidth) {
     final rowData = c.calendarRows[rowIndex];
     final groups = c.getTickGroups(rowData);
+
     return SizedBox(
       height: rowHeight.h,
       child: Stack(
@@ -99,11 +101,7 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                 case CellType.dot: icon = _dot(); break;
               }
               return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => c.toggleCalendarCell(rowIndex, i),
-                  child: Center(child: icon),
-                ),
+                child: Center(child: icon), // Interaction removed
               );
             }),
           ),
@@ -114,11 +112,15 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
 
   @override
   Widget build(BuildContext context) {
+    // Controller is still needed to provide the initial data for the static view
     final controller = Get.put(StreamStreaksController());
 
     return Container(
       height: Get.height * 0.9,
-      decoration: BoxDecoration(color: bottomSheetGrey, borderRadius: const BorderRadius.vertical(top: Radius.circular(18))),
+      decoration: BoxDecoration(
+        color: bottomSheetGrey,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
         child: Scaffold(
@@ -136,7 +138,10 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          InkWell(onTap: Get.back, child: Image.asset('assets/icons/x_icon.png', height: 44.h)),
+                          GestureDetector(
+                            onTap: () => Get.back(),
+                            child: Image.asset('assets/icons/x_icon.png', height: 44.h),
+                          ),
                           Text("Stream Streaks", style: sfProText600(17.sp, Colors.white)),
                           SizedBox(width: 44.w),
                         ],
@@ -156,7 +161,11 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   boxShadow: [
-                                    BoxShadow(color: const Color(0XFF84DEE4).withOpacity(_opacityAnimation.value), blurRadius: 55, spreadRadius: 15),
+                                    BoxShadow(
+                                      color: const Color(0XFF84DEE4).withOpacity(_opacityAnimation.value),
+                                      blurRadius: 55,
+                                      spreadRadius: 15,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -167,7 +176,11 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                       ],
                     ),
                     SizedBox(height: 6.h),
-                    Text("Streak in danger?\nHit the Freeze button!", textAlign: TextAlign.center, style: sfProDisplay600(22.sp, Colors.white)),
+                    Text(
+                      "Streak in danger?\nHit the Freeze button!",
+                      textAlign: TextAlign.center,
+                      style: sfProDisplay600(22.sp, Colors.white),
+                    ),
                     SizedBox(height: 6.h),
 
                     // Static Pill
@@ -196,40 +209,45 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                     ),
 
                     SizedBox(height: 20.h),
-                    // Wrapped the whole calendar area in Obx
-                    Obx(() {
-                      // Accessing this variable prevents the "Improper Use" red screen
-                      controller.refreshTrigger.value;
 
-                      return Container(
-                        width: 361.w,
-                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
-                        decoration: BoxDecoration(color: const Color(0xFF1E1D20), borderRadius: BorderRadius.circular(24.r)),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final totalWidth = constraints.maxWidth;
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((d) {
-                                    return Expanded(child: Center(child: Text(d, style: TextStyle(color: const Color(0xFF8E8E93), fontSize: 13.sp))));
-                                  }).toList(),
-                                ),
-                                SizedBox(height: 16.h),
-                                for (int i = 0; i < controller.calendarRows.length; i++) ...[
-                                  _row(i, controller, totalWidth),
-                                  if (i != controller.calendarRows.length - 1) SizedBox(height: 12.h),
-                                ],
+                    // Static Calendar Container (Obx removed)
+                    Container(
+                      width: 361.w,
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1D20),
+                        borderRadius: BorderRadius.circular(24.r),
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final totalWidth = constraints.maxWidth;
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((d) {
+                                  return Expanded(
+                                    child: Center(
+                                      child: Text(d, style: TextStyle(color: const Color(0xFF8E8E93), fontSize: 13.sp)),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              SizedBox(height: 16.h),
+                              for (int i = 0; i < controller.calendarRows.length; i++) ...[
+                                _row(i, controller, totalWidth),
+                                if (i != controller.calendarRows.length - 1) SizedBox(height: 12.h),
                               ],
-                            );
-                          },
-                        ),
-                      );
-                    }),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
+
+              // Bottom Action Button
               Positioned(
                 left: 16.w, right: 16.w, bottom: 16.h,
                 child: SizedBox(
@@ -237,7 +255,10 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                   child: ElevatedButton(
                     onPressed: () {
                       Get.back();
-                      Get.bottomSheet(const StreakFreezeSingleRowPreviewBottomSheet(), isScrollControlled: true);
+                      Get.bottomSheet(
+                        const StreakFreezeSingleRowPreviewBottomSheet(),
+                        isScrollControlled: true,
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,

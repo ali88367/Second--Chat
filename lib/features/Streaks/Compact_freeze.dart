@@ -45,30 +45,25 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
     super.dispose();
   }
 
-  // ---------------- ICONS ----------------
+  // ---------------- ICONS (Static) ----------------
 
   Widget _tick({bool highlighted = false}) {
-    return AnimatedScale(
-      scale: highlighted ? 1.05 : 1,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack,
-      child: Container(
-        padding: EdgeInsets.all(4.w),
-        decoration: highlighted
-            ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
-            : null,
-        child: Icon(
-          Icons.check,
-          size: 18.sp,
-          color: highlighted ? const Color(0xFFFDB747) : Colors.white,
-        ),
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: highlighted
+          ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
+          : null,
+      child: Icon(
+        Icons.check,
+        size: 18.sp,
+        color: highlighted ? const Color(0xFFFDB747) : Colors.white,
       ),
     );
   }
 
   Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
-  Widget _freeze() =>
-      Image.asset('assets/images/Mask group.png');
+  Widget _freeze() => Image.asset('assets/images/Mask group.png');
+
   // ---------------- LAYOUT HELPERS ----------------
 
   Widget _highlight(int start, int end, double totalWidth) {
@@ -110,59 +105,49 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
   }
 
   Widget _row(StreamStreaksController c, double totalWidth) {
-    return Obx(() {
-      final rowData = c.singleRowCells;
-      final groups = c.getTickGroups(rowData);
+    // Obx removed to keep it static
+    final rowData = c.singleRowCells;
+    final groups = c.getTickGroups(rowData);
 
-      return SizedBox(
-        height: rowHeight.h,
-        child: Stack(
-          children: [
-            for (final g in groups) _highlight(g[0], g[1], totalWidth),
-            Row(
-              children: List.generate(days, (i) {
-                final cell = rowData[i];
-                final isLast = c.lastTappedCol.value == i;
+    return SizedBox(
+      height: rowHeight.h,
+      child: Stack(
+        children: [
+          for (final g in groups) _highlight(g[0], g[1], totalWidth),
+          Row(
+            children: List.generate(days, (i) {
+              final cell = rowData[i];
+              final isLast = c.lastTappedCol.value == i;
 
-                // Allow interactions for the "best week" row
-                final tappable = cell == CellType.tick || cell == CellType.cross || cell == CellType.freeze;
+              Widget icon;
+              switch (cell) {
+                case CellType.tick:
+                  icon = _tick(highlighted: isLast);
+                  break;
+                case CellType.cross:
+                  icon = _cross();
+                  break;
+                case CellType.freeze:
+                  icon = _freeze();
+                  break;
+                case CellType.dot:
+                  icon = const SizedBox();
+                  break;
+              }
 
-                Widget icon;
-                switch (cell) {
-                  case CellType.tick:
-                    icon = _tick(highlighted: isLast);
-                    break;
-                  case CellType.cross:
-                    icon = _cross();
-                    break;
-                  case CellType.freeze:
-                    icon = _freeze();
-                    break;
-                  case CellType.dot:
-                    icon = const SizedBox();
-                    break;
-                }
-
-                return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: tappable
-                        ? () => c.toggleCalendarCell(0, i, isSingleRow: true)
-                        : null,
-                    child: Center(child: icon),
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-      );
-    });
+              return Expanded(
+                child: Center(child: icon), // GestureDetector logic removed
+              );
+            }),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StreamStreaksController(),permanent: true);
+    final controller = Get.put(StreamStreaksController(), permanent: true);
     return Container(
       height: Get.height * 0.9,
       decoration: BoxDecoration(
@@ -182,7 +167,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
               child: SizedBox(
                 height: 50.h,
                 child: ElevatedButton(
-                  onPressed: (){
+                  onPressed: () {
                     Get.back();
                     Get.bottomSheet(
                       const StreakFreezeUseBottomSheet(),
@@ -212,9 +197,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       InkWell(
-                        onTap: Get.back,
-                        child: Image.asset('assets/icons/x_icon.png', height: 44.h)),
-
+                        onTap: () => Get.back(),
+                        child: Image.asset('assets/icons/x_icon.png', height: 44.h),
+                      ),
                       SizedBox(width: 44.w),
                     ],
                   ),
@@ -280,7 +265,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                 ),
                 SizedBox(height: 20.h),
 
-                // --- CALENDAR CARD ---
+                // --- CALENDAR CARD (Static) ---
                 Container(
                   width: 361.w,
                   padding: EdgeInsets.symmetric(
