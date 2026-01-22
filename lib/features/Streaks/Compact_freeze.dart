@@ -69,8 +69,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
   Widget _cross() =>
       Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
   Widget _freeze() =>
-      Icon(Icons.ac_unit, color: Colors.cyanAccent, size: 26.sp);
-
+      Image.asset('assets/images/Mask group.png');
   // ---------------- LAYOUT HELPERS ----------------
 
   Widget _highlight(int start, int end, double totalWidth) {
