@@ -191,6 +191,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                 return SizedBox(
                                   height: rowHeight.h,
                                   child: Obx(() {
+                                    // Watching singleRowCells for changes
                                     final rowData = controller.singleRowCells;
                                     final groups = controller.getTickGroups(rowData);
                                     return Stack(

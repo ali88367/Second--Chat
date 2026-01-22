@@ -19,8 +19,18 @@ class StreamStreaksController extends GetxController {
   final calendarRows = <RxList<CellType>>[
     RxList.of([CellType.tick, CellType.cross, CellType.tick, CellType.tick, CellType.cross, CellType.freeze, CellType.cross]),
     RxList.of([CellType.cross, CellType.cross, CellType.cross, CellType.tick, CellType.tick, CellType.tick, CellType.cross]),
-    RxList.of(List.generate(7, (_) => CellType.tick)),
-    RxList.of([CellType.tick, CellType.tick, CellType.tick, CellType.dot, CellType.dot, CellType.dot, CellType.dot]),
+    // Row 3: Monday-Friday streak only
+    RxList.of([
+      CellType.tick,  // Mon
+      CellType.tick,  // Tue
+      CellType.tick,  // Wed
+      CellType.tick,  // Thur
+      CellType.tick,  // Fri
+      CellType.cross, // Sat
+      CellType.cross, // Sun
+    ]),
+    // Row 4: All crosses
+    RxList.of(List.generate(7, (_) => CellType.cross)),
   ];
 
   final singleRowCells = RxList<CellType>.of(List.generate(7, (_) => CellType.dot));
@@ -73,22 +83,25 @@ class StreamStreaksController extends GetxController {
     manualFreezeCount.value = count;
   }
 
-  // UPDATED: Now replaces the rightmost tick with a freeze
   void addFreezeAfterStreak() {
+    // Check if we have freezes available
     if (manualFreezeCount.value >= 3) return;
 
     final targetWeek = calendarRows[bestWeekIndex.value];
 
-    // Find the rightmost (last) tick index in the best week
+    // 1. Find the rightmost (last) tick index in the best week
     int lastTickIndex = targetWeek.lastIndexOf(CellType.tick);
 
-    if (lastTickIndex != -1) {
-      // Replace that tick with a freeze
-      targetWeek[lastTickIndex] = CellType.freeze;
+    // 2. The "day next to the last day" is lastTickIndex + 1
+    int nextDayIndex = lastTickIndex + 1;
+
+    // 3. Ensure the next day is within the 7-day bounds and not already a tick
+    if (nextDayIndex < targetWeek.length) {
+      targetWeek[nextDayIndex] = CellType.freeze;
 
       targetWeek.refresh();
       updateFreezeCount();
-      calculateLongestStreak();
+      calculateLongestStreak(); // Recalculate to update the singleRowCells preview
     }
   }
 
