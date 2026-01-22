@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:second_chat/LiveStreaming.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/features/intro/intro_screen3.dart';
 import 'package:second_chat/features/intro/intro_screen5.dart';
@@ -34,6 +35,7 @@ void main() async {
   );
 
   Get.put(SettingsController());
+  Get.put(StreamStreaksController());
 
   runApp(const MyApp());
 }
