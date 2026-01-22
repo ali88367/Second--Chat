@@ -290,11 +290,13 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             ),
                                             // First badge (xmark) - aligns with first feature
                                             SizedBox(height: 38.h),
-                                            _buildBadgeIcon(
-                                              imagePath:
-                                                  'assets/images/checkInfo.png',
-                                          
-                                              isInfo: false,
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 10.w),
+                                              child: _buildBadgeIcon(
+                                                imagePath:
+                                                'assets/images/checkInfo.png',
+                                                isInfo: true,
+                                              ),
                                             ),
                                             SizedBox(height: 48.h),
                                             // Second badge - aligns with second feature

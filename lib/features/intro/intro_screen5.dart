@@ -12,7 +12,6 @@ class IntroScreen5 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Put controller in GetX scope
     final IntroScreen5Controller controller = Get.put(IntroScreen5Controller());
 
     return Scaffold(
@@ -57,7 +56,7 @@ class IntroScreen5 extends StatelessWidget {
                   ),
                 ),
 
-                SizedBox(height: 20.h),
+                SizedBox(height: 10.h),
 
                 // Title
                 Padding(
@@ -67,152 +66,150 @@ class IntroScreen5 extends StatelessWidget {
 
                 SizedBox(height: 10.h),
 
-                // Swipeable Content
+                // -----------------------------------------------------
+                // 1. SMOOTH SLIDING SECTION (Images)
+                // -----------------------------------------------------
                 Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque, // Ensures the whole area detects the swipe
-                    onVerticalDragEnd: (details) {
-                      if (details.primaryVelocity! > 0) {
-                        // Swiped Down
-                        controller.switchPage(0);
-                      } else if (details.primaryVelocity! < 0) {
-                        // Swiped Up
-                        controller.switchPage(1);
-                      }
-                    },
-                    child: SingleChildScrollView(
-                      physics: const NeverScrollableScrollPhysics(), // Prevents scroll conflict with swipe
-                      clipBehavior: Clip.none,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // PageView Images
-                          SizedBox(
-                            height: 280.h,
-                            child: PageView(
-                              controller: controller.pageController,
-                              onPageChanged: controller.onPageChanged,
-                              physics: const NeverScrollableScrollPhysics(), // Managed by vertical drag
-                              children: [
-                                Center(
-                                  child: OverflowBox(
-                                    maxHeight: 330.h,
-                                    maxWidth: 420.w,
-                                    child: Image.asset(
-                                      'assets/images/secondGlow.png',
-                                      width: 420.w,
-                                      height: 360.h,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) =>
-                                          SizedBox(width: 280.w, height: 200.h),
-                                    ),
-                                  ),
-                                ),
-                                Center(
-                                  child: Image.asset(
-                                    'assets/images/bunnyGlow.png',
-                                    width: 280.w,
-                                    height: 280.h,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      width: 280.w,
-                                      height: 280.h,
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(20.r),
-                                      ),
-                                      child: Icon(
-                                        Icons.pets,
-                                        size: 100.sp,
-                                        color: Colors.orange.withOpacity(0.5),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                  child: PageView(
+                    controller: controller.pageController,
+                    scrollDirection: Axis.horizontal, // Enables vertical slide
+                    physics: const BouncingScrollPhysics(), // Native smooth feel
+                    onPageChanged: controller.onPageChanged,
+                    children: [
+                      // Page 0 Image
+                      Container(
+                        alignment: Alignment.center,
+                        padding: EdgeInsets.only(bottom: 20.h),
+                        child: OverflowBox(
+                          maxHeight: 330.h,
+                          maxWidth: 420.w,
+                          child: Image.asset(
+                            'assets/images/secondGlow.png',
+                            width: 420.w,
+                            height: 360.h,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                SizedBox(width: 280.w, height: 200.h),
                           ),
-
-                          Container(
-                            width: double.infinity,
-                            margin: EdgeInsets.symmetric(horizontal: 16.w),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 20.h,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color.fromRGBO(30, 29, 32, 1),
-                              borderRadius: BorderRadius.circular(24.r),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Page Indicators
-                                Obx(
-                                      () => Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildDot(
-                                        controller.currentPage.value == 0,
-                                      ),
-                                      SizedBox(width: 8.w),
-                                      _buildDot(
-                                        controller.currentPage.value == 1,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                SizedBox(height: 16.h),
-
-                                // Animated Content
-                                Obx(
-                                      () => AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 300),
-                                    child: controller.currentPage.value == 0
-                                        ? _buildSubscriptionContent(controller)
-                                        : _buildReferralContent(controller),
-                                  ),
-                                ),
-
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () =>
-                                          print('Terms of Service tapped'),
-                                      child: Text(
-                                        'Terms of Service',
-                                        style: sfProText400(
-                                          12.sp,
-                                          const Color.fromRGBO(
-                                              235, 235, 245, 0.6),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 20.w),
-                                    GestureDetector(
-                                      onTap: () =>
-                                          print('Restore Purchase tapped'),
-                                      child: Text(
-                                        'Restore Purchase',
-                                        style: sfProText400(
-                                          12.sp,
-                                          const Color.fromRGBO(
-                                              235, 235, 245, 0.6),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
+                      // Page 1 Image
+                      Container(
+                        alignment: Alignment.center,
+                        padding: EdgeInsets.only(bottom: 20.h),
+                        child: Image.asset(
+                          'assets/images/bunnyGlow.png',
+                          width: 280.w,
+                          height: 280.h,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 280.w,
+                            height: 280.h,
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20.r),
+                            ),
+                            child: Icon(
+                              Icons.pets,
+                              size: 100.sp,
+                              color: Colors.orange.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // -----------------------------------------------------
+                // 2. BOTTOM CARD (Static position, animates content)
+                // -----------------------------------------------------
+                GestureDetector(
+                  onHorizontalDragStart: controller.onHorizontalDragStart,
+                  onHorizontalDragUpdate: controller.onHorizontalDragUpdate,
+                  onHorizontalDragEnd: controller.onHorizontalDragEnd,
+
+                  child: Container(
+                    width: double.infinity,
+                    margin: EdgeInsets.symmetric(horizontal: 16.w),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 20.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(30, 29, 32, 1),
+                      borderRadius: BorderRadius.circular(24.r),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Page Indicators
+                        Obx(
+                              () => Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildDot(controller.currentPage.value == 0),
+                              SizedBox(width: 8.w),
+                              _buildDot(controller.currentPage.value == 1),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 16.h),
+
+                        // Animated Content (Subscription vs Referral)
+                        Obx(
+                              () => AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.1),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: controller.currentPage.value == 0
+                                ? _buildSubscriptionContent(controller)
+                                : _buildReferralContent(controller),
+                          ),
+                        ),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () => print('Terms of Service tapped'),
+                              child: Text(
+                                'Terms of Service',
+                                style: sfProText400(
+                                  12.sp,
+                                  const Color.fromRGBO(235, 235, 245, 0.6),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 20.w),
+                            GestureDetector(
+                              onTap: () => print('Restore Purchase tapped'),
+                              child: Text(
+                                'Restore Purchase',
+                                style: sfProText400(
+                                  12.sp,
+                                  const Color.fromRGBO(235, 235, 245, 0.6),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
+                SizedBox(height: 20.h),
               ],
             ),
           ),
@@ -222,7 +219,8 @@ class IntroScreen5 extends StatelessWidget {
   }
 
   Widget _buildDot(bool isActive) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       width: 32.w,
       height: 6.h,
       decoration: BoxDecoration(
@@ -235,6 +233,7 @@ class IntroScreen5 extends StatelessWidget {
   Widget _buildSubscriptionContent(IntroScreen5Controller c) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      key: const ValueKey('subscription'),
       children: [
         // Monthly Plan
         GestureDetector(
@@ -250,7 +249,7 @@ class IntroScreen5 extends StatelessWidget {
 
         SizedBox(height: 13.h),
 
-        // Yearly Plan (Most Popular)
+        // Yearly Plan
         GestureDetector(
           onTap: () => c.selectPlan(1),
           child: Obx(
@@ -441,7 +440,8 @@ class IntroScreen5 extends StatelessWidget {
               const Spacer(),
               Text(
                 '1 time',
-                style: sfProText600(17.sp, const Color.fromRGBO(235, 235, 245, 0.3)),
+                style: sfProText600(
+                    17.sp, const Color.fromRGBO(235, 235, 245, 0.3)),
               ),
             ],
           ),
@@ -488,6 +488,45 @@ class IntroScreen5Controller extends GetxController {
   var currentPage = 0.obs;
 
   final PageController pageController = PageController(initialPage: 0);
+  // Track Horizontal Drag Distance
+  double _dragDistance = 0.0;
+
+  void onHorizontalDragStart(DragStartDetails details) {
+    _dragDistance = 0.0; // Reset distance
+  }
+
+  void onHorizontalDragUpdate(DragUpdateDetails details) {
+    _dragDistance += details.delta.dx; // Track horizontal movement
+  }
+
+  void onHorizontalDragEnd(DragEndDetails details) {
+    double velocity = details.primaryVelocity ?? 0;
+    double distance = _dragDistance;
+
+    // Thresholds
+    double velocityThreshold = 300.0; // Fast swipe speed
+    double distanceThreshold = 50.0;  // Slow drag distance
+
+    // LOGIC:
+    // 1. Swipe LEFT (Negative values) -> Next Page (Page 1)
+    if (velocity < -velocityThreshold || distance < -distanceThreshold) {
+      switchPage(1);
+    }
+    // 2. Swipe RIGHT (Positive values) -> Previous Page (Page 0)
+    else if (velocity > velocityThreshold || distance > distanceThreshold) {
+      switchPage(0);
+    }
+  }
+
+  void switchPage(int index) {
+    if (currentPage.value != index) {
+      pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutQuart,
+      );
+    }
+  }
 
   void startTrial() async {
     if (isLoading.value) return;
@@ -519,16 +558,6 @@ class IntroScreen5Controller extends GetxController {
     selectedPlan.value = plan;
   }
 
-  void switchPage(int index) {
-    if (currentPage.value != index) {
-      currentPage.value = index;
-      pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
 
   void onPageChanged(int index) {
     currentPage.value = index;
