@@ -66,8 +66,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
     );
   }
 
-  Widget _cross() =>
-      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
   Widget _freeze() =>
       Image.asset('assets/images/Mask group.png');
   // ---------------- LAYOUT HELPERS ----------------
@@ -214,11 +213,8 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                     children: [
                       InkWell(
                         onTap: Get.back,
-                        child: Image.asset(
-                          'assets/images/Mask group.png',
-                          height: 44.h,
-                        ),
-                      ),
+                        child: Image.asset('assets/icons/x_icon.png', height: 44.h)),
+
                       SizedBox(width: 44.w),
                     ],
                   ),

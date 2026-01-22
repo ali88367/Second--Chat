@@ -187,7 +187,7 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                             text: TextSpan(
                               children: [
                                 TextSpan(text: '3 ', style: sfProDisplay400(15.sp, Colors.white)),
-                                TextSpan(text: 'freezes per month', style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))),
+                                TextSpan(text: 'freeze per month', style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))),
                               ],
                             ),
                           ),
