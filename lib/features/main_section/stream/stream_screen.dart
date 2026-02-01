@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import '../../../core/constants/app_images/app_images.dart';
+import '../../../controllers/Main Section Controllers/settings_controller.dart';
 
 class StreamScreen extends StatelessWidget {
   const StreamScreen({super.key});
@@ -132,16 +133,19 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _statPill(twitchPurple, twitch_icon, "11202", true), // Twitch style
-        SizedBox(width: 12.w),
-        _statPill(kickGreen, kick_icon, "1256", true), // Kick style
-        SizedBox(width: 12.w),
-        _statPill(youtubeRed, youtube_icon, "256", true), // Youtube style
-      ],
-    );
+    final SettingsController controller = Get.find<SettingsController>();
+    return Obx(() {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _statPill(controller.getPlatformColor('twitch'), twitch_icon, "11202", true), // Twitch style
+          SizedBox(width: 12.w),
+          _statPill(controller.getPlatformColor('kick'), kick_icon, "1256", true), // Kick style
+          SizedBox(width: 12.w),
+          _statPill(controller.getPlatformColor('youtube'), youtube_icon, "256", true), // Youtube style
+        ],
+      );
+    });
   }
 
   Widget _statPill(Color color, String icon, String count, bool coloredBack) {

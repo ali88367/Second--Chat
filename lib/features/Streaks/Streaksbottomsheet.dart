@@ -8,20 +8,26 @@ import 'package:second_chat/core/widgets/custom_switch.dart';
 
 import '../../3timewidget.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
-import '../../core/widgets/custom_black_glass_widget.dart';
 import 'Freeze_bottomsheet.dart';
 
 class StreamStreakSetupBottomSheet extends StatefulWidget {
   const StreamStreakSetupBottomSheet({super.key});
 
   @override
-  State<StreamStreakSetupBottomSheet> createState() => _StreamStreakSetupBottomSheetState();
+  State<StreamStreakSetupBottomSheet> createState() =>
+      _StreamStreakSetupBottomSheetState();
 }
 
-class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSheet> with SingleTickerProviderStateMixin {
+class _StreamStreakSetupBottomSheetState
+    extends State<StreamStreakSetupBottomSheet>
+    with TickerProviderStateMixin {
   late AnimationController _glowController;
+  late AnimationController _frameController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  bool _framesPreloaded = false;
+
+  static const int totalFrames = 119; // Frames from 0001 to 0119
 
   @override
   void initState() {
@@ -30,6 +36,18 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+
+    // Frame animation controller - loops continuously forward
+    _frameController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 3000,
+      ), // Adjust duration for animation speed
+    );
+
+    // Start animation and ensure it loops continuously from start
+    // repeat() automatically handles looping, no need to call forward() separately
+    _frameController.repeat();
 
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOutSine),
@@ -41,8 +59,43 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Preload first few frames when context is available
+    if (!_framesPreloaded) {
+      _preloadInitialFrames();
+      _framesPreloaded = true;
+    }
+  }
+
+  void _preloadInitialFrames() {
+    // Preload first 30 frames immediately for instant display
+    for (int i = 1; i <= 30 && i <= totalFrames; i++) {
+      final frameNumber = i.toString().padLeft(4, '0');
+      precacheImage(
+        AssetImage('assets/FIreAnimation2/frame_lq_$frameNumber.png'),
+        context,
+      );
+    }
+
+    // Preload remaining frames in background
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        for (int i = 31; i <= totalFrames; i++) {
+          final frameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/FIreAnimation2/frame_lq_$frameNumber.png'),
+            context,
+          );
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _glowController.dispose();
+    _frameController.dispose();
     super.dispose();
   }
 
@@ -88,8 +141,11 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
                             child: Image.asset(
                               'assets/icons/x_icon.png',
                               height: 44.h,
-                              errorBuilder: (_, __, ___) =>
-                                  Icon(Icons.close, color: Colors.white, size: 44.h),
+                              errorBuilder: (_, __, ___) => Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 44.h,
+                              ),
                             ),
                           ),
                           Text(
@@ -107,41 +163,89 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
 
                     // Main Graphic and Text Section
                     SizedBox(height: 10.h),
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AnimatedBuilder(
-                          animation: _glowController,
-                          builder: (context, child) {
-                            return Transform.scale(
-                              scale: _scaleAnimation.value,
-                              child: Container(
-                                width: 150.h,
-                                height: 150.h,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0XFFFFE6A7).withOpacity(_opacityAnimation.value),
-                                      blurRadius: 50,
-                                      spreadRadius: 20,
-                                    ),
-                                    BoxShadow(
-                                      color: const Color(0XFFF2B269).withOpacity(_opacityAnimation.value * 0.5),
-                                      blurRadius: 30,
-                                      spreadRadius: 5,
-                                    ),
-                                  ],
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([
+                          _glowController,
+                          _frameController,
+                        ]),
+                        builder: (context, child) {
+                          // Optimized frame calculation using round() for smoother transitions
+                          double animValue = _frameController.value.clamp(
+                            0.0,
+                            1.0,
+                          );
+                          // Use round() instead of floor() for smoother frame transitions
+                          int frame =
+                              ((animValue * totalFrames).round() % totalFrames);
+                          frame = (frame == 0 ? totalFrames : frame).clamp(
+                            1,
+                            totalFrames,
+                          );
+                          String frameNumber = frame.toString().padLeft(4, '0');
+
+                          return Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              Transform.scale(
+                                scale: _scaleAnimation.value,
+                                child: Container(
+                                  width: 150.h,
+                                  height: 150.h,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0XFFFFE6A7,
+                                        ).withOpacity(_opacityAnimation.value),
+                                        blurRadius: 50,
+                                        spreadRadius: 20,
+                                      ),
+                                      BoxShadow(
+                                        color: const Color(0XFFF2B269)
+                                            .withOpacity(
+                                              _opacityAnimation.value * 0.5,
+                                            ),
+                                        blurRadius: 30,
+                                        spreadRadius: 5,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                        Image.asset(
-                          'assets/images/abc.png',
-                          height: 177.h,
-                        ),
-                      ],
+                              Image.asset(
+                                'assets/FIreAnimation2/frame_lq_$frameNumber.png',
+                                height: 177.h,
+                                width: 177.w,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                                // Optimized cache dimensions for exact size
+                                cacheWidth:
+                                    (177.w *
+                                            MediaQuery.of(
+                                              context,
+                                            ).devicePixelRatio)
+                                        .round(),
+                                cacheHeight:
+                                    (177.h *
+                                            MediaQuery.of(
+                                              context,
+                                            ).devicePixelRatio)
+                                        .round(),
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 177.h,
+                                    width: 177.w,
+                                    color: Colors.transparent,
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                     SizedBox(height: 6.h),
                     Text(
@@ -155,7 +259,6 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: 24.h), // Adjusted spacing
-
                     // Toggles Section
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 20.w),
@@ -287,7 +390,10 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
     );
   }
 
-  Widget _buildThreeTimesOption(StreamStreaksController controller, BuildContext context) {
+  Widget _buildThreeTimesOption(
+    StreamStreaksController controller,
+    BuildContext context,
+  ) {
     final indicatorKey = GlobalKey();
 
     return Obx(() {
@@ -335,7 +441,11 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
                   controller.toggleThreeTimesWeek(val);
                   if (val) {
                     Future.delayed(const Duration(milliseconds: 50), () {
-                      _showGlassmorphicPopupMenu(context, indicatorKey, controller);
+                      _showGlassmorphicPopupMenu(
+                        context,
+                        indicatorKey,
+                        controller,
+                      );
                     });
                   }
                 },
@@ -348,12 +458,14 @@ class _StreamStreakSetupBottomSheetState extends State<StreamStreakSetupBottomSh
   }
 
   void _showGlassmorphicPopupMenu(
-      BuildContext context,
-      GlobalKey indicatorKey,
-      StreamStreaksController controller,
-      ) {
-    final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final RenderBox? button = indicatorKey.currentContext?.findRenderObject() as RenderBox?;
+    BuildContext context,
+    GlobalKey indicatorKey,
+    StreamStreaksController controller,
+  ) {
+    final RenderBox? overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final RenderBox? button =
+        indicatorKey.currentContext?.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
 

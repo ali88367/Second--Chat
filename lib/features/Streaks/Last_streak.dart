@@ -9,17 +9,22 @@ class StreakFreezeUseBottomSheet extends StatefulWidget {
   const StreakFreezeUseBottomSheet({super.key});
 
   @override
-  State<StreakFreezeUseBottomSheet> createState() => _StreakFreezeUseBottomSheetState();
+  State<StreakFreezeUseBottomSheet> createState() =>
+      _StreakFreezeUseBottomSheetState();
 }
 
-class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet> with SingleTickerProviderStateMixin {
+class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
+    with TickerProviderStateMixin {
   late AnimationController _freezeController;
+  late AnimationController _frameController;
   late Animation<double> _glowAnimation;
   late Animation<double> _floatAnimation;
+  bool _framesPreloaded = false;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
   static const double rowHeight = 32;
+  static const int totalFrames = 95; // Frames from 0001 to 0095
 
   @override
   void initState() {
@@ -28,6 +33,17 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       vsync: this,
       duration: const Duration(milliseconds: 2500),
     )..repeat(reverse: true);
+
+    // Frame animation controller - loops continuously forward
+    // Optimized duration for smoother playback (32ms per frame for 95 frames ≈ 3000ms)
+    _frameController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 2500,
+      ), // Slightly faster for smoother feel
+    );
+    // repeat() automatically handles looping and starts the animation
+    _frameController.repeat();
 
     _glowAnimation = Tween<double>(begin: 0.15, end: 0.4).animate(
       CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutSine),
@@ -39,8 +55,43 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Preload frames when context is available
+    if (!_framesPreloaded) {
+      _preloadFrozenFireFrames();
+      _framesPreloaded = true;
+    }
+  }
+
+  void _preloadFrozenFireFrames() {
+    // Preload first 30 frames immediately for instant display
+    for (int i = 1; i <= 30 && i <= totalFrames; i++) {
+      final frameNumber = i.toString().padLeft(4, '0');
+      precacheImage(
+        AssetImage('assets/FrozenFire/frame_$frameNumber.png'),
+        context,
+      );
+    }
+
+    // Preload remaining frames in background
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        for (int i = 31; i <= totalFrames; i++) {
+          final frameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/FrozenFire/frame_$frameNumber.png'),
+            context,
+          );
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _freezeController.dispose();
+    _frameController.dispose();
     super.dispose();
   }
 
@@ -58,9 +109,14 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     );
   }
 
-  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
-  Widget _freeze() => Image.asset('assets/images/Privacy & Security - SVG.png', width: 22.sp);
-  Widget _dot() => Opacity(opacity: 0.3, child: Icon(Icons.circle, size: 10.sp, color: Colors.white));
+  Widget _cross() =>
+      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _freeze() =>
+      Image.asset('assets/images/Privacy & Security - SVG.png', width: 22.sp);
+  Widget _dot() => Opacity(
+    opacity: 0.3,
+    child: Icon(Icons.circle, size: 10.sp, color: Colors.white),
+  );
 
   Widget _highlight(int start, int end, double totalWidth) {
     final int count = end - start + 1;
@@ -69,7 +125,9 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     Decoration decoration;
     if (count >= 3) {
       decoration = BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF7EDDE4), Color(0xFFC5F3F1)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7EDDE4), Color(0xFFC5F3F1)],
+        ),
         borderRadius: BorderRadius.circular(22.r),
       );
     } else {
@@ -86,7 +144,9 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       top: 0,
       bottom: 0,
       child: Container(
-        margin: count == 1 ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
+        margin: count == 1
+            ? EdgeInsets.zero
+            : EdgeInsets.symmetric(horizontal: 2.w),
         decoration: decoration,
       ),
     );
@@ -98,7 +158,10 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
 
     return Container(
       height: Get.height * 0.9,
-      decoration: BoxDecoration(color: bottomSheetGrey, borderRadius: const BorderRadius.vertical(top: Radius.circular(18))),
+      decoration: BoxDecoration(
+        color: bottomSheetGrey,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
         child: Scaffold(
@@ -117,53 +180,133 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            InkWell(onTap: Get.back, child: Image.asset('assets/icons/x_icon.png', height: 44.h)),
+                            InkWell(
+                              onTap: Get.back,
+                              child: Image.asset(
+                                'assets/icons/x_icon.png',
+                                height: 44.h,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      AnimatedBuilder(
-                        animation: _freezeController,
-                        builder: (context, child) {
-                          return Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 300.w, height: 240.h,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.rectangle,
-                                  borderRadius: BorderRadius.all(Radius.elliptical(70.w, 110.h)),
-                                  boxShadow: [
-                                    BoxShadow(color: const Color(0xFF7EDDE4).withOpacity(_glowAnimation.value), blurRadius: 180, spreadRadius: 10),
-                                  ],
+                      RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: Listenable.merge([
+                            _freezeController,
+                            _frameController,
+                          ]),
+                          builder: (context, child) {
+                            // Optimized frame calculation using round() for smoother transitions
+                            double animValue = _frameController.value.clamp(0.0, 1.0);
+                            // Use round() instead of floor() for smoother frame transitions
+                            int frame = ((animValue * totalFrames).round() % totalFrames);
+                            frame = (frame == 0 ? totalFrames : frame).clamp(1, totalFrames);
+                            String frameNumber = frame.toString().padLeft(4, '0');
+
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 300.w,
+                                  height: 240.h,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.rectangle,
+                                    borderRadius: BorderRadius.all(
+                                      Radius.elliptical(70.w, 110.h),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF7EDDE4,
+                                        ).withOpacity(_glowAnimation.value),
+                                        blurRadius: 180,
+                                        spreadRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Transform.translate(
+                                  offset: Offset(0, _floatAnimation.value),
+                                  child: Image.asset(
+                                    'assets/FrozenFire/frame_$frameNumber.png',
+                                    height: 250.h,
+                                    width: 250.w,
+                                    fit: BoxFit.contain,
+                                    gaplessPlayback: true,
+                                    // Optimized cache dimensions for exact size
+                                    cacheWidth: (250.w * MediaQuery.of(context).devicePixelRatio).round(),
+                                    cacheHeight: (250.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        height: 250.h,
+                                        width: 250.w,
+                                        color: Colors.transparent,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              Positioned(
+                                bottom: 0.h,
+                                child: Image.asset(
+                                  'assets/images/Streak number.png',
+                                  width: 155.w,
+                                  height: 90.h,
                                 ),
                               ),
-                              Transform.translate(offset: Offset(0, _floatAnimation.value), child: Image.asset('assets/images/hello.png', height: 250.h)),
-                              Positioned(bottom: 0.h, child: Image.asset('assets/images/Streak number.png', width: 155.w, height: 90.h)),
                             ],
                           );
                         },
                       ),
-                      Text("Go ahead, freeze it. Commitment is \noverrated anyway.", style: sfProDisplay600(22.sp, Colors.white), textAlign: TextAlign.center),
+                      ),
+                      Text(
+                        "Go ahead, freeze it. Commitment is \noverrated anyway.",
+                        style: sfProDisplay600(22.sp, Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
                       SizedBox(height: 12.h),
                       Obx(() {
-                        final available = 3 - controller.manualFreezeCount.value;
+                        final available =
+                            3 - controller.manualFreezeCount.value;
                         return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 4.h,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF32393D),
                             borderRadius: BorderRadius.circular(40.r),
-                            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 1,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Image.asset("assets/images/checkmark.circle.fill.png", width: 19.w, height: 24.h),
+                              Image.asset(
+                                "assets/images/checkmark.circle.fill.png",
+                                width: 19.w,
+                                height: 24.h,
+                              ),
                               SizedBox(width: 8.w),
                               RichText(
                                 text: TextSpan(
                                   children: [
-                                    TextSpan(text: '$available ', style: sfProDisplay400(15.sp, Colors.white)),
-                                    TextSpan(text: 'available', style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))),
+                                    TextSpan(
+                                      text: '$available ',
+                                      style: sfProDisplay400(
+                                        15.sp,
+                                        Colors.white,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'available',
+                                      style: sfProDisplay400(
+                                        15.sp,
+                                        const Color(0xFFB0B3B8),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -174,15 +317,40 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                       SizedBox(height: 20.h),
                       Container(
                         width: 361.w,
-                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
-                        decoration: BoxDecoration(color: const Color(0xFF1E1D20), borderRadius: BorderRadius.circular(24.r)),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding.w,
+                          vertical: 16.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1D20),
+                          borderRadius: BorderRadius.circular(24.r),
+                        ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Row(
-                              children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((day) {
-                                return Expanded(child: Center(child: Text(day, style: TextStyle(color: const Color(0xFF8E8E93), fontSize: 13.sp))));
-                              }).toList(),
+                              children:
+                                  [
+                                    'Mon',
+                                    'Tue',
+                                    'Wed',
+                                    'Thur',
+                                    'Fri',
+                                    'Sat',
+                                    'Sun',
+                                  ].map((day) {
+                                    return Expanded(
+                                      child: Center(
+                                        child: Text(
+                                          day,
+                                          style: TextStyle(
+                                            color: const Color(0xFF8E8E93),
+                                            fontSize: 13.sp,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                             ),
                             SizedBox(height: 16.h),
                             LayoutBuilder(
@@ -193,22 +361,41 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                   child: Obx(() {
                                     // Watching singleRowCells for changes
                                     final rowData = controller.singleRowCells;
-                                    final groups = controller.getTickGroups(rowData);
+                                    final groups = controller.getTickGroups(
+                                      rowData,
+                                    );
                                     return Stack(
                                       children: [
-                                        for (final g in groups) _highlight(g[0], g[1], totalWidth),
+                                        for (final g in groups)
+                                          _highlight(g[0], g[1], totalWidth),
                                         Row(
                                           children: List.generate(days, (i) {
                                             final cell = rowData[i];
-                                            final isLatest = controller.lastTappedCol.value == i;
+                                            final isLatest =
+                                                controller
+                                                    .lastTappedCol
+                                                    .value ==
+                                                i;
                                             Widget icon;
                                             switch (cell) {
-                                              case CellType.tick: icon = _tick(highlighted: isLatest); break;
-                                              case CellType.cross: icon = _cross(); break;
-                                              case CellType.freeze: icon = _freeze(); break;
-                                              case CellType.dot: icon = _dot(); break;
+                                              case CellType.tick:
+                                                icon = _tick(
+                                                  highlighted: isLatest,
+                                                );
+                                                break;
+                                              case CellType.cross:
+                                                icon = _cross();
+                                                break;
+                                              case CellType.freeze:
+                                                icon = _freeze();
+                                                break;
+                                              case CellType.dot:
+                                                icon = _dot();
+                                                break;
                                             }
-                                            return Expanded(child: Center(child: icon));
+                                            return Expanded(
+                                              child: Center(child: icon),
+                                            );
                                           }),
                                         ),
                                       ],
@@ -234,35 +421,60 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        height: 50.h, width: double.infinity,
+                        height: 50.h,
+                        width: double.infinity,
                         child: OutlinedButton(
                           onPressed: Get.back,
                           style: OutlinedButton.styleFrom(
                             backgroundColor: const Color(0xFF2C2C2E),
                             side: BorderSide.none,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.r)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25.r),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
                           ),
-                          child: Text("Ignore", style: sfProText600(17.sp, Colors.white.withOpacity(0.8))),
+                          child: Text(
+                            "Ignore",
+                            style: sfProText600(
+                              17.sp,
+                              Colors.white.withOpacity(0.8),
+                            ),
+                            textHeightBehavior: TextHeightBehavior(
+                              applyHeightToFirstAscent: false,
+                              applyHeightToLastDescent: false,
+                            ),
+                          ),
                         ),
                       ),
                       SizedBox(height: 12.h),
                       SizedBox(
-                        height: 50.h, width: double.infinity,
+                        height: 50.h,
+                        width: double.infinity,
                         child: Obx(() {
-                          final canFreeze = (3 - controller.manualFreezeCount.value) > 0;
+                          final canFreeze =
+                              (3 - controller.manualFreezeCount.value) > 0;
                           return ElevatedButton(
-                            onPressed: canFreeze ? () {
-                              controller.addFreezeAfterStreak();
-                            } : null,
+                            onPressed: canFreeze
+                                ? () {
+                                    controller.addFreezeAfterStreak();
+                                  }
+                                : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: canFreeze ? const Color(0xFF7EDDE4) : Colors.grey.withOpacity(0.5),
+                              backgroundColor: canFreeze
+                                  ? const Color(0xFF7EDDE4)
+                                  : Colors.grey.withOpacity(0.5),
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.r)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25.r),
+                              ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text("Use 1 ", style: sfProText600(17.sp, Colors.white)),
+                                Text(
+                                  "Use 1 ",
+                                  style: sfProText600(17.sp, Colors.white),
+                                ),
                                 Image.asset('assets/images/Mask group.png'),
                               ],
                             ),

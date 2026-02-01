@@ -36,9 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   get: ^4.6.6
   flutter_screenutil: ^5.9.3
-  google_fonts: ^6.2.1
   animate_do: ^3.3.4
-  toggle_switch:
   ios_color_picker:
   glassmorphism: ^3.0.0
   gradient_borders: ^1.0.2
@@ -75,6 +73,8 @@ flutter:
   assets:
     - assets/icons/
     - assets/images/
+    - assets/FrozenFire/
+    - assets/FIreAnimation2/
 
   fonts:
     - family: SFProDisplay

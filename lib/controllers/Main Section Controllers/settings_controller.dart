@@ -1,4 +1,6 @@
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
+import '../../core/constants/app_colors/app_colors.dart';
 
 class SettingsController extends GetxController {
   // General toggles
@@ -21,6 +23,42 @@ class SettingsController extends GetxController {
   RxString fontSize = "M".obs;
   RxString clockFormat = "12h".obs;
   RxString appLanguage = "English".obs;
+
+  // Premium unlock state
+  RxBool isPremiumUnlocked = false.obs;
+
+  // Platform colors - null means use default
+  Rx<Color?> twitchColor = Rx<Color?>(null);
+  Rx<Color?> kickColor = Rx<Color?>(null);
+  Rx<Color?> youtubeColor = Rx<Color?>(null);
+
+  // Helper methods to get platform colors (with defaults)
+  Color getPlatformColor(String platform) {
+    switch (platform.toLowerCase()) {
+      case 'twitch':
+        return twitchColor.value ?? twitchPurple;
+      case 'kick':
+        return kickColor.value ?? kickGreen;
+      case 'youtube':
+        return youtubeColor.value ?? youtubeRed;
+      default:
+        return Colors.white;
+    }
+  }
+
+  void setPlatformColor(String platform, Color color) {
+    switch (platform.toLowerCase()) {
+      case 'twitch':
+        twitchColor.value = color;
+        break;
+      case 'kick':
+        kickColor.value = color;
+        break;
+      case 'youtube':
+        youtubeColor.value = color;
+        break;
+    }
+  }
 
   // Helper methods
   void toggleNotifications() => notifications.toggle();

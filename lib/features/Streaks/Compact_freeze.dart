@@ -13,14 +13,17 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
   State<StreakFreezeSingleRowPreviewBottomSheet> createState() => _StreakFreezeSingleRowPreviewBottomSheetState();
 }
 
-class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSingleRowPreviewBottomSheet> with SingleTickerProviderStateMixin {
+class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSingleRowPreviewBottomSheet> with TickerProviderStateMixin {
   late AnimationController _fireController;
+  late AnimationController _frameController;
   late Animation<double> _glowPulse;
   late Animation<double> _fireJitter;
+  bool _framesPreloaded = false;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
   static const double rowHeight = 32;
+  static const int totalFrames = 119; // Frames from 0001 to 0119
 
   @override
   void initState() {
@@ -29,6 +32,15 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+
+    // Frame animation controller - loops continuously forward
+    // Optimized duration for smoother playback
+    _frameController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500), // Slightly faster for smoother feel
+    );
+    // repeat() automatically handles looping and starts the animation
+    _frameController.repeat();
 
     _glowPulse = Tween<double>(begin: 0.2, end: 0.45).animate(
       CurvedAnimation(parent: _fireController, curve: Curves.easeInOutSine),
@@ -40,8 +52,43 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Preload frames when context is available
+    if (!_framesPreloaded) {
+      _preloadFireAnimation2Frames();
+      _framesPreloaded = true;
+    }
+  }
+
+  void _preloadFireAnimation2Frames() {
+    // Preload first 30 frames immediately for instant display
+    for (int i = 1; i <= 30 && i <= totalFrames; i++) {
+      final frameNumber = i.toString().padLeft(4, '0');
+      precacheImage(
+        AssetImage('assets/FIreAnimation2/frame_lq_$frameNumber.png'),
+        context,
+      );
+    }
+    
+    // Preload remaining frames in background
+    Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+        for (int i = 31; i <= totalFrames; i++) {
+          final frameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/FIreAnimation2/frame_lq_$frameNumber.png'),
+            context,
+          );
+        }
+          }
+        });
+  }
+
+  @override
   void dispose() {
     _fireController.dispose();
+    _frameController.dispose();
     super.dispose();
   }
 
@@ -206,54 +253,78 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                 ),
 
                 // --- ANIMATED FIRE SECTION ---
-                AnimatedBuilder(
-                  animation: _fireController,
-                  builder: (context, child) {
-                    return Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 200.w,
-                          height: 240.h,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.rectangle,
-                            borderRadius: BorderRadius.all(
-                              Radius.elliptical(70.w, 110.h),
+                RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _fireController,
+                      _frameController,
+                    ]),
+                    builder: (context, child) {
+                      // Optimized frame calculation using round() for smoother transitions
+                      double animValue = _frameController.value.clamp(0.0, 1.0);
+                      // Use round() instead of floor() for smoother frame transitions
+                      int frame = ((animValue * totalFrames).round() % totalFrames);
+                      frame = (frame == 0 ? totalFrames : frame).clamp(1, totalFrames);
+                      String frameNumber = frame.toString().padLeft(4, '0');
+
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 200.w,
+                            height: 240.h,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.rectangle,
+                              borderRadius: BorderRadius.all(
+                                Radius.elliptical(70.w, 110.h),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFFF9C4).withOpacity(_glowPulse.value),
+                                  blurRadius: 180,
+                                  spreadRadius: 10,
+                                ),
+                                BoxShadow(
+                                  color: const Color(0xFFFDEBB2).withOpacity(_glowPulse.value * 0.6),
+                                  blurRadius: 40,
+                                  spreadRadius: -5,
+                                ),
+                              ],
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFFF9C4).withOpacity(_glowPulse.value),
-                                blurRadius: 180,
-                                spreadRadius: 10,
-                              ),
-                              BoxShadow(
-                                color: const Color(0xFFFDEBB2).withOpacity(_glowPulse.value * 0.6),
-                                blurRadius: 40,
-                                spreadRadius: -5,
-                              ),
-                            ],
                           ),
-                        ),
-                        Transform.translate(
-                          offset: Offset(0, _fireJitter.value),
-                          child: Image.asset(
-                            'assets/images/foire.png',
-                            height: 255.h,
-                            fit: BoxFit.contain,
+                          Transform.translate(
+                            offset: Offset(0, _fireJitter.value),
+                            child: Image.asset(
+                              'assets/FIreAnimation2/frame_lq_$frameNumber.png',
+                              height: 255.h,
+                              width: 255.w,
+                              fit: BoxFit.contain,
+                              gaplessPlayback: true,
+                              // Optimized cache dimensions for exact size
+                              cacheWidth: (255.w * MediaQuery.of(context).devicePixelRatio).round(),
+                              cacheHeight: (255.h * MediaQuery.of(context).devicePixelRatio).round(),
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 255.h,
+                                  width: 255.w,
+                                  color: Colors.transparent,
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        Positioned(
-                          bottom: 0.h,
-                          child: Image.asset(
-                            'assets/images/Streak number.png',
-                            width: 155.w,
-                            height: 100.h,
-                            fit: BoxFit.contain,
+                          Positioned(
+                            bottom: 0.h,
+                            child: Image.asset(
+                              'assets/images/Streak number.png',
+                              width: 155.w,
+                              height: 100.h,
+                              fit: BoxFit.contain,
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
                 SizedBox(height: 10.h),
 

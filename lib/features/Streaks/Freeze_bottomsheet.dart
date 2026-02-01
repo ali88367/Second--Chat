@@ -13,14 +13,17 @@ class StreakFreezePreviewBottomSheet extends StatefulWidget {
   State<StreakFreezePreviewBottomSheet> createState() => _StreakFreezePreviewBottomSheetState();
 }
 
-class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBottomSheet> with SingleTickerProviderStateMixin {
+class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBottomSheet> with TickerProviderStateMixin {
   late AnimationController _pulseController;
+  late AnimationController _frameController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  bool _framesPreloaded = false;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
   static const double rowHeight = 32;
+  static const int totalFrames = 95; // Frames from 0001 to 0095
 
   @override
   void initState() {
@@ -29,6 +32,15 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
+
+    // Frame animation controller - loops continuously forward
+    // Optimized duration for smoother playback
+    _frameController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500), // Slightly faster for smoother feel
+    );
+    // repeat() automatically handles looping and starts the animation
+    _frameController.repeat();
 
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -40,8 +52,43 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Preload frames when context is available
+    if (!_framesPreloaded) {
+      _preloadFrozenFireFrames();
+      _framesPreloaded = true;
+    }
+  }
+
+  void _preloadFrozenFireFrames() {
+    // Preload first 30 frames immediately for instant display
+    for (int i = 1; i <= 30 && i <= totalFrames; i++) {
+      final frameNumber = i.toString().padLeft(4, '0');
+      precacheImage(
+        AssetImage('assets/FrozenFire/frame_$frameNumber.png'),
+        context,
+      );
+    }
+    
+    // Preload remaining frames in background
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        for (int i = 31; i <= totalFrames; i++) {
+          final frameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/FrozenFire/frame_$frameNumber.png'),
+            context,
+          );
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _pulseController.dispose();
+    _frameController.dispose();
     super.dispose();
   }
 
@@ -148,32 +195,60 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                       ),
                     ),
                     SizedBox(height: 10.h),
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            return Transform.scale(
-                              scale: _scaleAnimation.value,
-                              child: Container(
-                                width: 140.h, height: 140.h,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0XFF84DEE4).withOpacity(_opacityAnimation.value),
-                                      blurRadius: 55,
-                                      spreadRadius: 15,
-                                    ),
-                                  ],
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([
+                          _pulseController,
+                          _frameController,
+                        ]),
+                        builder: (context, child) {
+                          // Optimized frame calculation using round() for smoother transitions
+                          double animValue = _frameController.value.clamp(0.0, 1.0);
+                          // Use round() instead of floor() for smoother frame transitions
+                          int frame = ((animValue * totalFrames).round() % totalFrames);
+                          frame = (frame == 0 ? totalFrames : frame).clamp(1, totalFrames);
+                          String frameNumber = frame.toString().padLeft(4, '0');
+
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Transform.scale(
+                                scale: _scaleAnimation.value,
+                                child: Container(
+                                  width: 140.h, height: 140.h,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0XFF84DEE4).withOpacity(_opacityAnimation.value),
+                                        blurRadius: 55,
+                                        spreadRadius: 15,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                        Image.asset('assets/images/a1.png', height: 177.h),
-                      ],
+                              Image.asset(
+                                'assets/FrozenFire/frame_$frameNumber.png',
+                                height: 177.h,
+                                width: 177.w,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                                // Optimized cache dimensions for exact size
+                                cacheWidth: (177.w * MediaQuery.of(context).devicePixelRatio).round(),
+                                cacheHeight: (177.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 177.h,
+                                    width: 177.w,
+                                    color: Colors.transparent,
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                     SizedBox(height: 6.h),
                     Text(
@@ -263,8 +338,13 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(36.r)),
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
                     ),
-                    child: Text("Let's go", style: sfProText600(17.sp, Colors.black)),
+                    child: Text(
+                      "Let's go",
+                      style: sfProText600(17.sp, Colors.black),
+                      textHeightBehavior: TextHeightBehavior(applyHeightToFirstAscent: false, applyHeightToLastDescent: false),
+                    ),
                   ),
                 ),
               ),

@@ -73,7 +73,8 @@ class IntroScreen5 extends StatelessWidget {
                   child: PageView(
                     controller: controller.pageController,
                     scrollDirection: Axis.horizontal, // Enables vertical slide
-                    physics: const BouncingScrollPhysics(), // Native smooth feel
+                    physics:
+                        const BouncingScrollPhysics(), // Native smooth feel
                     onPageChanged: controller.onPageChanged,
                     children: [
                       // Page 0 Image
@@ -145,7 +146,7 @@ class IntroScreen5 extends StatelessWidget {
                       children: [
                         // Page Indicators
                         Obx(
-                              () => Row(
+                          () => Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _buildDot(controller.currentPage.value == 0),
@@ -159,7 +160,7 @@ class IntroScreen5 extends StatelessWidget {
 
                         // Animated Content (Subscription vs Referral)
                         Obx(
-                              () => AnimatedSwitcher(
+                          () => AnimatedSwitcher(
                             duration: const Duration(milliseconds: 300),
                             transitionBuilder: (child, animation) {
                               return FadeTransition(
@@ -239,7 +240,7 @@ class IntroScreen5 extends StatelessWidget {
         GestureDetector(
           onTap: () => c.selectPlan(0),
           child: Obx(
-                () => _planCard(
+            () => _planCard(
               isSelected: c.selectedPlan.value == 0,
               title: 'Monthly',
               price: '£4.99/month',
@@ -253,7 +254,7 @@ class IntroScreen5 extends StatelessWidget {
         GestureDetector(
           onTap: () => c.selectPlan(1),
           child: Obx(
-                () => Stack(
+            () => Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
@@ -281,8 +282,10 @@ class IntroScreen5 extends StatelessWidget {
                       SizedBox(width: 12.w),
                       Text('Year', style: sfProText600(17.sp, Colors.white)),
                       const Spacer(),
-                      Text('£2.99/month',
-                          style: sfProText600(17.sp, Colors.white)),
+                      Text(
+                        '£2.99/month',
+                        style: sfProText600(17.sp, Colors.white),
+                      ),
                     ],
                   ),
                 ),
@@ -303,7 +306,7 @@ class IntroScreen5 extends StatelessWidget {
 
         // Start Trial Button
         Obx(
-              () => GestureDetector(
+          () => GestureDetector(
             onTap: c.isLoading.value ? null : c.startTrial,
             child: Container(
               width: double.infinity,
@@ -326,35 +329,35 @@ class IntroScreen5 extends StatelessWidget {
               child: Center(
                 child: c.isLoading.value
                     ? SizedBox(
-                  width: 24.w,
-                  height: 24.w,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.white,
-                    ),
-                  ),
-                )
+                        width: 24.w,
+                        height: 24.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
                     : RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Start Free Trial\n',
-                        style: sfProText600(17.sp, Colors.white),
-                      ),
-                      TextSpan(
-                        text: c.selectedPlan.value == 1
-                            ? 'Then £52.99/year'
-                            : 'Then £4.99/month',
-                        style: sfProText400(
-                          12.sp,
-                          const Color.fromRGBO(0, 0, 0, 0.6),
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Start Free Trial\n',
+                              style: sfProText600(17.sp, Colors.white),
+                            ),
+                            TextSpan(
+                              text: c.selectedPlan.value == 1
+                                  ? 'Then £2.99/year'
+                                  : 'Then £4.99/month',
+                              style: sfProText400(
+                                12.sp,
+                                const Color.fromRGBO(0, 0, 0, 0.6),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),
@@ -441,7 +444,9 @@ class IntroScreen5 extends StatelessWidget {
               Text(
                 '1 time',
                 style: sfProText600(
-                    17.sp, const Color.fromRGBO(235, 235, 245, 0.3)),
+                  17.sp,
+                  const Color.fromRGBO(235, 235, 245, 0.3),
+                ),
               ),
             ],
           ),
@@ -505,7 +510,7 @@ class IntroScreen5Controller extends GetxController {
 
     // Thresholds
     double velocityThreshold = 300.0; // Fast swipe speed
-    double distanceThreshold = 50.0;  // Slow drag distance
+    double distanceThreshold = 50.0; // Slow drag distance
 
     // LOGIC:
     // 1. Swipe LEFT (Negative values) -> Next Page (Page 1)
@@ -535,7 +540,7 @@ class IntroScreen5Controller extends GetxController {
     isLoading(false);
 
     Get.offAll(
-          () => const HomeScreen2(),
+      () => const HomeScreen2(),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 300),
       curve: Curves.fastOutSlowIn,
@@ -557,7 +562,6 @@ class IntroScreen5Controller extends GetxController {
   void selectPlan(int plan) {
     selectedPlan.value = plan;
   }
-
 
   void onPageChanged(int index) {
     currentPage.value = index;

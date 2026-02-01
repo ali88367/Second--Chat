@@ -183,12 +183,16 @@ class SettingsBottomsheetColumn extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (sectionTitle.isNotEmpty && sectionTitle != "Notifications")
+                  if (sectionTitle.isNotEmpty &&
+                      sectionTitle != "Notifications")
                     Padding(
                       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
                       child: Text(
                         sectionTitle.toUpperCase(),
-                        style: sfProDisplay400(13.sp, const Color.fromRGBO(235, 235, 245, 0.6)),
+                        style: sfProDisplay400(
+                          13.sp,
+                          const Color.fromRGBO(235, 235, 245, 0.6),
+                        ),
                       ),
                     )
                   else if (sectionTitle.isEmpty)
@@ -211,7 +215,13 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       children: tiles.asMap().entries.map((entry) {
                         int tileIndex = entry.key;
                         Map<String, dynamic> tile = entry.value;
-                        return _buildTile(tile, controller, tileIndex, sectionTitle, context);
+                        return _buildTile(
+                          tile,
+                          controller,
+                          tileIndex,
+                          sectionTitle,
+                          context,
+                        );
                       }).toList(),
                     ),
                   ),
@@ -225,12 +235,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   }
 
   Widget _buildTile(
-      Map<String, dynamic> tile,
-      SettingsController controller,
-      int index,
-      String sectionTitle,
-      BuildContext context,
-      ) {
+    Map<String, dynamic> tile,
+    SettingsController controller,
+    int index,
+    String sectionTitle,
+    BuildContext context,
+  ) {
     final bool isSwitch = tile["isSwitch"] ?? false;
     final bool isForward = tile["isForward"] ?? false;
     final bool isLocked = tile["isLocked"] ?? false;
@@ -242,7 +252,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     final GlobalKey iconKey = GlobalKey();
 
     RxBool? switchValue;
-    if (isSwitch && switchKey != null) {
+    // For locked items with switchKey, show switch when unlocked
+    if (switchKey != null) {
       switch (switchKey) {
         case "notifications":
           switchValue = controller.notifications;
@@ -274,25 +285,18 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       }
     }
 
-    final double opacity = isLocked ? 0.4 : 1.0;
-
     Color getBaseColor() {
       if (sectionTitle != "CHAT") return const Color.fromRGBO(255, 230, 167, 1);
-      switch (controller.selectedPlatform.value) {
-        case "Twitch":
-          return twitchPurple;
-        case "Kick":
-          return kickGreen;
-        case "YouTube":
-          return youtubeRed;
-        default:
-          return const Color.fromRGBO(255, 230, 167, 1);
-      }
+      final platform = controller.selectedPlatform.value;
+      if (platform == "All") return const Color.fromRGBO(255, 230, 167, 1);
+      return controller.getPlatformColor(platform);
     }
 
     void showGlassSelector() {
-      final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-      final RenderBox? iconBox = iconKey.currentContext?.findRenderObject() as RenderBox?;
+      final RenderBox? overlay =
+          Overlay.of(context).context.findRenderObject() as RenderBox?;
+      final RenderBox? iconBox =
+          iconKey.currentContext?.findRenderObject() as RenderBox?;
 
       if (iconBox == null || overlay == null) return;
 
@@ -305,7 +309,14 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           options = ["S", "M", "L", "XL"];
           break;
         case "App Language":
-          options = ["English", "Spanish", "French", "German", "Urdu", "Arabic"];
+          options = [
+            "English",
+            "Spanish",
+            "Arabic",
+            "Portuguese",
+            "German",
+            "French",
+          ];
           break;
         case "Clock":
           options = ["12h", "24h"];
@@ -325,7 +336,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
             children: [
               Positioned(
                 bottom: overlay.size.height - iconPosition.dy - 15.h,
-                right: overlay.size.width - (iconPosition.dx + iconSize.width) - 20.w,
+                right:
+                    overlay.size.width -
+                    (iconPosition.dx + iconSize.width) -
+                    20.w,
                 child: Material(
                   color: Colors.transparent,
                   child: CustomBlackGlassWidget(
@@ -365,126 +379,236 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       );
     }
 
-    return Container(
-      height: 56.h,
-      padding: EdgeInsets.symmetric(horizontal: 16.w),
-      decoration: BoxDecoration(
-        color: isLocked ? const Color.fromRGBO(20, 18, 18, 1) : null,
-        border: index > 0
-            ? Border(top: BorderSide(width: 0.5.w, color: const Color.fromRGBO(120, 120, 128, 0.36)))
-            : null,
-      ),
-      child: InkWell(
-        onTap: () {
-          if (isLocked) {
-            Get.bottomSheet(
-              Padding(
-                padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 25.h),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    constraints: BoxConstraints(maxHeight: 600.h),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(36.r),
-                      child: Image.asset("assets/images/premium.png", fit: BoxFit.contain),
+    // Build the tile - use GetBuilder for unlock state to avoid GetX tracking issues
+    return GetBuilder<SettingsController>(
+      id: 'premium_unlock',
+      builder: (controller) {
+        final bool isActuallyLocked =
+            isLocked && !controller.isPremiumUnlocked.value;
+        final double opacity = isActuallyLocked ? 0.4 : 1.0;
+        final bool shouldShowSwitch =
+            (isSwitch || (isLocked && switchKey != null)) &&
+            !isActuallyLocked &&
+            switchValue != null;
+
+        return Container(
+          height: 56.h,
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          decoration: BoxDecoration(
+            color: isActuallyLocked
+                ? const Color.fromRGBO(20, 18, 18, 1)
+                : null,
+            border: index > 0
+                ? Border(
+                    top: BorderSide(
+                      width: 0.5.w,
+                      color: const Color.fromRGBO(120, 120, 128, 0.36),
+                    ),
+                  )
+                : null,
+          ),
+          child: InkWell(
+            onTap: () {
+              if (isActuallyLocked) {
+                Get.bottomSheet(
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: 12.w,
+                      right: 12.w,
+                      bottom: 25.h,
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        constraints: BoxConstraints(maxHeight: 600.h),
+                        child: GestureDetector(
+                          onTap: () {
+                            // Unlock all premium features
+                            controller.isPremiumUnlocked.value = true;
+                            controller.update([
+                              'premium_unlock',
+                            ]); // Update GetBuilder
+                            Get.back(); // Close the unlock bottom sheet
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(36.r),
+                            child: Image.asset(
+                              "assets/images/premium.png",
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              isDismissible: true,
-              enableDrag: true,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-            );
-            return;
-          }
+                  isDismissible: true,
+                  enableDrag: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                );
+                return;
+              }
 
-          if (customForwardIcon == "assets/images/changer.png") {
-            showGlassSelector();
-            return;
-          }
+              if (customForwardIcon == "assets/images/changer.png") {
+                showGlassSelector();
+                return;
+              }
 
-          if (tile["title"] == "LED Notifications" || openAsBottomSheet != null) {
-            if (openAsBottomSheet != null) Get.back();
-            Get.bottomSheet(
-              Padding(
-                padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 15.h),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    width: 361.w,
-                    height: tile["title"] == "LED Notifications" ? 386.h : 730.h,
-                    decoration: BoxDecoration(color: const Color(0xFF2C2C2E), borderRadius: BorderRadius.circular(36.r)),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(36.r),
-                      child: tile["title"] == "LED Notifications"
-                          ? const LedSettingsBottomSheet()
-                          : openAsBottomSheet == "connect"
-                          ? ConnectPlatformSetting()
-                          : PlatformColorSettings(),
+              if (tile["title"] == "LED Notifications" ||
+                  openAsBottomSheet != null) {
+                if (openAsBottomSheet != null) Get.back();
+                Get.bottomSheet(
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: 12.w,
+                      right: 12.w,
+                      bottom: 15.h,
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: 361.w,
+                        height: tile["title"] == "LED Notifications"
+                            ? 386.h
+                            : 730.h,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2C2C2E),
+                          borderRadius: BorderRadius.circular(36.r),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(36.r),
+                          child: tile["title"] == "LED Notifications"
+                              ? const LedSettingsBottomSheet()
+                              : openAsBottomSheet == "connect"
+                              ? ConnectPlatformSetting()
+                              : PlatformColorSettings(),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              isDismissible: true,
-              isScrollControlled: true,
-              enableDrag: true,
-              backgroundColor: Colors.transparent,
-            );
-            return;
-          }
+                  isDismissible: true,
+                  isScrollControlled: true,
+                  enableDrag: true,
+                  backgroundColor: Colors.transparent,
+                );
+                return;
+              }
 
-          if (isForward && tile["nextPage"] != null) {
-            Get.toNamed(tile["nextPage"]);
-          }
-        },
-        child: Row(
-          children: [
-            if (sectionTitle == "CHAT")
-              Obx(() => Image.asset(tile["prefixImageAsset"], width: 24.w, height: 24.h, color: getBaseColor().withOpacity(opacity)))
-            else
-              Image.asset(tile["prefixImageAsset"], width: 24.w, height: 24.h, color: const Color.fromRGBO(255, 230, 167, 1).withOpacity(opacity)),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Text(tile["title"], style: sfProText400(16.sp, Colors.white.withOpacity(opacity))),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+              if (isForward && tile["nextPage"] != null) {
+                Get.toNamed(tile["nextPage"]);
+              }
+            },
+            child: Row(
               children: [
-                if (tile["suffixText"] != null)
-                  Padding(
-                    padding: EdgeInsets.only(right: 8.w),
-                    child: Obx(() {
-                      String display = tile["suffixText"];
-                      if (tile["title"] == "Font Size") display = controller.fontSize.value;
-                      if (tile["title"] == "App Language") display = controller.appLanguage.value;
-                      if (tile["title"] == "Clock") display = controller.clockFormat.value;
-                      return Text(display, style: TextStyle(color: Color.fromRGBO(235, 235, 245, 0.6 * opacity), fontSize: 15.sp, fontWeight: FontWeight.w600));
-                    }),
+                if (sectionTitle == "CHAT")
+                  Obx(
+                    () => Image.asset(
+                      tile["prefixImageAsset"],
+                      width: 24.w,
+                      height: 24.h,
+                      color: getBaseColor().withOpacity(opacity),
+                    ),
+                  )
+                else
+                  Image.asset(
+                    tile["prefixImageAsset"],
+                    width: 24.w,
+                    height: 24.h,
+                    color: const Color.fromRGBO(
+                      255,
+                      230,
+                      167,
+                      1,
+                    ).withOpacity(opacity),
                   ),
-                if (isSwitch && switchValue != null)
-                  Obx(() => CustomSwitch(
-                    value: switchValue!.value,
-                    onChanged: (val) => switchValue!.value = val,
-                    activeColor: sectionTitle == "CHAT" ? getBaseColor() : const Color.fromRGBO(255, 230, 167, 1),
-                  )),
-                if (isForward || openAsBottomSheet != null)
-                  Padding(
-                    padding: EdgeInsets.only(left: 4.w),
-                    child: GestureDetector(
-                      key: iconKey,  // ← Key is attached here
-                      onTap: customForwardIcon == "assets/images/changer.png" ? showGlassSelector : null,
-                      child: Image.asset(customForwardIcon ?? forward_arrow_icon, height: customForwardIcon != null ? 12.h : 28.h),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Text(
+                    tile["title"],
+                    style: sfProText400(
+                      16.sp,
+                      Colors.white.withOpacity(opacity),
                     ),
                   ),
-                if (isLocked)
-                  Padding(padding: EdgeInsets.only(left: 8.w), child: Image.asset(key_icon_2, height: 28.h)),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (tile["suffixText"] != null)
+                      Padding(
+                        padding: EdgeInsets.only(right: 8.w),
+                        child: _buildSuffixText(tile, controller, opacity),
+                      ),
+                    if (shouldShowSwitch)
+                      _buildSwitch(sectionTitle, switchValue!, getBaseColor),
+                    if ((isForward || openAsBottomSheet != null) &&
+                        !isActuallyLocked)
+                      Padding(
+                        padding: EdgeInsets.only(left: 4.w),
+                        child: GestureDetector(
+                          key: iconKey, // ← Key is attached here
+                          onTap:
+                              customForwardIcon == "assets/images/changer.png"
+                              ? showGlassSelector
+                              : null,
+                          child: Image.asset(
+                            customForwardIcon ?? forward_arrow_icon,
+                            height: customForwardIcon != null ? 12.h : 28.h,
+                          ),
+                        ),
+                      ),
+                    if (isActuallyLocked)
+                      Padding(
+                        padding: EdgeInsets.only(left: 8.w),
+                        child: Image.asset(key_icon_2, height: 28.h),
+                      ),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  Widget _buildSuffixText(
+    Map<String, dynamic> tile,
+    SettingsController controller,
+    double opacity,
+  ) {
+    return Obx(() {
+      String display = tile["suffixText"];
+      if (tile["title"] == "Font Size") display = controller.fontSize.value;
+      if (tile["title"] == "App Language")
+        display = controller.appLanguage.value;
+      if (tile["title"] == "Clock") display = controller.clockFormat.value;
+      return Text(
+        display,
+        style: TextStyle(
+          color: Color.fromRGBO(235, 235, 245, 0.6 * opacity),
+          fontSize: 15.sp,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    });
+  }
+
+  Widget _buildSwitch(
+    String sectionTitle,
+    RxBool switchValue,
+    Color Function() getBaseColor,
+  ) {
+    return Obx(() {
+      final baseColor = sectionTitle == "CHAT"
+          ? getBaseColor()
+          : const Color.fromRGBO(255, 230, 167, 1);
+      return CustomSwitch(
+        value: switchValue.value,
+        onChanged: (val) => switchValue.value = val,
+        activeColor: baseColor,
+      );
+    });
   }
 }
 
@@ -496,20 +620,32 @@ class FreePlanWidget extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
       margin: EdgeInsets.only(bottom: 12.h),
-      decoration: BoxDecoration(color: onBottomSheetGrey, borderRadius: BorderRadius.circular(24.r)),
+      decoration: BoxDecoration(
+        color: onBottomSheetGrey,
+        borderRadius: BorderRadius.circular(24.r),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("£4.99 per month", style: sfProDisplay400(13.sp, Colors.white.withOpacity(0.5))),
+              Text(
+                "£4.99 per month",
+                style: sfProDisplay400(13.sp, Colors.white.withOpacity(0.5)),
+              ),
               SizedBox(height: 4.h),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text("Your Plan", style: sfProDisplay600(17.sp, Colors.white.withOpacity(0.6))),
+                  Text(
+                    "Your Plan",
+                    style: sfProDisplay600(
+                      17.sp,
+                      Colors.white.withOpacity(0.6),
+                    ),
+                  ),
                   Text("Free", style: sfProDisplay600(20.sp, Colors.white)),
                 ],
               ),
@@ -533,7 +669,10 @@ class ChatPlatformTabs extends StatelessWidget {
     return Container(
       height: 36.h,
       width: double.infinity,
-      decoration: BoxDecoration(color: onBottomSheetGrey, borderRadius: BorderRadius.circular(16.r)),
+      decoration: BoxDecoration(
+        color: onBottomSheetGrey,
+        borderRadius: BorderRadius.circular(16.r),
+      ),
       padding: EdgeInsets.all(3.w),
       child: Obx(() {
         final selected = controller.selectedPlatform.value;
@@ -546,12 +685,20 @@ class ChatPlatformTabs extends StatelessWidget {
                   child: Container(
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: selected == tabs[i] ? _color(tabs[i]) : Colors.transparent,
+                      color: selected == tabs[i]
+                          ? _getPlatformColor(controller, tabs[i])
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(16.r),
                     ),
                     child: Text(
                       tabs[i],
-                      style: TextStyle(color: selected == tabs[i] ? Colors.white : _color(tabs[i]), fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: selected == tabs[i]
+                            ? (tabs[i] == "All" ? Colors.black : Colors.white)
+                            : _getPlatformColor(controller, tabs[i]),
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -560,7 +707,9 @@ class ChatPlatformTabs extends StatelessWidget {
                 Container(
                   width: 1.w,
                   height: 18.h,
-                  color: selected == tabs[i] || selected == tabs[i + 1] ? Colors.transparent : Colors.grey.withOpacity(0.3),
+                  color: selected == tabs[i] || selected == tabs[i + 1]
+                      ? Colors.transparent
+                      : Colors.grey.withOpacity(0.3),
                   margin: EdgeInsets.symmetric(horizontal: 2.w),
                 ),
             ],
@@ -570,16 +719,7 @@ class ChatPlatformTabs extends StatelessWidget {
     );
   }
 
-  Color _color(String tab) {
-    switch (tab) {
-      case "Twitch":
-        return twitchPurple;
-      case "Kick":
-        return kickGreen;
-      case "YouTube":
-        return youtubeRed;
-      default:
-        return Colors.black;
-    }
+  Color _getPlatformColor(SettingsController controller, String tab) {
+    return controller.getPlatformColor(tab);
   }
 }

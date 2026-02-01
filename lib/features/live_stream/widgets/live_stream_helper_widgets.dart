@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import '../../../../core/themes/textstyles.dart';
+import '../../../../controllers/Main Section Controllers/settings_controller.dart';
 
 Widget serviceRow({
   required String asset,
@@ -132,32 +134,58 @@ Widget panelRow(String text, {bool showChevron = false, VoidCallback? onTap}) {
 }
 
 Widget activityRow(String asset, String name, String time, String message) {
-  final Color nameColor = asset.contains('kick')
-      ? Color.fromRGBO(83, 252, 24, 1)
-      : asset.contains('twitch')
-      ? Color.fromRGBO(185, 80, 239, 1)
-      : asset.contains('youtube')
-      ? Color.fromRGBO(221, 44, 40, 1)
-      : Colors.white;
+  // Get platform color dynamically
+  SettingsController? controller;
+  try {
+    controller = Get.find<SettingsController>();
+  } catch (e) {
+    // Controller not found, use defaults
+  }
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Image.asset(asset, width: 16.w, height: 16.h),
-          SizedBox(width: 8.w),
-          Text(name, style: sfProText600(14.sp, nameColor)),
-          Spacer(),
-          Text(time, style: sfProText400(12.sp, Colors.grey.shade400)),
+  return Obx(() {
+    Color nameColor;
+    if (controller != null) {
+      if (asset.contains('kick')) {
+        nameColor = controller.getPlatformColor('kick');
+      } else if (asset.contains('twitch')) {
+        nameColor = controller.getPlatformColor('twitch');
+      } else if (asset.contains('youtube')) {
+        nameColor = controller.getPlatformColor('youtube');
+      } else {
+        nameColor = Colors.white;
+      }
+    } else {
+      // Fallback to defaults if controller not available
+      if (asset.contains('kick')) {
+        nameColor = const Color.fromRGBO(83, 252, 24, 1);
+      } else if (asset.contains('twitch')) {
+        nameColor = const Color.fromRGBO(185, 80, 239, 1);
+      } else if (asset.contains('youtube')) {
+        nameColor = const Color.fromRGBO(221, 44, 40, 1);
+      } else {
+        nameColor = Colors.white;
+      }
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Image.asset(asset, width: 16.w, height: 16.h),
+            SizedBox(width: 8.w),
+            Text(name, style: sfProText600(14.sp, nameColor)),
+            Spacer(),
+            Text(time, style: sfProText400(12.sp, Colors.grey.shade400)),
+          ],
+        ),
+        if (message.isNotEmpty) ...[
+          SizedBox(height: 6.h),
+          Text(message, style: sfProText600(15.sp, Colors.white)),
         ],
-      ),
-      if (message.isNotEmpty) ...[
-        SizedBox(height: 6.h),
-        Text(message, style: sfProText600(15.sp, Colors.white)),
       ],
-    ],
-  );
+    );
+  });
 }
 
 Widget pillButton(String text, {required bool isActive, String? assetPath}) {

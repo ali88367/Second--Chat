@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -10,13 +8,110 @@ import 'package:second_chat/features/Invite/Invite_screen.dart';
 import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
-import 'package:second_chat/features/main_section/stream/StreamStreak1.dart';
-import 'package:second_chat/features/main_section/stream/stream_screen.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
 
-class HomeScreen2 extends StatelessWidget {
+class HomeScreen2 extends StatefulWidget {
   const HomeScreen2({super.key});
+
+  @override
+  State<HomeScreen2> createState() => _HomeScreen2State();
+}
+
+class _HomeScreen2State extends State<HomeScreen2> {
+  bool _framesPreloaded = false;
+  bool _iconsPreloaded = false;
+  static const int frozenFireFrames = 95; // FrozenFire frames from 0001 to 0095
+  static const int fireAnimation2Frames =
+      119; // FIreAnimation2 frames from 0001 to 0119
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Preload all animation frames when context is available
+    if (!_framesPreloaded) {
+      _preloadAllAnimationFrames();
+      _framesPreloaded = true;
+    }
+    // Preload all icons immediately for instant display
+    if (!_iconsPreloaded) {
+      _preloadAllIcons();
+      _iconsPreloaded = true;
+    }
+  }
+
+  void _preloadAllIcons() {
+    // Preload all icons used in the header and UI
+    final iconsToPreload = [
+      'assets/images/offline.png',
+      'assets/images/streak_icon.png',
+      'assets/images/gift.png',
+      'assets/images/settings.png',
+      'assets/images/stream.png',
+      'assets/images/arrow.png',
+      'assets/images/topbarshade.png',
+      'assets/images/notification.png',
+      'assets/images/signals.png',
+      'assets/images/settingHome.png',
+      'assets/images/calendar.png',
+      'assets/images/check.png',
+      'assets/icons/loader_icon.png',
+      'assets/images/arrowRight.png',
+      'assets/icons/x_icon.png',
+    ];
+
+    // Preload all icons immediately
+    for (final iconPath in iconsToPreload) {
+      precacheImage(AssetImage(iconPath), context);
+    }
+  }
+
+  void _preloadAllAnimationFrames() {
+    // Preload first 30 frames of both animations immediately for instant display
+    for (int i = 1; i <= 30; i++) {
+      final frameNumber = i.toString().padLeft(4, '0');
+
+      // Preload FrozenFire frames
+      if (i <= frozenFireFrames) {
+        precacheImage(
+          AssetImage('assets/FrozenFire/frame_$frameNumber.png'),
+          context,
+        );
+      }
+
+      // Preload FIreAnimation2 frames
+      if (i <= fireAnimation2Frames) {
+        final fireFrameNumber = i.toString().padLeft(4, '0');
+        precacheImage(
+          AssetImage('assets/FIreAnimation2/frame_lq_$fireFrameNumber.png'),
+          context,
+        );
+      }
+    }
+
+    // Preload remaining frames in the background after a short delay
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        // Preload remaining FrozenFire frames
+        for (int i = 31; i <= frozenFireFrames; i++) {
+          final frameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/FrozenFire/frame_$frameNumber.png'),
+            context,
+          );
+        }
+
+        // Preload remaining FIreAnimation2 frames
+        for (int i = 31; i <= fireAnimation2Frames; i++) {
+          final fireFrameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/FIreAnimation2/frame_lq_$fireFrameNumber.png'),
+            context,
+          );
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +159,7 @@ class HomeScreen2 extends StatelessWidget {
                     GestureDetector(
                       onTap: () {
                         Get.to(
-                              () => HomeScreen(),
+                          () => HomeScreen(),
                           transition: Transition.cupertino,
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.fastOutSlowIn,
@@ -115,7 +210,7 @@ class HomeScreen2 extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       Get.to(
-                            () => Livestreaming(),
+                        () => Livestreaming(),
                         transition: Transition.cupertino,
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.fastOutSlowIn,
@@ -148,10 +243,12 @@ class HomeScreen2 extends StatelessWidget {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration:
-                            const Duration(milliseconds: 300),
-                            exitBottomSheetDuration:
-                            const Duration(milliseconds: 250),
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
                           );
                         },
                         child: _buildImageButton(
@@ -178,10 +275,12 @@ class HomeScreen2 extends StatelessWidget {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration:
-                            const Duration(milliseconds: 300),
-                            exitBottomSheetDuration:
-                            const Duration(milliseconds: 250),
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
                           );
                         },
                         child: _buildImageButton(
@@ -208,10 +307,12 @@ class HomeScreen2 extends StatelessWidget {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration:
-                            const Duration(milliseconds: 300),
-                            exitBottomSheetDuration:
-                            const Duration(milliseconds: 250),
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
                           );
                         },
                         child: _buildImageButton(
@@ -244,10 +345,10 @@ class HomeScreen2 extends StatelessWidget {
 
   /// 🔹 Reusable Image Button
   static Widget _buildImageButton(
-      String assetPath, {
-        required double width,
-        required double height,
-      }) {
+    String assetPath, {
+    required double width,
+    required double height,
+  }) {
     return Container(
       // Added transparent color to ensure taps work on transparent image areas
       color: Colors.transparent,
@@ -324,16 +425,20 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         height: 20.w,
                         child: _isAllCompleted
                             ? Image.asset(
-                          'assets/images/check.png',
-                          fit: BoxFit.contain,
-                        )
+                                'assets/images/check.png',
+                                fit: BoxFit.contain,
+                              )
                             : CircularProgressIndicator(
-                          value: _completedCount / 4.0,
-                          strokeWidth: 3.0,
-                          color: const Color.fromRGBO(176, 218, 200, 1),
-                          backgroundColor:
-                          const Color.fromRGBO(120, 120, 128, 0.36),
-                        ),
+                                value: _completedCount / 4.0,
+                                strokeWidth: 3.0,
+                                color: const Color.fromRGBO(176, 218, 200, 1),
+                                backgroundColor: const Color.fromRGBO(
+                                  120,
+                                  120,
+                                  128,
+                                  0.36,
+                                ),
+                              ),
                       ),
                     ],
                   ),
@@ -395,10 +500,12 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                             isScrollControlled: true,
                             enableDrag: true,
                             backgroundColor: Colors.transparent,
-                            enterBottomSheetDuration:
-                            const Duration(milliseconds: 300),
-                            exitBottomSheetDuration:
-                            const Duration(milliseconds: 250),
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
                           ).then((_) {
                             setState(() {
                               _streamServiceAdded = true;
@@ -432,10 +539,12 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration:
-                            const Duration(milliseconds: 300),
-                            exitBottomSheetDuration:
-                            const Duration(milliseconds: 250),
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
                           ).then((_) {
                             setState(() {
                               _settingsOpened = true;
@@ -469,10 +578,12 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                             isDismissible: true,
                             isScrollControlled: true,
                             enableDrag: true,
-                            enterBottomSheetDuration:
-                            const Duration(milliseconds: 300),
-                            exitBottomSheetDuration:
-                            const Duration(milliseconds: 250),
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
                           ).then((_) {
                             setState(() {
                               _streaksCustomized = true;
@@ -486,7 +597,6 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                           isChecked: _streaksCustomized,
                         ),
                       ),
-
                     ],
                   ),
                 ),
@@ -516,10 +626,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                   borderRadius: BorderRadius.circular(30.r),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  "Next",
-                  style: sfProText600(17.sp, Colors.black),
-                ),
+                child: Text("Next", style: sfProText600(17.sp, Colors.black)),
               ),
             ),
           ),
@@ -552,10 +659,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
               ),
               SizedBox(width: 12.w),
               Expanded(
-                child: Text(
-                  title,
-                  style: sfProText400(16.sp, Colors.white),
-                ),
+                child: Text(title, style: sfProText400(16.sp, Colors.white)),
               ),
 
               // Right side logic
@@ -582,7 +686,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                   height: 28.w,
                   fit: BoxFit.contain,
                 ),
-              ]
+              ],
             ],
           ),
         ),

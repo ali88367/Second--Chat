@@ -67,12 +67,12 @@ class CustomSwitch extends StatelessWidget {
     final Color finalThumbColor = thumbColor ?? Colors.white;
     final double finalSpacing = spacing ?? 12.w;
 
-    // Dimensions: wider and shorter for lengthy look
-    final double switchWidth = 58.w; // Increased width for lengthy look
-    final double switchHeight = 28.h; // Reduced height
+    // Dimensions: standard iPhone toggle size
+    final double switchWidth = 51.w; // Standard iPhone toggle width
+    final double switchHeight = 31.h; // Standard iPhone toggle height
     final double thumbPadding = 2.h;
     final double thumbHeight = switchHeight - (thumbPadding * 2);
-    final double thumbWidth = 35.w; // Rectangle thumb (longer than tall)
+    final double thumbWidth = 28.w; // Adjusted thumb width for standard size
 
     // Custom switch theme
     final SwitchThemeData switchTheme = SwitchThemeData(

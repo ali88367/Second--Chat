@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:gradient_borders/gradient_borders.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 
 class CustomBlackGlassWidget extends StatelessWidget {
   final List<String> items;
@@ -23,6 +24,12 @@ class CustomBlackGlassWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Reset selected index to 0 when widget is built to prevent out-of-range errors
+    // This ensures each widget instance starts with a valid selection
+    if (controller.selectedIndex.value >= items.length) {
+      controller.selectedIndex.value = 0;
+    }
+    
     return LayoutBuilder(
       builder: (context, constraints) {
         // Calculate responsive radius based on estimated height
@@ -91,7 +98,8 @@ class CustomBlackGlassWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
       decoration: _decoration(radiusValue),
       child: Obx(() {
-        final selected = controller.selectedIndex.value;
+        // Clamp selected index to valid range
+        final selected = controller.selectedIndex.value.clamp(0, items.length - 1);
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -108,6 +116,9 @@ class CustomBlackGlassWidget extends StatelessWidget {
   // ---------------- UI Parts ----------------
 
   Widget _header(int selected) {
+    // Ensure selected index is within valid range
+    final safeIndex = selected.clamp(0, items.length - 1);
+    
     return GestureDetector(
       onTap: () => _select(0),
       child: Row(
@@ -117,12 +128,12 @@ class CustomBlackGlassWidget extends StatelessWidget {
               color: Colors.white, size: 15),
           const SizedBox(width: 6),
           Text(
-            items[selected],
+            items[safeIndex],
             style: sfProText600(
               15,
-              selected == 0
+              safeIndex == 0
                   ? Colors.white
-                  : _color(items[selected]),
+                  : _color(items[safeIndex]),
             ),
           ),
         ],
@@ -209,15 +220,21 @@ class CustomBlackGlassWidget extends StatelessWidget {
   );
 
   Color _color(String text) {
-    switch (text.toLowerCase()) {
-      case 'twitch':
-        return twitchPurple;
-      case 'kick':
-        return kickGreen;
-      case 'youtube':
-        return youtubeRed;
-      default:
-        return Colors.white;
+    try {
+      final controller = Get.find<SettingsController>();
+      return controller.getPlatformColor(text);
+    } catch (e) {
+      // Fallback to defaults if controller not found
+      switch (text.toLowerCase()) {
+        case 'twitch':
+          return twitchPurple;
+        case 'kick':
+          return kickGreen;
+        case 'youtube':
+          return youtubeRed;
+        default:
+          return Colors.white;
+      }
     }
   }
 }
