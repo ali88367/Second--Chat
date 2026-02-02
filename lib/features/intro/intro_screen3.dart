@@ -22,7 +22,7 @@ class IntroScreen3Controller extends GetxController {
 
     // Navigate to IntroScreen4 using GetX
     Get.to(
-      () => const IntroScreen4(),
+          () => const IntroScreen4(),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 250),
       curve: Curves.fastOutSlowIn,
@@ -114,39 +114,39 @@ class IntroScreen3 extends StatelessWidget {
                               TextSpan(
                                 text: 'Premium',
                                 style:
-                                    sfProDisplay600(
-                                      34.sp,
-                                      Colors
-                                          .white, // base color won't matter, overridden by foreground
-                                    ).copyWith(
-                                      foreground: Paint()
-                                        ..shader =
-                                            LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Color(
-                                                  0xFFF2B269,
-                                                ), // yellow-orange
-                                                Color(
-                                                  0xFFF17A7A,
-                                                ), // fully opaque red
-                                                Color(
-                                                  0xFFFFE6A7,
-                                                ), // light yellow
-                                              ],
-                                              stops: [
-                                                0.2,
-                                                0.5,
-                                                0.8,
-                                              ], // shift stops to give more space to red
-                                              transform: GradientRotation(
-                                                185.5 * 3.1415927 / 180,
-                                              ),
-                                            ).createShader(
-                                              Rect.fromLTWH(0, 0, 200, 50),
-                                            ),
+                                sfProDisplay600(
+                                  34.sp,
+                                  Colors
+                                      .white, // base color won't matter, overridden by foreground
+                                ).copyWith(
+                                  foreground: Paint()
+                                    ..shader =
+                                    LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(
+                                          0xFFF2B269,
+                                        ), // yellow-orange
+                                        Color(
+                                          0xFFF17A7A,
+                                        ), // fully opaque red
+                                        Color(
+                                          0xFFFFE6A7,
+                                        ), // light yellow
+                                      ],
+                                      stops: [
+                                        0.2,
+                                        0.5,
+                                        0.8,
+                                      ], // shift stops to give more space to red
+                                      transform: GradientRotation(
+                                        185.5 * 3.1415927 / 180,
+                                      ),
+                                    ).createShader(
+                                      Rect.fromLTWH(0, 0, 200, 50),
                                     ),
+                                ),
                               ),
                             ],
                           ),
@@ -162,101 +162,77 @@ class IntroScreen3 extends StatelessWidget {
 
                         // Trial Image
                         SizedBox(
-                          height: 283.h,
-                          child: Image.asset('assets/images/trial.png'),
-                        ),
-                        // Flexible spacing
-                        SizedBox(height: 20.h),
-                        // Bottom Button
-                        SizedBox(height: 8.h),
-
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: 30.w,
-                            right: 30.w,
-                            top: 20.h,
-                            bottom: 20.h + 30.h, // Extra space for glow blur
-                          ),
-                          child: SizedBox(
-                            height: 90.h, // controls glow space (SAFE)
-                            child: Stack(
-                              alignment: Alignment.center,
-                              clipBehavior: Clip.none,
-                              children: [
-                                /// BACKGROUND GLOW
-                                _GlowOval(
-                                  width: 1.sw - 60.w, // match button width
-                                  height: 60.h,
-                                  blur: 30,
-                                  colors: [
-                                    const Color(0xFFFFF59D).withOpacity(0.6),
-                                    const Color(0xFFFFC107).withOpacity(0.35),
-                                    Colors.transparent,
-                                  ],
+                          height: 420.h, // controls whole overlap area
+                          child: Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              /// TRIAL IMAGE (TOP)
+                              Positioned(
+                                top: 0,
+                                child: Image.asset(
+                                  'assets/images/trial.png',
+                                  height: 283.h,
+                                  fit: BoxFit.contain,
                                 ),
+                              ),
 
-                                /// BUTTON
-                                Obx(
-                                  () => GestureDetector(
+                              /// GLOW (CENTER – overlaps image + button)
+                              Positioned(
+                                top: 210.h, // tweak this for perfect overlap
+                                child: Image.asset(
+                                  'assets/images/freetrialGlow.png',
+                                  width: 530.w,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+
+                              /// BUTTON (BOTTOM)
+                              Positioned(
+                                bottom: 0,
+                                left: 30.w,
+                                right: 30.w,
+                                child: Obx(
+                                      () => GestureDetector(
                                     onTap: controller.isLoading.value
                                         ? null
                                         : controller.startTrial,
                                     child: Container(
-                                      width: double.infinity,
-                                      height: 56.h,
+                                      height: 52.h,
                                       decoration: BoxDecoration(
                                         gradient: const LinearGradient(
                                           colors: [
                                             Color(0xFFE8B87E),
                                             Color(0xFFD4A574),
                                           ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
                                         ),
-                                        borderRadius: BorderRadius.circular(
-                                          28.r,
-                                        ),
+                                        borderRadius: BorderRadius.circular(28.r),
                                         border: Border.all(
                                           width: 0.7,
                                           color: Colors.white,
                                         ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(
-                                              0xFFFFC107,
-                                            ).withOpacity(0.35),
-                                            blurRadius: 16,
-                                            spreadRadius: 9,
-                                          ),
-                                        ],
                                       ),
                                       child: Center(
                                         child: controller.isLoading.value
                                             ? SizedBox(
-                                                width: 24.w,
-                                                height: 24.w,
-                                                child:
-                                                    const CircularProgressIndicator(
-                                                      strokeWidth: 2.5,
-                                                      valueColor:
-                                                          AlwaysStoppedAnimation<
-                                                            Color
-                                                          >(Colors.white),
-                                                    ),
-                                              )
+                                          width: 24.w,
+                                          height: 24.w,
+                                          child: const CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            valueColor:
+                                            AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
                                             : Text(
-                                                'Start My 14 Day Free Trial',
-                                                style: sfProText600(
-                                                  17.sp,
-                                                  Colors.white,
-                                                ),
-                                              ),
+                                          'Start My 14 Day Free Trial',
+                                          style: sfProText600(17.sp, Colors.white),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -272,31 +248,3 @@ class IntroScreen3 extends StatelessWidget {
   }
 }
 
-class _GlowOval extends StatelessWidget {
-  final double width;
-  final double height;
-  final List<Color> colors;
-  final double blur;
-
-  const _GlowOval({
-    required this.width,
-    required this.height,
-    required this.colors,
-    required this.blur,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(height),
-          gradient: RadialGradient(radius: 0.8, colors: colors),
-        ),
-      ),
-    );
-  }
-}

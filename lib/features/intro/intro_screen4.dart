@@ -14,9 +14,7 @@ class IntroScreen4Controller extends GetxController {
 
   void startTrial() async {
     isLoading.value = true;
-    //
-    // // Show loading for 2 seconds
-    // await Future.delayed(const Duration(milliseconds: 100));
+
 
     isLoading.value = false;
 
@@ -289,13 +287,15 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                               ),
                                             ),
                                             // First badge (xmark) - aligns with first feature
-                                            SizedBox(height: 38.h),
+                                            SizedBox(height: 35.h),
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(left: 0.w),
                                               child: _buildBadgeIcon(
                                                 imagePath:
-                                                'assets/images/checkInfo.png',
+                                                'assets/images/cross.png',
                                                 isInfo: true,
+                                                height: 28.h,
+                                                width: 28.w
                                               ),
                                             ),
                                             SizedBox(height: 48.h),
@@ -441,13 +441,15 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 3.w),
+                                              padding: EdgeInsets.only(left: 0.w),
                                               child: _buildBadgeIcon(
                                                 imagePath: 'assets/images/24-7.png',
                                                 isInfo: true,
+                                                height: 33.h,
+                                                width: 69.w
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 60.h),
                                           ],
                                         ),
                                       ),

@@ -25,6 +25,25 @@ class IntroScreen5 extends StatelessWidget {
             ),
           ),
           Image.asset('assets/images/topbarshade.png', fit: BoxFit.cover),
+          // Bottom rotated shade
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Transform.rotate(
+              angle: 3.14159, // 180 degrees
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Color(0x80F6F692), // F6F692 with 50% opacity
+                  BlendMode.srcATop,
+                ),
+                child: Image.asset(
+                  'assets/images/topbarshade.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
 
           SafeArea(
             child: Column(
@@ -474,7 +493,11 @@ class IntroScreen5 extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.copy, color: Colors.white, size: 17.sp),
+                  SizedBox(
+                    height: 16.h,
+                    width: 16.w,
+                    child: Image.asset('assets/images/copyIcon.png'),
+                  ),
                   SizedBox(width: 8.w),
                   Text('Copy link', style: sfProText600(17.sp, Colors.white)),
                 ],

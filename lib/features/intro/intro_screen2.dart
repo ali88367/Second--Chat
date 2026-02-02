@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:glassmorphism/glassmorphism.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import '../../core/themes/textstyles.dart';
@@ -58,7 +59,6 @@ class _IntroScreen2State extends State<IntroScreen2> {
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Color.fromRGBO(48, 48, 48, 0.5),
-
                       borderRadius: BorderRadius.circular(25),
                     ),
                     child: Row(
@@ -160,9 +160,7 @@ class _IntroScreen2State extends State<IntroScreen2> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () {
-
-                        },
+                        onTap: () {},
                         child: Text(
                           'Enjoy Better Streaming',
                           style: sfProDisplay600(22.sp, Colors.white),
@@ -174,19 +172,32 @@ class _IntroScreen2State extends State<IntroScreen2> {
                         style: sfProText400(15.sp, grey),
                       ),
                       SizedBox(height: 18.h),
-
-                      PlatformButton(
-                        label: 'Twitch',
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color.fromRGBO(185, 80, 239, 0.5),
-                            Color.fromRGBO(64, 17, 98, 0.5),
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                      GestureDetector(
+                        onTap: (){
+                          Get.to(
+                                () => IntroScreenNotification2(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.fastOutSlowIn,
+                          );
+                        },
+                        child: SizedBox(
+                          height: 50.h,
+                          child: Image.asset('assets/images/twitchT.png'),
                         ),
-                        imagePath: 'assets/images/twitch.png',
                       ),
+                      // PlatformButton(
+                      //   label: 'Twitch',
+                      //   gradient: const LinearGradient(
+                      //     colors: [
+                      //       Color.fromRGBO(185, 80, 239, 0.5),
+                      //       Color.fromRGBO(64, 17, 98, 0.5),
+                      //     ],
+                      //     begin: Alignment.centerLeft,
+                      //     end: Alignment.centerRight,
+                      //   ),
+                      //   imagePath: 'assets/images/twitch.png',
+                      // ),
                       SizedBox(height: 12.h),
 
                       PlatformButton(
@@ -256,7 +267,7 @@ class PlatformButton extends StatelessWidget {
           child: ElevatedButton(
             onPressed: () {
               Get.to(
-                    () => IntroScreenNotification2(),
+                () => IntroScreenNotification2(),
                 transition: Transition.cupertino,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.fastOutSlowIn,

@@ -642,7 +642,6 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     bool hasArrow = false,
     VoidCallback? onTap,
   }) {
-    // FIX: Wrapped InkWell in Material so ripples and taps work properly
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -651,6 +650,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
             children: [
+              // Left Icon
               Image.asset(
                 imagePath,
                 width: 42.w,
@@ -658,35 +658,40 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                 fit: BoxFit.contain,
               ),
               SizedBox(width: 12.w),
+
+              // Title
               Expanded(
                 child: Text(title, style: sfProText400(16.sp, Colors.white)),
               ),
 
-              // Right side logic
-              if (isChecked)
+              // --- STATUS ICON LOGIC (Swap Loader <-> Check) ---
+              if (isChecked) ...[
+                // Completed: Show Check Icon
                 Image.asset(
                   'assets/images/check.png',
                   width: 28.w,
                   height: 28.w,
                   fit: BoxFit.contain,
-                )
-              else ...[
-                if (hasArrow) ...[
-                  Image.asset(
-                    'assets/icons/loader_icon.png',
-                    width: 28.w,
-                    height: 28.w,
-                    fit: BoxFit.contain,
-                  ),
-                ],
+                ),
                 SizedBox(width: 8.w),
+              ] else if (hasArrow) ...[
+                // Not Completed: Show Loader (only if hasArrow/loader flag is true)
                 Image.asset(
-                  'assets/images/arrowRight.png',
+                  'assets/icons/loader_icon.png',
                   width: 28.w,
                   height: 28.w,
                   fit: BoxFit.contain,
                 ),
+                SizedBox(width: 8.w),
               ],
+
+              // --- NAVIGATION ARROW (Always Visible) ---
+              Image.asset(
+                'assets/images/arrowRight.png',
+                width: 28.w,
+                height: 28.w,
+                fit: BoxFit.contain,
+              ),
             ],
           ),
         ),

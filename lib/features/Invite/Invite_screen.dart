@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 
+import '../../core/constants/app_colors/app_colors.dart';
+
 class InviteBottomSheet extends StatelessWidget {
   const InviteBottomSheet({super.key});
 
@@ -20,8 +22,8 @@ class InviteBottomSheet extends StatelessWidget {
 
     return Container(
       height: Get.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1C1C1C), // Dark background color from your screenshots
+      decoration:  BoxDecoration(
+        color: bottomSheetGrey,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -128,7 +130,9 @@ class InviteBottomSheet extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFFFE6A7),Color(0xFFF2B269),],
+                        colors: [
+                          Color.fromRGBO(255, 230, 167, 0.7),
+                          Color.fromRGBO(242, 178, 105, 1),                        ],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
@@ -176,8 +180,10 @@ class InviteBottomSheet extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 decoration:
                                 isClaimed ? TextDecoration.lineThrough : null,
+                                decorationColor: Colors.white24, // 🔴 underline / line color
                               ),
                             ),
+
                             isClaimed
                                 ? Text(
                               "Claimed",

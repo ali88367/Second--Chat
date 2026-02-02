@@ -107,13 +107,13 @@ class _StreamStreakSetupBottomSheetState
       height: Get.height * 0.9,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(18),
-          topRight: Radius.circular(18),
+        borderRadius:  BorderRadius.only(
+          topLeft: Radius.circular(38.r),
+          topRight: Radius.circular(38.r),
         ),
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius:  BorderRadius.vertical(top: Radius.circular(38.r)),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
