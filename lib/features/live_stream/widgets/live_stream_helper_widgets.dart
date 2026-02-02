@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import '../../../../core/themes/textstyles.dart';
 import '../../../../controllers/Main Section Controllers/settings_controller.dart';
+import '../../../core/constants/app_colors/app_colors.dart';
 
 Widget serviceRow({
   required String asset,
@@ -13,7 +14,7 @@ Widget serviceRow({
   final row = Container(
     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
     decoration: BoxDecoration(
-      color: Color.fromRGBO(30, 29, 32, 1),
+      color: greyy,
       borderRadius: BorderRadius.circular(32.r),
     ),
     child: Row(
@@ -34,12 +35,13 @@ Widget serviceRow({
           width: 30.w,
           height: 30.w,
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
+            color: Color.fromRGBO(49, 49, 49, 1),
             borderRadius: BorderRadius.circular(18.r),
           ),
           child: Icon(
             Icons.arrow_forward_ios,
-            color: Colors.white,
+            color: Color.fromRGBO(174, 174, 178, 1),
+
             size: 16.sp,
           ),
         ),
@@ -85,7 +87,7 @@ Widget panelRow(String text, {bool showChevron = false, VoidCallback? onTap}) {
     width: double.infinity,
     padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
     decoration: BoxDecoration(
-      color: Color.fromRGBO(30, 29, 32, 1),
+      color: greyy,
       borderRadius: BorderRadius.circular(28.r),
     ),
     child: Row(
@@ -97,8 +99,8 @@ Widget panelRow(String text, {bool showChevron = false, VoidCallback? onTap}) {
               const Spacer(),
               if (showChevron)
                 Container(
-                  height: 20,
-                  width: 20,
+                  height: 28.h,
+                  width: 28.w,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade900,
                     borderRadius: BorderRadius.circular(18.r),

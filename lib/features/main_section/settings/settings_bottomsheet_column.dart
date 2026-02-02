@@ -686,15 +686,15 @@ class ChatPlatformTabs extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: selected == tabs[i]
-                          ? _getPlatformColor(controller, tabs[i])
+                          ? _getPlatformColor(controller, "All")
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(16.r),
                     ),
                     child: Text(
                       tabs[i],
                       style: TextStyle(
-                        color: selected == tabs[i]
-                            ? (tabs[i] == "All" ? Colors.white : Colors.white)
+                        color: tabs[i] == "All"
+                            ? Colors.white
                             : _getPlatformColor(controller, tabs[i]),
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w600,

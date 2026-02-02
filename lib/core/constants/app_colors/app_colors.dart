@@ -25,6 +25,8 @@ import 'package:flutter/material.dart';
   final golden = Color.fromRGBO(246, 246, 146, 0.25);
   final goldeffect = Color.fromRGBO(255, 230, 167, 0.25);
   final blackbox = Color.fromRGBO(35, 34, 37, 1);
+  final black = Color.fromRGBO(30, 29, 32, 1);
+  final greyy = Color.fromRGBO(37, 37, 37, 1);
 
 final grey = Color.fromRGBO(235, 235, 245, 0.3);
   final onDark = Colors.white;

@@ -118,7 +118,7 @@ class _LivestreamingState extends State<Livestreaming> {
         width: 297.w,
         height: 59.4.h,
         decoration: BoxDecoration(
-          color: const Color.fromRGBO(30, 29, 32, 1),
+          color: black,
           borderRadius: BorderRadius.circular(33.r),
         ),
         child: Row(
@@ -545,12 +545,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                           ),
                                                       decoration: BoxDecoration(
                                                         color:
-                                                            const Color.fromRGBO(
-                                                              22,
-                                                              21,
-                                                              24,
-                                                              1,
-                                                            ),
+                                                           black,
                                                         borderRadius:
                                                             BorderRadius.circular(
                                                               20.r,
@@ -904,12 +899,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                             ),
                                                         decoration: BoxDecoration(
                                                           color:
-                                                              const Color.fromRGBO(
-                                                                22,
-                                                                21,
-                                                                24,
-                                                                1,
-                                                              ),
+                                                            black,
                                                           borderRadius:
                                                               BorderRadius.circular(
                                                                 20.r,

@@ -41,6 +41,9 @@ class SettingsController extends GetxController {
         return kickColor.value ?? kickGreen;
       case 'youtube':
         return youtubeColor.value ?? youtubeRed;
+      case 'all':
+        return youtubeColor.value ?? Color.fromRGBO(22, 22, 22, 1);
+
       default:
         return Colors.white;
     }

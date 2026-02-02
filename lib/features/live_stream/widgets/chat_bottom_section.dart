@@ -766,7 +766,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         curve: Curves.easeInOut,
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
+            color: black,
             borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
           ),
           child: SafeArea(
@@ -984,13 +984,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                 onTap: () {
                                   _showEmojiEmotePicker(context, setSheetState);
                                 },
-                                child: Icon(
-                                  Icons.sentiment_satisfied_sharp,
-                                  color: Colors.white,
-                                  size: 24.sp,
-                                ),
+                                child: SizedBox(
+height: 20.h,
+                                    width: 20.w,
+                                    child: Image.asset('assets/images/smile.png'))
                               ),
-                              SizedBox(width: 12.w),
+                              SizedBox(width: 9.w),
                               _buildPlatformSelector(setSheetState),
                               SizedBox(width: 8.w),
                             ],
@@ -1017,7 +1016,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey.shade900,
+          color: black,
           borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
         ),
         child: Column(
@@ -1236,13 +1235,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                     onTap: () {
                                       _openExpandedChatWithEmoji(context);
                                     },
-                                    child: Icon(
-                                      Icons.sentiment_satisfied_alt_outlined,
-                                      color: Colors.white,
-                                      size: 24.sp,
-                                    ),
+                                    child: SizedBox(
+                                        height: 20.h,
+                                        width: 20.w,
+                                        child: Image.asset('assets/images/smile.png'))
                                   ),
-                                  SizedBox(width: 12.w),
+                                  SizedBox(width: 9.w),
                                   _buildPlatformSelector(null),
                                 ],
                               ),

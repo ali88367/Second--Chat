@@ -461,6 +461,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         imagePath: 'assets/images/notification.png',
                         title: 'Enable notifications',
                         hasCheckbox: true,
+                        hasArrow: true,
                         isChecked: _notificationsEnabled,
                         onTap: () {
                           setState(() {
