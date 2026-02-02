@@ -95,6 +95,23 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     super.dispose();
   }
 
+  // NEW: Widget for the drag handle (bottom sheet bar)
+  Widget _buildDragHandle() {
+    return Padding(
+      padding: EdgeInsets.only(top: 8.h, bottom: 8.h),
+      child: Center(
+        child: Container(
+          width: 40.w, // Common width for a grabber
+          height: 4.h, // Common height for a grabber
+          decoration: BoxDecoration(
+            color: const Color(0xFF48484A), // Medium dark grey for visibility
+            borderRadius: BorderRadius.circular(2.r),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
@@ -160,21 +177,26 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       height: Get.height * 0.9,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        // UPDATED: Increased border radius for better visibility
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        // UPDATED: Increased border radius for better visibility
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Column(
             children: [
               Expanded(
                 child: SingleChildScrollView(
+                  // Key to fixing the swipe-down issue: Use BouncingScrollPhysics
+                  // and ensure the drag handle is the first element.
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.only(bottom: 20.h),
                   child: Column(
                     children: [
-                      SizedBox(height: 12.h),
+                      _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
+                      // SizedBox(height: 12.h), // Removed/Adjusted
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16.w),
                         child: Row(
@@ -246,18 +268,18 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                     },
                                   ),
                                 ),
-                              Positioned(
-                                bottom: 0.h,
-                                child: Image.asset(
-                                  'assets/images/Streak number.png',
-                                  width: 155.w,
-                                  height: 90.h,
+                                Positioned(
+                                  bottom: 0.h,
+                                  child: Image.asset(
+                                    'assets/images/Streak number.png',
+                                    width: 155.w,
+                                    height: 90.h,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                       Text(
                         "Go ahead, freeze it. Commitment is \noverrated anyway.",
@@ -330,27 +352,27 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           children: [
                             Row(
                               children:
-                                  [
-                                    'Mon',
-                                    'Tue',
-                                    'Wed',
-                                    'Thur',
-                                    'Fri',
-                                    'Sat',
-                                    'Sun',
-                                  ].map((day) {
-                                    return Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          day,
-                                          style: TextStyle(
-                                            color: const Color(0xFF8E8E93),
-                                            fontSize: 13.sp,
-                                          ),
-                                        ),
+                              [
+                                'Mon',
+                                'Tue',
+                                'Wed',
+                                'Thur',
+                                'Fri',
+                                'Sat',
+                                'Sun',
+                              ].map((day) {
+                                return Expanded(
+                                  child: Center(
+                                    child: Text(
+                                      day,
+                                      style: TextStyle(
+                                        color: const Color(0xFF8E8E93),
+                                        fontSize: 13.sp,
                                       ),
-                                    );
-                                  }).toList(),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                             SizedBox(height: 16.h),
                             LayoutBuilder(
@@ -375,7 +397,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                                 controller
                                                     .lastTappedCol
                                                     .value ==
-                                                i;
+                                                    i;
                                             Widget icon;
                                             switch (cell) {
                                               case CellType.tick:
@@ -426,7 +448,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         child: OutlinedButton(
                           onPressed: Get.back,
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2C2C2E),
+                            backgroundColor: Color.fromRGBO(116, 116, 128, 0.18),
                             side: BorderSide.none,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25.r),
@@ -437,7 +459,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                             "Ignore",
                             style: sfProText600(
                               17.sp,
-                              Colors.white.withOpacity(0.8),
+                              Color.fromRGBO(235, 235, 245, 0.3),
+
                             ),
                             textHeightBehavior: TextHeightBehavior(
                               applyHeightToFirstAscent: false,
@@ -456,8 +479,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           return ElevatedButton(
                             onPressed: canFreeze
                                 ? () {
-                                    controller.addFreezeAfterStreak();
-                                  }
+                              controller.addFreezeAfterStreak();
+                            }
                                 : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: canFreeze

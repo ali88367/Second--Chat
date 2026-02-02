@@ -70,10 +70,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
         context,
       );
     }
-    
+
     // Preload remaining frames in background
     Future.delayed(const Duration(milliseconds: 100), () {
-          if (mounted) {
+      if (mounted) {
         for (int i = 31; i <= totalFrames; i++) {
           final frameNumber = i.toString().padLeft(4, '0');
           precacheImage(
@@ -81,8 +81,8 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
             context,
           );
         }
-          }
-        });
+      }
+    });
   }
 
   @override
@@ -90,6 +90,23 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
     _fireController.dispose();
     _frameController.dispose();
     super.dispose();
+  }
+
+  // NEW: Widget for the drag handle (bottom sheet bar)
+  Widget _buildDragHandle() {
+    return Padding(
+      padding: EdgeInsets.only(top: 8.h, bottom: 8.h),
+      child: Center(
+        child: Container(
+          width: 40.w, // Common width for a grabber
+          height: 4.h, // Common height for a grabber
+          decoration: BoxDecoration(
+            color: const Color(0xFF48484A), // Medium dark grey for visibility
+            borderRadius: BorderRadius.circular(2.r),
+          ),
+        ),
+      ),
+    );
   }
 
   // ---------------- ICONS (Static) ----------------
@@ -199,10 +216,12 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
       height: Get.height * 0.9,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        // UPDATED: Increased border radius for better visibility
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        // UPDATED: Increased border radius for better visibility
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           bottomSheet: Container(
@@ -233,11 +252,15 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
             ),
           ),
           body: SingleChildScrollView(
+            // Key to fixing the swipe-down issue: Use BouncingScrollPhysics
+            // and ensure the drag handle is the first element so a drag
+            // starts at scrollOffset == 0.
             physics: const BouncingScrollPhysics(),
             padding: EdgeInsets.only(bottom: 80.h),
             child: Column(
               children: [
-                SizedBox(height: 12.h),
+                _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
+                // SizedBox(height: 12.h), // Removed/Adjusted for drag handle
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Row(

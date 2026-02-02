@@ -70,7 +70,7 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
         context,
       );
     }
-    
+
     // Preload remaining frames in background
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
@@ -90,6 +90,23 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
     _pulseController.dispose();
     _frameController.dispose();
     super.dispose();
+  }
+
+  // NEW: Widget for the drag handle (bottom sheet bar)
+  Widget _buildDragHandle() {
+    return Padding(
+      padding: EdgeInsets.only(top: 8.h, bottom: 8.h),
+      child: Center(
+        child: Container(
+          width: 40.w, // Common width for a grabber
+          height: 4.h, // Common height for a grabber
+          decoration: BoxDecoration(
+            color: const Color(0xFF48484A), // Medium dark grey for visibility
+            borderRadius: BorderRadius.circular(2.r),
+          ),
+        ),
+      ),
+    );
   }
 
   // --- Static UI Components ---
@@ -112,21 +129,20 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
     final bool isCircle = count == 1;
 
     return Positioned(
-      left: start * cellWidth,
-      width: count * cellWidth,
-      top: 0,
-      bottom: 0,
-      child: Container(
-        margin: isCircle ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
-        decoration: BoxDecoration(
-          color: count >= 3 ? null : const Color(0xFF3C3C43).withOpacity(0.6),
-          gradient: count >= 3 ? const LinearGradient(colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)]) : null,
-          shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-          borderRadius: isCircle ? null : BorderRadius.circular(22.r),
-        ),
-      ),
-    );
-  }
+        left: start * cellWidth,
+        width: count * cellWidth,
+        top: 0,
+        bottom: 0,
+        child: Container(
+          margin: isCircle ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
+          decoration: BoxDecoration(
+            color: count >= 3 ? null : const Color(0xFF3C3C43).withOpacity(0.6),
+            gradient: count >= 3 ? const LinearGradient(colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)]) : null,
+            shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: isCircle ? null : BorderRadius.circular(22.r),
+          ),
+        ));
+    }
 
   Widget _row(int rowIndex, StreamStreaksController c, double totalWidth) {
     final rowData = c.calendarRows[rowIndex];
@@ -166,20 +182,24 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
       height: Get.height * 0.9,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        // UPDATED: Increased border radius for better visibility
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        // UPDATED: Increased border radius for better visibility
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
               SingleChildScrollView(
+                // This physics setting is important for the swipe down to work when at the top
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.only(bottom: 100.h),
                 child: Column(
                   children: [
-                    SizedBox(height: 12.h),
+                    _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
+                    // SizedBox(height: 12.h), // Replaced by drag handle's padding
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16.w),
                       child: Row(

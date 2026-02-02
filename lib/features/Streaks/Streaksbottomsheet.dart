@@ -99,6 +99,23 @@ class _StreamStreakSetupBottomSheetState
     super.dispose();
   }
 
+  // Widget for the drag handle (bottom sheet bar) - ALREADY PRESENT
+  Widget _buildDragHandle() {
+    return Padding(
+      padding: EdgeInsets.only(top: 8.h, bottom: 8.h),
+      child: Center(
+        child: Container(
+          width: 50.w, // Common width for a grabber
+          height: 4.h, // Common height for a grabber
+          decoration: BoxDecoration(
+            color: const Color(0xFF48484A), // Medium dark grey for visibility
+            borderRadius: BorderRadius.circular(2.r),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(StreamStreaksController());
@@ -107,6 +124,7 @@ class _StreamStreakSetupBottomSheetState
       height: Get.height * 0.9,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
+        // Visible border radius
         borderRadius:  BorderRadius.only(
           topLeft: Radius.circular(38.r),
           topRight: Radius.circular(38.r),
@@ -120,11 +138,12 @@ class _StreamStreakSetupBottomSheetState
             children: [
               // Scrollable Content
               SingleChildScrollView(
+                // This physics is key for allowing drag down when scrolled to top
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.only(bottom: 100.h),
                 child: Column(
                   children: [
-                    SizedBox(height: 12.h),
+                    _buildDragHandle(), // Placement at the top enables swipe-down dismissal
                     // Top App Bar Area
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -177,7 +196,7 @@ class _StreamStreakSetupBottomSheetState
                           );
                           // Use round() instead of floor() for smoother frame transitions
                           int frame =
-                              ((animValue * totalFrames).round() % totalFrames);
+                          ((animValue * totalFrames).round() % totalFrames);
                           frame = (frame == 0 ? totalFrames : frame).clamp(
                             1,
                             totalFrames,
@@ -206,8 +225,8 @@ class _StreamStreakSetupBottomSheetState
                                       BoxShadow(
                                         color: const Color(0XFFF2B269)
                                             .withOpacity(
-                                              _opacityAnimation.value * 0.5,
-                                            ),
+                                          _opacityAnimation.value * 0.5,
+                                        ),
                                         blurRadius: 30,
                                         spreadRadius: 5,
                                       ),
@@ -223,17 +242,17 @@ class _StreamStreakSetupBottomSheetState
                                 gaplessPlayback: true,
                                 // Optimized cache dimensions for exact size
                                 cacheWidth:
-                                    (177.w *
-                                            MediaQuery.of(
-                                              context,
-                                            ).devicePixelRatio)
-                                        .round(),
+                                (177.w *
+                                    MediaQuery.of(
+                                      context,
+                                    ).devicePixelRatio)
+                                    .round(),
                                 cacheHeight:
-                                    (177.h *
-                                            MediaQuery.of(
-                                              context,
-                                            ).devicePixelRatio)
-                                        .round(),
+                                (177.h *
+                                    MediaQuery.of(
+                                      context,
+                                    ).devicePixelRatio)
+                                    .round(),
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
                                     height: 177.h,
@@ -391,9 +410,9 @@ class _StreamStreakSetupBottomSheetState
   }
 
   Widget _buildThreeTimesOption(
-    StreamStreaksController controller,
-    BuildContext context,
-  ) {
+      StreamStreaksController controller,
+      BuildContext context,
+      ) {
     final indicatorKey = GlobalKey();
 
     return Obx(() {
@@ -458,14 +477,14 @@ class _StreamStreakSetupBottomSheetState
   }
 
   void _showGlassmorphicPopupMenu(
-    BuildContext context,
-    GlobalKey indicatorKey,
-    StreamStreaksController controller,
-  ) {
+      BuildContext context,
+      GlobalKey indicatorKey,
+      StreamStreaksController controller,
+      ) {
     final RenderBox? overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    Overlay.of(context).context.findRenderObject() as RenderBox?;
     final RenderBox? button =
-        indicatorKey.currentContext?.findRenderObject() as RenderBox?;
+    indicatorKey.currentContext?.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
 
@@ -517,4 +536,3 @@ class _StreamStreakSetupBottomSheetState
     );
   }
 }
-

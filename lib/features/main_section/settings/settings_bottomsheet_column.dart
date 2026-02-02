@@ -6,7 +6,7 @@ import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/main_section/settings/Led_settings.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
-import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart';
+import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart' hide SettingsController, onBottomSheetGrey, sfProDisplay600;
 import '../../../core/constants/app_colors/app_colors.dart';
 import '../../../core/widgets/custom_black_glass_widget.dart';
 import '../../../core/widgets/custom_switch.dart';

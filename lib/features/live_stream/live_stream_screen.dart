@@ -178,59 +178,75 @@ class _LivestreamingState extends State<Livestreaming> {
         bottom: false,
         child: Stack(
           children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 300.h,
-              child: ValueListenableBuilder<String>(
-                valueListenable: _topBarImage,
-                builder: (context, imagePath, child) {
-                  return ValueListenableBuilder<String?>(
-                    valueListenable: _chatFilter,
-                    builder: (context, filter, _) {
-                      // Only apply color filter when a platform is selected
-                      if (filter == null) {
-                        return Image.asset(
-                          imagePath,
-                          fit: BoxFit.cover,
-                          key: ValueKey(imagePath),
-                        );
+          Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 230.h, // Target height (around middle of carousel)
+          child: ClipRect( // <--- ADD THIS
+            child: ValueListenableBuilder<String>(
+              valueListenable: _topBarImage,
+              builder: (context, imagePath, child) {
+                return ValueListenableBuilder<String?>(
+                  valueListenable: _chatFilter,
+                  builder: (context, filter, _) {
+                    // Only apply color filter when a platform is selected
+                    if (filter == null) {
+                      return Image.asset(
+                        imagePath,
+                        fit: BoxFit.cover,
+                        key: ValueKey(imagePath),
+                      );
+                    }
+
+                    // Apply color filter based on selected platform
+                    return Obx(() {
+                      Color filterColor;
+                      if (filter == 'twitch') {
+                        filterColor =
+                            _settingsCtrl.twitchColor.value ?? twitchPurple;
+                      } else if (filter == 'kick') {
+                        filterColor =
+                            _settingsCtrl.kickColor.value ?? kickGreen;
+                      } else if (filter == 'youtube') {
+                        filterColor =
+                            _settingsCtrl.youtubeColor.value ?? youtubeRed;
+                      } else {
+                        filterColor = Colors.transparent;
                       }
 
-                      // Apply color filter based on selected platform
-                      return Obx(() {
-                        Color filterColor;
-                        if (filter == 'twitch') {
-                          filterColor =
-                              _settingsCtrl.twitchColor.value ?? twitchPurple;
-                        } else if (filter == 'kick') {
-                          filterColor =
-                              _settingsCtrl.kickColor.value ?? kickGreen;
-                        } else if (filter == 'youtube') {
-                          filterColor =
-                              _settingsCtrl.youtubeColor.value ?? youtubeRed;
-                        } else {
-                          filterColor = Colors.transparent;
-                        }
-
-                        return ColorFiltered(
-                          colorFilter: ColorFilter.mode(
-                            filterColor.withOpacity(0.6),
-                            BlendMode.color,
-                          ),
-                          child: Image.asset(
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // 1. The base image
+                          Image.asset(
                             imagePath,
                             fit: BoxFit.cover,
                             key: ValueKey(imagePath),
                           ),
-                        );
-                      });
-                    },
-                  );
-                },
-              ),
+                          // 2. The fading color overlay
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  filterColor.withOpacity(0.8), // Bright at the top
+                                  filterColor.withOpacity(0.0), // Fades to transparent at the bottom
+                                ],
+                                // Stop the fade over the full height of the positioned container
+                                stops: const [0.0, 1.0],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    });
+                  },
+                );
+              },
             ),
+          ),),
             Positioned.fill(
               child: Container(
                 decoration: const BoxDecoration(
