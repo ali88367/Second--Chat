@@ -10,10 +10,13 @@ class StreakFreezePreviewBottomSheet extends StatefulWidget {
   const StreakFreezePreviewBottomSheet({super.key});
 
   @override
-  State<StreakFreezePreviewBottomSheet> createState() => _StreakFreezePreviewBottomSheetState();
+  State<StreakFreezePreviewBottomSheet> createState() =>
+      _StreakFreezePreviewBottomSheetState();
 }
 
-class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBottomSheet> with TickerProviderStateMixin {
+class _StreakFreezePreviewBottomSheetState
+    extends State<StreakFreezePreviewBottomSheet>
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _frameController;
   late Animation<double> _scaleAnimation;
@@ -37,7 +40,9 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
     // Optimized duration for smoother playback
     _frameController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500), // Slightly faster for smoother feel
+      duration: const Duration(
+        milliseconds: 2500,
+      ), // Slightly faster for smoother feel
     );
     // repeat() automatically handles looping and starts the animation
     _frameController.repeat();
@@ -114,14 +119,25 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
-      decoration: highlighted ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle) : null,
-      child: Icon(Icons.check, size: 18.sp, color: highlighted ? const Color(0xFFFDB747) : Colors.white),
+      decoration: highlighted
+          ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
+          : null,
+      child: Icon(
+        Icons.check,
+        size: 18.sp,
+        color: highlighted ? const Color(0xFFFDB747) : Colors.white,
+      ),
     );
   }
 
-  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
-  Widget _freeze() => Image.asset('assets/images/Privacy & Security - SVG.png', width: 22.sp);
-  Widget _dot() => Opacity(opacity: 0.3, child: Icon(Icons.circle, size: 10.sp, color: Colors.white));
+  Widget _cross() =>
+      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _freeze() =>
+      Image.asset('assets/images/Privacy & Security - SVG.png', width: 22.sp);
+  Widget _dot() => Opacity(
+    opacity: 0.3,
+    child: Icon(Icons.circle, size: 10.sp, color: Colors.white),
+  );
 
   Widget _highlight(int start, int end, double totalWidth) {
     final int count = end - start + 1;
@@ -129,20 +145,27 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
     final bool isCircle = count == 1;
 
     return Positioned(
-        left: start * cellWidth,
-        width: count * cellWidth,
-        top: 0,
-        bottom: 0,
-        child: Container(
-          margin: isCircle ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
-          decoration: BoxDecoration(
-            color: count >= 3 ? null : const Color(0xFF3C3C43).withOpacity(0.6),
-            gradient: count >= 3 ? const LinearGradient(colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)]) : null,
-            shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-            borderRadius: isCircle ? null : BorderRadius.circular(22.r),
-          ),
-        ));
-    }
+      left: start * cellWidth,
+      width: count * cellWidth,
+      top: 0,
+      bottom: 0,
+      child: Container(
+        margin: isCircle
+            ? EdgeInsets.zero
+            : EdgeInsets.symmetric(horizontal: 2.w),
+        decoration: BoxDecoration(
+          color: count >= 3 ? null : const Color(0xFF3C3C43).withOpacity(0.6),
+          gradient: count >= 3
+              ? const LinearGradient(
+                  colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)],
+                )
+              : null,
+          shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+          borderRadius: isCircle ? null : BorderRadius.circular(22.r),
+        ),
+      ),
+    );
+  }
 
   Widget _row(int rowIndex, StreamStreaksController c, double totalWidth) {
     final rowData = c.calendarRows[rowIndex];
@@ -158,10 +181,18 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
               final cell = rowData[i];
               Widget icon;
               switch (cell) {
-                case CellType.tick: icon = _tick(); break;
-                case CellType.cross: icon = _cross(); break;
-                case CellType.freeze: icon = _freeze(); break;
-                case CellType.dot: icon = _dot(); break;
+                case CellType.tick:
+                  icon = _tick();
+                  break;
+                case CellType.cross:
+                  icon = _cross();
+                  break;
+                case CellType.freeze:
+                  icon = _freeze();
+                  break;
+                case CellType.dot:
+                  icon = _dot();
+                  break;
               }
               return Expanded(
                 child: Center(child: icon), // Interaction removed
@@ -207,9 +238,15 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                         children: [
                           GestureDetector(
                             onTap: () => Get.back(),
-                            child: Image.asset('assets/icons/x_icon.png', height: 44.h),
+                            child: Image.asset(
+                              'assets/icons/x_icon.png',
+                              height: 44.h,
+                            ),
                           ),
-                          Text("Stream Streaks", style: sfProText600(17.sp, Colors.white)),
+                          Text(
+                            "Stream Streaks",
+                            style: sfProText600(17.sp, Colors.white),
+                          ),
                           SizedBox(width: 44.w),
                         ],
                       ),
@@ -223,10 +260,17 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                         ]),
                         builder: (context, child) {
                           // Optimized frame calculation using round() for smoother transitions
-                          double animValue = _frameController.value.clamp(0.0, 1.0);
+                          double animValue = _frameController.value.clamp(
+                            0.0,
+                            1.0,
+                          );
                           // Use round() instead of floor() for smoother frame transitions
-                          int frame = ((animValue * totalFrames).round() % totalFrames);
-                          frame = (frame == 0 ? totalFrames : frame).clamp(1, totalFrames);
+                          int frame =
+                              ((animValue * totalFrames).round() % totalFrames);
+                          frame = (frame == 0 ? totalFrames : frame).clamp(
+                            1,
+                            totalFrames,
+                          );
                           String frameNumber = frame.toString().padLeft(4, '0');
 
                           return Stack(
@@ -235,12 +279,15 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                               Transform.scale(
                                 scale: _scaleAnimation.value,
                                 child: Container(
-                                  width: 140.h, height: 140.h,
+                                  width: 140.h,
+                                  height: 140.h,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0XFF84DEE4).withOpacity(_opacityAnimation.value),
+                                        color: const Color(
+                                          0XFF84DEE4,
+                                        ).withOpacity(_opacityAnimation.value),
                                         blurRadius: 55,
                                         spreadRadius: 15,
                                       ),
@@ -255,8 +302,18 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                                 fit: BoxFit.contain,
                                 gaplessPlayback: true,
                                 // Optimized cache dimensions for exact size
-                                cacheWidth: (177.w * MediaQuery.of(context).devicePixelRatio).round(),
-                                cacheHeight: (177.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                cacheWidth:
+                                    (177.w *
+                                            MediaQuery.of(
+                                              context,
+                                            ).devicePixelRatio)
+                                        .round(),
+                                cacheHeight:
+                                    (177.h *
+                                            MediaQuery.of(
+                                              context,
+                                            ).devicePixelRatio)
+                                        .round(),
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
                                     height: 177.h,
@@ -280,22 +337,40 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
 
                     // Static Pill
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14.w,
+                        vertical: 4.h,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF32393D),
                         borderRadius: BorderRadius.circular(40.r),
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset("assets/images/checkmark.circle.fill.png", width: 19.w, height: 24.h),
+                          Image.asset(
+                            "assets/images/checkmark.circle.fill.png",
+                            width: 19.w,
+                            height: 24.h,
+                          ),
                           SizedBox(width: 8.w),
                           RichText(
                             text: TextSpan(
                               children: [
-                                TextSpan(text: '3 ', style: sfProDisplay400(15.sp, Colors.white)),
-                                TextSpan(text: 'freeze per month', style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8))),
+                                TextSpan(
+                                  text: '3 ',
+                                  style: sfProDisplay400(15.sp, Colors.white),
+                                ),
+                                TextSpan(
+                                  text: 'freeze per month',
+                                  style: sfProDisplay400(
+                                    15.sp,
+                                    const Color(0xFFB0B3B8),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -308,7 +383,10 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                     // Static Calendar Container (Obx removed)
                     Container(
                       width: 361.w,
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding.w, vertical: 16.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding.w,
+                        vertical: 16.h,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E1D20),
                         borderRadius: BorderRadius.circular(24.r),
@@ -320,18 +398,38 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Row(
-                                children: ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'].map((d) {
-                                  return Expanded(
-                                    child: Center(
-                                      child: Text(d, style: TextStyle(color: const Color(0xFF8E8E93), fontSize: 13.sp)),
-                                    ),
-                                  );
-                                }).toList(),
+                                children:
+                                    [
+                                      'Mon',
+                                      'Tue',
+                                      'Wed',
+                                      'Thur',
+                                      'Fri',
+                                      'Sat',
+                                      'Sun',
+                                    ].map((d) {
+                                      return Expanded(
+                                        child: Center(
+                                          child: Text(
+                                            d,
+                                            style: TextStyle(
+                                              color: const Color(0xFF8E8E93),
+                                              fontSize: 13.sp,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                               ),
                               SizedBox(height: 16.h),
-                              for (int i = 0; i < controller.calendarRows.length; i++) ...[
+                              for (
+                                int i = 0;
+                                i < controller.calendarRows.length;
+                                i++
+                              ) ...[
                                 _row(i, controller, totalWidth),
-                                if (i != controller.calendarRows.length - 1) SizedBox(height: 12.h),
+                                if (i != controller.calendarRows.length - 1)
+                                  SizedBox(height: 12.h),
                               ],
                             ],
                           );
@@ -344,7 +442,9 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
 
               // Bottom Action Button
               Positioned(
-                left: 16.w, right: 16.w, bottom: 16.h,
+                left: 16.w,
+                right: 16.w,
+                bottom: 16.h,
                 child: SizedBox(
                   height: 50.h,
                   child: ElevatedButton(
@@ -357,13 +457,14 @@ class _StreakFreezePreviewBottomSheetState extends State<StreakFreezePreviewBott
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(36.r)),
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(36.r),
+                      ),
+                      padding: EdgeInsets.zero,
                     ),
                     child: Text(
                       "Let's go",
                       style: sfProText600(17.sp, Colors.black),
-                      textHeightBehavior: TextHeightBehavior(applyHeightToFirstAscent: false, applyHeightToLastDescent: false),
                     ),
                   ),
                 ),

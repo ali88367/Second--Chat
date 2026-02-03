@@ -8,6 +8,7 @@ import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/features/intro/intro_screen3.dart';
 import 'package:second_chat/features/intro/intro_screen4.dart';
 import 'package:second_chat/features/intro/intro_screen5.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
@@ -163,7 +164,7 @@ class MyApp extends StatelessWidget {
           ),
 
           // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
-          home: HomeScreen2(),
+          home: IntroScreen1(),
 
           // Navigation settings - Smooth and elegant transitions
           defaultTransition: Transition.cupertino,

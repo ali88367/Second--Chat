@@ -220,11 +220,22 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           ]),
                           builder: (context, child) {
                             // Optimized frame calculation using round() for smoother transitions
-                            double animValue = _frameController.value.clamp(0.0, 1.0);
+                            double animValue = _frameController.value.clamp(
+                              0.0,
+                              1.0,
+                            );
                             // Use round() instead of floor() for smoother frame transitions
-                            int frame = ((animValue * totalFrames).round() % totalFrames);
-                            frame = (frame == 0 ? totalFrames : frame).clamp(1, totalFrames);
-                            String frameNumber = frame.toString().padLeft(4, '0');
+                            int frame =
+                                ((animValue * totalFrames).round() %
+                                totalFrames);
+                            frame = (frame == 0 ? totalFrames : frame).clamp(
+                              1,
+                              totalFrames,
+                            );
+                            String frameNumber = frame.toString().padLeft(
+                              4,
+                              '0',
+                            );
 
                             return Stack(
                               alignment: Alignment.center,
@@ -257,8 +268,18 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                     fit: BoxFit.contain,
                                     gaplessPlayback: true,
                                     // Optimized cache dimensions for exact size
-                                    cacheWidth: (250.w * MediaQuery.of(context).devicePixelRatio).round(),
-                                    cacheHeight: (250.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                    cacheWidth:
+                                        (250.w *
+                                                MediaQuery.of(
+                                                  context,
+                                                ).devicePixelRatio)
+                                            .round(),
+                                    cacheHeight:
+                                        (250.h *
+                                                MediaQuery.of(
+                                                  context,
+                                                ).devicePixelRatio)
+                                            .round(),
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
                                         height: 250.h,
@@ -352,27 +373,27 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           children: [
                             Row(
                               children:
-                              [
-                                'Mon',
-                                'Tue',
-                                'Wed',
-                                'Thur',
-                                'Fri',
-                                'Sat',
-                                'Sun',
-                              ].map((day) {
-                                return Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      day,
-                                      style: TextStyle(
-                                        color: const Color(0xFF8E8E93),
-                                        fontSize: 13.sp,
+                                  [
+                                    'Mon',
+                                    'Tue',
+                                    'Wed',
+                                    'Thur',
+                                    'Fri',
+                                    'Sat',
+                                    'Sun',
+                                  ].map((day) {
+                                    return Expanded(
+                                      child: Center(
+                                        child: Text(
+                                          day,
+                                          style: TextStyle(
+                                            color: const Color(0xFF8E8E93),
+                                            fontSize: 13.sp,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                    );
+                                  }).toList(),
                             ),
                             SizedBox(height: 16.h),
                             LayoutBuilder(
@@ -397,7 +418,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                                 controller
                                                     .lastTappedCol
                                                     .value ==
-                                                    i;
+                                                i;
                                             Widget icon;
                                             switch (cell) {
                                               case CellType.tick:
@@ -435,7 +456,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                 ),
               ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
                 color: bottomSheetGrey,
                 child: SafeArea(
                   top: false,
@@ -448,23 +469,23 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         child: OutlinedButton(
                           onPressed: Get.back,
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: Color.fromRGBO(116, 116, 128, 0.18),
+                            backgroundColor: Color.fromRGBO(
+                              116,
+                              116,
+                              128,
+                              0.18,
+                            ),
                             side: BorderSide.none,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25.r),
                             ),
-                            padding: EdgeInsets.symmetric(vertical: 12.h),
+                            padding: EdgeInsets.zero,
                           ),
                           child: Text(
                             "Ignore",
                             style: sfProText600(
                               17.sp,
                               Color.fromRGBO(235, 235, 245, 0.3),
-
-                            ),
-                            textHeightBehavior: TextHeightBehavior(
-                              applyHeightToFirstAscent: false,
-                              applyHeightToLastDescent: false,
                             ),
                           ),
                         ),
@@ -479,8 +500,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           return ElevatedButton(
                             onPressed: canFreeze
                                 ? () {
-                              controller.addFreezeAfterStreak();
-                            }
+                                    controller.addFreezeAfterStreak();
+                                  }
                                 : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: canFreeze
@@ -490,6 +511,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(25.r),
                               ),
+                              padding: EdgeInsets.zero,
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,

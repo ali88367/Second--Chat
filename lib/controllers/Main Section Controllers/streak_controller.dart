@@ -4,7 +4,13 @@ enum CellType { tick, cross, dot, freeze }
 
 class StreamStreaksController extends GetxController {
   var selectedDays = <String, bool>{
-    'Mon': false, 'Tue': false, 'Wed': false, 'Thur': false, 'Fri': false, 'Sat': false, 'Sun': false,
+    'Mon': false,
+    'Tue': false,
+    'Wed': false,
+    'Thur': false,
+    'Fri': false,
+    'Sat': false,
+    'Sun': false,
   }.obs;
 
   RxBool threeTimesWeek = false.obs;
@@ -12,20 +18,37 @@ class StreamStreaksController extends GetxController {
   RxList<int> selectedMenuNumbers = <int>[].obs;
   final List<int> _fullNumberList = [1, 2, 3, 4, 5, 6, 7];
 
-  List<int> get availableNumbers => _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
+  List<int> get availableNumbers =>
+      _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
   int get selectedCount => selectedMenuNumbers.length;
   bool get areDaysDisabled => threeTimesWeek.value;
 
   final calendarRows = <RxList<CellType>>[
-    RxList.of([CellType.tick, CellType.cross, CellType.tick, CellType.tick, CellType.cross, CellType.freeze, CellType.cross]),
-    RxList.of([CellType.cross, CellType.cross, CellType.cross, CellType.tick, CellType.tick, CellType.tick, CellType.cross]),
+    RxList.of([
+      CellType.tick,
+      CellType.cross,
+      CellType.tick,
+      CellType.tick,
+      CellType.cross,
+      CellType.freeze,
+      CellType.cross,
+    ]),
+    RxList.of([
+      CellType.cross,
+      CellType.cross,
+      CellType.cross,
+      CellType.tick,
+      CellType.tick,
+      CellType.tick,
+      CellType.cross,
+    ]),
     // Row 3: Monday-Friday streak only
     RxList.of([
-      CellType.tick,  // Mon
-      CellType.tick,  // Tue
-      CellType.tick,  // Wed
-      CellType.tick,  // Thur
-      CellType.tick,  // Fri
+      CellType.tick, // Mon
+      CellType.tick, // Tue
+      CellType.tick, // Wed
+      CellType.tick, // Thur
+      CellType.tick, // Fri
       CellType.cross, // Sat
       CellType.cross, // Sun
     ]),
@@ -33,7 +56,9 @@ class StreamStreaksController extends GetxController {
     RxList.of(List.generate(7, (_) => CellType.cross)),
   ];
 
-  final singleRowCells = RxList<CellType>.of(List.generate(7, (_) => CellType.dot));
+  final singleRowCells = RxList<CellType>.of(
+    List.generate(7, (_) => CellType.dot),
+  );
 
   final lastTappedRow = RxnInt();
   final lastTappedCol = RxnInt();
@@ -128,12 +153,12 @@ class StreamStreaksController extends GetxController {
     if (selectedMenuNumbers.contains(number)) {
       selectedMenuNumbers.remove(number);
     } else {
-      if (selectedMenuNumbers.length < 3) { selectedMenuNumbers.add(number); }
+      if (selectedMenuNumbers.length < 3) selectedMenuNumbers.add(number);
     }
     if (selectedMenuNumbers.length == 3) {
       threeTimesWeek.value = true;
       isSelectingThreeDays.value = false;
-      syncMenuToDays();
+      // syncMenuToDays() called from dialog onItemSelected after pop to avoid lag
     } else {
       threeTimesWeek.value = false;
     }

@@ -22,8 +22,9 @@ class CCustomBlackGlassWidget extends StatelessWidget {
   });
 
   // Use different controllers depending on mode (or same if you refactor later)
-  final streakController = Get.find<StreamStreaksController>(); // ← from your streak example
-  final glassController = Get.put(GlassSelectorController1());  // original one
+  final streakController =
+      Get.find<StreamStreaksController>(); // ← from your streak example
+  final glassController = Get.put(GlassSelectorController1()); // original one
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +36,7 @@ class CCustomBlackGlassWidget extends StatelessWidget {
         return ClipRRect(
           borderRadius: radius,
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
             child: Container(
               width: isWeek ? 90.w : null,
               padding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 12.w),
@@ -52,44 +53,47 @@ class CCustomBlackGlassWidget extends StatelessWidget {
 
   // ── Streak mode (week == true) ────────────────────────────────────────────
   Widget _buildStreakContent(double radiusValue) {
-    return Obx(() {
-      final selectedNumbers = streakController.selectedMenuNumbers;
-      final availableNumbers = streakController.availableNumbers;
+    return RepaintBoundary(
+      child: Obx(() {
+        final selectedNumbers = streakController.selectedMenuNumbers;
+        final availableNumbers = streakController.availableNumbers;
 
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Selected items (with checkmark)
-          ...selectedNumbers.map((num) => _buildSelectedStreakItem(num)),
-
-          // Divider (only if there are selected items)
-          if (selectedNumbers.isNotEmpty) _divider(),
-
-          // Available items (no checkmark, lower opacity)
-          ...availableNumbers.map((num) => _buildAvailableStreakItem(num)),
-        ],
-      );
-    });
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...selectedNumbers.map((num) => _buildSelectedStreakItem(num)),
+            if (selectedNumbers.isNotEmpty) _divider(),
+            ...availableNumbers.map((num) => _buildAvailableStreakItem(num)),
+          ],
+        );
+      }),
+    );
   }
 
   Widget _buildSelectedStreakItem(int num) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         streakController.toggleMenuNumber(num);
         onItemSelected?.call("$num");
       },
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(CupertinoIcons.checkmark, color: Colors.white, size: 14),
-            SizedBox(width: 6.w),
-            Text(
-              "$num",
-              style: sfProText600(17.sp, Colors.white),
-            ),
-          ],
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                CupertinoIcons.checkmark,
+                color: Colors.white,
+                size: 14,
+              ),
+              SizedBox(width: 6.w),
+              Text("$num", style: sfProText600(17.sp, Colors.white)),
+            ],
+          ),
         ),
       ),
     );
@@ -97,16 +101,20 @@ class CCustomBlackGlassWidget extends StatelessWidget {
 
   Widget _buildAvailableStreakItem(int num) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         streakController.toggleMenuNumber(num);
         onItemSelected?.call("$num");
       },
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        child: Text(
-          "$num",
-          textAlign: TextAlign.center,
-          style: sfProText600(17.sp, Colors.white.withOpacity(0.6)),
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          child: Text(
+            "$num",
+            textAlign: TextAlign.center,
+            style: sfProText600(17.sp, Colors.white.withOpacity(0.6)),
+          ),
         ),
       ),
     );
@@ -119,11 +127,7 @@ class CCustomBlackGlassWidget extends StatelessWidget {
 
       return Column(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          _header(selected),
-          _divider(),
-          ..._items(selected),
-        ],
+        children: [_header(selected), _divider(), ..._items(selected)],
       );
     });
   }
@@ -188,7 +192,8 @@ class CCustomBlackGlassWidget extends StatelessWidget {
   double _calculateResponsiveRadius() {
     if (isWeek) {
       // Streak mode — simpler estimation (like your second file)
-      final totalItems = streakController.selectedMenuNumbers.length +
+      final totalItems =
+          streakController.selectedMenuNumbers.length +
           streakController.availableNumbers.length;
       final estimatedHeight = (31.h * totalItems) + 40.h;
       return (estimatedHeight * 0.2).clamp(22.0, 35.0);
@@ -201,7 +206,8 @@ class CCustomBlackGlassWidget extends StatelessWidget {
     const double itemHeight = 31.0;
     const double verticalPadding = 40.0;
 
-    final estimatedHeight = headerHeight +
+    final estimatedHeight =
+        headerHeight +
         dividerHeight +
         (itemHeight * (itemCount - 1)) +
         verticalPadding;
@@ -235,24 +241,26 @@ class CCustomBlackGlassWidget extends StatelessWidget {
             Colors.black,
             Colors.white.withOpacity(.12),
           ],
-          stops: isWeek ? [0, .3, .34, .65, .75, 1] : [0, .35, .36, .82, .83, 1],
+          stops: isWeek
+              ? [0, .3, .34, .65, .75, 1]
+              : [0, .35, .36, .82, .83, 1],
         ),
       ),
       color: Colors.black.withOpacity(.2),
       gradient: isWeek
           ? null
           : const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        stops: [0, .33, .43, .7, 1],
-        colors: [
-          Color(0xFF000000),
-          Color(0xFF171717),
-          Color(0xFF000000),
-          Color(0xFF000000),
-          Color(0xFF262626),
-        ],
-      ),
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .33, .43, .7, 1],
+              colors: [
+                Color(0xFF000000),
+                Color(0xFF171717),
+                Color(0xFF000000),
+                Color(0xFF000000),
+                Color(0xFF262626),
+              ],
+            ),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(isWeek ? .25 : .5),
