@@ -220,7 +220,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   Widget build(BuildContext context) {
     final controller = Get.put(StreamStreaksController(), permanent: true);
     return Container(
-      height: Get.height * 0.9,
+      height: Get.height * 0.91,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
         // UPDATED: Increased border radius for better visibility
