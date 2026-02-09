@@ -10,10 +10,13 @@ class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
   const StreakFreezeSingleRowPreviewBottomSheet({super.key});
 
   @override
-  State<StreakFreezeSingleRowPreviewBottomSheet> createState() => _StreakFreezeSingleRowPreviewBottomSheetState();
+  State<StreakFreezeSingleRowPreviewBottomSheet> createState() =>
+      _StreakFreezeSingleRowPreviewBottomSheetState();
 }
 
-class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSingleRowPreviewBottomSheet> with TickerProviderStateMixin {
+class _StreakFreezeSingleRowPreviewBottomSheetState
+    extends State<StreakFreezeSingleRowPreviewBottomSheet>
+    with TickerProviderStateMixin {
   late AnimationController _fireController;
   late AnimationController _frameController;
   late Animation<double> _glowPulse;
@@ -37,7 +40,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
     // Optimized duration for smoother playback
     _frameController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500), // Slightly faster for smoother feel
+      duration: const Duration(
+        milliseconds: 2500,
+      ), // Slightly faster for smoother feel
     );
     // repeat() automatically handles looping and starts the animation
     _frameController.repeat();
@@ -46,9 +51,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
       CurvedAnimation(parent: _fireController, curve: Curves.easeInOutSine),
     );
 
-    _fireJitter = Tween<double>(begin: 0.0, end: -8.h).animate(
-      CurvedAnimation(parent: _fireController, curve: Curves.bounceIn),
-    );
+    _fireJitter = Tween<double>(
+      begin: 0.0,
+      end: -8.h,
+    ).animate(CurvedAnimation(parent: _fireController, curve: Curves.bounceIn));
   }
 
   @override
@@ -125,7 +131,8 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
     );
   }
 
-  Widget _cross() => Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
+  Widget _cross() =>
+      Icon(Icons.close, color: const Color(0xFF8E8E93), size: 22.sp);
   Widget _freeze() => Image.asset('assets/images/Mask group.png');
 
   // ---------------- LAYOUT HELPERS ----------------
@@ -213,7 +220,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
   Widget build(BuildContext context) {
     final controller = Get.put(StreamStreaksController(), permanent: true);
     return Container(
-      height: Get.height * 0.9,
+      height: Get.height * 0.91,
       decoration: BoxDecoration(
         color: bottomSheetGrey,
         // UPDATED: Increased border radius for better visibility
@@ -226,7 +233,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
           backgroundColor: Colors.transparent,
           bottomSheet: Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
             color: bottomSheetGrey,
             child: SafeArea(
               top: false,
@@ -245,6 +252,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(36.r),
                     ),
+                    padding: EdgeInsets.zero,
                   ),
                   child: Text("Done", style: sfProText600(17.sp, Colors.black)),
                 ),
@@ -268,7 +276,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                     children: [
                       InkWell(
                         onTap: () => Get.back(),
-                        child: Image.asset('assets/icons/x_icon.png', height: 44.h),
+                        child: Image.asset(
+                          'assets/icons/x_icon.png',
+                          height: 44.h,
+                        ),
                       ),
                       SizedBox(width: 44.w),
                     ],
@@ -286,8 +297,12 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                       // Optimized frame calculation using round() for smoother transitions
                       double animValue = _frameController.value.clamp(0.0, 1.0);
                       // Use round() instead of floor() for smoother frame transitions
-                      int frame = ((animValue * totalFrames).round() % totalFrames);
-                      frame = (frame == 0 ? totalFrames : frame).clamp(1, totalFrames);
+                      int frame =
+                          ((animValue * totalFrames).round() % totalFrames);
+                      frame = (frame == 0 ? totalFrames : frame).clamp(
+                        1,
+                        totalFrames,
+                      );
                       String frameNumber = frame.toString().padLeft(4, '0');
 
                       return Stack(
@@ -303,12 +318,16 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFFF9C4).withOpacity(_glowPulse.value),
+                                  color: const Color(
+                                    0xFFFFF9C4,
+                                  ).withOpacity(_glowPulse.value),
                                   blurRadius: 180,
                                   spreadRadius: 10,
                                 ),
                                 BoxShadow(
-                                  color: const Color(0xFFFDEBB2).withOpacity(_glowPulse.value * 0.6),
+                                  color: const Color(
+                                    0xFFFDEBB2,
+                                  ).withOpacity(_glowPulse.value * 0.6),
                                   blurRadius: 40,
                                   spreadRadius: -5,
                                 ),
@@ -324,8 +343,18 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                               fit: BoxFit.contain,
                               gaplessPlayback: true,
                               // Optimized cache dimensions for exact size
-                              cacheWidth: (255.w * MediaQuery.of(context).devicePixelRatio).round(),
-                              cacheHeight: (255.h * MediaQuery.of(context).devicePixelRatio).round(),
+                              cacheWidth:
+                                  (255.w *
+                                          MediaQuery.of(
+                                            context,
+                                          ).devicePixelRatio)
+                                      .round(),
+                              cacheHeight:
+                                  (255.h *
+                                          MediaQuery.of(
+                                            context,
+                                          ).devicePixelRatio)
+                                      .round(),
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   height: 255.h,
@@ -378,20 +407,28 @@ class _StreakFreezeSingleRowPreviewBottomSheetState extends State<StreakFreezeSi
                         children: [
                           Row(
                             children:
-                            ['Mon','Tue','Wed','Thur','Fri','Sat','Sun'].map((d) {
-                              return Expanded(
-                                child: Center(
-                                  child: Text(
-                                    d,
-                                    maxLines: 1,
-                                    style: TextStyle(
-                                      color: const Color(0xFF8E8E93),
-                                      fontSize: 13.sp,
+                                [
+                                  'Mon',
+                                  'Tue',
+                                  'Wed',
+                                  'Thur',
+                                  'Fri',
+                                  'Sat',
+                                  'Sun',
+                                ].map((d) {
+                                  return Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        d,
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          color: const Color(0xFF8E8E93),
+                                          fontSize: 13.sp,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                }).toList(),
                           ),
                           SizedBox(height: 16.h),
                           _row(controller, totalWidth),

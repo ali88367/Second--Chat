@@ -125,13 +125,13 @@ class _StreamStreakSetupBottomSheetState
       decoration: BoxDecoration(
         color: bottomSheetGrey,
         // Visible border radius
-        borderRadius:  BorderRadius.only(
+        borderRadius: BorderRadius.only(
           topLeft: Radius.circular(38.r),
           topRight: Radius.circular(38.r),
         ),
       ),
       child: ClipRRect(
-        borderRadius:  BorderRadius.vertical(top: Radius.circular(38.r)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
@@ -196,7 +196,7 @@ class _StreamStreakSetupBottomSheetState
                           );
                           // Use round() instead of floor() for smoother frame transitions
                           int frame =
-                          ((animValue * totalFrames).round() % totalFrames);
+                              ((animValue * totalFrames).round() % totalFrames);
                           frame = (frame == 0 ? totalFrames : frame).clamp(
                             1,
                             totalFrames,
@@ -225,8 +225,8 @@ class _StreamStreakSetupBottomSheetState
                                       BoxShadow(
                                         color: const Color(0XFFF2B269)
                                             .withOpacity(
-                                          _opacityAnimation.value * 0.5,
-                                        ),
+                                              _opacityAnimation.value * 0.5,
+                                            ),
                                         blurRadius: 30,
                                         spreadRadius: 5,
                                       ),
@@ -242,17 +242,17 @@ class _StreamStreakSetupBottomSheetState
                                 gaplessPlayback: true,
                                 // Optimized cache dimensions for exact size
                                 cacheWidth:
-                                (177.w *
-                                    MediaQuery.of(
-                                      context,
-                                    ).devicePixelRatio)
-                                    .round(),
+                                    (177.w *
+                                            MediaQuery.of(
+                                              context,
+                                            ).devicePixelRatio)
+                                        .round(),
                                 cacheHeight:
-                                (177.h *
-                                    MediaQuery.of(
-                                      context,
-                                    ).devicePixelRatio)
-                                    .round(),
+                                    (177.h *
+                                            MediaQuery.of(
+                                              context,
+                                            ).devicePixelRatio)
+                                        .round(),
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
                                     height: 177.h,
@@ -317,6 +317,7 @@ class _StreamStreakSetupBottomSheetState
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(36.r),
                       ),
+                      padding: EdgeInsets.zero,
                     ),
                     child: Text(
                       "Next",
@@ -410,9 +411,9 @@ class _StreamStreakSetupBottomSheetState
   }
 
   Widget _buildThreeTimesOption(
-      StreamStreaksController controller,
-      BuildContext context,
-      ) {
+    StreamStreaksController controller,
+    BuildContext context,
+  ) {
     final indicatorKey = GlobalKey();
 
     return Obx(() {
@@ -421,8 +422,9 @@ class _StreamStreakSetupBottomSheetState
         onTap: () {
           if (!selected) {
             controller.toggleThreeTimesWeek(true);
-            Future.delayed(const Duration(milliseconds: 50), () {
-              _showGlassmorphicPopupMenu(context, indicatorKey, controller);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted)
+                _showGlassmorphicPopupMenu(context, indicatorKey, controller);
             });
           } else {
             controller.toggleThreeTimesWeek(false);
@@ -459,12 +461,13 @@ class _StreamStreakSetupBottomSheetState
                 onChanged: (val) {
                   controller.toggleThreeTimesWeek(val);
                   if (val) {
-                    Future.delayed(const Duration(milliseconds: 50), () {
-                      _showGlassmorphicPopupMenu(
-                        context,
-                        indicatorKey,
-                        controller,
-                      );
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted)
+                        _showGlassmorphicPopupMenu(
+                          context,
+                          indicatorKey,
+                          controller,
+                        );
                     });
                   }
                 },
@@ -477,14 +480,14 @@ class _StreamStreakSetupBottomSheetState
   }
 
   void _showGlassmorphicPopupMenu(
-      BuildContext context,
-      GlobalKey indicatorKey,
-      StreamStreaksController controller,
-      ) {
+    BuildContext context,
+    GlobalKey indicatorKey,
+    StreamStreaksController controller,
+  ) {
     final RenderBox? overlay =
-    Overlay.of(context).context.findRenderObject() as RenderBox?;
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     final RenderBox? button =
-    indicatorKey.currentContext?.findRenderObject() as RenderBox?;
+        indicatorKey.currentContext?.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
 
@@ -509,11 +512,8 @@ class _StreamStreakSetupBottomSheetState
                   items: List.generate(7, (i) => '${i + 1}'),
                   onItemSelected: (selected) {
                     if (controller.selectedMenuNumbers.length == 3) {
-                      Future.delayed(const Duration(milliseconds: 300), () {
-                        if (Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-                      });
+                      if (Navigator.canPop(context)) Navigator.pop(context);
+                      controller.syncMenuToDays();
                     }
                   },
                 ),

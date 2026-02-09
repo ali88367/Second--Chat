@@ -235,17 +235,21 @@ class _IntroScreen2State extends State<IntroScreen2> {
                       ),
                       SizedBox(height: 18.h),
                       GestureDetector(
-                        onTap: (){
+                        onTap: () {
                           Get.to(
-                                () => IntroScreenNotification2(),
+                            () => IntroScreenNotification2(),
                             transition: Transition.cupertino,
                             duration: const Duration(milliseconds: 250),
                             curve: Curves.fastOutSlowIn,
                           );
                         },
                         child: SizedBox(
+                          width: double.infinity,
                           height: 50.h,
-                          child: Image.asset('assets/images/twitchT.png'),
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            child: Image.asset('assets/images/twitchT.png'),
+                          ),
                         ),
                       ),
                       // PlatformButton(
@@ -311,7 +315,7 @@ class PlatformButton extends StatelessWidget {
         () => AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           width: double.infinity,
-          height: 50.h,
+          height: 52.h,
           decoration: BoxDecoration(
             gradient: gradient,
             color: gradient == null ? color : null,
