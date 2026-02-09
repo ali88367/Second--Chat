@@ -163,7 +163,7 @@ class MyApp extends StatelessWidget {
           ),
 
           // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
-          home: HomeScreen2(),
+          home: IntroScreen1(),
 
           // Navigation settings - Smooth and elegant transitions
           defaultTransition: Transition.cupertino,

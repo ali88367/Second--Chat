@@ -2,10 +2,18 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:glassmorphism/glassmorphism.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import '../../core/themes/textstyles.dart';
+
+class LanguageItem {
+  final String code;
+  final String label;
+  final String flag;
+
+  LanguageItem(this.code, this.label, this.flag);
+}
+
 
 class IntroScreen2 extends StatefulWidget {
   const IntroScreen2({super.key});
@@ -23,6 +31,15 @@ class _IntroScreen2State extends State<IntroScreen2> {
       _preloadScreen3Images(context);
     });
   }
+
+  late LanguageItem selectedLanguage = languages[0];
+
+  final List<LanguageItem> languages = [
+    LanguageItem('en', 'Eng', 'assets/images/USA Flag (1).png'),
+    LanguageItem('es', 'Spa', 'assets/images/spain.png'),
+    LanguageItem('fr', 'Fre', 'assets/images/france.png'),
+    LanguageItem('de', 'Ger', 'assets/images/german.png'),
+  ];
 
   void _preloadScreen3Images(BuildContext context) {
     // Preload all images used in Screen 3
@@ -52,72 +69,117 @@ class _IntroScreen2State extends State<IntroScreen2> {
             right: 2,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Color.fromRGBO(48, 48, 48, 0.5),
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: DecorationImage(
-                              image: AssetImage(
-                                'assets/images/USA Flag (1).png',
+              child: PopupMenuButton<LanguageItem>(
+                offset: const Offset(0, 45),
+                color: const Color.fromRGBO(48, 48, 48, 0.95),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                onSelected: (lang) {
+                  setState(() {
+                    selectedLanguage = lang;
+                  });
+
+                  // TODO: connect localization logic here
+                   Get.updateLocale(Locale(lang.code));
+                },
+                itemBuilder: (context) {
+                  return languages.map((lang) {
+                    return PopupMenuItem<LanguageItem>(
+                      value: lang,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              image: DecorationImage(
+                                image: AssetImage(lang.flag),
+                                fit: BoxFit.cover,
                               ),
-                              fit: BoxFit.cover,
                             ),
                           ),
-                        ),
-                        SizedBox(width: 8),
-                        Text('Eng', style: sfProText400(17.sp, Colors.white)),
-                        SizedBox(width: 4),
-                        Icon(Icons.keyboard_arrow_down, color: grey, size: 20),
-                      ],
-                    ),
+                          SizedBox(width: 10),
+                          Text(
+                            lang.label,
+                            style: sfProText400(15.sp, Colors.white),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color.fromRGBO(48, 48, 48, 0.5),
+                    borderRadius: BorderRadius.circular(25),
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          image: DecorationImage(
+                            image: AssetImage(selectedLanguage.flag),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        selectedLanguage.label,
+                        style: sfProText400(17.sp, Colors.white),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down, color: grey, size: 20),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
+
 
           /// Glow Effect (20% smaller)
           Positioned(
             top: 100.h,
             left: 0,
             right: 0,
-            child: Center(
-              child: Container(
-                width: 320.w * 0.8, // 256.w
-                height: 320.w * 0.8, // 256.w
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: goldeffect.withOpacity(0.4),
-                      blurRadius: 180 * 0.8, // 144
-                      spreadRadius: 60 * 0.8, // 48
-                    ),
-                  ],
+            child: IgnorePointer(
+              ignoring: true,
+              child: Center(
+                child: Container(
+                  width: 320.w * 0.8,
+                  height: 320.w * 0.8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: goldeffect.withOpacity(0.4),
+                        blurRadius: 144,
+                        spreadRadius: 48,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+
 
           /// Bunny
           Positioned(
             top: 60.h,
             left: 0,
             right: 0,
-            child: Image.asset('assets/images/bunny.png', height: 300.h),
+            child: IgnorePointer(
+                ignoring: true,
+                child: Image.asset('assets/images/bunny.png', height: 300.h)),
           ),
 
           /// Titles
@@ -168,7 +230,7 @@ class _IntroScreen2State extends State<IntroScreen2> {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        'And enjoy a smoother experience',
+                        'And a smoother experience',
                         style: sfProText400(15.sp, grey),
                       ),
                       SizedBox(height: 18.h),
