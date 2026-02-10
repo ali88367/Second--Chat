@@ -170,14 +170,17 @@ class _LivestreamingState extends State<Livestreaming> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFF0A0A0A),
       body: SafeArea(
         top: false,
         bottom: false,
-        child: Stack(
-          children: [
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: Stack(
+            children: [
           Positioned(
           top: 0,
           left: 0,
@@ -353,7 +356,7 @@ class _LivestreamingState extends State<Livestreaming> {
                           final screenHeight = Get.height;
                           final topPadding = 122.h;
                           final spacing = 12.h;
-                          final bottomPadding = 32.h;
+                          final bottomPadding = 16.h + MediaQuery.of(context).viewPadding.bottom;
                           // Calculate what Expanded would give us (remaining space)
                           // Upper section is approximately: carousel (236.h) + spacing
                           final upperSectionHeight = 236.h + spacing;
@@ -390,6 +393,9 @@ class _LivestreamingState extends State<Livestreaming> {
                         Flexible(
                           child: SingleChildScrollView(
                             physics: const ClampingScrollPhysics(),
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.of(context).viewPadding.bottom,
+                            ),
                             child: ValueListenableBuilder<bool>(
                               valueListenable: _showServiceCard,
                               builder: (context, showCard, child) {
@@ -1009,20 +1015,22 @@ class _LivestreamingState extends State<Livestreaming> {
                         ),
                         SizedBox(height: 12.h),
                         // Resizable bottom section
-                        _buildResizableBottomSection(constraints),
+                        _buildResizableBottomSection(context, constraints),
                       ],
                     );
                   },
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildResizableBottomSection(BoxConstraints constraints) {
+  Widget _buildResizableBottomSection(BuildContext context, BoxConstraints constraints) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     if (!_isInitialHeightSet) {
       // Return a placeholder while calculating initial height
       return SizedBox(
@@ -1049,13 +1057,15 @@ class _LivestreamingState extends State<Livestreaming> {
     }
 
     final screenHeight = Get.height;
-    // Use initial height as minimum - cannot shrink below initial size
+    // Consistent gap above nav bar (same as input bar offset)
+    const double bottomGap = 16;
     final minHeight = _isInitialHeightSet ? _initialHeight : 180.h;
     final maxHeight =
         screenHeight -
         122.h -
-        32.h -
-        12.h; // Maximum height (screen - top padding - bottom padding - spacing)
+        bottomGap.h -
+        12.h -
+        bottomInset; // Section ends above nav bar with consistent gap
 
     // Ensure height is within bounds
     final currentHeight = _bottomSectionHeight.clamp(minHeight, maxHeight);

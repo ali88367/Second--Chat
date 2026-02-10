@@ -103,6 +103,9 @@ class InviteBottomSheet extends StatelessWidget {
           // --- BODY CONTENT ---
           Expanded(
             child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewPadding.bottom,
+              ),
               child: Column(
                 children: [
                   SizedBox(height: 10.h),

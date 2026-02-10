@@ -6,7 +6,7 @@ import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/main_section/settings/Led_settings.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
-import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart' hide SettingsController, onBottomSheetGrey, sfProDisplay600;
+import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart';
 import '../../../core/constants/app_colors/app_colors.dart';
 import '../../../core/widgets/custom_black_glass_widget.dart';
 import '../../../core/widgets/custom_switch.dart';
@@ -139,9 +139,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final SettingsController controller = Get.find<SettingsController>();
 
-    return Column(
-      children: [
-        Align(
+    return SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          Align(
           alignment: Alignment.center,
           child: Container(
             margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
@@ -171,11 +173,15 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         SizedBox(height: 10.h),
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+            padding: EdgeInsets.only(
+              left: 16.w,
+              right: 16.w,
+              top: 10.h,
+              bottom: 10.h + MediaQuery.of(context).viewPadding.bottom,
+            ),
             itemCount: settingsData.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) return const FreePlanWidget();
-
               int sectionIndex = index - 1;
               String sectionTitle = settingsData.keys.elementAt(sectionIndex);
               List<Map<String, dynamic>> tiles = settingsData[sectionTitle]!;
@@ -231,6 +237,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 

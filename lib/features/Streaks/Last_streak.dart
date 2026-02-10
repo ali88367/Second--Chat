@@ -189,10 +189,10 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  // Key to fixing the swipe-down issue: Use BouncingScrollPhysics
-                  // and ensure the drag handle is the first element.
                   physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.only(bottom: 20.h),
+                  padding: EdgeInsets.only(
+                    bottom: 20.h + MediaQuery.of(context).viewPadding.bottom,
+                  ),
                   child: Column(
                     children: [
                       _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
@@ -456,7 +456,11 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                 ),
               ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                padding: EdgeInsets.only(
+                  left: 16.w,
+                  right: 16.w,
+                  bottom: MediaQuery.of(context).viewPadding.bottom,
+                ),
                 color: bottomSheetGrey,
                 child: SafeArea(
                   top: false,

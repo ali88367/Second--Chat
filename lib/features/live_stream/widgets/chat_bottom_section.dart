@@ -409,6 +409,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width * 0.9;
     final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final bottomInset = mediaQuery.viewPadding.bottom;
     final pickerHeight = 320.h;
 
     showGeneralDialog(
@@ -421,7 +422,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
         return Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: EdgeInsets.only(bottom: keyboardHeight + 70.h),
+            padding: EdgeInsets.only(
+              bottom: keyboardHeight + 70.h + bottomInset,
+            ),
             child: ScaleTransition(
               scale: CurvedAnimation(parent: animation, curve: Curves.easeOut),
               child: FadeTransition(
@@ -760,7 +763,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       heightFactor: 0.94,
       child: AnimatedPadding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom: MediaQuery.of(context).viewInsets.bottom +
+              MediaQuery.of(context).viewPadding.bottom,
         ),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -890,7 +894,11 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                 'expanded_chat_${_comments.length}_${filter ?? 'all'}',
                               ),
                               controller: _expandedScrollController,
-                              padding: EdgeInsets.only(bottom: 16.h + 20.h),
+                              padding: EdgeInsets.only(
+                                bottom: 16.h +
+                                    20.h +
+                                    MediaQuery.of(context).viewPadding.bottom,
+                              ),
                               itemCount: filteredList.length,
                               reverse: false,
                               addAutomaticKeepAlives: false,
@@ -1178,7 +1186,7 @@ height: 20.h,
                         );
                       },
                     ),
-                    // Main view input bar
+                    // Main view input bar (16.h above bottom; parent reserves nav bar space)
                     Positioned(
                       bottom: 16.h + MediaQuery.of(context).viewInsets.bottom,
                       left: 10.w,

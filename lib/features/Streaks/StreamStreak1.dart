@@ -50,17 +50,25 @@ class StreamStreaksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.only(
+                bottom: mq.viewPadding.bottom,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20.w),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(height: 20.h),
                       _buildFireIcon(),
@@ -79,8 +87,8 @@ class StreamStreaksScreen extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

@@ -304,7 +304,11 @@ class _ChatBottomSection extends StatelessWidget {
           // Chat List
           Expanded(
             child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              padding: EdgeInsets.only(
+                left: 16.w,
+                right: 16.w,
+                bottom: MediaQuery.of(context).viewPadding.bottom,
+              ),
               children: [
                 _chatItem(Colors.green, "SuperFan", "Great Stream!"),
                 _chatItem(Colors.green, "SuperGirl", "Great Stream!"),
@@ -319,7 +323,12 @@ class _ChatBottomSection extends StatelessWidget {
 
           // Input Field
           Container(
-            padding: EdgeInsets.all(16.w),
+            padding: EdgeInsets.only(
+              left: 16.w,
+              right: 16.w,
+              top: 16.w,
+              bottom: 16.w + MediaQuery.of(context).viewPadding.bottom,
+            ),
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               height: 50.h,

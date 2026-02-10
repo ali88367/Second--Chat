@@ -100,12 +100,15 @@ class _EdgeGlowNotificationPageState extends State<EdgeGlowNotificationPage>
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Stack(
-          children: [
-            Center(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: Stack(
+            children: [
+              Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -138,7 +141,8 @@ class _EdgeGlowNotificationPageState extends State<EdgeGlowNotificationPage>
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

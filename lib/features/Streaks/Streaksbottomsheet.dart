@@ -138,9 +138,10 @@ class _StreamStreakSetupBottomSheetState
             children: [
               // Scrollable Content
               SingleChildScrollView(
-                // This physics is key for allowing drag down when scrolled to top
                 physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.only(bottom: 100.h),
+                padding: EdgeInsets.only(
+                  bottom: 100.h + MediaQuery.of(context).viewPadding.bottom,
+                ),
                 child: Column(
                   children: [
                     _buildDragHandle(), // Placement at the top enables swipe-down dismissal
@@ -295,11 +296,11 @@ class _StreamStreakSetupBottomSheetState
                 ),
               ),
 
-              // Fixed Bottom Button
+              // Fixed Bottom Button (above nav bar)
               Positioned(
                 left: 16.w,
                 right: 16.w,
-                bottom: 16.h,
+                bottom: 16.h + MediaQuery.of(context).viewPadding.bottom,
                 child: SizedBox(
                   height: 50.h,
                   width: double.infinity,

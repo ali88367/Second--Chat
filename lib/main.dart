@@ -2,31 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:second_chat/LiveStreaming.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
-import 'package:second_chat/features/intro/intro_screen3.dart';
-import 'package:second_chat/features/intro/intro_screen4.dart';
-import 'package:second_chat/features/intro/intro_screen5.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
 import 'core/constants/constants.dart';
-import 'features/test.dart';
-import 'notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientations (optional)
+  // Lock orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Set system UI overlay style
+  // System UI style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -36,10 +28,12 @@ void main() async {
     ),
   );
 
+  // Global controllers
   Get.put(SettingsController());
   Get.put(StreamStreaksController());
 
   runApp(const MyApp());
+
 }
 
 class MyApp extends StatelessWidget {
@@ -48,16 +42,19 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
-      designSize: const Size(393, 852), // Design size from Figma
+      designSize: const Size(393, 852),
       minTextAdapt: true,
       splitScreenMode: true,
-      useInheritedMediaQuery: true,
+      useInheritedMediaQuery: true, // important
       builder: (context, child) {
-        return GetMaterialApp(
+        // Global fix: correct MediaQuery for insets (nav bar, gesture, safe area) app-wide
+        return MediaQuery(
+          data: MediaQueryData.fromView(View.of(context)),
+          child: GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: AppConstants.appName,
 
-          // Theme Configuration
+          // THEME
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
@@ -66,9 +63,8 @@ class MyApp extends StatelessWidget {
               secondary: secondary,
               error: error,
               surface: surface,
-              background: background,
             ),
-            scaffoldBackgroundColor: background,
+            scaffoldBackgroundColor: surface,
             appBarTheme: AppBarTheme(
               backgroundColor: background,
               elevation: 0,
@@ -81,7 +77,10 @@ class MyApp extends StatelessWidget {
                 backgroundColor: primary,
                 foregroundColor: textInverse,
                 elevation: 2,
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 24.w,
+                  vertical: 16.h,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.r),
                 ),
@@ -91,7 +90,10 @@ class MyApp extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: primary,
                 side: BorderSide(color: primary, width: 1.5),
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 24.w,
+                  vertical: 16.h,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.r),
                 ),
@@ -100,7 +102,10 @@ class MyApp extends StatelessWidget {
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 foregroundColor: primary,
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 12.h,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8.r),
                 ),
@@ -148,7 +153,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
 
-          // Dark Theme (optional - can be implemented later)
+          // DARK THEME
           darkTheme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
@@ -158,21 +163,18 @@ class MyApp extends StatelessWidget {
               secondary: secondary,
               error: error,
               surface: surfaceDark,
-              background: backgroundDark,
             ),
-            scaffoldBackgroundColor: backgroundDark,
+            scaffoldBackgroundColor: surfaceDark,
           ),
 
-          // Use Get.to(), Get.off(), Get.offAll() with direct widget references for navigation
           home: IntroScreen1(),
 
-          // Navigation settings - Smooth and elegant transitions
           defaultTransition: Transition.cupertino,
           transitionDuration: const Duration(milliseconds: 250),
 
-          // Locale settings (optional)
           locale: const Locale('en', 'US'),
           fallbackLocale: const Locale('en', 'US'),
+        ),
         );
       },
     );

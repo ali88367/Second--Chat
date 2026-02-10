@@ -233,7 +233,11 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
           backgroundColor: Colors.transparent,
           bottomSheet: Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            padding: EdgeInsets.only(
+              left: 16.w,
+              right: 16.w,
+              bottom: MediaQuery.of(context).viewPadding.bottom,
+            ),
             color: bottomSheetGrey,
             child: SafeArea(
               top: false,
@@ -260,11 +264,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
             ),
           ),
           body: SingleChildScrollView(
-            // Key to fixing the swipe-down issue: Use BouncingScrollPhysics
-            // and ensure the drag handle is the first element so a drag
-            // starts at scrollOffset == 0.
             physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.only(bottom: 80.h),
+            padding: EdgeInsets.only(
+              bottom: 80.h + MediaQuery.of(context).viewPadding.bottom,
+            ),
             child: Column(
               children: [
                 _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)

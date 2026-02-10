@@ -13,6 +13,7 @@ class IntroScreen5 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final IntroScreen5Controller controller = Get.put(IntroScreen5Controller());
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
       body: Stack(
@@ -229,7 +230,7 @@ class IntroScreen5 extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(height: 20.h),
+                SizedBox(height: 20.h + bottomInset),
               ],
             ),
           ),

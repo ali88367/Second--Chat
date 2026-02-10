@@ -224,9 +224,10 @@ class _StreakFreezePreviewBottomSheetState
           body: Stack(
             children: [
               SingleChildScrollView(
-                // This physics setting is important for the swipe down to work when at the top
                 physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.only(bottom: 100.h),
+                padding: EdgeInsets.only(
+                  bottom: 100.h + MediaQuery.of(context).viewPadding.bottom,
+                ),
                 child: Column(
                   children: [
                     _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
@@ -440,11 +441,11 @@ class _StreakFreezePreviewBottomSheetState
                 ),
               ),
 
-              // Bottom Action Button
+              // Bottom Action Button (above nav bar)
               Positioned(
                 left: 16.w,
                 right: 16.w,
-                bottom: 16.h,
+                bottom: 16.h + MediaQuery.of(context).viewPadding.bottom,
                 child: SizedBox(
                   height: 50.h,
                   child: ElevatedButton(

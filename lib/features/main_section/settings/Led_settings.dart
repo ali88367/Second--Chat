@@ -47,7 +47,11 @@ class LedSettingsBottomSheet extends StatelessWidget {
           // Header & Content
           Expanded(
             child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              padding: EdgeInsets.only(
+                left: 16.w,
+                right: 16.w,
+                bottom: MediaQuery.of(context).viewPadding.bottom,
+              ),
               children: [
                 SizedBox(height: 4.h),
                 Center(

@@ -47,6 +47,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
   @override
   Widget build(BuildContext context) {
     final IntroScreen4Controller controller = Get.put(IntroScreen4Controller());
+    final mq = MediaQuery.of(context);
 
     return Scaffold(
       body: Stack(
@@ -148,8 +149,10 @@ class _IntroScreen4State extends State<IntroScreen4> {
                               Positioned.fill(
                                 child: SingleChildScrollView(
                                   controller: _scrollController,
-                                  // Padding at top so first item isn't hidden by header
-                                  padding: EdgeInsets.only(top: 82.h),
+                                  padding: EdgeInsets.only(
+                                    top: 82.h,
+                                    bottom: mq.viewPadding.bottom,
+                                  ),
                                   child: Column(
                                     children: [
                                       _buildFeatureRow(
@@ -276,7 +279,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                     Expanded(
                                       child: SingleChildScrollView(
                                         controller: _scrollController,
-                                        // Same padding as features list to align
+                                        padding: EdgeInsets.only(
+                                          bottom: mq.viewPadding.bottom,
+                                        ),
                                         child: Column(
                                           children: [
                                             SizedBox(
