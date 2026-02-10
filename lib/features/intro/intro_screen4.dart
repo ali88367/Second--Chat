@@ -15,7 +15,6 @@ class IntroScreen4Controller extends GetxController {
   void startTrial() async {
     isLoading.value = true;
 
-
     isLoading.value = false;
 
     // Navigate to IntroScreen5 using GetX
@@ -36,11 +35,43 @@ class IntroScreen4 extends StatefulWidget {
 }
 
 class _IntroScreen4State extends State<IntroScreen4> {
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _freeScrollController = ScrollController();
+  final ScrollController _premiumScrollController = ScrollController();
+  bool _isSyncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sync Free column scroll to Premium column
+    _freeScrollController.addListener(_syncFreeToPremiun);
+    // Sync Premium column scroll to Free column
+    _premiumScrollController.addListener(_syncPremiumToFree);
+  }
+
+  void _syncFreeToPremiun() {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    if (_premiumScrollController.hasClients) {
+      _premiumScrollController.jumpTo(_freeScrollController.offset);
+    }
+    _isSyncing = false;
+  }
+
+  void _syncPremiumToFree() {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    if (_freeScrollController.hasClients) {
+      _freeScrollController.jumpTo(_premiumScrollController.offset);
+    }
+    _isSyncing = false;
+  }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _freeScrollController.removeListener(_syncFreeToPremiun);
+    _premiumScrollController.removeListener(_syncPremiumToFree);
+    _freeScrollController.dispose();
+    _premiumScrollController.dispose();
     super.dispose();
   }
 
@@ -103,26 +134,28 @@ class _IntroScreen4State extends State<IntroScreen4> {
                           ),
                           TextSpan(
                             text: 'Premium',
-                            style: sfProDisplay600(34.sp, Colors.white)
-                                .copyWith(
-                                  foreground: Paint()
-                                    ..shader =
-                                        LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            Color(0xFFF2B269),
-                                            Color(0xFFF17A7A),
-                                            Color(0xFFFFE6A7),
-                                          ],
-                                          stops: [0.2, 0.5, 0.8],
-                                          transform: GradientRotation(
-                                            135.5 * 3.1415927 / 180,
-                                          ),
-                                        ).createShader(
-                                          Rect.fromLTWH(0, 0, 200, 50),
-                                        ),
-                                ),
+                            style: sfProDisplay600(
+                              34.sp,
+                              Colors.white,
+                            ).copyWith(
+                              foreground:
+                                  Paint()
+                                    ..shader = LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(0xFFF2B269),
+                                        Color(0xFFF17A7A),
+                                        Color(0xFFFFE6A7),
+                                      ],
+                                      stops: [0.2, 0.5, 0.8],
+                                      transform: GradientRotation(
+                                        135.5 * 3.1415927 / 180,
+                                      ),
+                                    ).createShader(
+                                      Rect.fromLTWH(0, 0, 200, 50),
+                                    ),
+                            ),
                           ),
                         ],
                       ),
@@ -147,7 +180,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                               // 1. The Scrollable Content
                               Positioned.fill(
                                 child: SingleChildScrollView(
-                                  controller: _scrollController,
+                                  controller: _freeScrollController,
                                   // Padding at top so first item isn't hidden by header
                                   padding: EdgeInsets.only(top: 82.h),
                                   child: Column(
@@ -248,6 +281,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                         flex: 2,
                         child: Container(
                           width: 40.w,
+                          clipBehavior: Clip.hardEdge,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [
@@ -272,10 +306,10 @@ class _IntroScreen4State extends State<IntroScreen4> {
                               Positioned.fill(
                                 child: Column(
                                   children: [
-                                    SizedBox(height: 20.h,),
+                                    SizedBox(height: 20.h),
                                     Expanded(
                                       child: SingleChildScrollView(
-                                        controller: _scrollController,
+                                        controller: _premiumScrollController,
                                         // Same padding as features list to align
                                         child: Column(
                                           children: [
@@ -289,19 +323,23 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             // First badge (xmark) - aligns with first feature
                                             SizedBox(height: 35.h),
                                             Padding(
-                                              padding: EdgeInsets.only(left: 0.w),
+                                              padding: EdgeInsets.only(
+                                                left: 0.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
-                                                'assets/images/cross.png',
+                                                    'assets/images/checkInfo.png',
                                                 isInfo: true,
-                                                height: 28.h,
-                                                width: 28.w
+                                                // height: 28.h,
+                                                // width: 28.w,
                                               ),
                                             ),
                                             SizedBox(height: 48.h),
                                             // Second badge - aligns with second feature
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -311,7 +349,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Third badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkPlus.png',
@@ -321,7 +361,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Fourth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -331,7 +373,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Fifth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -341,7 +385,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Sixth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -351,7 +397,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Seventh badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -361,7 +409,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Eighth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -371,7 +421,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -381,7 +433,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -391,7 +445,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -401,7 +457,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -411,7 +469,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -421,7 +481,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -431,7 +493,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 10.w),
+                                              padding: EdgeInsets.only(
+                                                left: 10.w,
+                                              ),
                                               child: _buildBadgeIcon(
                                                 imagePath:
                                                     'assets/images/checkInfo.png',
@@ -441,12 +505,15 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                             SizedBox(height: 48.h),
                                             // Ninth badge
                                             Padding(
-                                              padding: EdgeInsets.only(left: 0.w),
+                                              padding: EdgeInsets.only(
+                                                left: 0.w,
+                                              ),
                                               child: _buildBadgeIcon(
-                                                imagePath: 'assets/images/24-7.png',
+                                                imagePath:
+                                                    'assets/images/24-7.png',
                                                 isInfo: true,
                                                 height: 33.h,
-                                                width: 69.w
+                                                width: 69.w,
                                               ),
                                             ),
                                             SizedBox(height: 60.h),
@@ -477,9 +544,10 @@ class _IntroScreen4State extends State<IntroScreen4> {
                 // Start Trial Button
                 Obx(
                   () => GestureDetector(
-                    onTap: controller.isLoading.value
-                        ? null
-                        : controller.startTrial,
+                    onTap:
+                        controller.isLoading.value
+                            ? null
+                            : controller.startTrial,
                     child: Container(
                       margin: EdgeInsets.symmetric(horizontal: 16.w),
                       width: double.infinity,
@@ -501,21 +569,22 @@ class _IntroScreen4State extends State<IntroScreen4> {
                         ],
                       ),
                       child: Center(
-                        child: controller.isLoading.value
-                            ? SizedBox(
-                                width: 24.w,
-                                height: 24.w,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                        child:
+                            controller.isLoading.value
+                                ? SizedBox(
+                                  width: 24.w,
+                                  height: 24.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
+                                )
+                                : Text(
+                                  'Start My 14 Day Free Trial',
+                                  style: sfProText600(17.sp, Colors.white),
                                 ),
-                              )
-                            : Text(
-                                'Start My 14 Day Free Trial',
-                                style: sfProText600(17.sp, Colors.white),
-                              ),
                       ),
                     ),
                   ),
@@ -584,8 +653,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
                               ? 'assets/images/checkintro.png' // Replace with your asset path
                               : 'assets/images/closeicon.png', // Replace with your asset path
                         ),
-                        fit: BoxFit
-                            .cover, // Or BoxFit.contain depending on your image
+                        fit:
+                            BoxFit
+                                .cover, // Or BoxFit.contain depending on your image
                       ),
                     ),
                   ),

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Compact_freeze.dart';
 
@@ -119,9 +120,10 @@ class _StreakFreezePreviewBottomSheetState
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
-      decoration: highlighted
-          ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
-          : null,
+      decoration:
+          highlighted
+              ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
+              : null,
       child: Icon(
         Icons.check,
         size: 18.sp,
@@ -150,16 +152,13 @@ class _StreakFreezePreviewBottomSheetState
       top: 0,
       bottom: 0,
       child: Container(
-        margin: isCircle
-            ? EdgeInsets.zero
-            : EdgeInsets.symmetric(horizontal: 2.w),
+        margin:
+            isCircle ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: 2.w),
         decoration: BoxDecoration(
-          color: count >= 3 ? null : const Color(0xFF3C3C43).withOpacity(0.6),
-          gradient: count >= 3
-              ? const LinearGradient(
-                  colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)],
-                )
-              : null,
+          // Always use golden gradient for all tick highlights
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF2B269), Color(0xFFFFE6A7)],
+          ),
           shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
           borderRadius: isCircle ? null : BorderRadius.circular(22.r),
         ),
@@ -329,7 +328,7 @@ class _StreakFreezePreviewBottomSheetState
                     ),
                     SizedBox(height: 6.h),
                     Text(
-                      "Streak in danger?\nHit the Freeze button!",
+                      "Streak in danger?\nHit the freeze button!",
                       textAlign: TextAlign.center,
                       style: sfProDisplay600(22.sp, Colors.white),
                     ),
