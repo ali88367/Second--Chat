@@ -1,16 +1,15 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 
 import '../../../../core/themes/textstyles.dart';
+import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
 import '../../../core/helper/emote_parser.dart';
 import '../../../core/widgets/custom_black_glass_widget.dart';
-import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
-
 import '../../../services/emote_service.dart';
 import 'live_stream_helper_widgets.dart';
 
@@ -21,6 +20,7 @@ class ChatBottomSection extends StatefulWidget {
   final ValueNotifier<bool> titleSelected;
   final ValueNotifier<String?> chatFilter;
   final Function(double delta)? onResize;
+  final VoidCallback? onResizeEnd;
   final Function(bool swipeRight)? onPlatformSwipe;
 
   const ChatBottomSection({
@@ -31,6 +31,7 @@ class ChatBottomSection extends StatefulWidget {
     required this.titleSelected,
     required this.chatFilter,
     this.onResize,
+    this.onResizeEnd,
     this.onPlatformSwipe,
   });
 
@@ -506,8 +507,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       if (selected.toLowerCase() == 'all') {
                         filterValue = null; // null means show all
                       } else {
-                        filterValue = selected
-                            .toLowerCase(); // 'twitch', 'kick', 'youtube'
+                        filterValue =
+                            selected
+                                .toLowerCase(); // 'twitch', 'kick', 'youtube'
                       }
 
                       // Update the ValueNotifier's value
@@ -866,23 +868,25 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                   // Chat list
                   Expanded(
                     child: GestureDetector(
-                      onHorizontalDragEnd: widget.onPlatformSwipe != null
-                          ? (details) {
-                              // Determine swipe direction based on velocity
-                              const swipeThreshold =
-                                  100.0; // Minimum velocity to trigger swipe
-                              if (details.primaryVelocity != null) {
-                                if (details.primaryVelocity! > swipeThreshold) {
-                                  // Swipe right
-                                  widget.onPlatformSwipe!(true);
-                                } else if (details.primaryVelocity! <
-                                    -swipeThreshold) {
-                                  // Swipe left
-                                  widget.onPlatformSwipe!(false);
+                      onHorizontalDragEnd:
+                          widget.onPlatformSwipe != null
+                              ? (details) {
+                                // Determine swipe direction based on velocity
+                                const swipeThreshold =
+                                    100.0; // Minimum velocity to trigger swipe
+                                if (details.primaryVelocity != null) {
+                                  if (details.primaryVelocity! >
+                                      swipeThreshold) {
+                                    // Swipe right
+                                    widget.onPlatformSwipe!(true);
+                                  } else if (details.primaryVelocity! <
+                                      -swipeThreshold) {
+                                    // Swipe left
+                                    widget.onPlatformSwipe!(false);
+                                  }
                                 }
                               }
-                            }
-                          : null,
+                              : null,
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16.w),
                         child: ValueListenableBuilder<String?>(
@@ -993,9 +997,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                   _showEmojiEmotePicker(context, setSheetState);
                                 },
                                 child: SizedBox(
-height: 20.h,
-                                    width: 20.w,
-                                    child: Image.asset('assets/images/smile.png'))
+                                  height: 20.h,
+                                  width: 20.w,
+                                  child: Image.asset('assets/images/smile.png'),
+                                ),
                               ),
                               SizedBox(width: 9.w),
                               _buildPlatformSelector(setSheetState),
@@ -1021,6 +1026,22 @@ height: 20.h,
       onTap: () {
         _focusNode.unfocus();
       },
+      // Allow swiping anywhere on the sheet to resize
+      onVerticalDragUpdate:
+          widget.onResize != null
+              ? (details) {
+                widget.onResize!(details.delta.dy);
+              }
+              : null,
+      onVerticalDragEnd:
+          widget.onResizeEnd != null
+              ? (_) {
+                widget.onResizeEnd!();
+              }
+              : null,
+      onVerticalDragStart: (_) {
+        // Optional: Add haptic feedback or visual feedback on drag start
+      },
       behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
@@ -1030,27 +1051,16 @@ height: 20.h,
         child: Column(
           children: [
             SizedBox(height: 10.h),
-            GestureDetector(
-              onVerticalDragUpdate: widget.onResize != null
-                  ? (details) {
-                      widget.onResize!(details.delta.dy);
-                    }
-                  : null,
-              onVerticalDragStart: (_) {
-                // Optional: Add haptic feedback or visual feedback on drag start
-              },
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                // Expanded drag area for easier interaction
-                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
-                child: Center(
-                  child: Container(
-                    width: 40.w,
-                    height: 4.h,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade700,
-                      borderRadius: BorderRadius.circular(2.r),
-                    ),
+            // Visual drag handle bar (no longer requires exact tap on bar)
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
+              child: Center(
+                child: Container(
+                  width: 40.w,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade700,
+                    borderRadius: BorderRadius.circular(2.r),
                   ),
                 ),
               ),
@@ -1122,32 +1132,32 @@ height: 20.h,
             SizedBox(height: 16.h),
             Expanded(
               child: GestureDetector(
-                onHorizontalDragEnd: widget.onPlatformSwipe != null
-                    ? (details) {
-                        // Determine swipe direction based on velocity
-                        const swipeThreshold =
-                            100.0; // Minimum velocity to trigger swipe
-                        if (details.primaryVelocity != null) {
-                          if (details.primaryVelocity! > swipeThreshold) {
-                            // Swipe right
-                            widget.onPlatformSwipe!(true);
-                          } else if (details.primaryVelocity! <
-                              -swipeThreshold) {
-                            // Swipe left
-                            widget.onPlatformSwipe!(false);
+                onHorizontalDragEnd:
+                    widget.onPlatformSwipe != null
+                        ? (details) {
+                          // Determine swipe direction based on velocity
+                          const swipeThreshold =
+                              100.0; // Minimum velocity to trigger swipe
+                          if (details.primaryVelocity != null) {
+                            if (details.primaryVelocity! > swipeThreshold) {
+                              // Swipe right
+                              widget.onPlatformSwipe!(true);
+                            } else if (details.primaryVelocity! <
+                                -swipeThreshold) {
+                              // Swipe left
+                              widget.onPlatformSwipe!(false);
+                            }
                           }
                         }
-                      }
-                    : null,
+                        : null,
                 child: Stack(
                   children: [
                     ValueListenableBuilder<String?>(
                       valueListenable: widget.chatFilter,
                       builder: (context, filter, child) {
                         final filteredList = _getFilteredComments(filter);
-                        final keyboardHeight = MediaQuery.of(
-                          context,
-                        ).viewInsets.bottom;
+                        final keyboardHeight =
+                            MediaQuery.of(context).viewInsets.bottom;
                         return AnimatedPadding(
                           padding: EdgeInsets.only(bottom: keyboardHeight),
                           duration: const Duration(milliseconds: 100),
@@ -1244,9 +1254,12 @@ height: 20.h,
                                       _openExpandedChatWithEmoji(context);
                                     },
                                     child: SizedBox(
-                                        height: 20.h,
-                                        width: 20.w,
-                                        child: Image.asset('assets/images/smile.png'))
+                                      height: 20.h,
+                                      width: 20.w,
+                                      child: Image.asset(
+                                        'assets/images/smile.png',
+                                      ),
+                                    ),
                                   ),
                                   SizedBox(width: 9.w),
                                   _buildPlatformSelector(null),
@@ -1300,7 +1313,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -1349,54 +1362,55 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                 AnimatedBuilder(
                   animation: _tabController,
                   builder: (context, child) {
-                    final showSearch = _tabController.index > 0;
+                    final showSearch = _tabController.index >= 2;
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       height: showSearch ? 50.h : 0,
-                      child: showSearch
-                          ? Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                12.w,
-                                8.h,
-                                12.w,
-                                4.h,
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14.sp,
+                      child:
+                          showSearch
+                              ? Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  12.w,
+                                  8.h,
+                                  12.w,
+                                  4.h,
                                 ),
-                                decoration: InputDecoration(
-                                  hintText: 'Search emotes...',
-                                  hintStyle: TextStyle(
-                                    color: Colors.white38,
+                                child: TextField(
+                                  controller: _searchController,
+                                  style: TextStyle(
+                                    color: Colors.white,
                                     fontSize: 14.sp,
                                   ),
-                                  prefixIcon: Icon(
-                                    Icons.search,
-                                    color: Colors.white38,
-                                    size: 20.sp,
+                                  decoration: InputDecoration(
+                                    hintText: 'Search emotes...',
+                                    hintStyle: TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 14.sp,
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.search,
+                                      color: Colors.white38,
+                                      size: 20.sp,
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white.withOpacity(0.1),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12.w,
+                                      vertical: 8.h,
+                                    ),
                                   ),
-                                  filled: true,
-                                  fillColor: Colors.white.withOpacity(0.1),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12.r),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 12.w,
-                                    vertical: 8.h,
-                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _searchQuery = value;
+                                    });
+                                  },
                                 ),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _searchQuery = value;
-                                  });
-                                },
-                              ),
-                            )
-                          : const SizedBox.shrink(),
+                              )
+                              : const SizedBox.shrink(),
                     );
                   },
                 ),
@@ -1418,12 +1432,13 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.white54,
                     dividerColor: Colors.transparent,
+                    labelPadding: EdgeInsets.symmetric(horizontal: 4.w),
                     labelStyle: TextStyle(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w600,
                     ),
                     tabs: [
-                      const Tab(text: '😀 Emoji'),
+                      const Tab(text: '😀'),
                       const Tab(text: '⭐ Recent'),
                       Tab(
                         child: Row(
@@ -1442,6 +1457,20 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                           ],
                         ),
                       ),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/images/kick.png',
+                              width: 16.sp,
+                              height: 16.sp,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text('Kick', style: TextStyle(color: kickGreen)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1457,7 +1486,10 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                       // Recent emotes tab
                       _buildRecentEmotesGrid(),
 
-                      // 7TV Emotes tab
+                      // 7TV Emotes tab (Twitch)
+                      _build7TVEmotesGrid(),
+
+                      // Kick Emotes tab (same as Twitch/7TV)
                       _build7TVEmotesGrid(),
                     ],
                   ),
@@ -1599,9 +1631,10 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
       }
 
       // Filter emotes based on search query
-      final emotes = _searchQuery.isEmpty
-          ? widget.emoteService.emoteList.toList()
-          : widget.emoteService.searchEmotes(_searchQuery);
+      final emotes =
+          _searchQuery.isEmpty
+              ? widget.emoteService.emoteList.toList()
+              : widget.emoteService.searchEmotes(_searchQuery);
 
       if (emotes.isEmpty) {
         return Center(
@@ -1644,24 +1677,29 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
               child: CachedNetworkImage(
                 imageUrl: emote.url,
                 fit: BoxFit.contain,
-                placeholder: (context, url) => Center(
-                  child: SizedBox(
-                    width: 16.sp,
-                    height: 16.sp,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: Colors.white24,
+                placeholder:
+                    (context, url) => Center(
+                      child: SizedBox(
+                        width: 16.sp,
+                        height: 16.sp,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: Colors.white24,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Center(
-                  child: Text(
-                    emote.name.length > 2
-                        ? emote.name.substring(0, 2)
-                        : emote.name,
-                    style: TextStyle(color: Colors.white54, fontSize: 10.sp),
-                  ),
-                ),
+                errorWidget:
+                    (context, url, error) => Center(
+                      child: Text(
+                        emote.name.length > 2
+                            ? emote.name.substring(0, 2)
+                            : emote.name,
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 10.sp,
+                        ),
+                      ),
+                    ),
               ),
             ),
           ),

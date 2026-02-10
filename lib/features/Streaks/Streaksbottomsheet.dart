@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -161,11 +160,12 @@ class _StreamStreakSetupBottomSheetState
                             child: Image.asset(
                               'assets/icons/x_icon.png',
                               height: 44.h,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 44.h,
-                              ),
+                              errorBuilder:
+                                  (_, __, ___) => Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 44.h,
+                                  ),
                             ),
                           ),
                           Text(
@@ -224,10 +224,11 @@ class _StreamStreakSetupBottomSheetState
                                         spreadRadius: 20,
                                       ),
                                       BoxShadow(
-                                        color: const Color(0XFFF2B269)
-                                            .withOpacity(
-                                              _opacityAnimation.value * 0.5,
-                                            ),
+                                        color: const Color(
+                                          0XFFF2B269,
+                                        ).withOpacity(
+                                          _opacityAnimation.value * 0.5,
+                                        ),
                                         blurRadius: 30,
                                         spreadRadius: 5,
                                       ),
@@ -274,7 +275,7 @@ class _StreamStreakSetupBottomSheetState
                     ),
                     SizedBox(height: 4.h),
                     Text(
-                      "Setting a streak goals  helps you stay consistent",
+                      "Setting streak goals  helps you stay consistent",
                       style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
                       textAlign: TextAlign.center,
                     ),
@@ -448,13 +449,17 @@ class _StreamStreakSetupBottomSheetState
                     color: selected ? Colors.white : Colors.grey,
                   ),
                   SizedBox(width: 12.w),
-                  Text(
-                    '3-times a week',
-                    style: sfProText400(
-                      17.sp,
-                      selected ? Colors.white : const Color(0xFF8E8E93),
-                    ),
-                  ),
+                  Obx(() {
+                    final count = controller.selectedMenuNumbers.length;
+                    final displayCount = count >= 3 ? count : 3;
+                    return Text(
+                      '$displayCount-times a week',
+                      style: sfProText400(
+                        17.sp,
+                        selected ? Colors.white : const Color(0xFF8E8E93),
+                      ),
+                    );
+                  }),
                 ],
               ),
               CustomSwitch(
@@ -512,10 +517,8 @@ class _StreamStreakSetupBottomSheetState
                   isWeek: true,
                   items: List.generate(7, (i) => '${i + 1}'),
                   onItemSelected: (selected) {
-                    if (controller.selectedMenuNumbers.length == 3) {
-                      if (Navigator.canPop(context)) Navigator.pop(context);
-                      controller.syncMenuToDays();
-                    }
+                    // Real-time sync is now handled in controller
+                    // Popup stays open for user to select 3-7 days
                   },
                 ),
               ),
@@ -534,6 +537,9 @@ class _StreamStreakSetupBottomSheetState
           ),
         );
       },
-    );
+    ).then((_) {
+      // When popup closes, clear selections if less than 3 were selected
+      controller.clearSelectionsIfBelow3();
+    });
   }
 }

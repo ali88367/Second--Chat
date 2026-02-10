@@ -423,22 +423,23 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                       SizedBox(
                         width: 20.w,
                         height: 20.w,
-                        child: _isAllCompleted
-                            ? Image.asset(
-                                'assets/images/check.png',
-                                fit: BoxFit.contain,
-                              )
-                            : CircularProgressIndicator(
-                                value: _completedCount / 4.0,
-                                strokeWidth: 3.0,
-                                color: const Color.fromRGBO(176, 218, 200, 1),
-                                backgroundColor: const Color.fromRGBO(
-                                  120,
-                                  120,
-                                  128,
-                                  0.36,
+                        child:
+                            _isAllCompleted
+                                ? Image.asset(
+                                  'assets/images/check.png',
+                                  fit: BoxFit.contain,
+                                )
+                                : CircularProgressIndicator(
+                                  value: _completedCount / 4.0,
+                                  strokeWidth: 3.0,
+                                  color: const Color.fromRGBO(176, 218, 200, 1),
+                                  backgroundColor: const Color.fromRGBO(
+                                    120,
+                                    120,
+                                    128,
+                                    0.36,
+                                  ),
                                 ),
-                              ),
                       ),
                     ],
                   ),
@@ -628,6 +629,33 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                 ),
                 alignment: Alignment.center,
                 child: Text("Next", style: sfProText600(17.sp, Colors.black)),
+              ),
+            ),
+          ),
+
+        // 3. The Skip Button - Shows only when not all tasks are completed
+        if (!_isAllCompleted)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: () {
+                Get.to(
+                  () => Livestreaming(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.fastOutSlowIn,
+                );
+              },
+              child: Container(
+                height: 52.h,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30.r),
+                ),
+                alignment: Alignment.center,
+                child: Text("Skip", style: sfProText600(17.sp, Colors.black)),
               ),
             ),
           ),

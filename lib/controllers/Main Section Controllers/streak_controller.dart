@@ -3,15 +3,16 @@ import 'package:get/get.dart';
 enum CellType { tick, cross, dot, freeze }
 
 class StreamStreaksController extends GetxController {
-  var selectedDays = <String, bool>{
-    'Mon': false,
-    'Tue': false,
-    'Wed': false,
-    'Thur': false,
-    'Fri': false,
-    'Sat': false,
-    'Sun': false,
-  }.obs;
+  var selectedDays =
+      <String, bool>{
+        'Mon': false,
+        'Tue': false,
+        'Wed': false,
+        'Thur': false,
+        'Fri': false,
+        'Sat': false,
+        'Sun': false,
+      }.obs;
 
   RxBool threeTimesWeek = false.obs;
   RxBool isSelectingThreeDays = false.obs;
@@ -151,18 +152,29 @@ class StreamStreaksController extends GetxController {
 
   void toggleMenuNumber(int number) {
     if (selectedMenuNumbers.contains(number)) {
-      selectedMenuNumbers.remove(number);
+      // Only allow removal if we have more than 3 selected
+      if (selectedMenuNumbers.length > 3) {
+        selectedMenuNumbers.remove(number);
+      }
     } else {
-      if (selectedMenuNumbers.length < 3) selectedMenuNumbers.add(number);
+      // Allow selecting up to 7 days
+      if (selectedMenuNumbers.length < 7) {
+        selectedMenuNumbers.add(number);
+      }
     }
-    if (selectedMenuNumbers.length == 3) {
+
+    // Update threeTimesWeek based on selection count
+    if (selectedMenuNumbers.length >= 3) {
       threeTimesWeek.value = true;
       isSelectingThreeDays.value = false;
-      // syncMenuToDays() called from dialog onItemSelected after pop to avoid lag
     } else {
       threeTimesWeek.value = false;
     }
+
     selectedMenuNumbers.refresh();
+
+    // Sync days in real-time whenever a number is toggled
+    syncMenuToDays();
   }
 
   void toggleDay(String day) {
@@ -180,11 +192,23 @@ class StreamStreaksController extends GetxController {
     } else {
       isSelectingThreeDays.value = false;
       selectedMenuNumbers.clear();
+      selectedDays.updateAll((key, value) => false);
+      selectedDays.refresh();
+    }
+  }
+
+  // Call this when popup is closed to clear selections if less than 3 are selected
+  void clearSelectionsIfBelow3() {
+    if (selectedMenuNumbers.length < 3) {
+      selectedMenuNumbers.clear();
+      selectedDays.updateAll((key, value) => false);
+      selectedDays.refresh();
+      threeTimesWeek.value = false;
+      isSelectingThreeDays.value = false;
     }
   }
 
   void syncMenuToDays() {
-    if (!threeTimesWeek.value) return;
     final dayKeys = selectedDays.keys.toList();
     selectedDays.updateAll((key, value) => false);
     for (final n in selectedMenuNumbers) {
