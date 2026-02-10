@@ -765,7 +765,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       heightFactor: 0.94,
       child: AnimatedPadding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom +
+          bottom:
+              MediaQuery.of(context).viewInsets.bottom +
               MediaQuery.of(context).viewPadding.bottom,
         ),
         duration: const Duration(milliseconds: 300),
@@ -899,7 +900,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                               ),
                               controller: _expandedScrollController,
                               padding: EdgeInsets.only(
-                                bottom: 16.h +
+                                bottom:
+                                    16.h +
                                     20.h +
                                     MediaQuery.of(context).viewPadding.bottom,
                               ),
@@ -1438,7 +1440,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                       fontWeight: FontWeight.w600,
                     ),
                     tabs: [
-                      const Tab(text: '😀'),
+                      const Tab(text: 'Emoji'),
                       const Tab(text: '⭐ Recent'),
                       Tab(
                         child: Row(
