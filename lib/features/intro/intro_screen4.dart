@@ -326,7 +326,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                               ),
                                             ),
                                             // First badge (xmark) - aligns with first feature
-                                            SizedBox(height: 35.h),
+                                            SizedBox(height: 20.h),
                                             Padding(
                                               padding: EdgeInsets.only(
                                                 left: 0.w,
