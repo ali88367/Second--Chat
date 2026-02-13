@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';

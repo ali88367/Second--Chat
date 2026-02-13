@@ -26,7 +26,7 @@ class StreamStreaksController extends GetxController {
 
   final calendarRows = <RxList<CellType>>[
     RxList.of([
-      CellType.tick,
+      CellType.cross,
       CellType.cross,
       CellType.tick,
       CellType.tick,

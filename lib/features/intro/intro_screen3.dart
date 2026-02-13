@@ -36,15 +36,17 @@ class IntroScreen3 extends StatelessWidget {
     final mq = MediaQuery.of(context);
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+
       body: Stack(
         children: [
           // Background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/Background.png',
-              fit: BoxFit.cover,
-            ),
-          ),
+          // Positioned.fill(
+          //   child: Image.asset(
+          //     'assets/images/Background.png',
+          //     fit: BoxFit.cover,
+          //   ),
+          // ),
           Image.asset('assets/images/topbarshade.png', fit: BoxFit.cover),
 
           SafeArea(

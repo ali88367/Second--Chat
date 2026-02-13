@@ -489,7 +489,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                           borderRadius: BorderRadius.circular(36.r),
                           child:
                               tile["title"] == "LED Notifications"
-                                  ? const LedSettingsBottomSheet()
+                                  ?  LedSettingsBottomSheet()
                                   : openAsBottomSheet == "connect"
                                   ? ConnectPlatformSetting()
                                   : PlatformColorSettings(),

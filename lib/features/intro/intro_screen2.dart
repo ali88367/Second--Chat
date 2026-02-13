@@ -52,17 +52,18 @@ class _IntroScreen2State extends State<IntroScreen2> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         children: [
           /// Background
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/Background.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
+          // Container(
+          //   decoration: const BoxDecoration(
+          //     image: DecorationImage(
+          //       image: AssetImage('assets/images/Background.png'),
+          //       fit: BoxFit.cover,
+          //     ),
+          //   ),
+          // ),
           // Top Bar
           Positioned(
             top: 40.h,
