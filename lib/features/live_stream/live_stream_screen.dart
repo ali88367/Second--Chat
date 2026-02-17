@@ -44,6 +44,7 @@ class _LivestreamingState extends State<Livestreaming> {
   bool _isDraggingActivity = false;
   static const double _activityMinHeight = 0.3;
   static const double _activityMaxHeight = 0.65;
+  final ScrollController _activityScrollController = ScrollController();
 
   final List<String> _streamingImages = [
     'assets/images/streaming.png',
@@ -88,6 +89,7 @@ class _LivestreamingState extends State<Livestreaming> {
     _topBarImage.dispose();
     _chatFilter.dispose();
     _currentStreamingIndex.dispose();
+    _activityScrollController.dispose();
     super.dispose();
   }
 
@@ -197,91 +199,138 @@ class _LivestreamingState extends State<Livestreaming> {
                 ? constraints.maxHeight.clamp(originalHeight, maxHeight)
                 : maxHeight;
         final height = clampedHeight.clamp(originalHeight, effectiveMax);
-        return AnimatedContainer(
-          duration: Duration(milliseconds: _isDraggingActivity ? 0 : 250),
-          curve: Curves.easeOut,
-          height: height,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color.fromRGBO(22, 21, 24, 1),
-            borderRadius: BorderRadius.circular(20.r),
-          ),
-          child: Stack(
-            children: [
-              // ─── Scrollable activity rows ───────────────────────
-              Positioned.fill(
-                bottom: 44.h,
-                child: Padding(
-                  padding: EdgeInsets.only(left: 12.w, right: 12.w, top: 12.h),
-                  child: SingleChildScrollView(
-                    physics:
-                        _isDraggingActivity
-                            ? const NeverScrollableScrollPhysics()
-                            : const BouncingScrollPhysics(),
-                    child: Column(
-                      children: [
-                        activityRow(
-                          'assets/images/kick.png',
-                          'New Follower',
-                          '19:41',
-                          '',
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onVerticalDragStart: (_) {
+            setState(() {
+              _isDraggingActivity = true;
+            });
+          },
+          onVerticalDragUpdate: (details) {
+            final delta = details.delta.dy * _activityDragSensitivity;
+            if (delta < 0 && _activityHeight <= originalHeight) {
+              return;
+            }
+            setState(() {
+              _activityHeight = (_activityHeight + delta).clamp(
+                originalHeight,
+                effectiveMax,
+              );
+            });
+          },
+          onVerticalDragEnd: (_) {
+            setState(() {
+              _isDraggingActivity = false;
+            });
+          },
+          onVerticalDragCancel: () {
+            setState(() {
+              _isDraggingActivity = false;
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: _isDraggingActivity ? 0 : 250),
+            curve: Curves.easeOut,
+            height: height,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color.fromRGBO(22, 21, 24, 1),
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            child: Stack(
+              children: [
+                // ─── Scrollable activity rows ───────────────────────
+                Positioned.fill(
+                  bottom: 12.h,
+                  child: ScrollbarTheme(
+                    data: ScrollbarThemeData(
+                      thumbColor: MaterialStateProperty.all(
+                        Colors.grey.shade500,
+                      ),
+                    ),
+                    child: Scrollbar(
+                      controller: _activityScrollController,
+                      thumbVisibility: true,
+                      thickness: 3.w,
+                      radius: Radius.circular(8.r),
+                      scrollbarOrientation: ScrollbarOrientation.right,
+                      child: SingleChildScrollView(
+                        controller: _activityScrollController,
+                        padding: EdgeInsets.only(
+                          left: 12.w,
+                          right: 12.w,
+                          top: 12.h,
                         ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/kick.png',
-                          'New Follower',
-                          '22:41',
-                          '',
+                        physics:
+                            _isDraggingActivity
+                                ? const NeverScrollableScrollPhysics()
+                                : const BouncingScrollPhysics(),
+                        child: Column(
+                          children: [
+                            activityRow(
+                              'assets/images/kick.png',
+                              'New Follower',
+                              '19:41',
+                              '',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/kick.png',
+                              'New Follower',
+                              '22:41',
+                              '',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/kick.png',
+                              'Mega Supporter',
+                              '19:49',
+                              '\$50',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/youtube1.png',
+                              'Fun',
+                              '19:49',
+                              'Subscribed',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/youtube1.png',
+                              'Fun',
+                              '19:49',
+                              'Subscribed',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/twitch1.png',
+                              'Ranen',
+                              '19:49',
+                              'Subscribed',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/kick.png',
+                              'New Follower',
+                              '20:15',
+                              '',
+                            ),
+                            SizedBox(height: 12.h),
+                            activityRow(
+                              'assets/images/twitch1.png',
+                              'SuperFan',
+                              '20:30',
+                              '\$100',
+                            ),
+                            SizedBox(height: 12.h),
+                          ],
                         ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/kick.png',
-                          'Mega Supporter',
-                          '19:49',
-                          '\$50',
-                        ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/youtube1.png',
-                          'Fun',
-                          '19:49',
-                          'Subscribed',
-                        ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/youtube1.png',
-                          'Fun',
-                          '19:49',
-                          'Subscribed',
-                        ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/twitch1.png',
-                          'Ranen',
-                          '19:49',
-                          'Subscribed',
-                        ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/kick.png',
-                          'New Follower',
-                          '20:15',
-                          '',
-                        ),
-                        SizedBox(height: 12.h),
-                        activityRow(
-                          'assets/images/twitch1.png',
-                          'SuperFan',
-                          '20:30',
-                          '\$100',
-                        ),
-                        SizedBox(height: 12.h),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -292,7 +341,7 @@ class _LivestreamingState extends State<Livestreaming> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       backgroundColor: const Color(0xFF0A0A0A),
       body: SafeArea(
         top: false,
@@ -547,67 +596,72 @@ class _LivestreamingState extends State<Livestreaming> {
                                                 currentIndex,
                                                 _,
                                               ) {
-                                                return Stack(
-                                                  children: [
-                                                    CarouselSlider(
-                                                      options: CarouselOptions(
-                                                        height: 226.h,
-                                                        viewportFraction: 1.0,
-                                                        enableInfiniteScroll:
-                                                            false,
-                                                        enlargeCenterPage:
-                                                            false,
-                                                        onPageChanged: (
-                                                          index,
-                                                          reason,
-                                                        ) {
-                                                          _currentStreamingIndex
-                                                              .value = index;
-                                                        },
-                                                      ),
-                                                      items:
-                                                          _streamingImages.map((
-                                                            imagePath,
+                                                return GestureDetector(
+                                                  behavior:
+                                                      HitTestBehavior.opaque,
+                                                  onVerticalDragStart: (_) {},
+                                                  onVerticalDragUpdate: (_) {},
+                                                  onVerticalDragEnd: (_) {},
+                                                  child: Stack(
+                                                    children: [
+                                                      CarouselSlider(
+                                                        options: CarouselOptions(
+                                                          height: 226.h,
+                                                          viewportFraction: 1.0,
+                                                          enableInfiniteScroll:
+                                                              false,
+                                                          enlargeCenterPage:
+                                                              false,
+                                                          onPageChanged: (
+                                                            index,
+                                                            reason,
                                                           ) {
-                                                            return Builder(
-                                                              builder: (
-                                                                BuildContext
-                                                                context,
-                                                              ) {
-                                                                return Container(
-                                                                  width:
-                                                                      MediaQuery.of(
-                                                                        context,
-                                                                      ).size.width,
-                                                                  margin:
-                                                                      EdgeInsets.symmetric(
-                                                                        horizontal:
-                                                                            5.w,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          24.r,
-                                                                        ),
-                                                                  ),
-                                                                  child: ClipRRect(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          24.r,
-                                                                        ),
-                                                                    child: Image.asset(
-                                                                      imagePath,
-                                                                      fit:
-                                                                          BoxFit
-                                                                              .cover,
+                                                            _currentStreamingIndex
+                                                                .value = index;
+                                                          },
+                                                        ),
+                                                        items:
+                                                            _streamingImages.map((
+                                                              imagePath,
+                                                            ) {
+                                                              return Builder(
+                                                                builder: (
+                                                                  BuildContext
+                                                                  context,
+                                                                ) {
+                                                                  return Container(
+                                                                    width:
+                                                                        MediaQuery.of(
+                                                                          context,
+                                                                        ).size.width,
+                                                                    margin: EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          5.w,
                                                                     ),
-                                                                  ),
-                                                                );
-                                                              },
-                                                            );
-                                                          }).toList(),
-                                                    ),
-                                                  ],
+                                                                    decoration: BoxDecoration(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            24.r,
+                                                                          ),
+                                                                    ),
+                                                                    child: ClipRRect(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            24.r,
+                                                                          ),
+                                                                      child: Image.asset(
+                                                                        imagePath,
+                                                                        fit:
+                                                                            BoxFit.cover,
+                                                                      ),
+                                                                    ),
+                                                                  );
+                                                                },
+                                                              );
+                                                            }).toList(),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 );
                                               },
                                             ),
@@ -1154,6 +1208,7 @@ class _LivestreamingState extends State<Livestreaming> {
     BoxConstraints constraints,
   ) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
 
     if (!_isInitialHeightSet) {
       return SizedBox(
@@ -1186,54 +1241,59 @@ class _LivestreamingState extends State<Livestreaming> {
 
     final currentHeight = _bottomSectionHeight.clamp(minHeight, maxHeight);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 100),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
-      height: currentHeight,
-      child: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
-            child: _buildInteractiveCounterRow(),
-          ),
-          Expanded(
-            child: ChatBottomSection(
-              showServiceCard: _showServiceCard,
-              showActivity: _showActivity,
-              selectedPlatform: _selectedPlatform,
-              titleSelected: _titleSelected,
-              chatFilter: _chatFilter,
-              onResize: (delta) {
-                final adjustedDelta = delta * _dragSensitivity;
-                setState(() {
-                  _bottomSectionHeight = (_bottomSectionHeight - adjustedDelta)
-                      .clamp(minHeight, maxHeight);
-                });
-              },
-              onResizeEnd: () {
-                final midHeight = (minHeight + maxHeight) / 2;
-
-                double targetHeight;
-                final distToMin = (_bottomSectionHeight - minHeight).abs();
-                final distToMid = (_bottomSectionHeight - midHeight).abs();
-                final distToMax = (_bottomSectionHeight - maxHeight).abs();
-
-                if (distToMin <= distToMid && distToMin <= distToMax) {
-                  targetHeight = minHeight;
-                } else if (distToMid <= distToMax) {
-                  targetHeight = midHeight;
-                } else {
-                  targetHeight = maxHeight;
-                }
-
-                setState(() {
-                  _bottomSectionHeight = targetHeight;
-                });
-              },
-              onPlatformSwipe: _handlePlatformSwipe,
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+        height: currentHeight,
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
+              child: _buildInteractiveCounterRow(),
             ),
-          ),
-        ],
+            Expanded(
+              child: ChatBottomSection(
+                showServiceCard: _showServiceCard,
+                showActivity: _showActivity,
+                selectedPlatform: _selectedPlatform,
+                titleSelected: _titleSelected,
+                chatFilter: _chatFilter,
+                onResize: (delta) {
+                  final adjustedDelta = delta * _dragSensitivity;
+                  setState(() {
+                    _bottomSectionHeight = (_bottomSectionHeight - adjustedDelta)
+                        .clamp(minHeight, maxHeight);
+                  });
+                },
+                onResizeEnd: () {
+                  final midHeight = (minHeight + maxHeight) / 2;
+
+                  double targetHeight;
+                  final distToMin = (_bottomSectionHeight - minHeight).abs();
+                  final distToMid = (_bottomSectionHeight - midHeight).abs();
+                  final distToMax = (_bottomSectionHeight - maxHeight).abs();
+
+                  if (distToMin <= distToMid && distToMin <= distToMax) {
+                    targetHeight = minHeight;
+                  } else if (distToMid <= distToMax) {
+                    targetHeight = midHeight;
+                  } else {
+                    targetHeight = maxHeight;
+                  }
+
+                  setState(() {
+                    _bottomSectionHeight = targetHeight;
+                  });
+                },
+                onPlatformSwipe: _handlePlatformSwipe,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

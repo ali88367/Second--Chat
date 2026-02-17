@@ -101,18 +101,19 @@ class IntroScreen5 extends StatelessWidget {
                     children: [
                       // Page 0 Image
                       Container(
-                        alignment: Alignment.center,
-                        padding: EdgeInsets.only(bottom: 20.h),
+                        alignment: Alignment.bottomCenter,
+                        // padding: EdgeInsets.only(bottom: 20.h),
                         child: OverflowBox(
-                          maxHeight: 330.h,
+                          maxHeight: 300.h,
                           maxWidth: 420.w,
                           child: Image.asset(
                             'assets/images/secondGlow.png',
                             width: 420.w,
                             height: 360.h,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                SizedBox(width: 280.w, height: 200.h),
+                            errorBuilder:
+                                (_, __, ___) =>
+                                    SizedBox(width: 280.w, height: 200.h),
                           ),
                         ),
                       ),
@@ -125,19 +126,20 @@ class IntroScreen5 extends StatelessWidget {
                           width: 280.w,
                           height: 280.h,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 280.w,
-                            height: 280.h,
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20.r),
-                            ),
-                            child: Icon(
-                              Icons.pets,
-                              size: 100.sp,
-                              color: Colors.orange.withOpacity(0.5),
-                            ),
-                          ),
+                          errorBuilder:
+                              (_, __, ___) => Container(
+                                width: 280.w,
+                                height: 280.h,
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20.r),
+                                ),
+                                child: Icon(
+                                  Icons.pets,
+                                  size: 100.sp,
+                                  color: Colors.orange.withOpacity(0.5),
+                                ),
+                              ),
                         ),
                       ),
                     ],
@@ -196,9 +198,10 @@ class IntroScreen5 extends StatelessWidget {
                                 ),
                               );
                             },
-                            child: controller.currentPage.value == 0
-                                ? _buildSubscriptionContent(controller)
-                                : _buildReferralContent(controller),
+                            child:
+                                controller.currentPage.value == 0
+                                    ? _buildSubscriptionContent(controller)
+                                    : _buildReferralContent(controller),
                           ),
                         ),
 
@@ -349,37 +352,39 @@ class IntroScreen5 extends StatelessWidget {
                 ],
               ),
               child: Center(
-                child: c.isLoading.value
-                    ? SizedBox(
-                        width: 24.w,
-                        height: 24.w,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+                child:
+                    c.isLoading.value
+                        ? SizedBox(
+                          width: 24.w,
+                          height: 24.w,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                        : RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Start Free Trial\n',
+                                style: sfProText600(17.sp, Colors.white),
+                              ),
+                              TextSpan(
+                                text:
+                                    c.selectedPlan.value == 1
+                                        ? 'Then £2.99/year'
+                                        : 'Then £4.99/month',
+                                style: sfProText400(
+                                  12.sp,
+                                  const Color.fromRGBO(0, 0, 0, 0.6),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    : RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Start Free Trial\n',
-                              style: sfProText600(17.sp, Colors.white),
-                            ),
-                            TextSpan(
-                              text: c.selectedPlan.value == 1
-                                  ? 'Then £2.99/year'
-                                  : 'Then £4.99/month',
-                              style: sfProText400(
-                                12.sp,
-                                const Color.fromRGBO(0, 0, 0, 0.6),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
               ),
             ),
           ),
@@ -450,9 +455,10 @@ class IntroScreen5 extends StatelessWidget {
                     children: [
                       Text('Get ', style: sfProText500(18.sp, Colors.white)),
                       ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFFE8B87E), Color(0xFFE89B7E)],
-                        ).createShader(bounds),
+                        shaderCallback:
+                            (bounds) => const LinearGradient(
+                              colors: [Color(0xFFE8B87E), Color(0xFFE89B7E)],
+                            ).createShader(bounds),
                         child: Text(
                           '1 month Free',
                           style: sfProText600(18.sp, Colors.white),

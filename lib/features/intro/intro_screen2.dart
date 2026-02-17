@@ -14,7 +14,6 @@ class LanguageItem {
   LanguageItem(this.code, this.label, this.flag);
 }
 
-
 class IntroScreen2 extends StatefulWidget {
   const IntroScreen2({super.key});
 
@@ -35,10 +34,12 @@ class _IntroScreen2State extends State<IntroScreen2> {
   late LanguageItem selectedLanguage = languages[0];
 
   final List<LanguageItem> languages = [
-    LanguageItem('en', 'Eng', 'assets/images/USA Flag (1).png'),
-    LanguageItem('es', 'Spa', 'assets/images/spain.png'),
-    LanguageItem('fr', 'Fre', 'assets/images/france.png'),
-    LanguageItem('de', 'Ger', 'assets/images/german.png'),
+    LanguageItem('en', 'Eng', 'https://flagcdn.com/w160/us.png'),
+    LanguageItem('es', 'Spa', 'https://flagcdn.com/w160/es.png'),
+    LanguageItem('ar', 'Ara', 'https://flagcdn.com/w160/sa.png'),
+    LanguageItem('pt', 'Por', 'https://flagcdn.com/w160/pt.png'),
+    LanguageItem('de', 'Ger', 'https://flagcdn.com/w160/de.png'),
+    LanguageItem('fr', 'Fre', 'https://flagcdn.com/w160/fr.png'),
   ];
 
   void _preloadScreen3Images(BuildContext context) {
@@ -70,81 +71,89 @@ class _IntroScreen2State extends State<IntroScreen2> {
             right: 2,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: PopupMenuButton<LanguageItem>(
-                offset: const Offset(0, 45),
-                color: const Color.fromRGBO(48, 48, 48, 0.95),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
                 ),
-                onSelected: (lang) {
-                  setState(() {
-                    selectedLanguage = lang;
-                  });
+                child: PopupMenuButton<LanguageItem>(
+                  offset: const Offset(0, 45),
+                  color: const Color.fromRGBO(48, 48, 48, 0.95),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  onSelected: (lang) {
+                    setState(() {
+                      selectedLanguage = lang;
+                    });
 
-                  // TODO: connect localization logic here
-                   Get.updateLocale(Locale(lang.code));
-                },
-                itemBuilder: (context) {
-                  return languages.map((lang) {
-                    return PopupMenuItem<LanguageItem>(
-                      value: lang,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              image: DecorationImage(
-                                image: AssetImage(lang.flag),
-                                fit: BoxFit.cover,
+                    // TODO: connect localization logic here
+                    Get.updateLocale(Locale(lang.code));
+                  },
+                  itemBuilder: (context) {
+                    return languages.map((lang) {
+                      return PopupMenuItem<LanguageItem>(
+                        value: lang,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                image: DecorationImage(
+                                  image: NetworkImage(lang.flag),
+                                  fit: BoxFit.cover,
+                                  filterQuality: FilterQuality.high,
+                                ),
                               ),
                             ),
-                          ),
-                          SizedBox(width: 10),
-                          Text(
-                            lang.label,
-                            style: sfProText400(15.sp, Colors.white),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color.fromRGBO(48, 48, 48, 0.5),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
+                            SizedBox(width: 10),
+                            Text(
+                              lang.label,
+                              style: sfProText400(15.sp, Colors.white),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(48, 48, 48, 0.5),
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           image: DecorationImage(
-                            image: AssetImage(selectedLanguage.flag),
+                            image: NetworkImage(selectedLanguage.flag),
                             fit: BoxFit.cover,
+                            filterQuality: FilterQuality.high,
                           ),
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        selectedLanguage.label,
-                        style: sfProText400(17.sp, Colors.white),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(Icons.keyboard_arrow_down, color: grey, size: 20),
-                    ],
+                        SizedBox(width: 8),
+                        Text(
+                          selectedLanguage.label,
+                          style: sfProText400(17.sp, Colors.white),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down, color: grey, size: 20),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-
 
           /// Glow Effect (20% smaller)
           Positioned(
@@ -172,15 +181,15 @@ class _IntroScreen2State extends State<IntroScreen2> {
             ),
           ),
 
-
           /// Bunny
           Positioned(
             top: 60.h,
             left: 0,
             right: 0,
             child: IgnorePointer(
-                ignoring: true,
-                child: Image.asset('assets/images/bunny.png', height: 300.h)),
+              ignoring: true,
+              child: Image.asset('assets/images/bunny.png', height: 300.h),
+            ),
           ),
 
           /// Titles
@@ -321,15 +330,16 @@ class PlatformButton extends StatelessWidget {
             gradient: gradient,
             color: gradient == null ? color : null,
             borderRadius: BorderRadius.circular(30),
-            boxShadow: _controller.isHover.value
-                ? [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.3),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : [],
+            boxShadow:
+                _controller.isHover.value
+                    ? [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.3),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                    : [],
           ),
           child: ElevatedButton(
             onPressed: () {

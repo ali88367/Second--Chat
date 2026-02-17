@@ -66,6 +66,7 @@ class _StreamStreakSetupBottomSheetState
       _framesPreloaded = true;
     }
   }
+
   void _preloadInitialFrames() {
     for (int i = 1; i <= 30 && i <= totalFrames; i++) {
       final frameNumber = i.toString().padLeft(4, '0');
@@ -237,8 +238,8 @@ class _StreamStreakSetupBottomSheetState
                               ),
                               Image.asset(
                                 'assets/Fire3/frame_mq_$frameNumber.png',
-                                height: 177.h,
-                                width: 177.w,
+                                height: 157.h,
+                                width: 157.w,
                                 fit: BoxFit.contain,
                                 gaplessPlayback: true,
                                 // Optimized cache dimensions for exact size
@@ -267,18 +268,18 @@ class _StreamStreakSetupBottomSheetState
                         },
                       ),
                     ),
-                    SizedBox(height: 6.h),
+                    SizedBox(height: 3.h),
                     Text(
                       "Build a long-term habit",
                       style: sfProDisplay600(22.sp, Colors.white),
                     ),
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 2.h),
                     Text(
                       "Setting streak goals  helps you stay consistent",
                       style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 24.h), // Adjusted spacing
+                    SizedBox(height: 14.h), // Adjusted spacing
                     // Toggles Section
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 20.w),

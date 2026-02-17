@@ -761,14 +761,11 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     BuildContext context,
     StateSetter setSheetState,
   ) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return FractionallySizedBox(
-      heightFactor: 0.94,
+      heightFactor: 1.0,
       child: AnimatedPadding(
-        padding: EdgeInsets.only(
-          bottom:
-              MediaQuery.of(context).viewInsets.bottom +
-              MediaQuery.of(context).viewPadding.bottom,
-        ),
+        padding: EdgeInsets.only(bottom: bottomInset),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         child: Container(
@@ -777,6 +774,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
           ),
           child: SafeArea(
+            bottom: false,
             child: GestureDetector(
               onTap: () {
                 _focusNode.unfocus();
@@ -903,7 +901,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                                 bottom:
                                     16.h +
                                     20.h +
-                                    MediaQuery.of(context).viewPadding.bottom,
+                                    bottomInset,
                               ),
                               itemCount: filteredList.length,
                               reverse: false,
@@ -932,8 +930,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                     ),
                   ),
                   // Input field
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+                  AnimatedPadding(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    padding: EdgeInsets.fromLTRB(
+                      16.w,
+                      8.h,
+                      16.w,
+                      16.h,
+                    ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(25.r),
                       child: BackdropFilter(
