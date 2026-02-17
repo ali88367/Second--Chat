@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:video_player/video_player.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
@@ -12,6 +12,7 @@ import 'core/constants/constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  VideoPlayerController? introVideoController;
 
   // Lock orientation
   await SystemChrome.setPreferredOrientations([
@@ -33,12 +34,26 @@ void main() async {
   Get.put(SettingsController());
   Get.put(StreamStreaksController());
 
-  runApp(const MyApp());
+  // Pre-initialize intro video so first screen does not show a loader.
+  try {
+    introVideoController = VideoPlayerController.asset('assets/intro.mp4');
+    await introVideoController.initialize();
+    introVideoController
+      ..setLooping(true)
+      ..setVolume(0);
+  } catch (_) {
+    await introVideoController?.dispose();
+    introVideoController = null;
+  }
+
+  runApp(MyApp(introVideoController: introVideoController));
 
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.introVideoController});
+
+  final VideoPlayerController? introVideoController;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +183,7 @@ class MyApp extends StatelessWidget {
             scaffoldBackgroundColor: surfaceDark,
           ),
 
-          home: IntroScreen1(),
+          home: IntroScreen1(initialController: introVideoController),
 
           defaultTransition: Transition.cupertino,
           transitionDuration: const Duration(milliseconds: 250),

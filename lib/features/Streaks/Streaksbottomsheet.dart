@@ -26,7 +26,7 @@ class _StreamStreakSetupBottomSheetState
   late Animation<double> _opacityAnimation;
   bool _framesPreloaded = false;
 
-  static const int totalFrames = 119; // Frames from 0001 to 0119
+  static const int totalFrames = 90; // Frames from 0001 to 0119
 
   @override
   void initState() {
@@ -66,24 +66,23 @@ class _StreamStreakSetupBottomSheetState
       _framesPreloaded = true;
     }
   }
-
   void _preloadInitialFrames() {
-    // Preload first 30 frames immediately for instant display
     for (int i = 1; i <= 30 && i <= totalFrames; i++) {
       final frameNumber = i.toString().padLeft(4, '0');
       precacheImage(
-        AssetImage('assets/FIreAnimation2/frame_lq_$frameNumber.png'),
+        // Updated path and prefix
+        AssetImage('assets/Fire3/frame_mq_$frameNumber.png'),
         context,
       );
     }
 
-    // Preload remaining frames in background
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         for (int i = 31; i <= totalFrames; i++) {
           final frameNumber = i.toString().padLeft(4, '0');
           precacheImage(
-            AssetImage('assets/FIreAnimation2/frame_lq_$frameNumber.png'),
+            // Updated path and prefix
+            AssetImage('assets/Fire3/frame_mq_$frameNumber.png'),
             context,
           );
         }
@@ -237,7 +236,7 @@ class _StreamStreakSetupBottomSheetState
                                 ),
                               ),
                               Image.asset(
-                                'assets/FIreAnimation2/frame_lq_$frameNumber.png',
+                                'assets/Fire3/frame_mq_$frameNumber.png',
                                 height: 177.h,
                                 width: 177.w,
                                 fit: BoxFit.contain,
@@ -307,6 +306,18 @@ class _StreamStreakSetupBottomSheetState
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
+                      if (!controller.isThreeTimesSelectionComplete) {
+                        Get.snackbar(
+                          'Pick your days',
+                          'Select exactly ${controller.selectedTimesPerWeek.value} days before continuing.',
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: const Color(0xFF2C2C2E),
+                          colorText: Colors.white,
+                          margin: EdgeInsets.all(12.w),
+                          duration: const Duration(seconds: 2),
+                        );
+                        return;
+                      }
                       Get.back();
                       Get.bottomSheet(
                         const StreakFreezePreviewBottomSheet(),
@@ -450,8 +461,10 @@ class _StreamStreakSetupBottomSheetState
                   ),
                   SizedBox(width: 12.w),
                   Obx(() {
-                    final count = controller.selectedMenuNumbers.length;
-                    final displayCount = count >= 3 ? count : 3;
+                    final displayCount =
+                        controller.selectedTimesPerWeek.value > 0
+                            ? controller.selectedTimesPerWeek.value
+                            : 3;
                     return Text(
                       '$displayCount-times a week',
                       style: sfProText400(
