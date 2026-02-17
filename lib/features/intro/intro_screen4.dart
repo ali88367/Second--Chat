@@ -81,15 +81,17 @@ class _IntroScreen4State extends State<IntroScreen4> {
     final mq = MediaQuery.of(context);
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+
       body: Stack(
         children: [
           // Background Image
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/Background.png',
-              fit: BoxFit.cover,
-            ),
-          ),
+          // Positioned.fill(
+          //   child: Image.asset(
+          //     'assets/images/Background.png',
+          //     fit: BoxFit.cover,
+          //   ),
+          // ),
           Image.asset('assets/images/topbarshade.png', fit: BoxFit.cover),
           // Content
           SafeArea(
@@ -326,7 +328,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                               ),
                                             ),
                                             // First badge (xmark) - aligns with first feature
-                                            SizedBox(height: 35.h),
+                                            SizedBox(height: 23.h),
                                             Padding(
                                               padding: EdgeInsets.only(
                                                 left: 0.w,
@@ -337,7 +339,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 50.h),
                                             // Second badge - aligns with second feature
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -349,7 +351,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 50.h),
                                             // Third badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -361,7 +363,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: false,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Fourth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -373,7 +375,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Fifth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -385,7 +387,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Sixth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -397,7 +399,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Seventh badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -409,7 +411,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Eighth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -421,7 +423,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Ninth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -433,7 +435,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Tenth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -445,7 +447,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Eleventh badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -457,7 +459,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 55.h),
                                             // Twelfth badge
                                             Padding(
                                               padding: EdgeInsets.only(
@@ -505,7 +507,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                 isInfo: true,
                                               ),
                                             ),
-                                            SizedBox(height: 48.h),
+                                            SizedBox(height: 65.h),
                                             // Sixteenth badge (24/7 support)
                                             Padding(
                                               padding: EdgeInsets.only(

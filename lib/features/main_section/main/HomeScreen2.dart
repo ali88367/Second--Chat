@@ -24,6 +24,8 @@ class _HomeScreen2State extends State<HomeScreen2> {
   static const int frozenFireFrames = 95; // FrozenFire frames from 0001 to 0095
   static const int fireAnimation2Frames =
       119; // FIreAnimation2 frames from 0001 to 0119
+  static const int streamStreakFrames =
+      90; // Fire3 frames used in StreamStreakSetupBottomSheet
 
   @override
   void didChangeDependencies() {
@@ -67,7 +69,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
   }
 
   void _preloadAllAnimationFrames() {
-    // Preload first 30 frames of both animations immediately for instant display
+    // Preload first 30 frames of all animations immediately for instant display
     for (int i = 1; i <= 30; i++) {
       final frameNumber = i.toString().padLeft(4, '0');
 
@@ -84,6 +86,14 @@ class _HomeScreen2State extends State<HomeScreen2> {
         final fireFrameNumber = i.toString().padLeft(4, '0');
         precacheImage(
           AssetImage('assets/FIreAnimation2/frame_lq_$fireFrameNumber.png'),
+          context,
+        );
+      }
+
+      // Preload StreamStreak (Fire3) frames
+      if (i <= streamStreakFrames) {
+        precacheImage(
+          AssetImage('assets/Fire3/frame_mq_$frameNumber.png'),
           context,
         );
       }
@@ -106,6 +116,15 @@ class _HomeScreen2State extends State<HomeScreen2> {
           final fireFrameNumber = i.toString().padLeft(4, '0');
           precacheImage(
             AssetImage('assets/FIreAnimation2/frame_lq_$fireFrameNumber.png'),
+            context,
+          );
+        }
+
+        // Preload remaining StreamStreak (Fire3) frames
+        for (int i = 31; i <= streamStreakFrames; i++) {
+          final frameNumber = i.toString().padLeft(4, '0');
+          precacheImage(
+            AssetImage('assets/Fire3/frame_mq_$frameNumber.png'),
             context,
           );
         }

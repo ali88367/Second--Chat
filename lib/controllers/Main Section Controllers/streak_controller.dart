@@ -16,17 +16,23 @@ class StreamStreaksController extends GetxController {
 
   RxBool threeTimesWeek = false.obs;
   RxBool isSelectingThreeDays = false.obs;
+  RxInt selectedTimesPerWeek = 0.obs;
   RxList<int> selectedMenuNumbers = <int>[].obs;
   final List<int> _fullNumberList = [1, 2, 3, 4, 5, 6, 7];
 
   List<int> get availableNumbers =>
       _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
   int get selectedCount => selectedMenuNumbers.length;
-  bool get areDaysDisabled => threeTimesWeek.value;
+  bool get areDaysDisabled => false;
+  int get selectedDaysCount => selectedDays.values.where((v) => v).length;
+  bool get isThreeTimesSelectionComplete =>
+      !threeTimesWeek.value ||
+      (selectedTimesPerWeek.value > 0 &&
+          selectedDaysCount == selectedTimesPerWeek.value);
 
   final calendarRows = <RxList<CellType>>[
     RxList.of([
-      CellType.tick,
+      CellType.cross,
       CellType.cross,
       CellType.tick,
       CellType.tick,
@@ -151,35 +157,42 @@ class StreamStreaksController extends GetxController {
   }
 
   void toggleMenuNumber(int number) {
-    if (selectedMenuNumbers.contains(number)) {
-      // Only allow removal if we have more than 3 selected
-      if (selectedMenuNumbers.length > 3) {
-        selectedMenuNumbers.remove(number);
-      }
+    if (selectedTimesPerWeek.value == number) {
+      selectedTimesPerWeek.value = 0;
+      selectedMenuNumbers.clear();
+      selectedDays.updateAll((key, value) => false);
+      selectedDays.refresh();
     } else {
-      // Allow selecting up to 7 days
-      if (selectedMenuNumbers.length < 7) {
-        selectedMenuNumbers.add(number);
-      }
+      selectedTimesPerWeek.value = number;
+      selectedMenuNumbers.assignAll([number]);
+      selectedDays.updateAll((key, value) => false);
+      selectedDays.refresh();
     }
 
-    // Update threeTimesWeek based on selection count
-    if (selectedMenuNumbers.length >= 3) {
-      threeTimesWeek.value = true;
-      isSelectingThreeDays.value = false;
-    } else {
-      threeTimesWeek.value = false;
-    }
-
+    threeTimesWeek.value = selectedTimesPerWeek.value > 0;
+    isSelectingThreeDays.value = false;
     selectedMenuNumbers.refresh();
-
-    // Sync days in real-time whenever a number is toggled
-    syncMenuToDays();
   }
 
   void toggleDay(String day) {
-    if (areDaysDisabled) return;
-    selectedDays[day] = !selectedDays[day]!;
+    if (!threeTimesWeek.value) {
+      selectedDays[day] = !selectedDays[day]!;
+      selectedDays.refresh();
+      return;
+    }
+
+    final currentlySelected = selectedDays[day] ?? false;
+    final count = selectedDays.values.where((v) => v).length;
+    final maxAllowed = selectedTimesPerWeek.value;
+
+    if (currentlySelected) {
+      selectedDays[day] = false;
+      selectedDays.refresh();
+      return;
+    }
+
+    if (maxAllowed <= 0 || count >= maxAllowed) return;
+    selectedDays[day] = true;
     selectedDays.refresh();
   }
 
@@ -188,10 +201,12 @@ class StreamStreaksController extends GetxController {
     if (value) {
       isSelectingThreeDays.value = true;
       selectedMenuNumbers.clear();
+      selectedTimesPerWeek.value = 0;
       selectedDays.updateAll((key, value) => false);
     } else {
       isSelectingThreeDays.value = false;
       selectedMenuNumbers.clear();
+      selectedTimesPerWeek.value = 0;
       selectedDays.updateAll((key, value) => false);
       selectedDays.refresh();
     }
@@ -199,24 +214,14 @@ class StreamStreaksController extends GetxController {
 
   // Call this when popup is closed to clear selections if less than 3 are selected
   void clearSelectionsIfBelow3() {
-    if (selectedMenuNumbers.length < 3) {
+    if (selectedTimesPerWeek.value <= 0) {
       selectedMenuNumbers.clear();
+      selectedTimesPerWeek.value = 0;
       selectedDays.updateAll((key, value) => false);
       selectedDays.refresh();
       threeTimesWeek.value = false;
       isSelectingThreeDays.value = false;
     }
-  }
-
-  void syncMenuToDays() {
-    final dayKeys = selectedDays.keys.toList();
-    selectedDays.updateAll((key, value) => false);
-    for (final n in selectedMenuNumbers) {
-      if (n > 0 && n <= dayKeys.length) {
-        selectedDays[dayKeys[n - 1]] = true;
-      }
-    }
-    selectedDays.refresh();
   }
 
   List<List<int>> getTickGroups(List<CellType> row) {

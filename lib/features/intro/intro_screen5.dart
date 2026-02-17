@@ -16,15 +16,17 @@ class IntroScreen5 extends StatelessWidget {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+
       body: Stack(
         children: [
           // Background Image
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/Background.png',
-              fit: BoxFit.cover,
-            ),
-          ),
+          // Positioned.fill(
+          //   child: Image.asset(
+          //     'assets/images/Background.png',
+          //     fit: BoxFit.cover,
+          //   ),
+          // ),
           Image.asset('assets/images/topbarshade.png', fit: BoxFit.cover),
           // Bottom rotated shade
           Positioned(

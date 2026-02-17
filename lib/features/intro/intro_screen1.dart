@@ -1,33 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../core/constants/app_images/app_images.dart';
 import 'intro_screen2.dart';
 
 class IntroScreen1 extends StatefulWidget {
-  const IntroScreen1({super.key});
+  const IntroScreen1({super.key, this.initialController});
+
+  final VideoPlayerController? initialController;
 
   @override
   State<IntroScreen1> createState() => _IntroScreen1State();
 }
 
 class _IntroScreen1State extends State<IntroScreen1> {
+  VideoPlayerController? _controller;
+  bool _videoFailed = false;
+
   @override
   void initState() {
     super.initState();
-    // Preload Screen 3 images in background
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _preloadScreen3Images(context);
-    });
+    _controller = widget.initialController;
+    if (_controller == null) {
+      _initializeVideo();
+    } else {
+      _controller!
+        ..setLooping(true)
+        ..setVolume(0)
+        ..play();
+    }
   }
 
-  void _preloadScreen3Images(BuildContext context) {
-    // Preload all images used in Screen 3
-    precacheImage(const AssetImage('assets/images/Background.png'), context);
-    precacheImage(const AssetImage('assets/images/topbarshade.png'), context);
-    precacheImage(const AssetImage('assets/images/glowintro.png'), context);
-    precacheImage(const AssetImage('assets/images/trial.png'), context);
+  Future<void> _initializeVideo() async {
+    final controller = VideoPlayerController.asset('assets/intro.mp4');
+
+    try {
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      controller
+        ..setLooping(true)
+        ..setVolume(0)
+        ..play();
+
+      setState(() {
+        _controller = controller;
+        _videoFailed = false;
+      });
+    } catch (_) {
+      await controller.dispose();
+      if (!mounted) return;
+
+      setState(() {
+        _videoFailed = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
   }
 
   @override
@@ -38,46 +76,52 @@ class _IntroScreen1State extends State<IntroScreen1> {
         top: false,
         child: Stack(
           children: [
-            Container(
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/images/ani.gif'),
-                  fit: BoxFit.contain,
+
+            Positioned.fill(
+              child: _controller?.value.isInitialized == true
+                  ? FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller!.value.size.width,
+                  height: _controller!.value.size.height,
+                  child: VideoPlayer(_controller!),
+                ),
+              )
+                  : _videoFailed
+                          ? Container(
+                              color: Colors.black,
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'Video failed to load',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            )
+                          : Container(color: Colors.black),
+            ),
+
+            /// Yellow Glow Overlay
+            Positioned(
+              top: -200.h,
+              left: -110.w,
+              child: Container(
+                width: 400,
+                height: 400,
+                decoration: const BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.6,
+                    colors: [
+                      Color.fromRGBO(246, 246, 146, 0.3),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
             ),
-            Stack(
-              children: [
-                // Base background
-                Container(
-                  //   color: Colors.black,
-                ),
 
-                // Yellow smog / glow (top-right)
-                Positioned(
-                  top: -200.h,
-                  left: -110.w,
-                  child: Container(
-                    width: 400,
-                    height: 400,
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment.center,
-                        radius: 0.6,
-                        colors: [
-                          const Color.fromRGBO(246, 246, 146, 0.5), // soft yellow
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // UI content
+            /// Logo
             Positioned(
-              bottom: 90.h,
+              bottom: 120.h,
               left: 0,
               right: 0,
               child: SizedBox(
@@ -87,25 +131,25 @@ class _IntroScreen1State extends State<IntroScreen1> {
               ),
             ),
 
+            /// Get Started Button
             Positioned(
-              bottom: 20.h,
-              left: 16.w,
-              right: 16.w,
+              bottom: 40.h,
+              left: 24.w,
+              right: 24.w,
               child: GestureDetector(
                 onTap: () {
                   Get.to(
-                    () => IntroScreen2(),
+                        () => const IntroScreen2(),
                     transition: Transition.cupertino,
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.fastOutSlowIn,
                   );
                 },
                 child: Container(
-                  height: 52.h,
-                  //  padding: const EdgeInsets.symmetric(horizontal: 25),
+                  height: 56.h,
                   decoration: BoxDecoration(
-                    color: Colors.white, // button color
-                    borderRadius: BorderRadius.circular(36),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(36.r),
                   ),
                   alignment: Alignment.center,
                   child: const Text(

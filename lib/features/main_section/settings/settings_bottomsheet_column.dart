@@ -489,7 +489,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                           borderRadius: BorderRadius.circular(36.r),
                           child:
                               tile["title"] == "LED Notifications"
-                                  ? const LedSettingsBottomSheet()
+                                  ?  LedSettingsBottomSheet()
                                   : openAsBottomSheet == "connect"
                                   ? ConnectPlatformSetting()
                                   : PlatformColorSettings(),
@@ -704,10 +704,10 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                               width: double.infinity,
                               padding: EdgeInsets.symmetric(vertical: 12.h),
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
+                                gradient:  LinearGradient(
                                   colors: [
-                                    Color(0xFF4CAF50),
-                                    Color(0xFF2E7D32),
+                                    beige,
+                                    beige,
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(14.r),
