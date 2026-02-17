@@ -1,4 +1,5 @@
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -38,6 +39,7 @@ class _LivestreamingState extends State<Livestreaming> {
   double _initialHeight = 0;
   bool _isInitialHeightSet = false;
   static const double _dragSensitivity = 1.8;
+  final Map<String, double> _lastLayoutLogs = {};
 
   // ── Activity section state ──────────────────────────────────────────
   double _activityHeight = 0;
@@ -112,6 +114,20 @@ class _LivestreamingState extends State<Livestreaming> {
       final prevIndex =
           (currentIndex - 1 + platforms.length) % platforms.length;
       _chatFilter.value = platforms[prevIndex];
+    }
+  }
+
+  void _log(String message) {
+    if (kDebugMode) {
+      debugPrint('[LiveStreamScreen] $message');
+    }
+  }
+
+  void _logValueChange(String key, double value) {
+    final prev = _lastLayoutLogs[key];
+    if (prev == null || (prev - value).abs() > 0.5) {
+      _lastLayoutLogs[key] = value;
+      _log('$key=$value');
     }
   }
 
@@ -1209,6 +1225,8 @@ class _LivestreamingState extends State<Livestreaming> {
   ) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    _logValueChange('layout.bottomInset', bottomInset);
+    _logValueChange('layout.keyboardInset', keyboardInset);
 
     if (!_isInitialHeightSet) {
       return SizedBox(
@@ -1240,60 +1258,56 @@ class _LivestreamingState extends State<Livestreaming> {
     final maxHeight = screenHeight - 122.h - bottomGap.h - 12.h - bottomInset;
 
     final currentHeight = _bottomSectionHeight.clamp(minHeight, maxHeight);
+    _logValueChange('layout.currentHeight', currentHeight);
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 200),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 100),
       curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: keyboardInset),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-        height: currentHeight,
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
-              child: _buildInteractiveCounterRow(),
+      height: currentHeight,
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
+            child: _buildInteractiveCounterRow(),
+          ),
+          Expanded(
+            child: ChatBottomSection(
+              showServiceCard: _showServiceCard,
+              showActivity: _showActivity,
+              selectedPlatform: _selectedPlatform,
+              titleSelected: _titleSelected,
+              chatFilter: _chatFilter,
+              onResize: (delta) {
+                final adjustedDelta = delta * _dragSensitivity;
+                setState(() {
+                  _bottomSectionHeight = (_bottomSectionHeight - adjustedDelta)
+                      .clamp(minHeight, maxHeight);
+                });
+              },
+              onResizeEnd: () {
+                final midHeight = (minHeight + maxHeight) / 2;
+
+                double targetHeight;
+                final distToMin = (_bottomSectionHeight - minHeight).abs();
+                final distToMid = (_bottomSectionHeight - midHeight).abs();
+                final distToMax = (_bottomSectionHeight - maxHeight).abs();
+
+                if (distToMin <= distToMid && distToMin <= distToMax) {
+                  targetHeight = minHeight;
+                } else if (distToMid <= distToMax) {
+                  targetHeight = midHeight;
+                } else {
+                  targetHeight = maxHeight;
+                }
+
+                setState(() {
+                  _bottomSectionHeight = targetHeight;
+                });
+              },
+              onPlatformSwipe: _handlePlatformSwipe,
             ),
-            Expanded(
-              child: ChatBottomSection(
-                showServiceCard: _showServiceCard,
-                showActivity: _showActivity,
-                selectedPlatform: _selectedPlatform,
-                titleSelected: _titleSelected,
-                chatFilter: _chatFilter,
-                onResize: (delta) {
-                  final adjustedDelta = delta * _dragSensitivity;
-                  setState(() {
-                    _bottomSectionHeight = (_bottomSectionHeight - adjustedDelta)
-                        .clamp(minHeight, maxHeight);
-                  });
-                },
-                onResizeEnd: () {
-                  final midHeight = (minHeight + maxHeight) / 2;
-
-                  double targetHeight;
-                  final distToMin = (_bottomSectionHeight - minHeight).abs();
-                  final distToMid = (_bottomSectionHeight - midHeight).abs();
-                  final distToMax = (_bottomSectionHeight - maxHeight).abs();
-
-                  if (distToMin <= distToMid && distToMin <= distToMax) {
-                    targetHeight = minHeight;
-                  } else if (distToMid <= distToMax) {
-                    targetHeight = midHeight;
-                  } else {
-                    targetHeight = maxHeight;
-                  }
-
-                  setState(() {
-                    _bottomSectionHeight = targetHeight;
-                  });
-                },
-                onPlatformSwipe: _handlePlatformSwipe,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -39,7 +41,8 @@ class ChatBottomSection extends StatefulWidget {
   State<ChatBottomSection> createState() => _ChatBottomSectionState();
 }
 
-class _ChatBottomSectionState extends State<ChatBottomSection> {
+class _ChatBottomSectionState extends State<ChatBottomSection>
+    with WidgetsBindingObserver {
   // Platform assets and colors
   static const List<String> platforms = [
     'assets/images/twitch1.png',
@@ -76,6 +79,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
   // Flag to prevent emoji picker from showing multiple times
   bool _emojiPickerScheduled = false;
+  final Map<String, double> _lastInsetLogs = {};
+  double _keyboardInset = 0.0;
 
   // Unicode emojis list
   static const List<String> _emojis = [
@@ -164,6 +169,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Initialize or get existing EmoteService
     _emoteService = Get.put(EmoteService());
@@ -227,6 +233,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       _scrollToBottom(_mainScrollController, animate: false);
       _scrollToBottom(_expandedScrollController, animate: false);
     });
+
+    _focusNode.addListener(_onFocusChanged);
+    _log('initState completed');
   }
 
   /// Update the emote parser when emotes change
@@ -242,11 +251,50 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
     _mainScrollController.dispose();
     _expandedScrollController.dispose();
     _focusNode.dispose();
+    _log('dispose called');
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final view = WidgetsBinding.instance.platformDispatcher.views.first;
+    final keyboardInset = view.viewInsets.bottom / view.devicePixelRatio;
+    _keyboardInset = keyboardInset;
+    _logInsetChange('metrics.keyboardInset', keyboardInset);
+    if (mounted) {
+      setState(() {});
+      _expandedSheetStateSetter?.call(() {});
+    }
+  }
+
+  void _onFocusChanged() {
+    final inset = MediaQuery.maybeOf(context)?.viewInsets.bottom ?? 0.0;
+    _log(
+      'focus changed: hasFocus=${_focusNode.hasFocus}, '
+      'hasPrimaryFocus=${_focusNode.hasPrimaryFocus}, '
+      'keyboardInset.mediaQuery=$inset, keyboardInset.metrics=$_keyboardInset',
+    );
+  }
+
+  void _log(String message) {
+    if (kDebugMode) {
+      debugPrint('[ChatBottomSection] $message');
+    }
+  }
+
+  void _logInsetChange(String key, double value) {
+    final prev = _lastInsetLogs[key];
+    if (prev == null || (prev - value).abs() > 0.5) {
+      _lastInsetLogs[key] = value;
+      _log('$key=$value');
+    }
   }
 
   void _scrollToBottom(ScrollController controller, {bool animate = true}) {
@@ -702,6 +750,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
 
   /// Opens expanded chat normally (without emoji picker)
   void _openExpandedChat(BuildContext context) {
+    _log('openExpandedChat called');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -718,13 +767,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
       },
     ).whenComplete(() {
       _expandedSheetStateSetter = null;
+      _log('expanded sheet closed');
     });
+    _log('expanded sheet opened');
   }
 
   /// Opens expanded chat and automatically shows emoji picker (only once)
   void _openExpandedChatWithEmoji(BuildContext context) {
     // Reset the flag before opening
     _emojiPickerScheduled = false;
+    _log('openExpandedChatWithEmoji called');
 
     showModalBottomSheet(
       context: context,
@@ -753,7 +805,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     ).whenComplete(() {
       _expandedSheetStateSetter = null;
       _emojiPickerScheduled = false;
+      _log('expanded sheet (emoji mode) closed');
     });
+    _log('expanded sheet (emoji mode) opened');
   }
 
   /// Builds the expanded chat content (shared between normal and emoji-trigger open)
@@ -761,27 +815,27 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
     BuildContext context,
     StateSetter setSheetState,
   ) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final keyboardInset = math.max(
+      MediaQuery.of(context).viewInsets.bottom,
+      _keyboardInset,
+    );
+    _logInsetChange('expanded.keyboardInset', keyboardInset);
     return FractionallySizedBox(
       heightFactor: 1.0,
-      child: AnimatedPadding(
-        padding: EdgeInsets.only(bottom: bottomInset),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        child: Container(
-          decoration: BoxDecoration(
-            color: black,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: GestureDetector(
-              onTap: () {
-                _focusNode.unfocus();
-              },
-              behavior: HitTestBehavior.opaque,
-              child: Column(
-                children: [
+      child: Container(
+        decoration: BoxDecoration(
+          color: black,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: GestureDetector(
+            onTap: () {
+              _focusNode.unfocus();
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              children: [
                   SizedBox(height: 10.h),
                   Container(
                     width: 40.w,
@@ -898,10 +952,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                               ),
                               controller: _expandedScrollController,
                               padding: EdgeInsets.only(
-                                bottom:
-                                    16.h +
-                                    20.h +
-                                    bottomInset,
+                                bottom: 16.h + 20.h,
                               ),
                               itemCount: filteredList.length,
                               reverse: false,
@@ -937,7 +988,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       16.w,
                       8.h,
                       16.w,
-                      16.h,
+                      16.h + keyboardInset,
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(25.r),
@@ -1018,8 +1069,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       ),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
@@ -1163,8 +1213,11 @@ class _ChatBottomSectionState extends State<ChatBottomSection> {
                       valueListenable: widget.chatFilter,
                       builder: (context, filter, child) {
                         final filteredList = _getFilteredComments(filter);
-                        final keyboardHeight =
-                            MediaQuery.of(context).viewInsets.bottom;
+                        final keyboardHeight = math.max(
+                          MediaQuery.of(context).viewInsets.bottom,
+                          _keyboardInset,
+                        );
+                        _logInsetChange('main.keyboardInset', keyboardHeight);
                         return AnimatedPadding(
                           padding: EdgeInsets.only(bottom: keyboardHeight),
                           duration: const Duration(milliseconds: 100),
