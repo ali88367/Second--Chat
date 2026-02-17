@@ -174,7 +174,9 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   // ── Resizable activity container ────────────────────────────────────
-  Widget _buildResizableActivityContainer() {
+  static const double _activityDragSensitivity = 1.5;
+
+  Widget _buildResizableActivityContainer(BuildContext context) {
     final double screenHeight = Get.height;
     final double originalHeight = screenHeight * _activityMinHeight;
     final double maxHeight = screenHeight * _activityMaxHeight;
@@ -188,164 +190,101 @@ class _LivestreamingState extends State<Livestreaming> {
       maxHeight,
     );
 
-    return AnimatedContainer(
-      duration: Duration(milliseconds: _isDraggingActivity ? 0 : 250),
-      curve: Curves.easeOut,
-      height: clampedHeight,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color.fromRGBO(22, 21, 24, 1),
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Stack(
-        children: [
-          // ─── Scrollable activity rows ───────────────────────
-          Positioned.fill(
-            bottom: 44.h,
-            child: Padding(
-              padding: EdgeInsets.only(left: 12.w, right: 12.w, top: 12.h),
-              child: SingleChildScrollView(
-                physics:
-                _isDraggingActivity
-                    ? const NeverScrollableScrollPhysics()
-                    : const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    activityRow(
-                      'assets/images/kick.png',
-                      'New Follower',
-                      '19:41',
-                      '',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/kick.png',
-                      'New Follower',
-                      '22:41',
-                      '',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/kick.png',
-                      'Mega Supporter',
-                      '19:49',
-                      '\$50',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/youtube1.png',
-                      'Fun',
-                      '19:49',
-                      'Subscribed',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/youtube1.png',
-                      'Fun',
-                      '19:49',
-                      'Subscribed',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/twitch1.png',
-                      'Ranen',
-                      '19:49',
-                      'Subscribed',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/kick.png',
-                      'New Follower',
-                      '20:15',
-                      '',
-                    ),
-                    SizedBox(height: 12.h),
-                    activityRow(
-                      'assets/images/twitch1.png',
-                      'SuperFan',
-                      '20:30',
-                      '\$100',
-                    ),
-                    SizedBox(height: 12.h),
-                  ],
-                ),
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final effectiveMax =
+            constraints.maxHeight.isFinite && constraints.maxHeight > 0
+                ? constraints.maxHeight.clamp(originalHeight, maxHeight)
+                : maxHeight;
+        final height = clampedHeight.clamp(originalHeight, effectiveMax);
+        return AnimatedContainer(
+          duration: Duration(milliseconds: _isDraggingActivity ? 0 : 250),
+          curve: Curves.easeOut,
+          height: height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color.fromRGBO(22, 21, 24, 1),
+            borderRadius: BorderRadius.circular(20.r),
           ),
-
-          // ─── Pull-down drag handle at the bottom ─────────────
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: RawGestureDetector(
-              gestures: <Type, GestureRecognizerFactory>{
-                _EagerVerticalDragGestureRecognizer:
-                GestureRecognizerFactoryWithHandlers<
-                    _EagerVerticalDragGestureRecognizer
-                >(() => _EagerVerticalDragGestureRecognizer(), (
-                    _EagerVerticalDragGestureRecognizer instance,
-                    ) {
-                  instance
-                    ..onStart = (_) {
-                      setState(() => _isDraggingActivity = true);
-                    }
-                    ..onUpdate = (details) {
-                      setState(() {
-                        _activityHeight = (_activityHeight +
-                            details.delta.dy)
-                            .clamp(originalHeight, maxHeight);
-                      });
-                    }
-                    ..onEnd = (_) {
-                      setState(() => _isDraggingActivity = false);
-                    }
-                    ..onCancel = () {
-                      setState(() => _isDraggingActivity = false);
-                    };
-                }),
-              },
-              child: Container(
-                width: double.infinity,
-                height: 44.h,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color.fromRGBO(22, 21, 24, 0.0),
-                      const Color.fromRGBO(22, 21, 24, 1.0),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(20.r),
-                    bottomRight: Radius.circular(20.r),
+          child: Stack(
+            children: [
+              // ─── Scrollable activity rows ───────────────────────
+              Positioned.fill(
+                bottom: 44.h,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 12.w, right: 12.w, top: 12.h),
+                  child: SingleChildScrollView(
+                    physics:
+                        _isDraggingActivity
+                            ? const NeverScrollableScrollPhysics()
+                            : const BouncingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        activityRow(
+                          'assets/images/kick.png',
+                          'New Follower',
+                          '19:41',
+                          '',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/kick.png',
+                          'New Follower',
+                          '22:41',
+                          '',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/kick.png',
+                          'Mega Supporter',
+                          '19:49',
+                          '\$50',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/youtube1.png',
+                          'Fun',
+                          '19:49',
+                          'Subscribed',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/youtube1.png',
+                          'Fun',
+                          '19:49',
+                          'Subscribed',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/twitch1.png',
+                          'Ranen',
+                          '19:49',
+                          'Subscribed',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/kick.png',
+                          'New Follower',
+                          '20:15',
+                          '',
+                        ),
+                        SizedBox(height: 12.h),
+                        activityRow(
+                          'assets/images/twitch1.png',
+                          'SuperFan',
+                          '20:30',
+                          '\$100',
+                        ),
+                        SizedBox(height: 12.h),
+                      ],
+                    ),
                   ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 48.w,
-                      height: 5.h,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(3.r),
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: Colors.white.withOpacity(0.4),
-                      size: 18.sp,
-                    ),
-                  ],
-                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -388,13 +327,14 @@ class _LivestreamingState extends State<Livestreaming> {
                             if (filter == 'twitch') {
                               filterColor =
                                   _settingsCtrl.twitchColor.value ??
-                                      twitchPurple;
+                                  twitchPurple;
                             } else if (filter == 'kick') {
                               filterColor =
                                   _settingsCtrl.kickColor.value ?? kickGreen;
                             } else if (filter == 'youtube') {
                               filterColor =
-                                  _settingsCtrl.youtubeColor.value ?? youtubeRed;
+                                  _settingsCtrl.youtubeColor.value ??
+                                  youtubeRed;
                             } else {
                               filterColor = Colors.transparent;
                             }
@@ -542,22 +482,22 @@ class _LivestreamingState extends State<Livestreaming> {
                             final spacing = 12.h;
                             final bottomPadding =
                                 16.h +
-                                    MediaQuery.of(context).viewPadding.bottom;
+                                MediaQuery.of(context).viewPadding.bottom;
                             final upperSectionHeight = 236.h + spacing;
                             final counterRowHeight = 59.4.h + 24.h;
                             final availableHeight =
                                 screenHeight - topPadding - bottomPadding;
                             final calculatedHeight =
                                 availableHeight -
-                                    upperSectionHeight -
-                                    spacing -
-                                    counterRowHeight;
+                                upperSectionHeight -
+                                spacing -
+                                counterRowHeight;
                             final initialBottomHeight = calculatedHeight * 1.4;
                             setState(() {
                               _initialHeight =
-                              initialBottomHeight > 200.h
-                                  ? initialBottomHeight
-                                  : 200.h;
+                                  initialBottomHeight > 200.h
+                                      ? initialBottomHeight
+                                      : 200.h;
                               _bottomSectionHeight = _initialHeight;
                               _isInitialHeightSet = true;
                             });
@@ -574,99 +514,105 @@ class _LivestreamingState extends State<Livestreaming> {
 
                           // ── Upper section ──
                           Flexible(
-                            child: SingleChildScrollView(
-                              physics:
-                              _isDraggingActivity
-                                  ? const NeverScrollableScrollPhysics()
-                                  : const ClampingScrollPhysics(),
-                              padding: EdgeInsets.only(
-                                bottom:
-                                MediaQuery.of(context).viewPadding.bottom,
-                              ),
-                              child: ValueListenableBuilder<bool>(
-                                valueListenable: _showServiceCard,
-                                builder: (context, showCard, child) {
-                                  if (!showCard) {
-                                    return Column(
-                                      children: [
-                                        ValueListenableBuilder<int>(
-                                          valueListenable:
-                                          _currentStreamingIndex,
-                                          builder: (context, currentIndex, _) {
-                                            return Stack(
-                                              children: [
-                                                CarouselSlider(
-                                                  options: CarouselOptions(
-                                                    height: 226.h,
-                                                    viewportFraction: 1.0,
-                                                    enableInfiniteScroll: false,
-                                                    enlargeCenterPage: false,
-                                                    onPageChanged: (
-                                                        index,
-                                                        reason,
+                            child: ValueListenableBuilder<bool>(
+                              valueListenable: _showActivity,
+                              builder: (context, showActivity, _) {
+                                if (showActivity) {
+                                  return _buildResizableActivityContainer(
+                                    context,
+                                  );
+                                }
+                                return SingleChildScrollView(
+                                  physics:
+                                      _isDraggingActivity
+                                          ? const NeverScrollableScrollPhysics()
+                                          : const ClampingScrollPhysics(),
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        MediaQuery.of(
+                                          context,
+                                        ).viewPadding.bottom,
+                                  ),
+                                  child: ValueListenableBuilder<bool>(
+                                    valueListenable: _showServiceCard,
+                                    builder: (context, showCard, child) {
+                                      if (!showCard) {
+                                        return Column(
+                                          children: [
+                                            ValueListenableBuilder<int>(
+                                              valueListenable:
+                                                  _currentStreamingIndex,
+                                              builder: (
+                                                context,
+                                                currentIndex,
+                                                _,
+                                              ) {
+                                                return Stack(
+                                                  children: [
+                                                    CarouselSlider(
+                                                      options: CarouselOptions(
+                                                        height: 226.h,
+                                                        viewportFraction: 1.0,
+                                                        enableInfiniteScroll:
+                                                            false,
+                                                        enlargeCenterPage:
+                                                            false,
+                                                        onPageChanged: (
+                                                          index,
+                                                          reason,
                                                         ) {
-                                                      _currentStreamingIndex
-                                                          .value = index;
-                                                    },
-                                                  ),
-                                                  items:
-                                                  _streamingImages.map((
-                                                      imagePath,
-                                                      ) {
-                                                    return Builder(
-                                                      builder: (
-                                                          BuildContext
-                                                          context,
+                                                          _currentStreamingIndex
+                                                              .value = index;
+                                                        },
+                                                      ),
+                                                      items:
+                                                          _streamingImages.map((
+                                                            imagePath,
                                                           ) {
-                                                        return Container(
-                                                          width:
-                                                          MediaQuery.of(
-                                                            context,
-                                                          ).size.width,
-                                                          margin: EdgeInsets
-                                                              .symmetric(
-                                                            horizontal:
-                                                            5.w,
-                                                          ),
-                                                          decoration:
-                                                          BoxDecoration(
-                                                            borderRadius:
-                                                            BorderRadius.circular(
-                                                              24.r,
-                                                            ),
-                                                          ),
-                                                          child: ClipRRect(
-                                                            borderRadius:
-                                                            BorderRadius.circular(
-                                                              24.r,
-                                                            ),
-                                                            child:
-                                                            Image.asset(
-                                                              imagePath,
-                                                              fit:
-                                                              BoxFit
-                                                                  .cover,
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                    );
-                                                  }).toList(),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  }
-
-                                  return ValueListenableBuilder<bool>(
-                                    valueListenable: _showActivity,
-                                    builder: (context, showActivity, _) {
-                                      // ── ACTIVITY SECTION ──
-                                      if (showActivity) {
-                                        return _buildResizableActivityContainer();
+                                                            return Builder(
+                                                              builder: (
+                                                                BuildContext
+                                                                context,
+                                                              ) {
+                                                                return Container(
+                                                                  width:
+                                                                      MediaQuery.of(
+                                                                        context,
+                                                                      ).size.width,
+                                                                  margin:
+                                                                      EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            5.w,
+                                                                      ),
+                                                                  decoration: BoxDecoration(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          24.r,
+                                                                        ),
+                                                                  ),
+                                                                  child: ClipRRect(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          24.r,
+                                                                        ),
+                                                                    child: Image.asset(
+                                                                      imagePath,
+                                                                      fit:
+                                                                          BoxFit
+                                                                              .cover,
+                                                                    ),
+                                                                  ),
+                                                                );
+                                                              },
+                                                            );
+                                                          }).toList(),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        );
                                       }
 
                                       return ValueListenableBuilder<bool>(
@@ -674,102 +620,100 @@ class _LivestreamingState extends State<Livestreaming> {
                                         builder: (context, titleSelected, _) {
                                           if (titleSelected) {
                                             return ValueListenableBuilder<
-                                                String?
+                                              String?
                                             >(
-                                              valueListenable: _selectedPlatform,
+                                              valueListenable:
+                                                  _selectedPlatform,
                                               builder: (context, platform, _) {
                                                 if (platform != null) {
                                                   final asset =
-                                                  platform == 'twitch'
-                                                      ? 'assets/images/twitch1.png'
-                                                      : platform == 'kick'
-                                                      ? 'assets/images/kick.png'
-                                                      : 'assets/images/youtube1.png';
+                                                      platform == 'twitch'
+                                                          ? 'assets/images/twitch1.png'
+                                                          : platform == 'kick'
+                                                          ? 'assets/images/kick.png'
+                                                          : 'assets/images/youtube1.png';
 
                                                   return Column(
                                                     children: [
                                                       Container(
                                                         width: double.infinity,
                                                         padding:
-                                                        EdgeInsets.symmetric(
-                                                          horizontal: 12.w,
-                                                          vertical: 12.h,
-                                                        ),
-                                                        decoration:
-                                                        BoxDecoration(
+                                                            EdgeInsets.symmetric(
+                                                              horizontal: 12.w,
+                                                              vertical: 12.h,
+                                                            ),
+                                                        decoration: BoxDecoration(
                                                           color: black,
                                                           borderRadius:
-                                                          BorderRadius.circular(
-                                                            20.r,
-                                                          ),
+                                                              BorderRadius.circular(
+                                                                20.r,
+                                                              ),
                                                         ),
                                                         child: Column(
                                                           children: [
                                                             Padding(
-                                                              padding: EdgeInsets
-                                                                  .symmetric(
-                                                                horizontal:
-                                                                8.w,
-                                                              ),
+                                                              padding:
+                                                                  EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8.w,
+                                                                  ),
                                                               child: Row(
                                                                 children: [
                                                                   GestureDetector(
                                                                     onTap: () {
                                                                       _selectedPlatform
-                                                                          .value =
-                                                                      null;
+                                                                              .value =
+                                                                          null;
                                                                       _showServiceCard
-                                                                          .value =
-                                                                      false;
+                                                                              .value =
+                                                                          false;
                                                                       _titleSelected
-                                                                          .value =
-                                                                      false;
+                                                                              .value =
+                                                                          false;
                                                                       _showActivity
-                                                                          .value =
-                                                                      false;
+                                                                              .value =
+                                                                          false;
                                                                       _activityHeight =
-                                                                      0;
+                                                                          0;
                                                                       _isDraggingActivity =
-                                                                      false;
+                                                                          false;
                                                                     },
-                                                                    child:
-                                                                    Container(
+                                                                    child: Container(
                                                                       padding:
-                                                                      EdgeInsets.all(
-                                                                        8.w,
-                                                                      ),
-                                                                      decoration:
-                                                                      BoxDecoration(
+                                                                          EdgeInsets.all(
+                                                                            8.w,
+                                                                          ),
+                                                                      decoration: BoxDecoration(
                                                                         color:
-                                                                        Colors.grey.shade900,
+                                                                            Colors.grey.shade900,
                                                                         shape:
-                                                                        BoxShape.circle,
+                                                                            BoxShape.circle,
                                                                       ),
-                                                                      child:
-                                                                      Transform.translate(
-                                                                        offset: const Offset(
-                                                                          2,
-                                                                          0,
-                                                                        ),
+                                                                      child: Transform.translate(
+                                                                        offset:
+                                                                            const Offset(
+                                                                              2,
+                                                                              0,
+                                                                            ),
                                                                         child: Icon(
-                                                                          Icons.arrow_back_ios,
+                                                                          Icons
+                                                                              .arrow_back_ios,
                                                                           color:
-                                                                          Colors.white,
+                                                                              Colors.white,
                                                                           size:
-                                                                          16.sp,
+                                                                              16.sp,
                                                                         ),
                                                                       ),
                                                                     ),
                                                                   ),
                                                                   const Spacer(),
                                                                   Center(
-                                                                    child:
-                                                                    Image.asset(
+                                                                    child: Image.asset(
                                                                       asset,
                                                                       width:
-                                                                      22.w,
+                                                                          22.w,
                                                                       height:
-                                                                      22.h,
+                                                                          22.h,
                                                                     ),
                                                                   ),
                                                                   const Spacer(),
@@ -794,42 +738,39 @@ class _LivestreamingState extends State<Livestreaming> {
                                                               onTap: () {
                                                                 showModalBottomSheet(
                                                                   context:
-                                                                  context,
+                                                                      context,
                                                                   isScrollControlled:
-                                                                  true,
+                                                                      true,
                                                                   backgroundColor:
-                                                                  Colors
-                                                                      .transparent,
-                                                                  builder:
-                                                                      (ctx) {
+                                                                      Colors
+                                                                          .transparent,
+                                                                  builder: (
+                                                                    ctx,
+                                                                  ) {
                                                                     return Padding(
-                                                                      padding:
-                                                                      EdgeInsets.only(
+                                                                      padding: EdgeInsets.only(
                                                                         bottom:
-                                                                        MediaQuery.of(
-                                                                          ctx,
-                                                                        ).viewInsets.bottom,
-                                                                      ),
-                                                                      child:
-                                                                      FractionallySizedBox(
-                                                                        heightFactor:
-                                                                        0.8,
-                                                                        child:
-                                                                        AnimatedPadding(
-                                                                          padding: EdgeInsets.only(
-                                                                            bottom:
                                                                             MediaQuery.of(
                                                                               ctx,
                                                                             ).viewInsets.bottom,
+                                                                      ),
+                                                                      child: FractionallySizedBox(
+                                                                        heightFactor:
+                                                                            0.8,
+                                                                        child: AnimatedPadding(
+                                                                          padding: EdgeInsets.only(
+                                                                            bottom:
+                                                                                MediaQuery.of(
+                                                                                  ctx,
+                                                                                ).viewInsets.bottom,
                                                                           ),
                                                                           duration: const Duration(
                                                                             milliseconds:
-                                                                            250,
+                                                                                250,
                                                                           ),
                                                                           curve:
-                                                                          Curves.easeOut,
-                                                                          child:
-                                                                          Container(
+                                                                              Curves.easeOut,
+                                                                          child: Container(
                                                                             decoration: BoxDecoration(
                                                                               color: const Color.fromRGBO(
                                                                                 20,
@@ -849,41 +790,39 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                   children: [
                                                                                     SizedBox(
                                                                                       height:
-                                                                                      10.h,
+                                                                                          10.h,
                                                                                     ),
                                                                                     Padding(
                                                                                       padding: EdgeInsets.symmetric(
                                                                                         horizontal:
-                                                                                        18.w,
+                                                                                            18.w,
                                                                                         vertical:
-                                                                                        10,
+                                                                                            10,
                                                                                       ),
                                                                                       child: Row(
                                                                                         children: [
                                                                                           GestureDetector(
                                                                                             onTap:
-                                                                                                () => Navigator.of(
-                                                                                              ctx,
-                                                                                            ).pop(),
+                                                                                                () =>
+                                                                                                    Navigator.of(
+                                                                                                      ctx,
+                                                                                                    ).pop(),
                                                                                             child: Container(
-                                                                                              padding:
-                                                                                              EdgeInsets.all(
+                                                                                              padding: EdgeInsets.all(
                                                                                                 8.w,
                                                                                               ),
                                                                                               decoration: const BoxDecoration(
-                                                                                                color:
-                                                                                                Color.fromRGBO(
+                                                                                                color: Color.fromRGBO(
                                                                                                   120,
                                                                                                   120,
                                                                                                   128,
                                                                                                   0.16,
                                                                                                 ),
                                                                                                 shape:
-                                                                                                BoxShape.circle,
+                                                                                                    BoxShape.circle,
                                                                                               ),
                                                                                               child: Center(
-                                                                                                child:
-                                                                                                Transform.translate(
+                                                                                                child: Transform.translate(
                                                                                                   offset: const Offset(
                                                                                                     2.5,
                                                                                                     0,
@@ -891,9 +830,9 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   child: Icon(
                                                                                                     Icons.arrow_back_ios,
                                                                                                     color:
-                                                                                                    Colors.white,
+                                                                                                        Colors.white,
                                                                                                     size:
-                                                                                                    18,
+                                                                                                        18,
                                                                                                   ),
                                                                                                 ),
                                                                                               ),
@@ -902,8 +841,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                           const Spacer(),
                                                                                           Text(
                                                                                             'Category',
-                                                                                            style:
-                                                                                            sfProText600(
+                                                                                            style: sfProText600(
                                                                                               18.sp,
                                                                                               Colors.white,
                                                                                             ),
@@ -911,68 +849,62 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                           const Spacer(),
                                                                                           SizedBox(
                                                                                             width:
-                                                                                            40.w,
+                                                                                                40.w,
                                                                                           ),
                                                                                         ],
                                                                                       ),
                                                                                     ),
                                                                                     SizedBox(
                                                                                       height:
-                                                                                      12.h,
+                                                                                          12.h,
                                                                                     ),
                                                                                     Expanded(
                                                                                       child: ListView.separated(
-                                                                                        padding:
-                                                                                        EdgeInsets.only(
+                                                                                        padding: EdgeInsets.only(
                                                                                           left:
-                                                                                          16.w,
+                                                                                              16.w,
                                                                                           right:
-                                                                                          16.w,
+                                                                                              16.w,
                                                                                           top:
-                                                                                          8.h,
+                                                                                              8.h,
                                                                                           bottom:
-                                                                                          100.h,
+                                                                                              100.h,
                                                                                         ),
                                                                                         itemCount:
-                                                                                        3,
+                                                                                            3,
                                                                                         separatorBuilder:
                                                                                             (
-                                                                                            _,
-                                                                                            __,
+                                                                                              _,
+                                                                                              __,
                                                                                             ) => SizedBox(
-                                                                                          height:
-                                                                                          12.h,
-                                                                                        ),
-                                                                                        itemBuilder:
-                                                                                            (
-                                                                                            c,
-                                                                                            i,
-                                                                                            ) {
+                                                                                              height:
+                                                                                                  12.h,
+                                                                                            ),
+                                                                                        itemBuilder: (
+                                                                                          c,
+                                                                                          i,
+                                                                                        ) {
                                                                                           return InkWell(
                                                                                             onTap:
                                                                                                 () {},
-                                                                                            borderRadius:
-                                                                                            BorderRadius.circular(
+                                                                                            borderRadius: BorderRadius.circular(
                                                                                               32.r,
                                                                                             ),
-                                                                                            child:
-                                                                                            Container(
+                                                                                            child: Container(
                                                                                               padding: EdgeInsets.symmetric(
                                                                                                 horizontal:
-                                                                                                20.w,
+                                                                                                    20.w,
                                                                                                 vertical:
-                                                                                                13.h,
+                                                                                                    13.h,
                                                                                               ),
                                                                                               decoration: BoxDecoration(
-                                                                                                color:
-                                                                                                const Color.fromRGBO(
+                                                                                                color: const Color.fromRGBO(
                                                                                                   37,
                                                                                                   37,
                                                                                                   37,
                                                                                                   1,
                                                                                                 ),
-                                                                                                borderRadius:
-                                                                                                BorderRadius.circular(
+                                                                                                borderRadius: BorderRadius.circular(
                                                                                                   28.r,
                                                                                                 ),
                                                                                               ),
@@ -980,8 +912,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                 children: [
                                                                                                   Text(
                                                                                                     'Name Category',
-                                                                                                    style:
-                                                                                                    sfProText400(
+                                                                                                    style: sfProText400(
                                                                                                       13.sp,
                                                                                                       Colors.white,
                                                                                                     ),
@@ -989,23 +920,22 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   const Spacer(),
                                                                                                   Container(
                                                                                                     width:
-                                                                                                    25.w,
+                                                                                                        25.w,
                                                                                                     height:
-                                                                                                    25.w,
+                                                                                                        25.w,
                                                                                                     decoration: BoxDecoration(
                                                                                                       color:
-                                                                                                      Colors.grey.shade900,
-                                                                                                      borderRadius:
-                                                                                                      BorderRadius.circular(
+                                                                                                          Colors.grey.shade900,
+                                                                                                      borderRadius: BorderRadius.circular(
                                                                                                         18.r,
                                                                                                       ),
                                                                                                     ),
                                                                                                     child: Icon(
                                                                                                       Icons.arrow_forward_ios,
                                                                                                       color:
-                                                                                                      Colors.grey.shade500,
+                                                                                                          Colors.grey.shade500,
                                                                                                       size:
-                                                                                                      10.sp,
+                                                                                                          10.sp,
                                                                                                     ),
                                                                                                   ),
                                                                                                 ],
@@ -1019,24 +949,22 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                 ),
                                                                                 Positioned(
                                                                                   bottom:
-                                                                                  18.h,
+                                                                                      18.h,
                                                                                   left:
-                                                                                  74.w,
+                                                                                      74.w,
                                                                                   right:
-                                                                                  74.w,
+                                                                                      74.w,
                                                                                   child: Container(
                                                                                     height:
-                                                                                    56.h,
-                                                                                    padding:
-                                                                                    EdgeInsets.symmetric(
+                                                                                        56.h,
+                                                                                    padding: EdgeInsets.symmetric(
                                                                                       horizontal:
-                                                                                      16.w,
+                                                                                          16.w,
                                                                                     ),
                                                                                     decoration: BoxDecoration(
                                                                                       color:
-                                                                                      Colors.black,
-                                                                                      borderRadius:
-                                                                                      BorderRadius.circular(
+                                                                                          Colors.black,
+                                                                                      borderRadius: BorderRadius.circular(
                                                                                         28.r,
                                                                                       ),
                                                                                     ),
@@ -1045,20 +973,18 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                         Icon(
                                                                                           Icons.search,
                                                                                           color:
-                                                                                          Colors.white,
+                                                                                              Colors.white,
                                                                                           size:
-                                                                                          22.sp,
+                                                                                              22.sp,
                                                                                         ),
                                                                                         SizedBox(
                                                                                           width:
-                                                                                          12.w,
+                                                                                              12.w,
                                                                                         ),
                                                                                         Expanded(
-                                                                                          child:
-                                                                                          Text(
+                                                                                          child: Text(
                                                                                             'Search',
-                                                                                            style:
-                                                                                            sfProText400(
+                                                                                            style: sfProText400(
                                                                                               18.sp,
                                                                                               Colors.white.withOpacity(
                                                                                                 0.6,
@@ -1068,14 +994,14 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                         ),
                                                                                         SizedBox(
                                                                                           width:
-                                                                                          8.w,
+                                                                                              8.w,
                                                                                         ),
                                                                                         Icon(
                                                                                           Icons.mic,
                                                                                           color:
-                                                                                          Colors.white,
+                                                                                              Colors.white,
                                                                                           size:
-                                                                                          22.sp,
+                                                                                              22.sp,
                                                                                         ),
                                                                                       ],
                                                                                     ),
@@ -1102,46 +1028,45 @@ class _LivestreamingState extends State<Livestreaming> {
                                                   children: [
                                                     Stack(
                                                       alignment:
-                                                      Alignment.center,
+                                                          Alignment.center,
                                                       children: [
                                                         Container(
                                                           width:
-                                                          double.infinity,
+                                                              double.infinity,
                                                           padding:
-                                                          EdgeInsets.symmetric(
-                                                            horizontal:
-                                                            14.w,
-                                                            vertical: 14.h,
-                                                          ),
-                                                          decoration:
-                                                          BoxDecoration(
+                                                              EdgeInsets.symmetric(
+                                                                horizontal:
+                                                                    14.w,
+                                                                vertical: 14.h,
+                                                              ),
+                                                          decoration: BoxDecoration(
                                                             color: black,
                                                             borderRadius:
-                                                            BorderRadius.circular(
-                                                              20.r,
-                                                            ),
+                                                                BorderRadius.circular(
+                                                                  20.r,
+                                                                ),
                                                           ),
                                                           child: Column(
                                                             mainAxisSize:
-                                                            MainAxisSize
-                                                                .min,
+                                                                MainAxisSize
+                                                                    .min,
                                                             children: [
                                                               serviceRow(
                                                                 asset:
-                                                                'assets/images/youtube1.png',
+                                                                    'assets/images/youtube1.png',
                                                                 title: 'Title',
                                                                 subtitle:
-                                                                'Category',
+                                                                    'Category',
                                                                 onTap: () {
                                                                   _selectedPlatform
-                                                                      .value =
-                                                                  'youtube';
+                                                                          .value =
+                                                                      'youtube';
                                                                   _titleSelected
-                                                                      .value =
-                                                                  true;
+                                                                          .value =
+                                                                      true;
                                                                   _showServiceCard
-                                                                      .value =
-                                                                  true;
+                                                                          .value =
+                                                                      true;
                                                                 },
                                                               ),
                                                               SizedBox(
@@ -1154,36 +1079,33 @@ class _LivestreamingState extends State<Livestreaming> {
                                                           bottom: 6.h,
                                                           child: Container(
                                                             padding:
-                                                            EdgeInsets.symmetric(
-                                                              horizontal:
-                                                              20.w,
-                                                              vertical: 8.h,
-                                                            ),
-                                                            decoration:
-                                                            BoxDecoration(
+                                                                EdgeInsets.symmetric(
+                                                                  horizontal:
+                                                                      20.w,
+                                                                  vertical: 8.h,
+                                                                ),
+                                                            decoration: BoxDecoration(
                                                               color:
-                                                              const Color.fromRGBO(
-                                                                20,
-                                                                18,
-                                                                20,
-                                                                1,
-                                                              ),
+                                                                  const Color.fromRGBO(
+                                                                    20,
+                                                                    18,
+                                                                    20,
+                                                                    1,
+                                                                  ),
                                                               borderRadius:
-                                                              BorderRadius.circular(
-                                                                20.r,
-                                                              ),
-                                                              border:
-                                                              Border.all(
+                                                                  BorderRadius.circular(
+                                                                    20.r,
+                                                                  ),
+                                                              border: Border.all(
                                                                 color:
-                                                                Colors.white10,
-                                                                width:
-                                                                1.w,
+                                                                    Colors
+                                                                        .white10,
+                                                                width: 1.w,
                                                               ),
                                                             ),
                                                             child: Text(
                                                               'Update All',
-                                                              style:
-                                                              sfProText400(
+                                                              style: sfProText400(
                                                                 14.sp,
                                                                 const Color.fromRGBO(
                                                                   238,
@@ -1207,14 +1129,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                         },
                                       );
                                     },
-                                  );
-                                },
-                              ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           SizedBox(height: 12.h),
-
-                          // ── Bottom section ──
                           _buildResizableBottomSection(context, constraints),
                         ],
                       );
@@ -1230,9 +1150,9 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   Widget _buildResizableBottomSection(
-      BuildContext context,
-      BoxConstraints constraints,
-      ) {
+    BuildContext context,
+    BoxConstraints constraints,
+  ) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     if (!_isInitialHeightSet) {
@@ -1262,8 +1182,7 @@ class _LivestreamingState extends State<Livestreaming> {
     final screenHeight = Get.height;
     const double bottomGap = 16;
     final minHeight = _isInitialHeightSet ? _initialHeight : 180.h;
-    final maxHeight =
-        screenHeight - 122.h - bottomGap.h - 12.h - bottomInset;
+    final maxHeight = screenHeight - 122.h - bottomGap.h - 12.h - bottomInset;
 
     final currentHeight = _bottomSectionHeight.clamp(minHeight, maxHeight);
 
@@ -1321,7 +1240,8 @@ class _LivestreamingState extends State<Livestreaming> {
 }
 
 // ── Eager gesture recognizer ──────────────────────────────────────────
-class _EagerVerticalDragGestureRecognizer extends VerticalDragGestureRecognizer {
+class _EagerVerticalDragGestureRecognizer
+    extends VerticalDragGestureRecognizer {
   @override
   void addAllowedPointer(PointerDownEvent event) {
     super.addAllowedPointer(event);
