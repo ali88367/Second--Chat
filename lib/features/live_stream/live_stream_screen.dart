@@ -36,9 +36,12 @@ class _LivestreamingState extends State<Livestreaming> {
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
+  double? _bottomSectionHeightBeforeActivityMore;
+  bool _isActivitySeeMoreActive = false;
   bool _isInitialHeightSet = false;
   static const double _dragSensitivity = 1.8;
   static const double _minBottomSectionHeightFactor = 0.20;
+  static const double _minUpperSectionHeight = 50.0;
   final Map<String, double> _lastLayoutLogs = {};
 
   // ── Activity section state ──────────────────────────────────────────
@@ -143,6 +146,52 @@ class _LivestreamingState extends State<Livestreaming> {
     return minByFactor > minByContent ? minByFactor : minByContent;
   }
 
+  double _mainContentTopOffset(BuildContext context) {
+    final safeTop = MediaQuery.of(context).viewPadding.top;
+    final dynamicOffset =
+        safeTop +
+        28.h + // top padding used by top icon row
+        36.w + // icon row visual height
+        12.h; // spacing below row
+    final legacyOffset = 117.h;
+    return dynamicOffset > legacyOffset ? dynamicOffset : legacyOffset;
+  }
+
+  double _layoutTopPadding(BuildContext context) {
+    return _mainContentTopOffset(context) + 5.h;
+  }
+
+  void _toggleChatSheetForActivity(BuildContext context) {
+    final screenHeight = Get.height;
+    final minHeight = _bottomSectionMinHeight(screenHeight);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    const double bottomGap = 16;
+    final maxHeight =
+        screenHeight -
+        _layoutTopPadding(context) -
+        bottomGap.h -
+        _minUpperSectionHeight -
+        12.h -
+        bottomInset;
+    final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
+
+    setState(() {
+      if (!_isActivitySeeMoreActive) {
+        _bottomSectionHeightBeforeActivityMore =
+            _bottomSectionHeight.clamp(minHeight, clampedMaxHeight).toDouble();
+        _bottomSectionHeight = minHeight;
+        _isActivitySeeMoreActive = true;
+      } else {
+        final restoredHeight =
+            (_bottomSectionHeightBeforeActivityMore ?? clampedMaxHeight)
+                .clamp(minHeight, clampedMaxHeight)
+                .toDouble();
+        _bottomSectionHeight = restoredHeight;
+        _isActivitySeeMoreActive = false;
+      }
+    });
+  }
+
   Widget _buildInteractiveCounterRow() {
     return Obx(() {
       if (!_settingsCtrl.viewerCount.value) {
@@ -215,7 +264,6 @@ class _LivestreamingState extends State<Livestreaming> {
     final double maxHeightFromScreen = screenHeight * _activityMaxHeight;
     final double maxHeight =
         (availableHeight > 0 ? availableHeight : maxHeightFromScreen)
-            .clamp(minHeightFromScreen, double.infinity)
             .toDouble();
     final double originalHeight =
         minHeightFromScreen.clamp(0, maxHeight).toDouble();
@@ -233,14 +281,13 @@ class _LivestreamingState extends State<Livestreaming> {
       builder: (context, constraints) {
         final effectiveMax =
             constraints.maxHeight.isFinite && constraints.maxHeight > 0
-                ? constraints.maxHeight
-                    .clamp(originalHeight, maxHeight)
-                    .toDouble()
+                ? constraints.maxHeight.clamp(0, maxHeight).toDouble()
                 : maxHeight;
+        final effectiveMin = originalHeight.clamp(0, effectiveMax).toDouble();
         // Keep activity filling the free space above the bottom sheet by default.
         final height =
             (_isDraggingActivity ? clampedHeight : effectiveMax)
-                .clamp(originalHeight, effectiveMax)
+                .clamp(effectiveMin, effectiveMax)
                 .toDouble();
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -251,12 +298,12 @@ class _LivestreamingState extends State<Livestreaming> {
           },
           onVerticalDragUpdate: (details) {
             final delta = details.delta.dy * _activityDragSensitivity;
-            if (delta < 0 && _activityHeight <= originalHeight) {
+            if (delta < 0 && _activityHeight <= effectiveMin) {
               return;
             }
             setState(() {
               _activityHeight = (_activityHeight + delta).clamp(
-                originalHeight,
+                effectiveMin,
                 effectiveMax,
               );
             });
@@ -282,9 +329,16 @@ class _LivestreamingState extends State<Livestreaming> {
             ),
             child: Stack(
               children: [
+                Positioned(
+                  top: 10.h,
+                  left: 12.w,
+                  child: Text(
+                    'Activity',
+                    style: sfProText600(13.sp, Colors.white),
+                  ),
+                ),
                 // ─── Scrollable activity rows ───────────────────────
                 Positioned.fill(
-                  bottom: 12.h,
                   child: ScrollbarTheme(
                     data: ScrollbarThemeData(
                       thumbColor: MaterialStateProperty.all(
@@ -302,7 +356,8 @@ class _LivestreamingState extends State<Livestreaming> {
                         padding: EdgeInsets.only(
                           left: 12.w,
                           right: 12.w,
-                          top: 12.h,
+                          top: 34.h,
+                          bottom: 42.h,
                         ),
                         physics:
                             _isDraggingActivity
@@ -368,6 +423,28 @@ class _LivestreamingState extends State<Livestreaming> {
                             SizedBox(height: 12.h),
                           ],
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 12.w,
+                  bottom: 10.h,
+                  child: GestureDetector(
+                    onTap: () => _toggleChatSheetForActivity(context),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.w,
+                        vertical: 5.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(38, 37, 41, 1),
+                        borderRadius: BorderRadius.circular(14.r),
+                        border: Border.all(color: Colors.white12, width: 1.w),
+                      ),
+                      child: Text(
+                        _isActivitySeeMoreActive ? 'See less' : 'See more',
+                        style: sfProText400(11.sp, Colors.white),
                       ),
                     ),
                   ),
@@ -566,11 +643,15 @@ class _LivestreamingState extends State<Livestreaming> {
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      final layoutTopPadding = _layoutTopPadding(context);
+                      final mainContentTopOffset = _mainContentTopOffset(
+                        context,
+                      );
                       if (!_isInitialHeightSet) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (mounted) {
                             final screenHeight = Get.height;
-                            final topPadding = 122.h;
+                            final topPadding = layoutTopPadding;
                             final spacing = 12.h;
                             final bottomPadding =
                                 16.h +
@@ -582,6 +663,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                 screenHeight -
                                 topPadding -
                                 spacing -
+                                _minUpperSectionHeight -
                                 bottomPadding;
                             final safeMaxHeight =
                                 maxHeight > minHeight ? maxHeight : minHeight;
@@ -615,7 +697,7 @@ class _LivestreamingState extends State<Livestreaming> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          SizedBox(height: 117.h),
+                          SizedBox(height: mainContentTopOffset),
 
                           // ── Upper section ──
                           Expanded(
@@ -1335,7 +1417,13 @@ class _LivestreamingState extends State<Livestreaming> {
     final screenHeight = Get.height;
     const double bottomGap = 16;
     final minHeight = _bottomSectionMinHeight(screenHeight);
-    final maxHeight = screenHeight - 122.h - bottomGap.h - 12.h - bottomInset;
+    final maxHeight =
+        screenHeight -
+        _layoutTopPadding(context) -
+        _minUpperSectionHeight -
+        bottomGap.h -
+        12.h -
+        bottomInset;
     final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
 
     final currentHeight =
