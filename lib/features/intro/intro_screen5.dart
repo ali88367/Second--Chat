@@ -389,6 +389,22 @@ class IntroScreen5 extends StatelessWidget {
             ),
           ),
         ),
+        SizedBox(height: 12.h),
+        Obx(
+          () => GestureDetector(
+            onTap: c.isLoading.value ? null : c.skipTrial,
+            child: Container(
+              width: double.infinity,
+              height: 52.h,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30.r),
+              ),
+              alignment: Alignment.center,
+              child: Text('Skip', style: sfProText600(17.sp, Colors.black)),
+            ),
+          ),
+        ),
         SizedBox(height: 13.h),
       ],
     );
@@ -571,6 +587,15 @@ class IntroScreen5Controller extends GetxController {
     await Future.delayed(const Duration(milliseconds: 100));
     isLoading(false);
 
+    _goToHome();
+  }
+
+  void skipTrial() {
+    if (isLoading.value) return;
+    _goToHome();
+  }
+
+  void _goToHome() {
     Get.offAll(
       () => const HomeScreen2(),
       transition: Transition.cupertino,
