@@ -18,14 +18,17 @@ class IntroScreen1 extends StatefulWidget {
 class _IntroScreen1State extends State<IntroScreen1> {
   VideoPlayerController? _controller;
   bool _videoFailed = false;
+  bool _ownsController = false;
 
   @override
   void initState() {
     super.initState();
     _controller = widget.initialController;
     if (_controller == null) {
+      _ownsController = true;
       _initializeVideo();
     } else {
+      _ownsController = false;
       _controller!
         ..setLooping(true)
         ..setVolume(0)
@@ -64,7 +67,9 @@ class _IntroScreen1State extends State<IntroScreen1> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    if (_ownsController) {
+      _controller?.dispose();
+    }
     super.dispose();
   }
 

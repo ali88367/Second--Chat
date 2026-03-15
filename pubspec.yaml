@@ -43,7 +43,11 @@ dependencies:
   carousel_slider:
   cached_network_image:
   http:
+  dio:
   shared_preferences:
+  flutter_secure_storage:
+  url_launcher:
+  app_links:
   sqflite: 
   path_provider:
   video_player:

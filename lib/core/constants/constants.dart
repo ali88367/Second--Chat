@@ -10,7 +10,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API Constants
-  static const String baseUrl = 'https://api.example.com';
+  // Backend base URL (overridable at build/run time via `--dart-define=API_BASE_URL=...`).
+  static const String baseUrl = 'https://cafe7bygasco.com';
   static const int connectionTimeout = 30000; // milliseconds
   static const int receiveTimeout = 30000; // milliseconds
 
@@ -49,4 +50,3 @@ class AppConstants {
   static const String displayDateFormat = 'MMM dd, yyyy';
   static const String displayTimeFormat = 'hh:mm a';
 }
-
