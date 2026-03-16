@@ -46,8 +46,8 @@ dependencies:
   dio:
   shared_preferences:
   flutter_secure_storage:
-  url_launcher:
   app_links:
+  flutter_custom_tabs:
   sqflite: 
   path_provider:
   video_player:

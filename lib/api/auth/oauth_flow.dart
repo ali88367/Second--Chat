@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
+import 'package:get/get.dart';
 
 import '../config/api_config.dart';
 import 'oauth_provider.dart';
@@ -33,6 +35,12 @@ class OAuthFlow {
     return params;
   }
 
+  void _logRedirect(String tag, Uri uri) {
+    if (!kDebugMode) return;
+    debugPrint('OAUTH REDIRECT [$tag]: $uri');
+    debugPrint('OAUTH REDIRECT [$tag] params: ${_allParams(uri)}');
+  }
+
   bool _isLikelyOAuthResult(Uri uri) {
     final p = _allParams(uri);
     return p.containsKey('code') ||
@@ -51,14 +59,13 @@ class OAuthFlow {
     _sub ??= _appLinks.uriLinkStream.listen((uri) {
       if (_pendingCompleter == null || _pendingCompleter!.isCompleted) return;
       if (!_isExpectedRedirect(uri)) return;
+      _logRedirect('stream', uri);
       if (!_isLikelyOAuthResult(uri)) {
         if (kDebugMode) debugPrint('OAUTH REDIRECT (ignored): $uri');
         return;
       }
       if (kDebugMode) debugPrint('OAUTH REDIRECT: $uri');
       _pendingCompleter!.complete(uri);
-      // Best-effort close of in-app view once the callback has returned to the app.
-      unawaited(closeInAppWebView());
     });
 
     try {
@@ -77,6 +84,7 @@ class OAuthFlow {
           _pendingCompleter != null &&
           !_pendingCompleter!.isCompleted &&
           _isExpectedRedirect(initial)) {
+        _logRedirect('initial', initial);
         _pendingCompleter!.complete(initial);
       }
     } catch (_) {
@@ -100,20 +108,9 @@ class OAuthFlow {
 
     _pendingCompleter = Completer<Uri>();
 
-    bool launched = false;
     try {
-      launched = await launchUrl(
-        authorizationUrl,
-        mode: LaunchMode.inAppBrowserView,
-        browserConfiguration: const BrowserConfiguration(showTitle: false),
-        webViewConfiguration: const WebViewConfiguration(
-          enableJavaScript: true,
-          enableDomStorage: true,
-        ),
-      );
-    } catch (_) {}
-
-    if (!launched) {
+      await _launchCustomTab(authorizationUrl);
+    } catch (_) {
       _resetPending();
       throw StateError('Failed to open OAuth browser view');
     }
@@ -123,7 +120,50 @@ class OAuthFlow {
     } on TimeoutException {
       _resetPending();
       rethrow;
+    } catch (_) {
+      _resetPending();
+      rethrow;
     }
+  }
+
+  Future<void> _launchCustomTab(Uri authorizationUrl) async {
+    try {
+      await launchUrl(
+        authorizationUrl,
+        customTabsOptions: CustomTabsOptions(
+          colorSchemes: CustomTabsColorSchemes.defaults(
+            toolbarColor: Color(0xFF1E1D20),
+          ),
+          urlBarHidingEnabled: true,
+          showTitle: false,
+        ),
+        safariVCOptions: SafariViewControllerOptions(
+          preferredBarTintColor: Color(0xFF1E1D20),
+          preferredControlTintColor: Colors.white,
+          barCollapsingEnabled: true,
+          dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
+        ),
+      );
+    } catch (e) {
+      _showLaunchError(e);
+      rethrow;
+    }
+  }
+
+  void _showLaunchError(Object error) {
+    debugPrint('OAUTH CUSTOM TABS ERROR: $error');
+    if (Get.isSnackbarOpen) {
+      Get.closeCurrentSnackbar();
+    }
+    Get.snackbar(
+      'Connection issue',
+      'We couldn\'t open the login page. Please try again.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFF232225),
+      colorText: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      borderRadius: 14,
+    );
   }
 
   OAuthCallback parseCallback(Uri callbackUri) {
@@ -131,6 +171,7 @@ class OAuthFlow {
       throw StateError('Unexpected redirect URI: $callbackUri');
     }
 
+    _logRedirect('parse', callbackUri);
     final params = _allParams(callbackUri);
 
     final error = params['error'];
@@ -257,3 +298,5 @@ class OAuthCallback {
 
   bool get isSuccess => error == null;
 }
+
+

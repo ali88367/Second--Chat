@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
@@ -139,6 +139,175 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final SettingsController controller = Get.find<SettingsController>();
+    controller.loadSettingsIfNeeded();
+
+    return Obx(() {
+      final hasData = controller.settingsPayload.value != null;
+      final error = controller.settingsError.value;
+
+      if (!hasData) {
+        return _buildLoading(context, controller, error);
+      }
+
+      return SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.center,
+              child: Container(
+                margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
+                width: 36.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  InkWell(
+                    onTap: () => Get.back(),
+                    child: Image.asset(x_icon, height: 44.h),
+                  ),
+                  Text("Settings", style: sfProText600(17.sp, Colors.white)),
+                  SizedBox(width: 44.w),
+                ],
+              ),
+            ),
+            SizedBox(height: 10.h),
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.only(
+                  left: 16.w,
+                  right: 16.w,
+                  top: 10.h,
+                  bottom: 10.h + MediaQuery.of(context).viewPadding.bottom,
+                ),
+                itemCount: settingsData.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return FreePlanWidget(controller: controller);
+                  }
+                  int sectionIndex = index - 1;
+                  String sectionTitle = settingsData.keys.elementAt(sectionIndex);
+                  List<Map<String, dynamic>> tiles = settingsData[sectionTitle]!;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (sectionTitle.isNotEmpty &&
+                          sectionTitle != "Notifications")
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
+                          child: Text(
+                            sectionTitle.toUpperCase(),
+                            style: sfProDisplay400(
+                              13.sp,
+                              const Color.fromRGBO(235, 235, 245, 0.6),
+                            ),
+                          ),
+                        )
+                      else if (sectionTitle.isEmpty)
+                        SizedBox(height: 6.h)
+                      else
+                        SizedBox(height: 2.h),
+
+                      if (sectionTitle == "CHAT")
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 12.h),
+                          child: const ChatPlatformTabs(),
+                        ),
+
+                      Container(
+                        decoration: BoxDecoration(
+                          color: onBottomSheetGrey,
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                        child: Column(
+                          children: tiles.asMap().entries.map((entry) {
+                            int tileIndex = entry.key;
+                            Map<String, dynamic> tile = entry.value;
+                            return _buildTile(
+                              tile,
+                              controller,
+                              tileIndex,
+                              sectionTitle,
+                              context,
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildLoading(
+    BuildContext context,
+    SettingsController controller,
+    String? error,
+  ) {
+    final Widget content = error != null
+        ? GestureDetector(
+            onTap: () => controller.loadSettings(force: true),
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 24.w),
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: onBottomSheetGrey,
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Failed to load settings',
+                    style: sfProDisplay600(16.sp, Colors.white),
+                  ),
+                  SizedBox(height: 6.h),
+                  Text(
+                    'Tap to retry',
+                    style: sfProText400(13.sp, Colors.white60),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : Container(
+            margin: EdgeInsets.symmetric(horizontal: 24.w),
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+            decoration: BoxDecoration(
+              color: onBottomSheetGrey,
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 18.w,
+                  height: 18.w,
+                  child: const CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 10.w),
+                Text(
+                  'Loading settings...',
+                  style: sfProText500(14.sp, Colors.white70),
+                ),
+              ],
+            ),
+          );
 
     return SafeArea(
       top: false,
@@ -173,70 +342,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           ),
           SizedBox(height: 10.h),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.only(
-                left: 16.w,
-                right: 16.w,
-                top: 10.h,
-                bottom: 10.h + MediaQuery.of(context).viewPadding.bottom,
-              ),
-              itemCount: settingsData.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) return const FreePlanWidget();
-                int sectionIndex = index - 1;
-                String sectionTitle = settingsData.keys.elementAt(sectionIndex);
-                List<Map<String, dynamic>> tiles = settingsData[sectionTitle]!;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (sectionTitle.isNotEmpty &&
-                        sectionTitle != "Notifications")
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
-                        child: Text(
-                          sectionTitle.toUpperCase(),
-                          style: sfProDisplay400(
-                            13.sp,
-                            const Color.fromRGBO(235, 235, 245, 0.6),
-                          ),
-                        ),
-                      )
-                    else if (sectionTitle.isEmpty)
-                      SizedBox(height: 6.h)
-                    else
-                      SizedBox(height: 2.h),
-
-                    if (sectionTitle == "CHAT")
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 12.h),
-                        child: const ChatPlatformTabs(),
-                      ),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: onBottomSheetGrey,
-                        borderRadius: BorderRadius.circular(16.r),
-                      ),
-                      child: Column(
-                        children:
-                            tiles.asMap().entries.map((entry) {
-                              int tileIndex = entry.key;
-                              Map<String, dynamic> tile = entry.value;
-                              return _buildTile(
-                                tile,
-                                controller,
-                                tileIndex,
-                                sectionTitle,
-                                context,
-                              );
-                            }).toList(),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+            child: Center(child: content),
           ),
         ],
       ),
@@ -257,7 +363,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     final String? openAsBottomSheet = tile["openAsBottomSheet"];
     final String? customForwardIcon = tile["customForwardIcon"];
 
-    // Declare key here — each tile gets its own unique key
+    // Declare key here â€” each tile gets its own unique key
     final GlobalKey iconKey = GlobalKey();
 
     RxBool? switchValue;
@@ -357,13 +463,13 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     onItemSelected: (selected) {
                       switch (tile["title"]) {
                         case "Font Size":
-                          controller.fontSize.value = selected;
+                          controller.updateFontSize(selected);
                           break;
                         case "App Language":
-                          controller.appLanguage.value = selected;
+                          controller.updateAppLanguage(selected);
                           break;
                         case "Clock":
-                          controller.clockFormat.value = selected;
+                          controller.updateClockFormat(selected);
                           break;
                       }
                       Navigator.of(context).pop();
@@ -551,7 +657,13 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         child: _buildSuffixText(tile, controller, opacity),
                       ),
                     if (shouldShowSwitch)
-                      _buildSwitch(sectionTitle, switchValue!, getBaseColor),
+                      _buildSwitch(
+                        sectionTitle,
+                        switchValue!,
+                        getBaseColor,
+                        controller,
+                        switchKey,
+                      ),
                     if ((isForward || openAsBottomSheet != null) &&
                         !isActuallyLocked)
                       Padding(
@@ -609,6 +721,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     String sectionTitle,
     RxBool switchValue,
     Color Function() getBaseColor,
+    SettingsController controller,
+    String? switchKey,
   ) {
     return Obx(() {
       final baseColor =
@@ -617,7 +731,13 @@ class SettingsBottomsheetColumn extends StatelessWidget {
               : const Color.fromRGBO(255, 230, 167, 1);
       return CustomSwitch(
         value: switchValue.value,
-        onChanged: (val) => switchValue.value = val,
+        onChanged: (val) {
+          if (switchKey != null) {
+            controller.updateToggle(switchKey, val);
+          } else {
+            switchValue.value = val;
+          }
+        },
         activeColor: baseColor,
       );
     });
@@ -625,7 +745,9 @@ class SettingsBottomsheetColumn extends StatelessWidget {
 }
 
 class FreePlanWidget extends StatefulWidget {
-  const FreePlanWidget({super.key});
+  const FreePlanWidget({super.key, required this.controller});
+
+  final SettingsController controller;
 
   @override
   State<FreePlanWidget> createState() => _FreePlanWidgetState();
@@ -636,64 +758,72 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _showSubscribe = !_showSubscribe;
-        });
-      },
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(16.w),
-        margin: EdgeInsets.only(bottom: 12.h),
-        decoration: BoxDecoration(
-          color: onBottomSheetGrey,
-          borderRadius: BorderRadius.circular(24.r),
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "£4.99 per month",
-                      style: sfProDisplay400(
-                        13.sp,
-                        Colors.white.withOpacity(0.5),
+    return Obx(() {
+      final account =
+          widget.controller.settingsPayload.value?['account'] as Map?;
+      final plan = (account?['yourPlan'] ?? 'Free').toString();
+      final price =
+          (account?['premiumPerMonth'] ?? '£4.99 per month').toString();
+      final isPremium = account?['isPremium'] == true;
+      final planLabel = isPremium ? 'Premium' : plan;
+
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _showSubscribe = !_showSubscribe;
+          });
+        },
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(16.w),
+          margin: EdgeInsets.only(bottom: 12.h),
+          decoration: BoxDecoration(
+            color: onBottomSheetGrey,
+            borderRadius: BorderRadius.circular(24.r),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        price,
+                        style: sfProDisplay400(
+                          13.sp,
+                          Colors.white.withOpacity(0.5),
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          "Your Plan",
-                          style: sfProDisplay600(
-                            17.sp,
-                            Colors.white.withOpacity(0.6),
+                      SizedBox(height: 4.h),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            "Your Plan",
+                            style: sfProDisplay600(
+                              17.sp,
+                              Colors.white.withOpacity(0.6),
+                            ),
                           ),
-                        ),
-                        Text(
-                          "Free",
-                          style: sfProDisplay600(20.sp, Colors.white),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Image.asset(key_icon, height: 76.h),
-              ],
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              child:
-                  _showSubscribe
-                      ? Column(
+                          Text(
+                            planLabel,
+                            style: sfProDisplay600(20.sp, Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Image.asset(key_icon, height: 76.h),
+                ],
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                child: _showSubscribe
+                    ? Column(
                         children: [
                           SizedBox(height: 12.h),
                           GestureDetector(
@@ -704,7 +834,7 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                               width: double.infinity,
                               padding: EdgeInsets.symmetric(vertical: 12.h),
                               decoration: BoxDecoration(
-                                gradient:  LinearGradient(
+                                gradient: LinearGradient(
                                   colors: [
                                     beige,
                                     beige,
@@ -722,12 +852,13 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                           ),
                         ],
                       )
-                      : const SizedBox.shrink(),
-            ),
-          ],
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -799,3 +930,7 @@ class ChatPlatformTabs extends StatelessWidget {
     return controller.getPlatformColor(tab);
   }
 }
+
+
+
+

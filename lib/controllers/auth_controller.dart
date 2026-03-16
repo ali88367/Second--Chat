@@ -1,8 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/app_api.dart';
 import '../api/auth/auth_api.dart';
@@ -11,6 +12,7 @@ import '../api/auth/oauth_api.dart';
 import '../api/auth/oauth_flow.dart';
 import '../api/auth/oauth_provider.dart';
 import '../api/http/api_json.dart';
+import '../core/constants/app_colors/app_colors.dart';
 
 class AuthController extends GetxController {
   AuthController({
@@ -100,16 +102,22 @@ class AuthController extends GetxController {
         provider: provider,
         authorizationUrl: authUrl,
       );
-      // Ensure the in-app browser sheet is dismissed (best-effort).
-      unawaited(closeInAppWebView());
-
+      if (kDebugMode) {
+        debugPrint('OAUTH CALLBACK URI: $callbackUri');
+        debugPrint('OAUTH CALLBACK params: ${_extractParams(callbackUri)}');
+      }
       final parsed = _oauthFlow.parseCallback(callbackUri);
       if (!parsed.isSuccess) {
-        lastError.value = 'OAuth failed: ${parsed.error ?? 'unknown error'}';
+        final err = parsed.error ?? 'unknown error';
+        lastError.value = 'OAuth failed: $err';
         if (kDebugMode) {
-          debugPrint('OAUTH ERROR(${provider.name}): ${parsed.error}');
+          debugPrint('OAUTH ERROR(${provider.name}): $err');
           debugPrint('OAUTH PARAMS(${provider.name}): ${parsed.rawParams ?? {}}');
         }
+        _showOauthError(
+          'Login failed. Please try again.',
+          error: err,
+        );
         return false;
       }
 
@@ -138,6 +146,11 @@ class AuthController extends GetxController {
           ),
         );
         isAuthenticated.value = true;
+        await _saveTokensToPrefs(
+          provider: provider,
+          accessToken: parsed.accessToken!,
+          refreshToken: parsed.refreshToken!,
+        );
       } else {
         final result = await oauthApi.exchangeCallback(
           provider: parsed.provider!,
@@ -149,6 +162,11 @@ class AuthController extends GetxController {
         if (tokens != null) {
           await _api.tokenStore.write(tokens);
           isAuthenticated.value = true;
+          await _saveTokensToPrefs(
+            provider: provider,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+          );
         }
       }
 
@@ -159,12 +177,67 @@ class AuthController extends GetxController {
     } on TimeoutException {
       lastError.value = 'Timed out waiting for OAuth callback';
       if (kDebugMode) debugPrint('OAUTH TIMEOUT(${provider.name})');
+      _showOauthError(
+        'Login timed out. Please try again.',
+        error: 'Timeout',
+      );
       return false;
     } catch (e) {
       lastError.value = 'Failed to connect ${provider.name}: $e';
       if (kDebugMode) debugPrint('OAUTH ERROR(${provider.name}): $e');
+      if (!(e is StateError &&
+          e.message == 'Failed to open OAuth browser view')) {
+        _showOauthError(
+          'We couldn\'t connect. Please try again.',
+          error: e,
+        );
+      }
       return false;
     }
+  }
+
+  void _showOauthError(String message, {Object? error}) {
+    if (error != null) {
+      debugPrint('OAUTH UI ERROR: $error');
+    }
+    if (Get.isSnackbarOpen) {
+      Get.closeCurrentSnackbar();
+    }
+    Get.snackbar(
+      'Connection issue',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: blackbox.withOpacity(0.9),
+      colorText: onDark,
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      borderRadius: 14,
+    );
+  }
+
+  static const _kPrefsAccessToken = 'second_chat.access_token';
+  static const _kPrefsRefreshToken = 'second_chat.refresh_token';
+
+  Map<String, String> _extractParams(Uri uri) {
+    final params = <String, String>{...uri.queryParameters};
+    final frag = uri.fragment;
+    if (frag.isNotEmpty) {
+      try {
+        params.addAll(Uri.splitQueryString(frag));
+      } catch (_) {}
+    }
+    return params;
+  }
+
+  Future<void> _saveTokensToPrefs({
+    required OAuthProvider provider,
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    debugPrint('OAUTH TOKENS(${provider.name}): accessToken=$accessToken');
+    debugPrint('OAUTH TOKENS(${provider.name}): refreshToken=$refreshToken');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPrefsAccessToken, accessToken);
+    await prefs.setString(_kPrefsRefreshToken, refreshToken);
   }
 
   SessionTokens? _tryParseTokens(dynamic json) {
@@ -188,3 +261,10 @@ class AuthController extends GetxController {
     super.onClose();
   }
 }
+
+
+
+
+
+
+
