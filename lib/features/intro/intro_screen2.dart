@@ -415,25 +415,31 @@ class PlatformButton extends StatelessWidget {
               ),
               padding: EdgeInsets.zero,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                if (imagePath != null)
-                  Image.asset(imagePath!, height: 24.h, width: 24.w),
-                SizedBox(width: 6.w),
-                Text(label, style: sfProText600(17.sp, Colors.white)),
-                if (isLoading) ...[
-                  SizedBox(width: 8.w),
-                  SizedBox(
-                    width: 16.w,
-                    height: 16.w,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (imagePath != null)
+                      Image.asset(imagePath!, height: 24.h, width: 24.w),
+                    SizedBox(width: 6.w),
+                    Text(label, style: sfProText600(17.sp, Colors.white)),
+                  ],
+                ),
+                if (isLoading)
+                  Positioned(
+                    right: 16.w,
+                    child: SizedBox(
+                      width: 16.w,
+                      height: 16.w,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
                     ),
                   ),
-                ],
               ],
             ),
           ),
