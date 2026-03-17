@@ -51,6 +51,8 @@ dependencies:
   sqflite: 
   path_provider:
   video_player:
+  socket_io_client:
+  webview_flutter:
 
 dev_dependencies:
   flutter_test:
