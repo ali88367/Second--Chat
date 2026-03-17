@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
 class StreakFreezeUseBottomSheet extends StatefulWidget {
@@ -303,14 +305,15 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         ),
                       ),
                       Text(
-                        "Go ahead, freeze it. Commitment is \noverrated anyway.",
+                        context.l10n.freezeTagline,
                         style: sfProDisplay600(22.sp, Colors.white),
                         textAlign: TextAlign.center,
                       ),
                       SizedBox(height: 12.h),
                       Obx(() {
+                        const int maxFreezesPerMonth = 3;
                         final available =
-                            3 - controller.manualFreezeCount.value;
+                            maxFreezesPerMonth - controller.manualFreezeCount.value;
                         return Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: 14.w,
@@ -344,7 +347,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'available',
+                                      text: context.l10n.availableLabel,
                                       style: sfProDisplay400(
                                         15.sp,
                                         const Color(0xFFB0B3B8),
@@ -372,16 +375,13 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Row(
-                              children:
-                                  [
-                                    'Mon',
-                                    'Tue',
-                                    'Wed',
-                                    'Thur',
-                                    'Fri',
-                                    'Sat',
-                                    'Sun',
-                                  ].map((day) {
+                              children: (() {
+                                final locale =
+                                    Localizations.localeOf(context).toLanguageTag();
+                                final weekdays =
+                                    DateFormat.E(locale).dateSymbols.SHORTWEEKDAYS;
+                                return [...weekdays.skip(1), weekdays.first];
+                              })().map((day) {
                                     return Expanded(
                                       child: Center(
                                         child: Text(

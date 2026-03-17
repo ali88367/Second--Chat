@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import '../../../../core/constants/app_colors/app_colors.dart';
 import '../../../../core/themes/textstyles.dart';
 
@@ -12,6 +13,7 @@ class ConnectPlatformSetting extends StatelessWidget {
 
   // Reusable platform card widget
   Widget _buildPlatformCard({
+    required BuildContext context,
     required String title,
     required String largeLogoAsset, // Big logo on top
     required String smallLogoAsset, // Small logo inside button
@@ -68,7 +70,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                         Image.asset(smallLogoAsset, width: 22.w, height: 22.h),
                         SizedBox(width: 6.w),
                         Text(
-                          isConnected ? 'Connected' : title,
+                          isConnected ? context.l10n.connected : title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sfProText600(18.sp, Colors.white),
@@ -136,7 +138,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                         },
                         child: Image.asset(back_arrow_icon, height: 44.h)),
                     Text(
-                      "Connect Platform",
+                      context.l10n.connectPlatform,
                       style: sfProDisplay600(17.sp, onDark),
                     ),
                     SizedBox(width: 44.w),
@@ -149,6 +151,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _buildPlatformCard(
+                        context: context,
                         title: 'Twitch',
                         largeLogoAsset: twitch_logo,
                         smallLogoAsset: twitch_icon,
@@ -168,6 +171,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                     SizedBox(width: 12.w),
                     Expanded(
                       child: _buildPlatformCard(
+                        context: context,
                         title: 'Kick',
                         largeLogoAsset: kick,
                         smallLogoAsset: kick_icon,
@@ -188,6 +192,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                 ),
                 SizedBox(height: 12.w),
                 _buildPlatformCard(
+                  context: context,
                   title: 'YouTube',
                   largeLogoAsset: youtube_logo,
                   smallLogoAsset: youtube_icon,
@@ -231,11 +236,11 @@ Future<void> _handlePlatformTap(
             borderRadius: BorderRadius.circular(16.r),
           ),
           title: Text(
-            'Disconnect Platform',
+            context.l10n.disconnectPlatform,
             style: sfProText600(18.sp, Colors.white),
           ),
           content: Text(
-            'Do you want to disconnect this platform?',
+            context.l10n.disconnectPlatformQuestion,
             style: sfProText400(14.sp, Colors.white70),
           ),
           actionsPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -243,7 +248,7 @@ Future<void> _handlePlatformTap(
             TextButton(
               onPressed: () => Get.back(result: false),
               child: Text(
-                'Cancel',
+                context.l10n.cancel,
                 style: sfProText500(14.sp, Colors.white70),
               ),
             ),
@@ -257,7 +262,7 @@ Future<void> _handlePlatformTap(
               ),
               onPressed: () => Get.back(result: true),
               child: Text(
-                'Disconnect',
+                context.l10n.disconnect,
                 style: sfProText600(14.sp, Colors.black),
               ),
             ),
@@ -272,8 +277,8 @@ Future<void> _handlePlatformTap(
   final ok = await ctrl.disconnect(provider);
   if (ok) {
     Get.snackbar(
-      'Disconnected',
-      'Platform disconnected',
+      context.l10n.disconnected,
+      context.l10n.platformDisconnected,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.black.withOpacity(0.7),
       colorText: Colors.white,
@@ -281,8 +286,8 @@ Future<void> _handlePlatformTap(
     );
   } else {
     Get.snackbar(
-      'Disconnect failed',
-      'Please try again.',
+      context.l10n.disconnectFailed,
+      context.l10n.pleaseTryAgain,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.black.withOpacity(0.7),
       colorText: Colors.white,

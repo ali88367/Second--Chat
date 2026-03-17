@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
@@ -998,7 +999,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   filled: true,
                                   fillColor: Colors.transparent,
                                   contentPadding: EdgeInsets.zero,
-                                  hintText: 'Text',
+                                  hintText: context.l10n.writeAMessage,
                                   hintStyle: TextStyle(
                                     color: const Color.fromRGBO(
                                       235,
@@ -1407,7 +1408,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                                     fontSize: 14.sp,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: 'Search emotes...',
+                                    hintText: context.l10n.searchEmotes,
                                     hintStyle: TextStyle(
                                       color: Colors.white38,
                                       fontSize: 14.sp,
@@ -1463,8 +1464,8 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                       fontWeight: FontWeight.w600,
                     ),
                     tabs: [
-                      const Tab(text: 'Emoji'),
-                      const Tab(text: '⭐ Recent'),
+                      Tab(text: context.l10n.emoji),
+                      Tab(text: context.l10n.recent),
                       Tab(
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1573,12 +1574,12 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
               Icon(Icons.history, color: Colors.white38, size: 48.sp),
               SizedBox(height: 12.h),
               Text(
-                'No recent emotes',
+                context.l10n.noRecentEmotes,
                 style: TextStyle(color: Colors.white38, fontSize: 14.sp),
               ),
               SizedBox(height: 4.h),
               Text(
-                'Emotes you use will appear here',
+                context.l10n.emotesYouUseWillAppearHere,
                 style: TextStyle(color: Colors.white24, fontSize: 12.sp),
               ),
             ],
@@ -1608,7 +1609,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
               ),
               SizedBox(height: 12.h),
               Text(
-                'Loading emotes...',
+                context.l10n.loadingEmotes,
                 style: TextStyle(color: Colors.white54, fontSize: 14.sp),
               ),
             ],
@@ -1629,7 +1630,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
               ),
               SizedBox(height: 12.h),
               Text(
-                'Failed to load emotes',
+                context.l10n.failedToLoadEmotes,
                 style: TextStyle(color: Colors.white54, fontSize: 14.sp),
               ),
               SizedBox(height: 8.h),
@@ -1645,7 +1646,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Text(
-                    'Retry',
+                    context.l10n.retry,
                     style: TextStyle(color: Colors.white, fontSize: 14.sp),
                   ),
                 ),
@@ -1664,7 +1665,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
       if (emotes.isEmpty) {
         return Center(
           child: Text(
-            'No emotes found',
+            context.l10n.noEmotesFound,
             style: TextStyle(color: Colors.white38, fontSize: 14.sp),
           ),
         );

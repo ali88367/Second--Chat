@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 
 import '../../../core/themes/textstyles.dart';
 
@@ -73,15 +75,15 @@ class StreamStreaksScreen extends StatelessWidget {
                       SizedBox(height: 20.h),
                       _buildFireIcon(),
                       SizedBox(height: 12.h),
-                      _buildTitle(),
+                      _buildTitle(context),
                       SizedBox(height: 12.h),
-                      _buildSubtitle(),
+                      _buildSubtitle(context),
                       SizedBox(height: 50.h),
-                      _buildDayToggles(),
+                      _buildDayToggles(context),
                       SizedBox(height: 40.h),
-                      _buildDivider(),
+                      _buildDivider(context),
                       SizedBox(height: 40.h),
-                      _buildThreeTimesOption(),
+                      _buildThreeTimesOption(context),
                       SizedBox(height: 60.h),
                     ],
                   ),
@@ -147,49 +149,49 @@ class StreamStreaksScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(BuildContext context) {
     return Text(
-      'Build a long-term habit',
+      context.l10n.buildALongTermHabit,
       style: sfProDisplay600(22.sp, Colors.white),
       textAlign: TextAlign.center,
     );
   }
 
-  Widget _buildSubtitle() {
+  Widget _buildSubtitle(BuildContext context) {
     return Text(
-      'Settings a streak goals  helps you stay consistent',
+      context.l10n.settingStreakGoalsHelpsYouStayConsistent,
       style: sfProDisplay400(15.sp, const Color(0xFF8E8E93)),
       textAlign: TextAlign.center,
     );
   }
 
-  Widget _buildDayToggles() {
+  Widget _buildDayToggles(BuildContext context) {
     return Obx(() {
       final days = controller.selectedDays.keys.toList();
       return Column(
         children: [
-          _buildDayRow(days[0], days[1]),
+          _buildDayRow(context, days[0], days[1]),
           SizedBox(height: 16.h),
-          _buildDayRow(days[2], days[3]),
+          _buildDayRow(context, days[2], days[3]),
           SizedBox(height: 16.h),
-          _buildDayRow(days[4], days[5]),
+          _buildDayRow(context, days[4], days[5]),
           SizedBox(height: 16.h),
-          _buildDayRow(days[6], null),
+          _buildDayRow(context, days[6], null),
         ],
       );
     });
   }
 
-  Widget _buildDayRow(String day1, String? day2) {
+  Widget _buildDayRow(BuildContext context, String day1, String? day2) {
     return Row(
       children: [
         Expanded(
-          child: _buildDayToggle(day1),
+          child: _buildDayToggle(context, day1),
         ),
         if (day2 != null) ...[
           SizedBox(width: 16.w),
           Expanded(
-            child: _buildDayToggle(day2),
+            child: _buildDayToggle(context, day2),
           ),
         ] else
           Expanded(child: SizedBox()),
@@ -197,7 +199,7 @@ class StreamStreaksScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDayToggle(String day) {
+  Widget _buildDayToggle(BuildContext context, String day) {
     return Obx(() {
       final isSelected = controller.selectedDays[day] ?? false;
       final isDisabled = controller.areDaysDisabled;
@@ -217,7 +219,7 @@ class StreamStreaksScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  day,
+                  _weekdayLabel(context, day),
                   style: sfProText400(
                     17.sp,
                     isSelected ? Colors.white : const Color(0xFF8E8E93),
@@ -257,7 +259,7 @@ class StreamStreaksScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(BuildContext context) {
     return Row(
       children: [
         Expanded(
@@ -269,7 +271,7 @@ class StreamStreaksScreen extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Text(
-            'OR',
+            context.l10n.or,
             style: sfProText400(13.sp, const Color(0xFF8E8E93)),
           ),
         ),
@@ -283,7 +285,7 @@ class StreamStreaksScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildThreeTimesOption() {
+  Widget _buildThreeTimesOption(BuildContext context) {
     return Obx(() {
       final isSelected = controller.threeTimesWeek.value;
       return GestureDetector(
@@ -306,7 +308,7 @@ class StreamStreaksScreen extends StatelessWidget {
                   ),
                   SizedBox(width: 12.w),
                   Text(
-                    '3-times a week',
+                    context.l10n.threeTimesAWeek,
                     style: sfProText400(
                       17.sp,
                       isSelected ? Colors.white : const Color(0xFF8E8E93),
@@ -345,5 +347,29 @@ class StreamStreaksScreen extends StatelessWidget {
         ),
       );
     });
+  }
+
+  String _weekdayLabel(BuildContext context, String dayKey) {
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final weekdays = DateFormat.E(locale).dateSymbols.SHORTWEEKDAYS;
+    final labels = [...weekdays.skip(1), weekdays.first];
+    switch (dayKey) {
+      case 'Mon':
+        return labels[0];
+      case 'Tue':
+        return labels[1];
+      case 'Wed':
+        return labels[2];
+      case 'Thur':
+        return labels[3];
+      case 'Fri':
+        return labels[4];
+      case 'Sat':
+        return labels[5];
+      case 'Sun':
+        return labels[6];
+      default:
+        return dayKey;
+    }
   }
 }

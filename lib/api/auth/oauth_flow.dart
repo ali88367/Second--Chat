@@ -7,6 +7,7 @@ import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:get/get.dart';
 
 import '../config/api_config.dart';
+import '../../core/localization/get_l10n.dart';
 import 'oauth_provider.dart';
 
 class OAuthFlow {
@@ -168,9 +169,11 @@ class OAuthFlow {
     if (Get.isSnackbarOpen) {
       Get.closeCurrentSnackbar();
     }
+    final l10n = getAppL10n();
     Get.snackbar(
-      'Connection issue',
-      'We couldn\'t open the login page. Please try again.',
+      l10n?.connectionIssue ?? 'Connection issue',
+      l10n?.couldntOpenLoginPagePleaseTryAgain ??
+          'We couldn\'t open the login page. Please try again.',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: const Color(0xFF232225),
       colorText: Colors.white,
@@ -311,5 +314,3 @@ class OAuthCallback {
 
   bool get isSuccess => error == null;
 }
-
-

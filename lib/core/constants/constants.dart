@@ -22,6 +22,7 @@ class AppConstants {
   static const String keyUserData = 'user_data';
   static const String keyThemeMode = 'theme_mode';
   static const String keyLanguage = 'language';
+  static const String keyFontSize = 'font_size';
 
   // Animation Durations
   static const Duration animationDurationShort = Duration(milliseconds: 200);

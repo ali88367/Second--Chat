@@ -8,6 +8,8 @@ import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
+import '../../core/localization/get_l10n.dart';
+import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
 
 class IntroScreen5 extends StatelessWidget {
@@ -204,8 +206,8 @@ class IntroScreen5 extends StatelessWidget {
                             },
                             child:
                                 controller.currentPage.value == 0
-                                    ? _buildSubscriptionContent(controller)
-                                    : _buildReferralContent(controller),
+                                    ? _buildSubscriptionContent(context, controller)
+                                    : _buildReferralContent(context, controller),
                           ),
                         ),
 
@@ -215,7 +217,7 @@ class IntroScreen5 extends StatelessWidget {
                             GestureDetector(
                               onTap: () => print('Terms of Service tapped'),
                               child: Text(
-                                'Terms of Service',
+                                context.l10n.termsOfService,
                                 style: sfProText400(
                                   12.sp,
                                   const Color.fromRGBO(235, 235, 245, 0.6),
@@ -226,7 +228,7 @@ class IntroScreen5 extends StatelessWidget {
                             GestureDetector(
                               onTap: () => print('Restore Purchase tapped'),
                               child: Text(
-                                'Restore Purchase',
+                                context.l10n.restorePurchase,
                                 style: sfProText400(
                                   12.sp,
                                   const Color.fromRGBO(235, 235, 245, 0.6),
@@ -260,7 +262,7 @@ class IntroScreen5 extends StatelessWidget {
     );
   }
 
-  Widget _buildSubscriptionContent(IntroScreen5Controller c) {
+  Widget _buildSubscriptionContent(BuildContext context, IntroScreen5Controller c) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       key: const ValueKey('subscription'),
@@ -286,7 +288,7 @@ class IntroScreen5 extends StatelessWidget {
           child: Obx(
             () => _planCard(
               isSelected: c.selectedPlan.value == 0,
-              title: 'Monthly',
+              title: context.l10n.monthly,
               price: c.monthlyPriceLabel.value,
             ),
           ),
@@ -324,7 +326,10 @@ class IntroScreen5 extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 12.w),
-                      Text('Year', style: sfProText600(17.sp, Colors.white)),
+                      Text(
+                        context.l10n.year,
+                        style: sfProText600(17.sp, Colors.white),
+                      ),
                       const Spacer(),
                       Text(
                         c.yearlyPriceLabel.value,
@@ -385,10 +390,10 @@ class IntroScreen5 extends StatelessWidget {
                         )
                         : RichText(
                           textAlign: TextAlign.center,
-                          text: TextSpan(
+                              text: TextSpan(
                             children: [
                               TextSpan(
-                                text: 'Start Free Trial\n',
+                                text: '${context.l10n.startFreeTrial}\n',
                                 style: sfProText600(17.sp, Colors.white),
                               ),
                               TextSpan(
@@ -419,7 +424,10 @@ class IntroScreen5 extends StatelessWidget {
                 borderRadius: BorderRadius.circular(30.r),
               ),
               alignment: Alignment.center,
-              child: Text('Skip', style: sfProText600(17.sp, Colors.black)),
+              child: Text(
+                context.l10n.skip,
+                style: sfProText600(17.sp, Colors.black),
+              ),
             ),
           ),
         ),
@@ -459,7 +467,7 @@ class IntroScreen5 extends StatelessWidget {
     );
   }
 
-  Widget _buildReferralContent(IntroScreen5Controller c) {
+  Widget _buildReferralContent(BuildContext context, IntroScreen5Controller c) {
     return Padding(
       key: const ValueKey('referral'),
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
@@ -467,7 +475,7 @@ class IntroScreen5 extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Invite a friend and receive',
+            context.l10n.inviteFriendAndReceive,
             style: sfProText600(17.sp, Colors.white),
             textAlign: TextAlign.center,
           ),
@@ -487,14 +495,17 @@ class IntroScreen5 extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text('Get ', style: sfProText500(18.sp, Colors.white)),
+                      Text(
+                        '${context.l10n.get} ',
+                        style: sfProText500(18.sp, Colors.white),
+                      ),
                       ShaderMask(
                         shaderCallback:
                             (bounds) => const LinearGradient(
                               colors: [Color(0xFFE8B87E), Color(0xFFE89B7E)],
                             ).createShader(bounds),
                         child: Text(
-                          '1 month Free',
+                          context.l10n.oneMonthFree,
                           style: sfProText600(18.sp, Colors.white),
                         ),
                       ),
@@ -504,7 +515,7 @@ class IntroScreen5 extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '1 time',
+                context.l10n.oneTime,
                 style: sfProText600(
                   17.sp,
                   const Color.fromRGBO(235, 235, 245, 0.3),
@@ -542,7 +553,10 @@ class IntroScreen5 extends StatelessWidget {
                     child: Image.asset('assets/images/copyIcon.png'),
                   ),
                   SizedBox(width: 8.w),
-                  Text('Copy link', style: sfProText600(17.sp, Colors.white)),
+                  Text(
+                    context.l10n.copyLink,
+                    style: sfProText600(17.sp, Colors.white),
+                  ),
                 ],
               ),
             ),
@@ -925,9 +939,11 @@ class IntroScreen5Controller extends GetxController {
     try {
       final token = await _readAccessToken();
       if (token == null) {
+        final l10n = getAppL10n();
         Get.snackbar(
-          'Session missing',
-          'Please log in again to start your free trial.',
+          l10n?.sessionMissing ?? 'Session missing',
+          l10n?.sessionMissingMessage ??
+              'Please log in again to start your free trial.',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
           margin: const EdgeInsets.all(20),
@@ -960,9 +976,11 @@ class IntroScreen5Controller extends GetxController {
       if (isActive) {
         _goToHome();
       } else {
+        final l10n = getAppL10n();
         Get.snackbar(
-          'Trial not active',
-          'We could not start your free trial. Please try again.',
+          l10n?.trialNotActive ?? 'Trial not active',
+          l10n?.trialNotActiveMessage ??
+              'We could not start your free trial. Please try again.',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
           margin: const EdgeInsets.all(20),
@@ -975,9 +993,11 @@ class IntroScreen5Controller extends GetxController {
       if (e is DioException) {
         print('TRIAL START ERROR RESPONSE: ${e.response?.data}');
       }
+      final l10n = getAppL10n();
       Get.snackbar(
-        'Trial failed',
-        'Unable to start the free trial. Please try again.',
+        l10n?.trialFailed ?? 'Trial failed',
+        l10n?.trialFailedMessage ??
+            'Unable to start the free trial. Please try again.',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
         margin: const EdgeInsets.all(20),
@@ -1004,9 +1024,10 @@ class IntroScreen5Controller extends GetxController {
   }
 
   void copyLink() {
+    final l10n = getAppL10n();
     Get.snackbar(
-      'Success',
-      'Link copied to clipboard!',
+      l10n?.success ?? 'Success',
+      l10n?.linkCopiedToClipboard ?? 'Link copied to clipboard!',
       snackPosition: SnackPosition.BOTTOM,
       duration: const Duration(seconds: 2),
       margin: const EdgeInsets.all(20),
@@ -1029,12 +1050,4 @@ class IntroScreen5Controller extends GetxController {
     super.onClose();
   }
 }
-
-
-
-
-
-
-
-
 

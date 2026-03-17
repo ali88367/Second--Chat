@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 
 @Deprecated('OAuth now uses Custom Tabs. This screen is no longer used.')
 class OAuthWebViewScreen extends StatelessWidget {
@@ -6,11 +7,11 @@ class OAuthWebViewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
         child: Text(
-          'OAuth is handled in your browser.',
+          context.l10n.oauthHandledInBrowser,
           style: TextStyle(color: Colors.white70),
         ),
       ),

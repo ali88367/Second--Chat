@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/widgets/custom_switch.dart';
 
 import '../../3timewidget.dart';
@@ -169,7 +171,7 @@ class _StreamStreakSetupBottomSheetState
                             ),
                           ),
                           Text(
-                            "Stream Streaks",
+                            context.l10n.streamStreaks,
                             style: TextStyle(
                               fontSize: 17.sp,
                               fontWeight: FontWeight.w700,
@@ -270,12 +272,12 @@ class _StreamStreakSetupBottomSheetState
                     ),
                     SizedBox(height: 3.h),
                     Text(
-                      "Build a long-term habit",
+                      context.l10n.buildALongTermHabit,
                       style: sfProDisplay600(22.sp, Colors.white),
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      "Setting streak goals  helps you stay consistent",
+                      context.l10n.settingStreakGoalsHelpsYouStayConsistent,
                       style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
                       textAlign: TextAlign.center,
                     ),
@@ -285,7 +287,7 @@ class _StreamStreakSetupBottomSheetState
                       padding: EdgeInsets.symmetric(horizontal: 20.w),
                       child: Column(
                         children: [
-                          _buildDayToggles(controller),
+                          _buildDayToggles(context, controller),
                           SizedBox(height: 14.h),
                           _buildDivider(),
                           SizedBox(height: 10.h),
@@ -309,8 +311,10 @@ class _StreamStreakSetupBottomSheetState
                     onPressed: () {
                       if (!controller.isThreeTimesSelectionComplete) {
                         Get.snackbar(
-                          'Pick your days',
-                          'Select exactly ${controller.selectedTimesPerWeek.value} days before continuing.',
+                          context.l10n.pickYourDays,
+                          context.l10n.selectExactlyDaysBeforeContinuing(
+                            controller.selectedTimesPerWeek.value,
+                          ),
                           snackPosition: SnackPosition.BOTTOM,
                           backgroundColor: const Color(0xFF2C2C2E),
                           colorText: Colors.white,
@@ -334,7 +338,7 @@ class _StreamStreakSetupBottomSheetState
                       padding: EdgeInsets.zero,
                     ),
                     child: Text(
-                      "Next",
+                      context.l10n.next,
                       style: sfProText600(17.sp, Colors.black),
                     ),
                   ),
@@ -347,32 +351,65 @@ class _StreamStreakSetupBottomSheetState
     );
   }
 
-  Widget _buildDayToggles(StreamStreaksController controller) {
+  List<String> _weekdaysMonFirst(BuildContext context) {
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final weekdays = DateFormat.E(locale).dateSymbols.SHORTWEEKDAYS;
+    return [...weekdays.skip(1), weekdays.first];
+  }
+
+  String _weekdayLabel(BuildContext context, String dayKey) {
+    final labels = _weekdaysMonFirst(context);
+    switch (dayKey) {
+      case 'Mon':
+        return labels[0];
+      case 'Tue':
+        return labels[1];
+      case 'Wed':
+        return labels[2];
+      case 'Thur':
+        return labels[3];
+      case 'Fri':
+        return labels[4];
+      case 'Sat':
+        return labels[5];
+      case 'Sun':
+        return labels[6];
+      default:
+        return dayKey;
+    }
+  }
+
+  Widget _buildDayToggles(BuildContext context, StreamStreaksController controller) {
     final days = controller.selectedDays.keys.toList();
     return Column(
       children: [
-        _row(controller, days[0], days[1]),
+        _row(context, controller, days[0], days[1]),
         SizedBox(height: 16.h),
-        _row(controller, days[2], days[3]),
+        _row(context, controller, days[2], days[3]),
         SizedBox(height: 16.h),
-        _row(controller, days[4], days[5]),
+        _row(context, controller, days[4], days[5]),
         SizedBox(height: 16.h),
-        _toggle(controller, days[6]),
+        _toggle(context, controller, days[6]),
       ],
     );
   }
 
-  Widget _row(StreamStreaksController c, String d1, String d2) {
+  Widget _row(
+    BuildContext context,
+    StreamStreaksController c,
+    String d1,
+    String d2,
+  ) {
     return Row(
       children: [
-        Expanded(child: _toggle(c, d1)),
+        Expanded(child: _toggle(context, c, d1)),
         SizedBox(width: 16.w),
-        Expanded(child: _toggle(c, d2)),
+        Expanded(child: _toggle(context, c, d2)),
       ],
     );
   }
 
-  Widget _toggle(StreamStreaksController c, String day) {
+  Widget _toggle(BuildContext context, StreamStreaksController c, String day) {
     return Obx(() {
       final selected = c.selectedDays[day]!;
       final disabled = c.areDaysDisabled;
@@ -391,7 +428,7 @@ class _StreamStreakSetupBottomSheetState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                day,
+                _weekdayLabel(context, day),
                 style: sfProText400(
                   17.sp,
                   selected ? Colors.white : const Color(0xFF8E8E93),
@@ -415,7 +452,7 @@ class _StreamStreakSetupBottomSheetState
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Text(
-            'OR',
+            context.l10n.or,
             style: sfProText400(13.sp, const Color(0xFF8E8E93)),
           ),
         ),
@@ -467,7 +504,7 @@ class _StreamStreakSetupBottomSheetState
                             ? controller.selectedTimesPerWeek.value
                             : 3;
                     return Text(
-                      '$displayCount-times a week',
+                      context.l10n.timesAWeek(displayCount),
                       style: sfProText400(
                         17.sp,
                         selected ? Colors.white : const Color(0xFF8E8E93),
@@ -517,7 +554,7 @@ class _StreamStreakSetupBottomSheetState
       context: context,
       barrierColor: Colors.transparent,
       barrierDismissible: true,
-      barrierLabel: 'Dismiss',
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) {
         return Stack(

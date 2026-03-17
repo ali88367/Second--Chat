@@ -15,6 +15,7 @@ import '../api/auth/oauth_flow.dart';
 import '../api/auth/oauth_provider.dart';
 import '../api/http/api_json.dart';
 import '../core/constants/app_colors/app_colors.dart';
+import '../core/localization/get_l10n.dart';
 
 class AuthController extends GetxController {
   AuthController({
@@ -189,8 +190,10 @@ class AuthController extends GetxController {
     } on TimeoutException {
       lastError.value = 'Timed out waiting for OAuth callback';
       if (kDebugMode) debugPrint('OAUTH TIMEOUT(${provider.name})');
+      final l10n = getAppL10n();
       _showOauthError(
-        'Login timed out. Please try again.',
+        l10n?.loginTimedOutPleaseTryAgain ??
+            'Login timed out. Please try again.',
         error: 'Timeout',
       );
       return false;
@@ -199,8 +202,10 @@ class AuthController extends GetxController {
       if (kDebugMode) debugPrint('OAUTH ERROR(${provider.name}): $e');
       if (!(e is StateError &&
           e.message == 'Failed to open OAuth browser view')) {
+        final l10n = getAppL10n();
         _showOauthError(
-          'We couldn\'t connect. Please try again.',
+          l10n?.couldntConnectPleaseTryAgain ??
+              'We couldn\'t connect. Please try again.',
           error: e,
         );
       }
@@ -215,8 +220,9 @@ class AuthController extends GetxController {
     if (Get.isSnackbarOpen) {
       Get.closeCurrentSnackbar();
     }
+    final l10n = getAppL10n();
     Get.snackbar(
-      'Connection issue',
+      l10n?.connectionIssue ?? 'Connection issue',
       message,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: blackbox.withOpacity(0.9),
@@ -299,7 +305,6 @@ class AuthController extends GetxController {
     super.onClose();
   }
 }
-
 
 
 

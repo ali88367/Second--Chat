@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Compact_freeze.dart';
@@ -244,7 +246,7 @@ class _StreakFreezePreviewBottomSheetState
                             ),
                           ),
                           Text(
-                            "Stream Streaks",
+                            context.l10n.streamStreaks,
                             style: sfProText600(17.sp, Colors.white),
                           ),
                           SizedBox(width: 44.w),
@@ -329,7 +331,7 @@ class _StreakFreezePreviewBottomSheetState
                     ),
                     SizedBox(height: 6.h),
                     Text(
-                      "Streak in danger?\nHit the freeze button!",
+                      context.l10n.streakInDangerHitFreezeButton,
                       textAlign: TextAlign.center,
                       style: sfProDisplay600(22.sp, Colors.white),
                     ),
@@ -365,7 +367,7 @@ class _StreakFreezePreviewBottomSheetState
                                   style: sfProDisplay400(15.sp, Colors.white),
                                 ),
                                 TextSpan(
-                                  text: 'freeze per month',
+                                  text: context.l10n.freezesPerMonthLabel,
                                   style: sfProDisplay400(
                                     15.sp,
                                     const Color(0xFFB0B3B8),
@@ -398,16 +400,14 @@ class _StreakFreezePreviewBottomSheetState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Row(
-                                children:
-                                    [
-                                      'Mon',
-                                      'Tue',
-                                      'Wed',
-                                      'Thur',
-                                      'Fri',
-                                      'Sat',
-                                      'Sun',
-                                    ].map((d) {
+                                children: (() {
+                                  final locale =
+                                      Localizations.localeOf(context)
+                                          .toLanguageTag();
+                                  final weekdays =
+                                      DateFormat.E(locale).dateSymbols.SHORTWEEKDAYS;
+                                  return [...weekdays.skip(1), weekdays.first];
+                                })().map((d) {
                                       return Expanded(
                                         child: Center(
                                           child: Text(
@@ -463,7 +463,7 @@ class _StreakFreezePreviewBottomSheetState
                       padding: EdgeInsets.zero,
                     ),
                     child: Text(
-                      "Let's go",
+                      context.l10n.letsGo,
                       style: sfProText600(17.sp, Colors.black),
                     ),
                   ),

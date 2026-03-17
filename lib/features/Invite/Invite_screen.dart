@@ -8,6 +8,7 @@ import 'package:second_chat/core/themes/textstyles.dart';
 
 import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
+import '../../core/localization/l10n.dart';
 
 class InviteBottomSheet extends StatelessWidget {
   const InviteBottomSheet({super.key});
@@ -70,7 +71,8 @@ class InviteBottomSheet extends StatelessWidget {
                 top: 20.h,
                 child: Obx(() {
                   final title =
-                      ctrl.invitePayload.value?['title']?.toString() ?? 'Invites';
+                      ctrl.invitePayload.value?['title']?.toString() ??
+                      context.l10n.invites;
                   return Text(
                     title,
                     style: TextStyle(
@@ -115,8 +117,8 @@ class InviteBottomSheet extends StatelessWidget {
                     final invitesLeft = data['invitesLeft'] ?? data['invites_left'];
                     final maxInvites = data['maxInvites'] ?? data['max_invites'];
                     final leftText = invitesLeft != null && maxInvites != null
-                        ? '$invitesLeft invites left'
-                        : 'Invites';
+                        ? context.l10n.invitesLeft(invitesLeft)
+                        : context.l10n.invites;
                     return Text(
                       leftText,
                       style: TextStyle(
@@ -132,7 +134,7 @@ class InviteBottomSheet extends StatelessWidget {
                     child: Obx(() {
                       final text = ctrl.invitePayload.value?['rewardTitle']
                               ?.toString() ??
-                          "Share invite codes with your friends and you will receive:";
+                          context.l10n.shareInviteCodesReward;
                       return Text(
                         text,
                         textAlign: TextAlign.center,
@@ -166,7 +168,7 @@ class InviteBottomSheet extends StatelessWidget {
                     child: Obx(() {
                       final reward =
                           ctrl.invitePayload.value?['reward']?.toString() ??
-                              "1 month free premium";
+                              context.l10n.oneMonthFreePremium;
                       return Text(
                         reward,
                         style: sfProDisplay400(15.sp, Colors.white),
@@ -202,7 +204,7 @@ class InviteBottomSheet extends StatelessWidget {
                       return Padding(
                         padding: EdgeInsets.symmetric(vertical: 16.h),
                         child: Text(
-                          'No invites available right now.',
+                          context.l10n.noInvitesAvailableRightNow,
                           style: sfProDisplay400(14.sp, Colors.white54),
                         ),
                       );
@@ -242,7 +244,7 @@ class InviteBottomSheet extends StatelessWidget {
 
                               isClaimed
                                   ? Text(
-                                      "Claimed",
+                                      context.l10n.claimed,
                                       style: TextStyle(
                                         color: Colors.white24,
                                         fontSize: 14.sp,
@@ -253,8 +255,8 @@ class InviteBottomSheet extends StatelessWidget {
                                         Clipboard.setData(
                                             ClipboardData(text: item['code']));
                                         Get.snackbar(
-                                          "Copied",
-                                          "Code copied to clipboard",
+                                          context.l10n.copied,
+                                          context.l10n.codeCopiedToClipboard,
                                           snackPosition: SnackPosition.BOTTOM,
                                           backgroundColor: Colors.white10,
                                           colorText: Colors.white,

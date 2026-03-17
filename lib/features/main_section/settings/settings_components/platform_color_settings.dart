@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:ios_color_picker/show_ios_color_picker.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 
@@ -140,7 +141,10 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
                   onTap: () => Get.back(),
                   child: Image.asset(back_arrow_icon, height: 44.h),
                 ),
-                Text("Platform Colours", style: sfProDisplay600(17.sp, onDark)),
+                Text(
+                  context.l10n.platformColours,
+                  style: sfProDisplay600(17.sp, onDark),
+                ),
                 SizedBox(width: 44.w),
               ],
             ),

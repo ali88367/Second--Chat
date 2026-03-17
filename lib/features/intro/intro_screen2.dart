@@ -6,7 +6,10 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/themes/textstyles.dart';
+import '../../core/constants/constants.dart';
+import '../../core/localization/l10n.dart';
 
 class LanguageItem {
   final String code;
@@ -106,8 +109,17 @@ class _IntroScreen2State extends State<IntroScreen2> {
                       selectedLanguage = lang;
                     });
 
-                    // TODO: connect localization logic here
-                    Get.updateLocale(Locale(lang.code));
+                    // Persist and apply locale.
+                    () async {
+                      try {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString(
+                          AppConstants.keyLanguage,
+                          lang.code,
+                        );
+                      } catch (_) {}
+                      Get.updateLocale(Locale(lang.code));
+                    }();
                   },
                   itemBuilder: (context) {
                     return languages.map((lang) {
@@ -149,15 +161,15 @@ class _IntroScreen2State extends State<IntroScreen2> {
                         Container(
                           width: 24,
                           height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(
-                            image: NetworkImage(selectedLanguage.flag),
-                            fit: BoxFit.cover,
-                            filterQuality: FilterQuality.high,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              image: NetworkImage(selectedLanguage.flag),
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                            ),
                           ),
                         ),
-                      ),
                         SizedBox(width: 8),
                         Text(
                           selectedLanguage.label,
@@ -218,9 +230,12 @@ class _IntroScreen2State extends State<IntroScreen2> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text('All-In-One', style: sfProDisplay600(34.sp, Colors.white)),
+                Text(
+                  context.l10n.allInOne,
+                  style: sfProDisplay600(34.sp, Colors.white),
+                ),
                 ShimmerText(
-                  text: 'Multichat',
+                  text: context.l10n.multichat,
                   style: sfProDisplay600(34.sp, Colors.white),
                   gradientColors: [Color(0xFFFFD966), Color(0xFFFF7A18)],
                 ),
@@ -252,62 +267,60 @@ class _IntroScreen2State extends State<IntroScreen2> {
                       GestureDetector(
                         onTap: () {},
                         child: Text(
-                          'Enjoy Better Streaming',
+                          context.l10n.enjoyBetterStreaming,
                           style: sfProDisplay600(22.sp, Colors.white),
                         ),
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        'And a smoother experience',
+                        context.l10n.andASmootherExperience,
                         style: sfProText400(15.sp, grey),
                       ),
                       SizedBox(height: 18.h),
-                      Obx(
-                        () {
-                          final isLoading =
-                              connectCtrl.connectingProvider.value ==
-                                  OAuthProvider.twitch;
-                          return GestureDetector(
-                            onTap: isLoading
-                                ? null
-                                : () {
+                      Obx(() {
+                        final isLoading =
+                            connectCtrl.connectingProvider.value ==
+                            OAuthProvider.twitch;
+                        return GestureDetector(
+                          onTap:
+                              isLoading
+                                  ? null
+                                  : () {
                                     _connectAndContinue(OAuthProvider.twitch);
                                   },
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 50.h,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Positioned.fill(
-                                    child: Opacity(
-                                      opacity: isLoading ? 0.7 : 1.0,
-                                      child: FittedBox(
-                                        fit: BoxFit.cover,
-                                        child: Image.asset(
-                                          'assets/images/twitchT.png',
-                                        ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 50.h,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Positioned.fill(
+                                  child: Opacity(
+                                    opacity: isLoading ? 0.7 : 1.0,
+                                    child: FittedBox(
+                                      fit: BoxFit.cover,
+                                      child: Image.asset(
+                                        'assets/images/twitchT.png',
                                       ),
                                     ),
                                   ),
-                                  if (isLoading)
-                                    SizedBox(
-                                      width: 20.w,
-                                      height: 20.w,
-                                      child: const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
+                                ),
+                                if (isLoading)
+                                  SizedBox(
+                                    width: 20.w,
+                                    height: 20.w,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
                                       ),
                                     ),
-                                ],
-                              ),
+                                  ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      }),
                       // PlatformButton(
                       //   label: 'Twitch',
                       //   gradient: const LinearGradient(
@@ -327,7 +340,8 @@ class _IntroScreen2State extends State<IntroScreen2> {
                           label: 'Kick',
                           color: const Color(0xFF42A720), // solid green
                           imagePath: 'assets/images/kick.png',
-                          isLoading: connectCtrl.connectingProvider.value ==
+                          isLoading:
+                              connectCtrl.connectingProvider.value ==
                               OAuthProvider.kick,
                           onPressed: () {
                             _connectAndContinue(OAuthProvider.kick);
@@ -341,7 +355,8 @@ class _IntroScreen2State extends State<IntroScreen2> {
                           label: 'YouTube',
                           color: const Color(0xFFDD2C28), // solid red
                           imagePath: 'assets/images/youtube.png',
-                          isLoading: connectCtrl.connectingProvider.value ==
+                          isLoading:
+                              connectCtrl.connectingProvider.value ==
                               OAuthProvider.youtube,
                           onPressed: () {
                             _connectAndContinue(OAuthProvider.youtube);
@@ -435,8 +450,7 @@ class PlatformButton extends StatelessWidget {
                       height: 16.w,
                       child: const CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
                   ),

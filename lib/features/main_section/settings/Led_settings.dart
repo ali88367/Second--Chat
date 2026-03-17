@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import '../../../../core/themes/textstyles.dart';
+import '../../../../core/localization/l10n.dart';
 import '../../../../core/widgets/custom_switch.dart';
 
 class LedSettingsBottomSheet extends StatelessWidget {
@@ -49,13 +50,16 @@ class LedSettingsBottomSheet extends StatelessWidget {
               children: [
                 SizedBox(height: 4.h),
                 Center(
-                  child: Text("LED settings", style: sfProDisplay600(17.sp, Colors.white)),
+                  child: Text(
+                    context.l10n.ledSettings,
+                    style: sfProDisplay600(17.sp, Colors.white),
+                  ),
                 ),
                 SizedBox(height: 12.h),
 
                 _buildSettingGroup([
                   _buildSwitchTile(
-                    "New Followers",
+                    context.l10n.newFollowers,
                     controller.ledNewFollowers,
                     onChanged:
                         (val) => controller.updateLedSetting('newFollowers', val),
@@ -65,7 +69,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
 
                 _buildSettingGroup([
                   _buildSwitchTile(
-                    "All Subscribers",
+                    context.l10n.allSubscribers,
                     controller.ledAllSubscribers,
                     onChanged: (val) =>
                         controller.updateLedSetting('allSubscribers', val),
@@ -76,7 +80,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
                 // Group 3: Milestones
                 _buildSettingGroup([
                   _buildSwitchTile(
-                    "Milestone Subscribers",
+                    context.l10n.milestoneSubscribers,
                     controller.ledMilestoneSubscribers,
                     onChanged: (val) => controller.updateLedSetting(
                       'milestoneSubscribers',
@@ -171,7 +175,14 @@ class LedSettingsBottomSheet extends StatelessWidget {
                     controller.updateLedMilestoneValue(tempValue);
                     Get.back();
                   },
-                  child: Text("Done", style: TextStyle(color: const Color(0xFFE6C571), fontWeight: FontWeight.bold, fontSize: 16.sp)),
+                  child: Text(
+                    context.l10n.done,
+                    style: TextStyle(
+                      color: const Color(0xFFE6C571),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.sp,
+                    ),
+                  ),
                 ),
               ),
               Expanded(

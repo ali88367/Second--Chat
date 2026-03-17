@@ -7,9 +7,27 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/config/api_config.dart';
+import '../../core/constants/constants.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 
 class SettingsController extends GetxController {
+  static const Map<String, String> _languageNameToCode = {
+    'english': 'en',
+    'spanish': 'es',
+    'arabic': 'ar',
+    'portuguese': 'pt',
+    'german': 'de',
+    'french': 'fr',
+  };
+  static const Map<String, String> _languageCodeToName = {
+    'en': 'English',
+    'es': 'Spanish',
+    'ar': 'Arabic',
+    'pt': 'Portuguese',
+    'de': 'German',
+    'fr': 'French',
+  };
+
   final Rxn<Map<String, dynamic>> settingsPayload = Rxn<Map<String, dynamic>>();
   final RxBool settingsLoading = false.obs;
   final RxnString settingsError = RxnString();
@@ -110,18 +128,14 @@ class SettingsController extends GetxController {
     try {
       final token = await _readAccessToken();
       if (token == null) {
-        settingsError.value = 'Missing access token';
+        settingsError.value = 'missingAccessToken';
         print('SETTINGS ERROR: Missing access token in SharedPreferences');
         return;
       }
       final dio = _buildDio();
       final res = await dio.get<dynamic>(
         '/api/v1/settings',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       final data = res.data;
@@ -129,7 +143,7 @@ class SettingsController extends GetxController {
         settingsPayload.value = Map<String, dynamic>.from(data['data'] as Map);
         _applySettingsFromApi(settingsPayload.value!);
       } else {
-        settingsError.value = 'Unexpected response format';
+        settingsError.value = 'unexpectedResponseFormat';
       }
 
       print('SETTINGS RESPONSE RAW: $data');
@@ -137,7 +151,7 @@ class SettingsController extends GetxController {
         print('SETTINGS RESPONSE DATA: ${data['data']}');
       }
     } catch (e) {
-      settingsError.value = 'Failed to load settings';
+      settingsError.value = 'failedToLoadSettings';
       print('SETTINGS ERROR: $e');
       if (e is DioException) {
         print('SETTINGS ERROR RESPONSE: ${e.response?.data}');
@@ -151,8 +165,10 @@ class SettingsController extends GetxController {
     try {
       final token = await _readAccessToken();
       if (token == null) {
-        settingsError.value = 'Missing access token';
-        print('SETTINGS PATCH ERROR: Missing access token in SharedPreferences');
+        settingsError.value = 'missingAccessToken';
+        print(
+          'SETTINGS PATCH ERROR: Missing access token in SharedPreferences',
+        );
         return false;
       }
       final dio = _buildDio();
@@ -160,11 +176,7 @@ class SettingsController extends GetxController {
       final res = await dio.patch<dynamic>(
         '/api/v1/settings',
         data: patch,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       print('SETTINGS PATCH RESPONSE: ${res.data}');
       return true;
@@ -233,14 +245,75 @@ class SettingsController extends GetxController {
     final prev = fontSize.value;
     fontSize.value = value;
     final ok = await _patchSettings(_buildFullSettingsPatch());
-    if (!ok) fontSize.value = prev;
+    if (!ok) {
+      fontSize.value = prev;
+      return;
+    }
+    await _persistFontSizeToPrefs();
   }
 
   Future<void> updateAppLanguage(String value) async {
     final prev = appLanguage.value;
     appLanguage.value = value;
     final ok = await _patchSettings(_buildFullSettingsPatch());
-    if (!ok) appLanguage.value = prev;
+    if (!ok) {
+      appLanguage.value = prev;
+      return;
+    }
+    await _persistAndApplyLocaleFromAppLanguage();
+  }
+
+  Future<void> _persistAndApplyLocaleFromAppLanguage() async {
+    final normalized = appLanguage.value.toLowerCase().trim();
+    final code = _languageNameToCode[normalized];
+    if (code == null || code.isEmpty) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.keyLanguage, code);
+    } catch (_) {}
+
+    try {
+      Get.updateLocale(Locale(code));
+    } catch (_) {}
+  }
+
+  Future<void> _persistFontSizeToPrefs() async {
+    final value = fontSize.value.trim();
+    if (value.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.keyFontSize, value);
+    } catch (_) {}
+  }
+
+  Future<void> _loadUiPrefsFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final code = prefs.getString(AppConstants.keyLanguage)?.trim();
+      if (code != null && code.isNotEmpty) {
+        appLanguage.value = _languageCodeToName[code.toLowerCase()] ?? appLanguage.value;
+      }
+      final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
+      if (fs != null && fs.isNotEmpty) {
+        fontSize.value = fs.toUpperCase();
+      }
+    } catch (_) {}
+  }
+
+  double get textScaleFactor {
+    switch (fontSize.value.trim().toUpperCase()) {
+      case 'S':
+        return 0.90;
+      case 'M':
+        return 1.00;
+      case 'L':
+        return 1.12;
+      case 'XL':
+        return 1.25;
+      default:
+        return 1.00;
+    }
   }
 
   Future<void> updateClockFormat(String value) async {
@@ -310,40 +383,54 @@ class SettingsController extends GetxController {
     final notif = settings['notifications'];
     if (notif is Map) {
       notifications.value = _asBool(notif['enabled'], notifications.value);
-      ledNotifications.value =
-          _asBool(notif['ledNotifications'], ledNotifications.value);
+      ledNotifications.value = _asBool(
+        notif['ledNotifications'],
+        ledNotifications.value,
+      );
       final ledSettings = notif['ledSettings'];
       if (ledSettings is Map) {
-        ledNewFollowers.value =
-            _asBool(ledSettings['newFollowers'], ledNewFollowers.value);
-        ledAllSubscribers.value =
-            _asBool(ledSettings['allSubscribers'], ledAllSubscribers.value);
+        ledNewFollowers.value = _asBool(
+          ledSettings['newFollowers'],
+          ledNewFollowers.value,
+        );
+        ledAllSubscribers.value = _asBool(
+          ledSettings['allSubscribers'],
+          ledAllSubscribers.value,
+        );
         ledMilestoneSubscribers.value = _asBool(
           ledSettings['milestoneSubscribers'],
           ledMilestoneSubscribers.value,
         );
-        ledMilestoneValue.value =
-            _asInt(ledSettings['milestoneValue'], ledMilestoneValue.value);
+        ledMilestoneValue.value = _asInt(
+          ledSettings['milestoneValue'],
+          ledMilestoneValue.value,
+        );
       }
     }
 
     final chat = settings['chat'];
     if (chat is Map) {
       viewerCount.value = _asBool(chat['viewerCount'], viewerCount.value);
-      hideViewerNames.value =
-          _asBool(chat['hideViewerNames'], hideViewerNames.value);
-      showSubscribersOnly.value =
-          _asBool(chat['showSubscribersOnly'], showSubscribersOnly.value);
+      hideViewerNames.value = _asBool(
+        chat['hideViewerNames'],
+        hideViewerNames.value,
+      );
+      showSubscribersOnly.value = _asBool(
+        chat['showSubscribersOnly'],
+        showSubscribersOnly.value,
+      );
       showVipsOnly.value = _asBool(chat['showVipModsOnly'], showVipsOnly.value);
-      multiChatMergedMode.value =
-          _asBool(chat['multiChatMergedMode'], multiChatMergedMode.value);
+      multiChatMergedMode.value = _asBool(
+        chat['multiChatMergedMode'],
+        multiChatMergedMode.value,
+      );
       fontSize.value = _asString(chat['fontSize'], fontSize.value);
+      unawaited(_persistFontSizeToPrefs());
 
       final platforms = chat['selectedPlatforms'];
       if (platforms is List && platforms.isNotEmpty) {
-        final normalized = platforms
-            .map((e) => e.toString().toLowerCase())
-            .toList();
+        final normalized =
+            platforms.map((e) => e.toString().toLowerCase()).toList();
         if (normalized.contains('all')) {
           selectedPlatform.value = 'All';
         } else {
@@ -363,8 +450,7 @@ class SettingsController extends GetxController {
         final youtube = platformColours['youtube'];
         final twitchHex = twitch is Map ? twitch['color']?.toString() : null;
         final kickHex = kick is Map ? kick['color']?.toString() : null;
-        final youtubeHex =
-            youtube is Map ? youtube['color']?.toString() : null;
+        final youtubeHex = youtube is Map ? youtube['color']?.toString() : null;
         final tColor = _parseHexColor(twitchHex);
         final kColor = _parseHexColor(kickHex);
         final yColor = _parseHexColor(youtubeHex);
@@ -387,20 +473,29 @@ class SettingsController extends GetxController {
     if (language is Map) {
       appLanguage.value = _asString(language['appLanguage'], appLanguage.value);
       clockFormat.value = _asString(language['clock'], clockFormat.value);
-      timeZoneDetection.value =
-          _asBool(language['timeZoneDetection'], timeZoneDetection.value);
+      timeZoneDetection.value = _asBool(
+        language['timeZoneDetection'],
+        timeZoneDetection.value,
+      );
+      _persistAndApplyLocaleFromAppLanguage();
     }
 
     final other = settings['other'];
     if (other is Map) {
-      multiScreenPreview.value =
-          _asBool(other['multiScreenPreview'], multiScreenPreview.value);
+      multiScreenPreview.value = _asBool(
+        other['multiScreenPreview'],
+        multiScreenPreview.value,
+      );
       animations.value = _asBool(other['animations'], animations.value);
       lowPowerMode.value = _asBool(other['lowPowerMode'], lowPowerMode.value);
-      fullActivityFilters.value =
-          _asBool(other['fullActivityFilters'], fullActivityFilters.value);
-      ttsAdvancedSettings.value =
-          _asBool(other['ttsAdvancedSettings'], ttsAdvancedSettings.value);
+      fullActivityFilters.value = _asBool(
+        other['fullActivityFilters'],
+        fullActivityFilters.value,
+      );
+      ttsAdvancedSettings.value = _asBool(
+        other['ttsAdvancedSettings'],
+        ttsAdvancedSettings.value,
+      );
     }
 
     final account = payload['account'];
@@ -569,14 +664,13 @@ class SettingsController extends GetxController {
     if (tColor != null) twitchColor.value = tColor;
     if (kColor != null) kickColor.value = kColor;
     if (yColor != null) youtubeColor.value = yColor;
-    print(
-      'PLATFORM COLOR PREF LOADED: twitch=$tHex kick=$kHex youtube=$yHex',
-    );
+    print('PLATFORM COLOR PREF LOADED: twitch=$tHex kick=$kHex youtube=$yHex');
   }
 
   @override
   void onInit() {
     super.onInit();
+    unawaited(_loadUiPrefsFromPrefs());
     unawaited(_loadPlatformColorsFromPrefs());
   }
 

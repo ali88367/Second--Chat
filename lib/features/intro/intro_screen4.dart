@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/intro_screen5.dart';
 
+import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
 
 // GetX Controller
@@ -54,88 +55,89 @@ class _IntroScreen4State extends State<IntroScreen4> {
   final ScrollController _freeScrollController = ScrollController();
   final ScrollController _premiumScrollController = ScrollController();
   bool _isSyncing = false;
-  final List<FeatureRowData> _features = [
-    FeatureRowData(
-      'Multi-Platform Chat',
-      true,
-      const BadgeIcon('assets/images/checkInfo.png', width: 49, height: 28),
-    ),
-    FeatureRowData(
-      'Multi-Stream Monitor',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Activity Feed',
-      true,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Title/Category Manage',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Edge LED Notification',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Advanced Chat Filters',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Custom Notification',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Analytics',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Animated Elements',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Stream Streak',
-      true,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Advanced Chat Filters',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'All Title/Category',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Ad Free',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Early Access Updates',
-      false,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Refer a Friend Rewards',
-      true,
-      const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
-    ),
-    FeatureRowData(
-      'Support Level',
-      true,
-      const BadgeIcon('assets/images/24-7.png', width: 69, height: 33),
-    ),
-  ];
+
+  List<FeatureRowData> _features(BuildContext context) => [
+        FeatureRowData(
+          context.l10n.featureMultiPlatformChat,
+          true,
+          const BadgeIcon('assets/images/checkInfo.png', width: 49, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureMultiStreamMonitor,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureActivityFeed,
+          true,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureTitleCategoryManage,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureEdgeLedNotification,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureAdvancedChatFilters,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureCustomNotification,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureAnalytics,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureAnimatedElements,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.streamStreak,
+          true,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureAdvancedChatFilters,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureAllTitleCategory,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureAdFree,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureEarlyAccessUpdates,
+          false,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureReferAFriendRewards,
+          true,
+          const BadgeIcon('assets/images/checkInfo.png', width: 59, height: 28),
+        ),
+        FeatureRowData(
+          context.l10n.featureSupportLevel,
+          true,
+          const BadgeIcon('assets/images/24-7.png', width: 69, height: 33),
+        ),
+      ];
 
   @override
   void initState() {
@@ -226,41 +228,59 @@ class _IntroScreen4State extends State<IntroScreen4> {
                 // Title
                 Column(
                   children: [
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Unlock the full experience with  ',
-                            style: sfProDisplay600(34.sp, Colors.white),
-                          ),
-                          TextSpan(
-                            text: 'Premium',
-                            style: sfProDisplay600(
-                              34.sp,
-                              Colors.white,
-                            ).copyWith(
-                              foreground:
-                                  Paint()
-                                    ..shader = LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        Color(0xFFF2B269),
-                                        Color(0xFFF17A7A),
-                                        Color(0xFFFFE6A7),
-                                      ],
-                                      stops: [0.2, 0.5, 0.8],
-                                      transform: GradientRotation(
-                                        135.5 * 3.1415927 / 180,
-                                      ),
-                                    ).createShader(
-                                      Rect.fromLTWH(0, 0, 200, 50),
-                                    ),
+                    Builder(
+                      builder: (context) {
+                        final premium = context.l10n.premium;
+                        final full =
+                            context.l10n.unlockTheFullExperienceWith(premium);
+
+                        final normalStyle =
+                            sfProDisplay600(34.sp, Colors.white);
+                        final premiumStyle = normalStyle.copyWith(
+                          foreground: Paint()
+                            ..shader = LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: const [
+                                Color(0xFFF2B269),
+                                Color(0xFFF17A7A),
+                                Color(0xFFFFE6A7),
+                              ],
+                              stops: [0.2, 0.5, 0.8],
+                              transform: GradientRotation(
+                                135.5 * 3.1415927 / 180,
+                              ),
+                            ).createShader(
+                              const Rect.fromLTWH(0, 0, 240, 60),
                             ),
+                        );
+
+                        final idx = full.indexOf(premium);
+                        if (idx < 0) {
+                          return Text(
+                            full,
+                            textAlign: TextAlign.center,
+                            style: normalStyle,
+                          );
+                        }
+
+                        return RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: full.substring(0, idx),
+                                style: normalStyle,
+                              ),
+                              TextSpan(text: premium, style: premiumStyle),
+                              TextSpan(
+                                text: full.substring(idx + premium.length),
+                                style: normalStyle,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -289,7 +309,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                   ),
                                   child: Column(
                                     children:
-                                        _features
+                                        _features(context)
                                             .map(
                                               (item) => _buildFeatureRow(
                                                 item.label,
@@ -363,7 +383,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                         ),
                                         child: Column(
                                           children:
-                                              _features
+                                              _features(context)
                                                   .map(
                                                     (item) => _buildBadgeRow(
                                                       item.badge,
@@ -428,7 +448,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                   ),
                                 )
                                 : Text(
-                                  'Start My 14 Day Free Trial',
+                                  context.l10n.startMy14DayFreeTrial,
                                   style: sfProText600(17.sp, Colors.white),
                                 ),
                       ),
@@ -464,8 +484,8 @@ class _IntroScreen4State extends State<IntroScreen4> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Features", style: sfProText600(17.sp, Colors.white)),
-              Text('Free', style: sfProText600(17.sp, Colors.white)),
+              Text(context.l10n.features, style: sfProText600(17.sp, Colors.white)),
+              Text(context.l10n.free, style: sfProText600(17.sp, Colors.white)),
             ],
           ),
         ),

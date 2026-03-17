@@ -4,11 +4,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
 class StreamWebView extends StatefulWidget {
-  const StreamWebView({
-    super.key,
-    required this.url,
-    required this.height,
-  });
+  const StreamWebView({super.key, required this.url, required this.height});
 
   final String url;
   final double height;
@@ -23,13 +19,10 @@ class _StreamWebViewState extends State<StreamWebView> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (_) {},
-        ),
-      );
+    _controller =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setNavigationDelegate(NavigationDelegate(onPageFinished: (_) {}));
     if (widget.url.trim().isNotEmpty) {
       _controller.loadRequest(Uri.parse(widget.url));
     }
@@ -51,7 +44,11 @@ class _StreamWebViewState extends State<StreamWebView> {
         child: Container(
           color: Colors.black,
           alignment: Alignment.center,
-          child: const Icon(Icons.videocam_off, color: Colors.white38, size: 48),
+          child: const Icon(
+            Icons.videocam_off,
+            color: Colors.white38,
+            size: 48,
+          ),
         ),
       );
     }

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import 'package:second_chat/l10n/app_localizations.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
@@ -43,6 +44,21 @@ void main() async {
   Get.put(ChatController(), permanent: true);
   Get.put(PlatformConnectController(), permanent: true);
 
+  // Load persisted locale (if any) before building the app.
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(AppConstants.keyLanguage)?.trim();
+    if (code != null && code.isNotEmpty) {
+      Get.updateLocale(Locale(code));
+    }
+    final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
+    if (fs != null && fs.isNotEmpty) {
+      try {
+        Get.find<SettingsController>().fontSize.value = fs.toUpperCase();
+      } catch (_) {}
+    }
+  } catch (_) {}
+
   await debugPrintTokensOnce();
 
   // Pre-initialize intro video so first screen does not show a loader.
@@ -58,7 +74,6 @@ void main() async {
   }
 
   runApp(MyApp(introVideoController: introVideoController));
-
 }
 
 class MyApp extends StatelessWidget {
@@ -78,148 +93,164 @@ class MyApp extends StatelessWidget {
         return MediaQuery(
           data: MediaQueryData.fromView(View.of(context)),
           child: GetMaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: AppConstants.appName,
+            debugShowCheckedModeBanner: false,
+            title: AppConstants.appName,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            // Force the entire app to remain LTR even for RTL locales (e.g., Arabic).
+            builder: (context, child) {
+              final settings = Get.find<SettingsController>();
+              return Obx(() {
+                final scale = settings.textScaleFactor;
+                final media = MediaQuery.of(context);
+                return MediaQuery(
+                  data: media.copyWith(textScaler: TextScaler.linear(scale)),
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                );
+              });
+            },
 
-          // THEME
-          theme: ThemeData(
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: primary,
-              primary: primary,
-              secondary: secondary,
-              error: error,
-              surface: surface,
-            ),
-            scaffoldBackgroundColor: surface,
-            appBarTheme: AppBarTheme(
-              backgroundColor: background,
-              elevation: 0,
-              iconTheme: IconThemeData(color: textPrimary),
-              centerTitle: true,
-              systemOverlayStyle: SystemUiOverlayStyle.dark,
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: textInverse,
-                elevation: 2,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 24.w,
-                  vertical: 16.h,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
+            // THEME
+            theme: ThemeData(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: primary,
+                primary: primary,
+                secondary: secondary,
+                error: error,
+                surface: surface,
+              ),
+              scaffoldBackgroundColor: surface,
+              appBarTheme: AppBarTheme(
+                backgroundColor: background,
+                elevation: 0,
+                iconTheme: IconThemeData(color: textPrimary),
+                centerTitle: true,
+                systemOverlayStyle: SystemUiOverlayStyle.dark,
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primary,
+                  foregroundColor: textInverse,
+                  elevation: 2,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.w,
+                    vertical: 16.h,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
                 ),
               ),
-            ),
-            outlinedButtonTheme: OutlinedButtonThemeData(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: primary,
-                side: BorderSide(color: primary, width: 1.5),
-                padding: EdgeInsets.symmetric(
-                  horizontal: 24.w,
-                  vertical: 16.h,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primary,
+                  side: BorderSide(color: primary, width: 1.5),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.w,
+                    vertical: 16.h,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
                 ),
               ),
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: primary,
-                padding: EdgeInsets.symmetric(
+              textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  foregroundColor: primary,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 12.h,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: greyScale50,
+                contentPadding: EdgeInsets.symmetric(
                   horizontal: 16.w,
-                  vertical: 12.h,
+                  vertical: 16.h,
                 ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: BorderSide(color: border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: BorderSide(color: border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: BorderSide(color: primary, width: 2),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: BorderSide(color: error),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: BorderSide(color: error, width: 2),
+                ),
+              ),
+              cardTheme: CardThemeData(
+                color: card,
+                elevation: 2,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
               ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: greyScale50,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16.w,
-                vertical: 16.h,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
-                borderSide: BorderSide(color: border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
-                borderSide: BorderSide(color: border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
-                borderSide: BorderSide(color: primary, width: 2),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
-                borderSide: BorderSide(color: error),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
-                borderSide: BorderSide(color: error, width: 2),
+              dividerTheme: DividerThemeData(
+                color: divider,
+                thickness: 1,
+                space: 1,
               ),
             ),
-            cardTheme: CardThemeData(
-              color: card,
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
+
+            // DARK THEME
+            darkTheme: ThemeData(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: primary,
+                brightness: Brightness.dark,
+                primary: primary,
+                secondary: secondary,
+                error: error,
+                surface: surfaceDark,
               ),
+              scaffoldBackgroundColor: surfaceDark,
             ),
-            dividerTheme: DividerThemeData(
-              color: divider,
-              thickness: 1,
-              space: 1,
+
+            // Handles deep links like `/auth/callback` without crashing routing.
+            getPages: [
+              GetPage(
+                name: '/',
+                page:
+                    () =>
+                        StartupGate(introVideoController: introVideoController),
+              ),
+              GetPage(
+                name: '/auth/callback',
+                page: () => const _OAuthCallbackPlaceholder(),
+              ),
+            ],
+            unknownRoute: GetPage(
+              name: '/unknown',
+              page: () => IntroScreen1(initialController: introVideoController),
             ),
+            initialRoute: '/',
+            home: StartupGate(introVideoController: introVideoController),
+
+            defaultTransition: Transition.cupertino,
+            transitionDuration: const Duration(milliseconds: 250),
+
+            fallbackLocale: const Locale('en'),
           ),
-
-          // DARK THEME
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: primary,
-              brightness: Brightness.dark,
-              primary: primary,
-              secondary: secondary,
-              error: error,
-              surface: surfaceDark,
-            ),
-            scaffoldBackgroundColor: surfaceDark,
-          ),
-
-          // Handles deep links like `/auth/callback` without crashing routing.
-          getPages: [
-            GetPage(
-              name: '/',
-              page: () => StartupGate(
-                introVideoController: introVideoController,
-              ),
-            ),
-            GetPage(
-              name: '/auth/callback',
-              page: () => const _OAuthCallbackPlaceholder(),
-            ),
-          ],
-          unknownRoute: GetPage(
-            name: '/unknown',
-            page: () => IntroScreen1(initialController: introVideoController),
-          ),
-          initialRoute: '/',
-          home: StartupGate(introVideoController: introVideoController),
-
-          defaultTransition: Transition.cupertino,
-          transitionDuration: const Duration(milliseconds: 250),
-
-          locale: const Locale('en', 'US'),
-          fallbackLocale: const Locale('en', 'US'),
-        ),
         );
       },
     );
@@ -272,9 +303,7 @@ class _StartupGateState extends State<StartupGate> {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
             backgroundColor: Color(0xFF0A0A0A),
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 

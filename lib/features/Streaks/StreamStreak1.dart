@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../core/themes/textstyles.dart';
+import '../../core/localization/l10n.dart';
 
 // Controller
 class StreamStreaksController extends GetxController {
@@ -73,15 +74,15 @@ class StreamStreaksScreen extends StatelessWidget {
                       SizedBox(height: 20.h),
                       _buildFireIcon(),
                       SizedBox(height: 12.h),
-                      _buildTitle(),
+                      _buildTitle(context),
                       SizedBox(height: 12.h),
-                      _buildSubtitle(),
+                      _buildSubtitle(context),
                       SizedBox(height: 50.h),
                       _buildDayToggles(),
                       SizedBox(height: 40.h),
-                      _buildDivider(),
+                      _buildDivider(context),
                       SizedBox(height: 40.h),
-                      _buildThreeTimesOption(),
+                      _buildThreeTimesOption(context),
                       SizedBox(height: 60.h),
                     ],
                   ),
@@ -147,17 +148,17 @@ class StreamStreaksScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(BuildContext context) {
     return Text(
-      'Build a long-term habit',
+      context.l10n.buildALongTermHabit,
       style: sfProDisplay600(28.sp, Colors.white),
       textAlign: TextAlign.center,
     );
   }
 
-  Widget _buildSubtitle() {
+  Widget _buildSubtitle(BuildContext context) {
     return Text(
-      'Settings a streak goals  helps you stay consistent',
+      context.l10n.settingStreakGoalsHelpsYouStayConsistent,
       style: sfProText400(15.sp, const Color(0xFF8E8E93)),
       textAlign: TextAlign.center,
     );
@@ -257,7 +258,7 @@ class StreamStreaksScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(BuildContext context) {
     return Row(
       children: [
         Expanded(
@@ -269,7 +270,7 @@ class StreamStreaksScreen extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Text(
-            'OR',
+            context.l10n.or,
             style: sfProText400(13.sp, const Color(0xFF8E8E93)),
           ),
         ),
@@ -283,7 +284,7 @@ class StreamStreaksScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildThreeTimesOption() {
+  Widget _buildThreeTimesOption(BuildContext context) {
     return Obx(() {
       final isSelected = controller.threeTimesWeek.value;
       return GestureDetector(
@@ -306,7 +307,7 @@ class StreamStreaksScreen extends StatelessWidget {
                   ),
                   SizedBox(width: 12.w),
                   Text(
-                    '3-times a week',
+                    context.l10n.threeTimesAWeek,
                     style: sfProText400(
                       17.sp,
                       isSelected ? Colors.white : const Color(0xFF8E8E93),

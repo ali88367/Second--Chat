@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/features/main_section/settings/Led_settings.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart';
@@ -14,6 +15,66 @@ import '../../../core/widgets/custom_switch.dart';
 
 class SettingsBottomsheetColumn extends StatelessWidget {
   SettingsBottomsheetColumn({super.key});
+
+  String _sectionTitle(BuildContext context, String raw) {
+    switch (raw) {
+      case 'Notifications':
+        return context.l10n.settingsSectionNotifications;
+      case 'CHAT':
+        return context.l10n.settingsSectionChat;
+      case 'LANGUAGE':
+        return context.l10n.settingsSectionLanguage;
+      case 'OTHER':
+        return context.l10n.settingsSectionOther;
+      default:
+        return raw;
+    }
+  }
+
+  String _tileTitle(BuildContext context, String raw) {
+    switch (raw) {
+      case 'Notifications':
+        return context.l10n.settingsTitleNotifications;
+      case 'LED Notifications':
+        return context.l10n.settingsTitleLedNotifications;
+      case 'Viewer Count':
+        return context.l10n.settingsTitleViewerCount;
+      case 'Hide Viewer Names':
+        return context.l10n.settingsTitleHideViewerNames;
+      case 'Show Subscribers Only':
+        return context.l10n.settingsTitleShowSubscribersOnly;
+      case 'Show VIP/Mods Only':
+        return context.l10n.settingsTitleShowVipModsOnly;
+      case 'Multi-Chat Merged Mode':
+        return context.l10n.settingsTitleMultiChatMergedMode;
+      case 'Font Size':
+        return context.l10n.settingsTitleFontSize;
+      case 'Platform Colour':
+        return context.l10n.settingsTitlePlatformColour;
+      case 'Connect Other Platforms':
+        return context.l10n.settingsTitleConnectOtherPlatforms;
+      case 'App Language':
+        return context.l10n.settingsTitleAppLanguage;
+      case 'Clock':
+        return context.l10n.settingsTitleClock;
+      case 'Time Zone Detection':
+        return context.l10n.settingsTitleTimeZoneDetection;
+      case 'Low Power Mode':
+        return context.l10n.settingsTitleLowPowerMode;
+      case 'Multi-Screen Preview':
+        return context.l10n.settingsTitleMultiScreenPreview;
+      case 'Animations':
+        return context.l10n.settingsTitleAnimations;
+      case 'Full Activity Filters':
+        return context.l10n.settingsTitleFullActivityFilters;
+      case 'TTS Advanced settings':
+        return context.l10n.settingsTitleTtsAdvancedSettings;
+      case 'Disconnect Platform':
+        return context.l10n.disconnectPlatform;
+      default:
+        return raw;
+    }
+  }
 
   final Map<String, List<Map<String, dynamic>>> settingsData = {
     "Notifications": [
@@ -183,7 +244,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     onTap: () => Get.back(),
                     child: Image.asset(x_icon, height: 44.h),
                   ),
-                  Text("Settings", style: sfProText600(17.sp, Colors.white)),
+                  Text(
+                    context.l10n.settings,
+                    style: sfProText600(17.sp, Colors.white),
+                  ),
                   SizedBox(width: 44.w),
                 ],
               ),
@@ -214,7 +278,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         Padding(
                           padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
                           child: Text(
-                            sectionTitle.toUpperCase(),
+                            _sectionTitle(context, sectionTitle).toUpperCase(),
                             style: sfProDisplay400(
                               13.sp,
                               const Color.fromRGBO(235, 235, 245, 0.6),
@@ -267,6 +331,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     SettingsController controller,
     String? error,
   ) {
+    final errorMessage = switch (error) {
+      'missingAccessToken' => context.l10n.missingAccessToken,
+      'unexpectedResponseFormat' => context.l10n.unexpectedResponseFormat,
+      'failedToLoadSettings' => context.l10n.failedToLoadSettings,
+      _ => context.l10n.failedToLoadSettings,
+    };
     final Widget content = error != null
         ? GestureDetector(
             onTap: () => controller.loadSettings(force: true),
@@ -281,12 +351,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Failed to load settings',
+                    errorMessage,
                     style: sfProDisplay600(16.sp, Colors.white),
                   ),
                   SizedBox(height: 6.h),
                   Text(
-                    'Tap to retry',
+                    context.l10n.tapToRetry,
                     style: sfProText400(13.sp, Colors.white60),
                   ),
                 ],
@@ -310,7 +380,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                 ),
                 SizedBox(width: 10.w),
                 Text(
-                  'Loading settings...',
+                  context.l10n.loadingSettings,
                   style: sfProText500(14.sp, Colors.white70),
                 ),
               ],
@@ -343,7 +413,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                   onTap: () => Get.back(),
                   child: Image.asset(x_icon, height: 44.h),
                 ),
-                Text("Settings", style: sfProText600(17.sp, Colors.white)),
+                Text(
+                  context.l10n.settings,
+                  style: sfProText600(17.sp, Colors.white),
+                ),
                 SizedBox(width: 44.w),
               ],
             ),
@@ -661,7 +734,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                 SizedBox(width: 12.w),
                 Expanded(
                   child: Text(
-                    tile["title"],
+                    _tileTitle(context, tile["title"]),
                     style: sfProText400(
                       16.sp,
                       Colors.white.withOpacity(opacity),
@@ -822,7 +895,7 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                         textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
-                            "Your Plan",
+                            context.l10n.yourPlan,
                             style: sfProDisplay600(
                               17.sp,
                               Colors.white.withOpacity(0.6),
@@ -864,7 +937,7 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                               ),
                               child: Center(
                                 child: Text(
-                                  "Subscribe",
+                                  context.l10n.subscribe,
                                   style: sfProText600(15.sp, Colors.white),
                                 ),
                               ),
@@ -950,7 +1023,3 @@ class ChatPlatformTabs extends StatelessWidget {
     return controller.getPlatformColor(tab);
   }
 }
-
-
-
-

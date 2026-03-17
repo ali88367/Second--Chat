@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/constants/app_images/app_images.dart';
+import '../../core/localization/l10n.dart';
 import 'intro_screen2.dart';
 
 class IntroScreen1 extends StatefulWidget {
@@ -96,9 +97,9 @@ class _IntroScreen1State extends State<IntroScreen1> {
                           ? Container(
                               color: Colors.black,
                               alignment: Alignment.center,
-                              child: const Text(
-                                'Video failed to load',
-                                style: TextStyle(color: Colors.white70),
+                              child: Text(
+                                context.l10n.videoFailedToLoad,
+                                style: const TextStyle(color: Colors.white70),
                               ),
                             )
                           : Container(color: Colors.black),
@@ -157,8 +158,8 @@ class _IntroScreen1State extends State<IntroScreen1> {
                     borderRadius: BorderRadius.circular(36.r),
                   ),
                   alignment: Alignment.center,
-                  child: const Text(
-                    'Get Started',
+                  child: Text(
+                    context.l10n.getStarted,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.black,

@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 
+import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
 import 'intro_screen4.dart';
 
@@ -101,47 +102,59 @@ class IntroScreen3 extends StatelessWidget {
 
                         SizedBox(height: 20.h),
 
-                        RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'How your ',
-                                style:
-                                sfProDisplay600(34.sp, Colors.white),
-                              ),
-                              TextSpan(
-                                text: 'Premium',
-                                style: sfProDisplay600(
-                                  34.sp,
-                                  Colors.white,
-                                ).copyWith(
-                                  foreground: Paint()
-                                    ..shader = LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: const [
-                                        Color(0xFFF2B269),
-                                        Color(0xFFF17A7A),
-                                        Color(0xFFFFE6A7),
-                                      ],
-                                      stops: const [0.2, 0.5, 0.8],
-                                      transform: GradientRotation(
-                                        185.5 * 3.1415927 / 180,
-                                      ),
-                                    ).createShader(
-                                      const Rect.fromLTWH(0, 0, 200, 50),
-                                    ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        Builder(
+                          builder: (context) {
+                            final premium = context.l10n.premium;
+                            final full = context.l10n
+                                .howYourPremiumFreeTrialWorks(premium);
 
-                        Text(
-                          'free trial works',
-                          style:
-                          sfProDisplay600(32.sp, Colors.white),
+                            final normalStyle =
+                                sfProDisplay600(34.sp, Colors.white);
+                            final premiumStyle = normalStyle.copyWith(
+                              foreground: Paint()
+                                ..shader = LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: const [
+                                    Color(0xFFF2B269),
+                                    Color(0xFFF17A7A),
+                                    Color(0xFFFFE6A7),
+                                  ],
+                                  stops: const [0.2, 0.5, 0.8],
+                                  transform: GradientRotation(
+                                    185.5 * 3.1415927 / 180,
+                                  ),
+                                ).createShader(
+                                  const Rect.fromLTWH(0, 0, 240, 60),
+                                ),
+                            );
+
+                            final idx = full.indexOf(premium);
+                            if (idx < 0) {
+                              return Text(
+                                full,
+                                textAlign: TextAlign.center,
+                                style: normalStyle,
+                              );
+                            }
+
+                            return RichText(
+                              textAlign: TextAlign.center,
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: full.substring(0, idx),
+                                    style: normalStyle,
+                                  ),
+                                  TextSpan(text: premium, style: premiumStyle),
+                                  TextSpan(
+                                    text: full.substring(idx + premium.length),
+                                    style: normalStyle,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
 
                         SizedBox(height: 20.h),
@@ -218,8 +231,8 @@ class IntroScreen3 extends StatelessWidget {
                                                   Colors.white),
                                             ),
                                           )
-                                              : Text(
-                                            'Start My 14 Day Free Trial',
+                                          : Text(
+                                            context.l10n.startMy14DayFreeTrial,
                                             style: sfProText600(
                                                 17.sp,
                                                 Colors.white),

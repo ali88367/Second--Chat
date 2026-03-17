@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import '../../../core/constants/app_images/app_images.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 
@@ -290,9 +291,9 @@ class _ChatBottomSection extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 24.w),
             child: Row(
               children: [
-                pillButton("Activity", isActive: false),
+                pillButton(context.l10n.activity, isActive: false),
                 const Spacer(),
-                pillButton("Title", isActive: false),
+                pillButton(context.l10n.title, isActive: false),
                 SizedBox(width: 12.w),
                 Icon(Icons.open_in_full, color: Colors.grey.shade600, size: 18.sp),
               ],
@@ -339,7 +340,13 @@ class _ChatBottomSection extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Text("Text", style: TextStyle(color: Colors.grey.shade600, fontSize: 14.sp)),
+                  Text(
+                    context.l10n.writeAMessage,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14.sp,
+                    ),
+                  ),
                   const Spacer(),
                   Icon(Icons.emoji_emotions_outlined, color: Colors.white, size: 20.sp),
                   SizedBox(width: 10.w),
@@ -351,7 +358,13 @@ class _ChatBottomSection extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Text("All", style: TextStyle(color: Colors.white, fontSize: 12.sp)),
+                        Text(
+                          context.l10n.all,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.sp,
+                          ),
+                        ),
                         Icon(Icons.unfold_more, color: Colors.grey, size: 14.sp)
                       ],
                     ),

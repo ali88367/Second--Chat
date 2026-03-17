@@ -9,6 +9,7 @@ import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
 
@@ -193,7 +194,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
                     ),
                     SizedBox(height: 24.h),
                     Text(
-                      ' You haven\'t started the\nstream yet, but in the\nmeantime you can',
+                      context.l10n.homeStreamNotStartedMessage,
                       textAlign: TextAlign.center,
                       style: sfProDisplay400(
                         28.sp,
@@ -435,7 +436,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Getting Started',
+                          context.l10n.gettingStarted,
                           style: sfProText600(
                             17.sp,
                             isAllCompleted
@@ -483,7 +484,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         // 1. Enable notifications
                         _buildMenuItem(
                           imagePath: 'assets/images/notification.png',
-                          title: 'Enable notifications',
+                          title: context.l10n.enableNotifications,
                           hasCheckbox: true,
                           hasArrow: true,
                           isChecked: notificationsEnabled,
@@ -539,7 +540,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         },
                         child: _buildMenuItem(
                           imagePath: 'assets/images/signals.png',
-                          title: 'Add new stream service',
+                          title: context.l10n.addNewStreamService,
                           hasArrow: true,
                           isChecked: _streamServiceAdded,
                         ),
@@ -578,7 +579,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         },
                         child: _buildMenuItem(
                           imagePath: 'assets/images/settingHome.png',
-                          title: 'Open settings',
+                          title: context.l10n.openSettings,
                           hasArrow: true,
                           isChecked: _settingsOpened,
                         ),
@@ -617,7 +618,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         },
                         child: _buildMenuItem(
                           imagePath: 'assets/images/calendar.png',
-                          title: 'Customisable streaks',
+                          title: context.l10n.customisableStreaks,
                           hasArrow: true,
                           isChecked: _streaksCustomized,
                         ),
@@ -651,7 +652,10 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                   borderRadius: BorderRadius.circular(30.r),
                 ),
                 alignment: Alignment.center,
-                child: Text("Next", style: sfProText600(17.sp, Colors.black)),
+                child: Text(
+                  context.l10n.next,
+                  style: sfProText600(17.sp, Colors.black),
+                ),
               ),
             ),
           ),
@@ -678,7 +682,10 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                   borderRadius: BorderRadius.circular(30.r),
                 ),
                 alignment: Alignment.center,
-                child: Text("Skip", style: sfProText600(17.sp, Colors.black)),
+                child: Text(
+                  context.l10n.skip,
+                  style: sfProText600(17.sp, Colors.black),
+                ),
               ),
             ),
           ),

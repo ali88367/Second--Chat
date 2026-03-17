@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Streaks/Last_streak.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
 class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
@@ -258,7 +259,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                     ),
                     padding: EdgeInsets.zero,
                   ),
-                  child: Text("Done", style: sfProText600(17.sp, Colors.black)),
+                  child: Text(
+                    context.l10n.done,
+                    style: sfProText600(17.sp, Colors.black),
+                  ),
                 ),
               ),
             ),
@@ -383,9 +387,12 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                 ),
                 SizedBox(height: 10.h),
 
-                Text("Day Streak", style: sfProDisplay600(34.sp, Colors.white)),
                 Text(
-                  "You’ve never been hotter, keep the streak burning!",
+                  context.l10n.dayStreak,
+                  style: sfProDisplay600(34.sp, Colors.white),
+                ),
+                Text(
+                  context.l10n.youVeNeverBeenHotterKeepStreakBurning,
                   style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
                   textAlign: TextAlign.center,
                 ),

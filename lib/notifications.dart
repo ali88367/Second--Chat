@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:ui';
+import 'package:second_chat/core/localization/l10n.dart';
 
 
 
@@ -182,10 +183,10 @@ class _EdgeGlowNotificationPageState extends State<EdgeGlowNotificationPage>
             child: const Icon(Icons.notifications, color: Colors.white),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              "SuperFan sent you a message",
-              style: TextStyle(color: Colors.white),
+              context.l10n.superFanSentYouAMessage,
+              style: const TextStyle(color: Colors.white),
             ),
           ),
         ],
