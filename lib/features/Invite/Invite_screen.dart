@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 
+import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 
 class InviteBottomSheet extends StatelessWidget {
@@ -11,14 +14,8 @@ class InviteBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dummy data for the codes
-    final List<Map<String, dynamic>> inviteCodes = [
-      {'code': 'HAKGP2X', 'isClaimed': false},
-      {'code': 'JGLP56C', 'isClaimed': false},
-      {'code': 'KNBP312', 'isClaimed': true},
-      {'code': 'GASG651', 'isClaimed': false},
-      {'code': 'KYSLM10', 'isClaimed': false},
-    ];
+    final ctrl = Get.put(InviteController());
+    ctrl.loadInvitesIfNeeded();
 
     return Container(
       height: Get.height * 0.85,
@@ -71,14 +68,18 @@ class InviteBottomSheet extends StatelessWidget {
               // 4. "Invites" Title
               Positioned(
                 top: 20.h,
-                child: Text(
-                  "Invites",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: Obx(() {
+                  final title =
+                      ctrl.invitePayload.value?['title']?.toString() ?? 'Invites';
+                  return Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                }),
               ),
 
               // 5. Close Button (X Icon)
@@ -109,22 +110,35 @@ class InviteBottomSheet extends StatelessWidget {
               child: Column(
                 children: [
                   SizedBox(height: 10.h),
-                  Text(
-                    "4 invites left",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Obx(() {
+                    final data = ctrl.invitePayload.value ?? {};
+                    final invitesLeft = data['invitesLeft'] ?? data['invites_left'];
+                    final maxInvites = data['maxInvites'] ?? data['max_invites'];
+                    final leftText = invitesLeft != null && maxInvites != null
+                        ? '$invitesLeft invites left'
+                        : 'Invites';
+                    return Text(
+                      leftText,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  }),
                   SizedBox(height: 8.h),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 40.w),
-                    child: Text(
-                      "Share invite codes with your friends and you will receive:",
-                      textAlign: TextAlign.center,
-                      style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
-                    ),
+                    child: Obx(() {
+                      final text = ctrl.invitePayload.value?['rewardTitle']
+                              ?.toString() ??
+                          "Share invite codes with your friends and you will receive:";
+                      return Text(
+                        text,
+                        textAlign: TextAlign.center,
+                        style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
+                      );
+                    }),
                   ),
                   SizedBox(height: 16.h),
 
@@ -149,71 +163,111 @@ class InviteBottomSheet extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Text(
-                      "1 month free premium",
-                      style: sfProDisplay400(15.sp, Colors.white)
-                    ),
+                    child: Obx(() {
+                      final reward =
+                          ctrl.invitePayload.value?['reward']?.toString() ??
+                              "1 month free premium";
+                      return Text(
+                        reward,
+                        style: sfProDisplay400(15.sp, Colors.white),
+                      );
+                    }),
                   ),
                   SizedBox(height: 20.h),
 
                   // --- Invite Codes List ---
                   // Use ShrinkWrap to work inside SingleChildScrollView
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(horizontal: 24.w),
-                    itemCount: inviteCodes.length,
-                    separatorBuilder: (context, index) =>
-                    const Divider(color: Colors.white10, height: 1),
-                    itemBuilder: (context, index) {
-                      final item = inviteCodes[index];
-                      final bool isClaimed = item['isClaimed'];
-
-                      return SizedBox(
-                        height: 60.h,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              item['code'],
-                              style: TextStyle(
-                                color: isClaimed ? Colors.white24 : Colors.white,
-                                fontSize: 17.sp,
-                                fontFamily: 'SFProText',
-                                fontWeight: FontWeight.w600,
-                                decoration:
-                                isClaimed ? TextDecoration.lineThrough : null,
-                                decorationColor: Colors.white24, // 🔴 underline / line color
-                              ),
-                            ),
-
-                            isClaimed
-                                ? Text(
-                              "Claimed",
-                              style: TextStyle(
-                                color: Colors.white24,
-                                fontSize: 14.sp,
-                              ),
-                            )
-                                : IconButton(
-                              onPressed: () {
-                                Clipboard.setData(
-                                    ClipboardData(text: item['code']));
-                                Get.snackbar(
-                                  "Copied",
-                                  "Code copied to clipboard",
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor: Colors.white10,
-                                  colorText: Colors.white,
-                                );
-                              },
-                              icon: Image.asset("assets/images/Group.png")
-                            ),
-                          ],
+                  Obx(() {
+                    if (ctrl.isLoading.value &&
+                        ctrl.invitePayload.value == null) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.h),
+                        child: const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       );
-                    },
-                  ),
+                    }
+
+                    final data = ctrl.invitePayload.value ?? {};
+                    final invites = data['invites'];
+                    final inviteList = invites is List
+                        ? invites.whereType<Map>().map((e) {
+                            final code = e['code']?.toString() ?? '';
+                            final claimed = e['claimed'] == true;
+                            return {'code': code, 'claimed': claimed};
+                          }).toList()
+                        : <Map<String, dynamic>>[];
+
+                    if (inviteList.isEmpty) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16.h),
+                        child: Text(
+                          'No invites available right now.',
+                          style: sfProDisplay400(14.sp, Colors.white54),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.symmetric(horizontal: 24.w),
+                      itemCount: inviteList.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(color: Colors.white10, height: 1),
+                      itemBuilder: (context, index) {
+                        final item = inviteList[index];
+                        final bool isClaimed = item['claimed'] == true;
+
+                        return SizedBox(
+                          height: 60.h,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                item['code'],
+                                style: TextStyle(
+                                  color:
+                                      isClaimed ? Colors.white24 : Colors.white,
+                                  fontSize: 17.sp,
+                                  fontFamily: 'SFProText',
+                                  fontWeight: FontWeight.w600,
+                                  decoration: isClaimed
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  decorationColor:
+                                      Colors.white24, // 🔴 underline / line color
+                                ),
+                              ),
+
+                              isClaimed
+                                  ? Text(
+                                      "Claimed",
+                                      style: TextStyle(
+                                        color: Colors.white24,
+                                        fontSize: 14.sp,
+                                      ),
+                                    )
+                                  : IconButton(
+                                      onPressed: () {
+                                        Clipboard.setData(
+                                            ClipboardData(text: item['code']));
+                                        Get.snackbar(
+                                          "Copied",
+                                          "Code copied to clipboard",
+                                          snackPosition: SnackPosition.BOTTOM,
+                                          backgroundColor: Colors.white10,
+                                          colorText: Colors.white,
+                                        );
+                                      },
+                                      icon: Image.asset("assets/images/Group.png"),
+                                    ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  }),
                   SizedBox(height: 20.h),
                 ],
               ),
@@ -222,5 +276,74 @@ class InviteBottomSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class InviteController extends GetxController {
+  final Rxn<Map<String, dynamic>> invitePayload = Rxn<Map<String, dynamic>>();
+  final RxBool isLoading = false.obs;
+  final RxnString error = RxnString();
+  bool _requested = false;
+
+  void loadInvitesIfNeeded() {
+    if (_requested) return;
+    _requested = true;
+    loadInvites();
+  }
+
+  Future<void> loadInvites() async {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      final token = await _readAccessToken();
+      if (token == null) {
+        error.value = 'Missing access token';
+        print('INVITES ERROR: Missing access token in SharedPreferences');
+        return;
+      }
+      final dio = _buildDio();
+      final res = await dio.get<dynamic>(
+        '/api/v1/subscriptions/referral/invites',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      final data = res.data;
+      print('INVITES RESPONSE RAW: $data');
+      if (data is Map && data['data'] is Map) {
+        invitePayload.value = Map<String, dynamic>.from(data['data'] as Map);
+      } else {
+        error.value = 'Unexpected response format';
+      }
+    } catch (e) {
+      error.value = 'Failed to load invites';
+      print('INVITES ERROR: $e');
+      if (e is DioException) {
+        print('INVITES ERROR RESPONSE: ${e.response?.data}');
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Dio _buildDio() {
+    return Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: const {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+  }
+
+  Future<String?> _readAccessToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('second_chat.access_token')?.trim();
+    if (token == null || token.isEmpty) return null;
+    return token;
   }
 }

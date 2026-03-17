@@ -24,6 +24,7 @@ class PlatformConnectController extends GetxController {
 
   final RxBool isLoading = false.obs;
   final Rxn<OAuthProvider> connectingProvider = Rxn<OAuthProvider>();
+  final Rxn<OAuthProvider> disconnectingProvider = Rxn<OAuthProvider>();
   final RxMap<OAuthProvider, bool> isConnected = <OAuthProvider, bool>{}.obs;
   final RxSet<OAuthProvider> optimisticLinked = <OAuthProvider>{}.obs;
 
@@ -328,6 +329,52 @@ class PlatformConnectController extends GetxController {
       await Future<void>.delayed(const Duration(milliseconds: 600));
       await refreshConnections();
     }
+    return ok;
+  }
+
+  Future<bool> disconnect(OAuthProvider provider) async {
+    if (disconnectingProvider.value != null) return false;
+    disconnectingProvider.value = provider;
+    bool ok = false;
+    try {
+      final token = await _readAccessToken();
+      if (token == null) {
+        if (kDebugMode) {
+          debugPrint('PLATFORMS DISCONNECT ERROR: Missing access token');
+        }
+        return false;
+      }
+
+      final dio = _buildDio();
+      final res = await dio.delete<dynamic>(
+        '/api/v1/platforms/${provider.name.toLowerCase()}',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      final data = res.data;
+      if (kDebugMode) {
+        debugPrint('PLATFORMS DISCONNECT RESPONSE: $data');
+      }
+
+      ok = data is Map && data['success'] == true;
+      if (ok) {
+        isConnected[provider] = false;
+        optimisticLinked.remove(provider);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('PLATFORMS DISCONNECT ERROR: $e');
+      if (e is DioException && kDebugMode) {
+        debugPrint('PLATFORMS DISCONNECT ERROR RESPONSE: ${e.response?.data}');
+      }
+    } finally {
+      disconnectingProvider.value = null;
+    }
+
+    await refreshConnections();
     return ok;
   }
 
