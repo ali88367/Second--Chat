@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -216,6 +217,7 @@ class AuthController extends GetxController {
 
   static const _kPrefsAccessToken = 'second_chat.access_token';
   static const _kPrefsRefreshToken = 'second_chat.refresh_token';
+  static const _kPrefsPlatformTokens = 'second_chat.platform_tokens';
 
   Map<String, String> _extractParams(Uri uri) {
     final params = <String, String>{...uri.queryParameters};
@@ -238,6 +240,31 @@ class AuthController extends GetxController {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kPrefsAccessToken, accessToken);
     await prefs.setString(_kPrefsRefreshToken, refreshToken);
+
+    final raw = prefs.getString(_kPrefsPlatformTokens);
+    Map<String, dynamic> map;
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        map = decoded is Map<String, dynamic>
+            ? decoded
+            : Map<String, dynamic>.from(decoded as Map);
+      } catch (_) {
+        map = <String, dynamic>{};
+      }
+    } else {
+      map = <String, dynamic>{};
+    }
+
+    map[provider.name] = {
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+    };
+    await prefs.setString(_kPrefsPlatformTokens, jsonEncode(map));
+
+    debugPrint(
+      'OAUTH TOKENS STORED(${provider.name}) prefs=$_kPrefsPlatformTokens map=$map',
+    );
   }
 
   SessionTokens? _tryParseTokens(dynamic json) {

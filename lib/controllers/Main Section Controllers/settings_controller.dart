@@ -1,20 +1,14 @@
 import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 
 class SettingsController extends GetxController {
-  // Static tokens for now. Replace with dynamic tokens when ready.
-  // TODO: read access token from AuthController/TokenStore instead of constants.
-  static const String _staticAccessToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEzMmM3NjQ3LTAyNGQtNGNjZS1iYzEwLTM2ZGQ3MWFlYzJjMCIsImVtYWlsIjoiYXR0YXVsbW9oaW1hbjExMkBnbWFpbC5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc3MzY1Nzg3MSwiZXhwIjoxNzc0MjYyNjcxfQ.6S40x9cbivESF_d7NErs1Kjy47a8-TnS1PxoR__gZ4c';
-  // ignore: unused_field
-  static const String _staticRefreshToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEzMmM3NjQ3LTAyNGQtNGNjZS1iYzEwLTM2ZGQ3MWFlYzJjMCIsImVtYWlsIjoiYXR0YXVsbW9oaW1hbjExMkBnbWFpbC5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc3MzY1Nzg3MSwiZXhwIjoxNzc0MjYyNjcxfQ.fUvra_Pzt300Oek5gp8kMmM-nJDD0Ed7rfwHMGRlDMI';
-
   final Rxn<Map<String, dynamic>> settingsPayload = Rxn<Map<String, dynamic>>();
   final RxBool settingsLoading = false.obs;
   final RxnString settingsError = RxnString();
@@ -96,12 +90,18 @@ class SettingsController extends GetxController {
     settingsError.value = null;
 
     try {
+      final token = await _readAccessToken();
+      if (token == null) {
+        settingsError.value = 'Missing access token';
+        print('SETTINGS ERROR: Missing access token in SharedPreferences');
+        return;
+      }
       final dio = _buildDio();
       final res = await dio.get<dynamic>(
         '/api/v1/settings',
         options: Options(
           headers: {
-            'Authorization': 'Bearer $_staticAccessToken',
+            'Authorization': 'Bearer $token',
           },
         ),
       );
@@ -131,6 +131,12 @@ class SettingsController extends GetxController {
 
   Future<bool> _patchSettings(Map<String, dynamic> patch) async {
     try {
+      final token = await _readAccessToken();
+      if (token == null) {
+        settingsError.value = 'Missing access token';
+        print('SETTINGS PATCH ERROR: Missing access token in SharedPreferences');
+        return false;
+      }
       final dio = _buildDio();
       print('SETTINGS PATCH REQUEST: $patch');
       final res = await dio.patch<dynamic>(
@@ -138,7 +144,7 @@ class SettingsController extends GetxController {
         data: patch,
         options: Options(
           headers: {
-            'Authorization': 'Bearer $_staticAccessToken',
+            'Authorization': 'Bearer $token',
           },
         ),
       );
@@ -282,6 +288,13 @@ class SettingsController extends GetxController {
         },
       ),
     );
+  }
+
+  Future<String?> _readAccessToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('second_chat.access_token')?.trim();
+    if (token == null || token.isEmpty) return null;
+    return token;
   }
 
   void _applySettingsFromApi(Map<String, dynamic> payload) {

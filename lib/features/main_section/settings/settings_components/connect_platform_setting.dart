@@ -48,6 +48,9 @@ class ConnectPlatformSetting extends StatelessWidget {
               onTap: (isConnected || isConnecting) ? null : onPressed,
               child: Container(
                 height: 50.h,
+                padding: isConnected
+                    ? EdgeInsets.symmetric(horizontal: 14.w)
+                    : EdgeInsets.zero,
                 decoration: BoxDecoration(
                   color: (isConnected || isConnecting)
                       ? buttonColor.withOpacity(0.75)

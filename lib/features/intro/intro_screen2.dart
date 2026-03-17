@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
+import 'package:second_chat/controllers/platform_connect_controller.dart';
+import 'package:second_chat/api/auth/oauth_provider.dart';
 import '../../core/themes/textstyles.dart';
 
 class LanguageItem {
@@ -50,8 +52,24 @@ class _IntroScreen2State extends State<IntroScreen2> {
     precacheImage(const AssetImage('assets/images/trial.png'), context);
   }
 
+  Future<void> _connectAndContinue(OAuthProvider provider) async {
+    final ctrl = Get.find<PlatformConnectController>();
+    if (ctrl.connectingProvider.value != null) return;
+    final ok = await ctrl.connect(provider);
+    if (!mounted) return;
+    if (ok) {
+      Get.to(
+        () => IntroScreenNotification2(),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final connectCtrl = Get.find<PlatformConnectController>();
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
@@ -244,23 +262,51 @@ class _IntroScreen2State extends State<IntroScreen2> {
                         style: sfProText400(15.sp, grey),
                       ),
                       SizedBox(height: 18.h),
-                      GestureDetector(
-                        onTap: () {
-                          Get.to(
-                            () => IntroScreenNotification2(),
-                            transition: Transition.cupertino,
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.fastOutSlowIn,
+                      Obx(
+                        () {
+                          final isLoading =
+                              connectCtrl.connectingProvider.value ==
+                                  OAuthProvider.twitch;
+                          return GestureDetector(
+                            onTap: isLoading
+                                ? null
+                                : () {
+                                    _connectAndContinue(OAuthProvider.twitch);
+                                  },
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 50.h,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Positioned.fill(
+                                    child: Opacity(
+                                      opacity: isLoading ? 0.7 : 1.0,
+                                      child: FittedBox(
+                                        fit: BoxFit.cover,
+                                        child: Image.asset(
+                                          'assets/images/twitchT.png',
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (isLoading)
+                                    SizedBox(
+                                      width: 20.w,
+                                      height: 20.w,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                           );
                         },
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 50.h,
-                          child: FittedBox(
-                            fit: BoxFit.cover,
-                            child: Image.asset('assets/images/twitchT.png'),
-                          ),
-                        ),
                       ),
                       // PlatformButton(
                       //   label: 'Twitch',
@@ -276,17 +322,31 @@ class _IntroScreen2State extends State<IntroScreen2> {
                       // ),
                       SizedBox(height: 12.h),
 
-                      PlatformButton(
-                        label: 'Kick',
-                        color: const Color(0xFF42A720), // solid green
-                        imagePath: 'assets/images/kick.png',
+                      Obx(
+                        () => PlatformButton(
+                          label: 'Kick',
+                          color: const Color(0xFF42A720), // solid green
+                          imagePath: 'assets/images/kick.png',
+                          isLoading: connectCtrl.connectingProvider.value ==
+                              OAuthProvider.kick,
+                          onPressed: () {
+                            _connectAndContinue(OAuthProvider.kick);
+                          },
+                        ),
                       ),
                       SizedBox(height: 12.h),
 
-                      PlatformButton(
-                        label: 'YouTube',
-                        color: const Color(0xFFDD2C28), // solid red
-                        imagePath: 'assets/images/youtube.png',
+                      Obx(
+                        () => PlatformButton(
+                          label: 'YouTube',
+                          color: const Color(0xFFDD2C28), // solid red
+                          imagePath: 'assets/images/youtube.png',
+                          isLoading: connectCtrl.connectingProvider.value ==
+                              OAuthProvider.youtube,
+                          onPressed: () {
+                            _connectAndContinue(OAuthProvider.youtube);
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -305,12 +365,16 @@ class PlatformButton extends StatelessWidget {
   final String? imagePath; // path to your image asset
   final Color? color;
   final LinearGradient? gradient;
+  final VoidCallback? onPressed;
+  final bool isLoading;
 
   const PlatformButton({
     required this.label,
     this.imagePath,
     this.color,
     this.gradient,
+    this.onPressed,
+    this.isLoading = false,
     super.key,
   });
 
@@ -342,14 +406,7 @@ class PlatformButton extends StatelessWidget {
                     : [],
           ),
           child: ElevatedButton(
-            onPressed: () {
-              Get.to(
-                () => IntroScreenNotification2(),
-                transition: Transition.cupertino,
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.fastOutSlowIn,
-              );
-            },
+            onPressed: isLoading ? null : onPressed,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
@@ -365,6 +422,18 @@ class PlatformButton extends StatelessWidget {
                   Image.asset(imagePath!, height: 24.h, width: 24.w),
                 SizedBox(width: 6.w),
                 Text(label, style: sfProText600(17.sp, Colors.white)),
+                if (isLoading) ...[
+                  SizedBox(width: 8.w),
+                  SizedBox(
+                    width: 16.w,
+                    height: 16.w,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

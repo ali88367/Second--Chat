@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
@@ -191,7 +193,9 @@ class MyApp extends StatelessWidget {
           getPages: [
             GetPage(
               name: '/',
-              page: () => IntroScreen1(initialController: introVideoController),
+              page: () => StartupGate(
+                introVideoController: introVideoController,
+              ),
             ),
             GetPage(
               name: '/auth/callback',
@@ -203,7 +207,7 @@ class MyApp extends StatelessWidget {
             page: () => IntroScreen1(initialController: introVideoController),
           ),
           initialRoute: '/',
-          home: IntroScreen1(initialController: introVideoController),
+          home: StartupGate(introVideoController: introVideoController),
 
           defaultTransition: Transition.cupertino,
           transitionDuration: const Duration(milliseconds: 250),
@@ -226,6 +230,56 @@ class _OAuthCallbackPlaceholder extends StatelessWidget {
     return const Scaffold(
       backgroundColor: Colors.transparent,
       body: SizedBox.shrink(),
+    );
+  }
+}
+
+class StartupGate extends StatefulWidget {
+  const StartupGate({super.key, this.introVideoController});
+
+  final VideoPlayerController? introVideoController;
+
+  @override
+  State<StartupGate> createState() => _StartupGateState();
+}
+
+class _StartupGateState extends State<StartupGate> {
+  late final Future<bool> _hasTokensFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _hasTokensFuture = _hasStoredTokens();
+  }
+
+  Future<bool> _hasStoredTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accessToken = prefs.getString('second_chat.access_token') ?? '';
+    final refreshToken = prefs.getString('second_chat.refresh_token') ?? '';
+    return accessToken.isNotEmpty && refreshToken.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _hasTokensFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF0A0A0A),
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        final hasTokens = snapshot.data == true;
+        if (hasTokens) {
+          return const HomeScreen2();
+        }
+
+        return IntroScreen1(initialController: widget.introVideoController);
+      },
     );
   }
 }

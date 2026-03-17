@@ -1,9 +1,12 @@
-import 'dart:ui';
+﻿import 'dart:ui';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
+import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/themes/textstyles.dart';
 
@@ -13,6 +16,7 @@ class IntroScreen5 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final IntroScreen5Controller controller = Get.put(IntroScreen5Controller());
+    controller.loadPlansIfNeeded();
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
@@ -261,6 +265,21 @@ class IntroScreen5 extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       key: const ValueKey('subscription'),
       children: [
+        Obx(
+          () => c.plansLoading.value
+              ? Padding(
+                  padding: EdgeInsets.only(bottom: 10.h),
+                  child: SizedBox(
+                    height: 4.h,
+                    child: LinearProgressIndicator(
+                      backgroundColor: Colors.white.withOpacity(0.15),
+                      valueColor:
+                          const AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
         // Monthly Plan
         GestureDetector(
           onTap: () => c.selectPlan(0),
@@ -268,7 +287,7 @@ class IntroScreen5 extends StatelessWidget {
             () => _planCard(
               isSelected: c.selectedPlan.value == 0,
               title: 'Monthly',
-              price: '£4.99/month',
+              price: c.monthlyPriceLabel.value,
             ),
           ),
         ),
@@ -308,7 +327,7 @@ class IntroScreen5 extends StatelessWidget {
                       Text('Year', style: sfProText600(17.sp, Colors.white)),
                       const Spacer(),
                       Text(
-                        '£2.99/month',
+                        c.yearlyPriceLabel.value,
                         style: sfProText600(17.sp, Colors.white),
                       ),
                     ],
@@ -373,10 +392,9 @@ class IntroScreen5 extends StatelessWidget {
                                 style: sfProText600(17.sp, Colors.white),
                               ),
                               TextSpan(
-                                text:
-                                    c.selectedPlan.value == 1
-                                        ? 'Then £2.99/year'
-                                        : 'Then £4.99/month',
+                                text: c.selectedPlan.value == 1
+                                    ? c.yearlyAfterTrialLabel.value
+                                    : c.monthlyAfterTrialLabel.value,
                                 style: sfProText400(
                                   12.sp,
                                   const Color.fromRGBO(0, 0, 0, 0.6),
@@ -537,12 +555,332 @@ class IntroScreen5 extends StatelessWidget {
 
 class IntroScreen5Controller extends GetxController {
   var isLoading = false.obs;
+  var plansLoading = false.obs;
+  final RxnString plansError = RxnString();
   var selectedPlan = 1.obs; // 0 = Monthly, 1 = Yearly
   var currentPage = 0.obs;
+  final RxString monthlyPriceLabel = '£4.99/month'.obs;
+  final RxString yearlyPriceLabel = '£2.99/year'.obs;
+  final RxString monthlyAfterTrialLabel = '£4.99/month'.obs;
+  final RxString yearlyAfterTrialLabel = '£2.99/year'.obs;
+  bool _plansRequested = false;
 
   final PageController pageController = PageController(initialPage: 0);
   // Track Horizontal Drag Distance
   double _dragDistance = 0.0;
+
+  @override
+  void onInit() {
+    super.onInit();
+    loadPlansIfNeeded();
+  }
+
+  void loadPlansIfNeeded({bool force = false}) {
+    if (_plansRequested && !force) return;
+    _plansRequested = true;
+    loadPlans();
+  }
+
+  Future<void> loadPlans() async {
+    try {
+      plansLoading.value = true;
+      plansError.value = null;
+      final dio = _buildDio();
+      print('SUBSCRIPTION PLANS REQUEST: GET /api/v1/subscriptions/plans');
+      final res = await dio.get<dynamic>(
+        '/api/v1/subscriptions/plans',
+      );
+      final data = res.data;
+      print('SUBSCRIPTION PLANS RESPONSE RAW: $data');
+      _applyPlans(data);
+      print(
+        'SUBSCRIPTION PLANS PARSED: monthly=${monthlyPriceLabel.value}, yearly=${yearlyPriceLabel.value}, '
+        'afterMonthly=${monthlyAfterTrialLabel.value}, afterYearly=${yearlyAfterTrialLabel.value}',
+      );
+    } catch (e) {
+      plansError.value = 'Failed to load plans';
+      print('SUBSCRIPTION PLANS ERROR: $e');
+      if (e is DioException) {
+        print('SUBSCRIPTION PLANS ERROR RESPONSE: ${e.response?.data}');
+      }
+    } finally {
+      plansLoading.value = false;
+    }
+  }
+
+  void _applyPlans(dynamic payload) {
+    dynamic data = payload;
+    if (data is Map && data['data'] != null) {
+      data = data['data'];
+    }
+
+    if (data is Map) {
+      if (data['plans'] is List) {
+        _applyPlansFromList(data['plans'] as List);
+        return;
+      }
+      _applyPlanFromMap('monthly', data['monthly']);
+      _applyPlanFromMap('yearly', data['yearly'] ?? data['annual']);
+      return;
+    }
+
+    if (data is List) {
+      _applyPlansFromList(data);
+    }
+  }
+
+  void _applyPlansFromList(List plans) {
+    for (final item in plans) {
+      if (item is! Map) continue;
+      final planType = _pickString(item, const [
+        'id',
+        'name',
+        'planType',
+        'plan_type',
+        'type',
+        'billingPeriod',
+        'billing_period',
+        'interval',
+        'period',
+      ]);
+      if (planType == null) continue;
+      final price = _extractCardPrice(item, planType);
+      if (price != null) {
+        _setPlanPrice(planType, price);
+      }
+      final afterTrial = _extractAfterTrialLabel(item, planType);
+      if (afterTrial != null) {
+        _setAfterTrialLabel(planType, afterTrial);
+      }
+    }
+  }
+
+  void _applyPlanFromMap(String planType, dynamic plan) {
+    if (plan is String) {
+      _setPlanPrice(planType, plan);
+      _setAfterTrialLabel(planType, plan);
+      return;
+    }
+    if (plan is! Map) return;
+    final price = _extractCardPrice(plan, planType);
+    if (price != null) _setPlanPrice(planType, price);
+    final afterTrial = _extractAfterTrialLabel(plan, planType);
+    if (afterTrial != null) _setAfterTrialLabel(planType, afterTrial);
+  }
+
+  void _setPlanPrice(String planType, String price) {
+    final normalized = _normalizeInterval(planType);
+    if (normalized == 'month') {
+      monthlyPriceLabel.value = price;
+    } else if (normalized == 'year') {
+      yearlyPriceLabel.value = price;
+    }
+  }
+
+  void _setAfterTrialLabel(String planType, String price) {
+    final normalized = _normalizeInterval(planType);
+    if (normalized == 'month') {
+      monthlyAfterTrialLabel.value = price;
+    } else if (normalized == 'year') {
+      yearlyAfterTrialLabel.value = price;
+    }
+  }
+
+  String? _extractCardPrice(Map plan, String fallbackType) {
+    final description = _pickString(plan, const [
+      'description',
+      'priceLabel',
+      'price_text',
+      'priceText',
+      'displayPrice',
+      'display_price',
+    ]);
+
+    if (description != null) {
+      return description.trim();
+    }
+
+    return _extractPriceLabel(plan, fallbackType);
+  }
+
+  String? _extractAfterTrialLabel(Map plan, String fallbackType) {
+    final fullDescription = _pickString(plan, const [
+      'fullDescription',
+      'full_description',
+      'afterTrialText',
+      'after_trial_text',
+    ]);
+    if (fullDescription != null) {
+      return fullDescription.trim();
+    }
+
+    final description = _pickString(plan, const [
+      'description',
+    ]);
+    if (description != null) {
+      return description.trim();
+    }
+
+    final totalPrice = _pickNum(plan, const [
+      'totalPrice',
+      'total_price',
+    ]);
+    if (totalPrice != null) {
+      final currency = _pickString(plan, const [
+            'currencySymbol',
+            'currency_symbol',
+          ]) ??
+          _currencySymbolFromCode(
+            _pickString(plan, const [
+              'currency',
+              'currencyCode',
+              'currency_code',
+            ]),
+          ) ??
+          '£';
+      final formatted = totalPrice % 1 == 0
+          ? totalPrice.toStringAsFixed(0)
+          : totalPrice.toStringAsFixed(2);
+      final base = '$currency$formatted';
+      final interval = _pickString(plan, const [
+            'billingPeriod',
+            'billing_period',
+          ]) ??
+          'year';
+      return _appendIntervalIfMissing(base, interval);
+    }
+
+    return _extractCardPrice(plan, fallbackType) ??
+        _extractPriceLabel(plan, fallbackType);
+  }
+
+  String? _extractPriceLabel(Map plan, String fallbackType) {
+    final raw = _pickString(plan, const [
+      'priceLabel',
+      'price_text',
+      'priceText',
+      'displayPrice',
+      'display_price',
+      'price',
+      'amountFormatted',
+      'amount_formatted',
+      'pricePerMonth',
+      'price_per_month',
+      'pricePerYear',
+      'price_per_year',
+    ]);
+    final interval = _pickString(plan, const [
+      'interval',
+      'period',
+      'billingPeriod',
+      'billing_period',
+      'planType',
+      'plan_type',
+      'type',
+    ]);
+
+    if (raw != null) {
+      return _appendIntervalIfMissing(raw, interval ?? fallbackType);
+    }
+
+    final amount = _pickNum(plan, const [
+      'amount',
+      'priceAmount',
+      'price_amount',
+      'value',
+    ]);
+    if (amount == null) return null;
+
+    final currency = _pickString(plan, const [
+          'currencySymbol',
+          'currency_symbol',
+        ]) ??
+        _currencySymbolFromCode(
+          _pickString(plan, const [
+            'currency',
+            'currencyCode',
+            'currency_code',
+          ]),
+        ) ??
+        '£';
+    final formatted = amount % 1 == 0
+        ? amount.toStringAsFixed(0)
+        : amount.toStringAsFixed(2);
+    final base = '$currency$formatted';
+    return _appendIntervalIfMissing(base, interval ?? fallbackType);
+  }
+
+  String _appendIntervalIfMissing(String price, String intervalRaw) {
+    final trimmed = price.trim();
+    if (trimmed.contains('/') || trimmed.contains('per ')) {
+      return trimmed;
+    }
+    final interval = _normalizeInterval(intervalRaw);
+    if (interval.isEmpty) return trimmed;
+    return '$trimmed/$interval';
+  }
+
+  String _normalizeInterval(String raw) {
+    final v = raw.toLowerCase();
+    if (v.contains('year') || v.contains('annual')) return 'year';
+    if (v.contains('month')) return 'month';
+    return v;
+  }
+
+  String? _currencySymbolFromCode(String? code) {
+    if (code == null) return null;
+    switch (code.toUpperCase()) {
+      case 'USD':
+        return '\$';
+      case 'GBP':
+        return '£';
+      case 'EUR':
+        return 'â‚¬';
+      default:
+        return null;
+    }
+  }
+
+  String? _pickString(Map map, List<String> keys) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value == null) continue;
+      final str = value.toString().trim();
+      if (str.isNotEmpty) return str;
+    }
+    return null;
+  }
+
+  double? _pickNum(Map map, List<String> keys) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value is num) return value.toDouble();
+      if (value is String) {
+        final parsed = double.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
+  Dio _buildDio() {
+    return Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: const {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+  }
+
+  Future<String?> _readAccessToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('second_chat.access_token')?.trim();
+    if (token == null || token.isEmpty) return null;
+    return token;
+  }
 
   void onHorizontalDragStart(DragStartDetails details) {
     _dragDistance = 0.0; // Reset distance
@@ -584,10 +922,71 @@ class IntroScreen5Controller extends GetxController {
   void startTrial() async {
     if (isLoading.value) return;
     isLoading(true);
-    await Future.delayed(const Duration(milliseconds: 100));
-    isLoading(false);
+    try {
+      final token = await _readAccessToken();
+      if (token == null) {
+        Get.snackbar(
+          'Session missing',
+          'Please log in again to start your free trial.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 2),
+          margin: const EdgeInsets.all(20),
+          backgroundColor: Colors.black.withOpacity(0.7),
+          colorText: Colors.white,
+        );
+        return;
+      }
+      final dio = _buildDio();
+      final res = await dio.post<dynamic>(
+        '/api/v1/subscriptions/trial/start',
+        data: const {'planType': 'monthly'},
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
 
-    _goToHome();
+      final data = res.data;
+      print('TRIAL START RESPONSE RAW: $data');
+      if (data is Map) {
+        print('TRIAL START RESPONSE DATA: ${data['data']}');
+      }
+
+      final isActive = data is Map &&
+          data['success'] == true &&
+          data['data'] is Map &&
+          data['data']['status']?.toString() == 'active';
+      if (isActive) {
+        _goToHome();
+      } else {
+        Get.snackbar(
+          'Trial not active',
+          'We could not start your free trial. Please try again.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 2),
+          margin: const EdgeInsets.all(20),
+          backgroundColor: Colors.black.withOpacity(0.7),
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('TRIAL START ERROR: $e');
+      if (e is DioException) {
+        print('TRIAL START ERROR RESPONSE: ${e.response?.data}');
+      }
+      Get.snackbar(
+        'Trial failed',
+        'Unable to start the free trial. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(20),
+        backgroundColor: Colors.black.withOpacity(0.7),
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading(false);
+    }
   }
 
   void skipTrial() {
@@ -630,3 +1029,12 @@ class IntroScreen5Controller extends GetxController {
     super.onClose();
   }
 }
+
+
+
+
+
+
+
+
+
