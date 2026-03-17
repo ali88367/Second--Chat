@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
@@ -65,6 +66,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   late final SettingsController _settingsController;
 
   // Controllers and state
+  late final ChatController _chatCtrl;
   late List<Map<String, dynamic>> _comments;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _mainScrollController = ScrollController();
@@ -72,6 +74,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   final FocusNode _focusNode = FocusNode();
   StateSetter? _expandedSheetStateSetter;
   final filterController = Get.put(FilterController());
+  Worker? _scrollWorker;
 
   // Emote service - initialized lazily
   late final EmoteService _emoteService;
@@ -171,54 +174,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    _chatCtrl = Get.find<ChatController>();
+
     // Initialize or get existing EmoteService
     _emoteService = Get.put(EmoteService());
 
     // Initialize SettingsController
     _settingsController = Get.find<SettingsController>();
 
-    // Initialize sample comments
-    _comments = [
-      {
-        'platform': 'assets/images/twitch1.png',
-        'name': 'TwitchFan1',
-        'message': 'KEKW Amazing play!',
-      },
-      {
-        'platform': 'assets/images/twitch1.png',
-        'name': 'TwitchFan2',
-        'message': 'Wow, insane! catJAM',
-      },
-      {
-        'platform': 'assets/images/kick.png',
-        'name': 'KickFan1',
-        'message': 'Lets goooo! POGGERS',
-      },
-      {
-        'platform': 'assets/images/kick.png',
-        'name': 'KickFan2',
-        'message': 'Hyped for this! monkaS',
-      },
-      {
-        'platform': 'assets/images/youtube1.png',
-        'name': 'YTViewer1',
-        'message': 'Nice content! PepeLaugh',
-      },
-      {
-        'platform': 'assets/images/youtube1.png',
-        'name': 'YTViewer2',
-        'message': 'Love this! Sadge',
-      },
-    ];
-
-    for (int i = 0; i < 10; i++) {
-      _comments.add({
-        'platform': 'assets/images/twitch1.png',
-        'name': 'User$i',
-        'message': 'Hello $i KEKW!',
-      });
-    }
-    _comments.shuffle();
+    // Keep local list as a fallback; primary source is ChatController.messages.
+    _comments = <Map<String, dynamic>>[];
 
     // Listen for emote changes to update parser
     ever(_emoteService.emoteList, (_) {
@@ -232,6 +197,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom(_mainScrollController, animate: false);
       _scrollToBottom(_expandedScrollController, animate: false);
+    });
+
+    // Scroll trigger driven by controller updates (no UI layout change).
+    _scrollWorker = ever<int>(_chatCtrl.scrollTick, (_) {
+      _scrollToBottom(_mainScrollController, animate: true);
+      _scrollToBottom(_expandedScrollController, animate: true);
     });
 
     _focusNode.addListener(_onFocusChanged);
@@ -253,6 +224,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   void dispose() {
     _focusNode.removeListener(_onFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
+    _scrollWorker?.dispose();
     _messageController.dispose();
     _mainScrollController.dispose();
     _expandedScrollController.dispose();
@@ -340,8 +312,19 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   }
 
   List<Map<String, dynamic>> _getFilteredComments(String? filter) {
-    if (filter == null) return _comments;
-    return _comments.where((item) {
+    // Prefer live controller messages, fall back to local list if empty.
+    final source = _chatCtrl.messages.isNotEmpty
+        ? _chatCtrl.messages
+            .map<Map<String, dynamic>>((m) => {
+                  'platform': _getPlatformAsset(m.platform),
+                  'name': m.userName,
+                  'message': m.message,
+                })
+            .toList(growable: false)
+        : _comments;
+
+    if (filter == null) return source;
+    return source.where((item) {
       final platformPath = item['platform'].toString().toLowerCase();
       final filterKey = filter.toLowerCase();
       return platformPath.contains(filterKey);
@@ -352,22 +335,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    // Keep existing platform selection behavior.
     String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
+    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!;
     }
-
-    final platformAsset = _getPlatformAsset(currentPlatform);
-    final item = {'platform': platformAsset, 'name': 'You', 'message': text};
-
-    setState(() {
-      _comments.add(item);
-    });
-
-    if (_expandedSheetStateSetter != null) {
-      _expandedSheetStateSetter!(() {});
-    }
+    _chatCtrl.platform.value = currentPlatform;
+    _chatCtrl.sendMessage(text);
 
     _messageController.clear();
     _focusNode.requestFocus();
@@ -393,25 +367,11 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   /// Send emote directly to chat (not to text field)
   void _sendEmoteDirectly(String emoteName) {
     String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
+    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!;
     }
-
-    final platformAsset = _getPlatformAsset(currentPlatform);
-    final item = {
-      'platform': platformAsset,
-      'name': 'You',
-      'message': emoteName,
-    };
-
-    setState(() {
-      _comments.add(item);
-    });
-
-    if (_expandedSheetStateSetter != null) {
-      _expandedSheetStateSetter!(() {});
-    }
+    _chatCtrl.platform.value = currentPlatform;
+    _chatCtrl.sendMessage(emoteName);
 
     // Track recently used
     _emoteService.addToRecentlyUsed(emoteName);
@@ -945,36 +905,38 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                         child: ValueListenableBuilder<String?>(
                           valueListenable: widget.chatFilter,
                           builder: (context, filter, child) {
-                            final filteredList = _getFilteredComments(filter);
-                            return ListView.builder(
-                              key: ValueKey(
-                                'expanded_chat_${_comments.length}_${filter ?? 'all'}',
-                              ),
-                              controller: _expandedScrollController,
-                              padding: EdgeInsets.only(
-                                bottom: 16.h + 20.h,
-                              ),
-                              itemCount: filteredList.length,
-                              reverse: false,
-                              addAutomaticKeepAlives: false,
-                              addRepaintBoundaries: false,
-                              itemBuilder: (context, index) {
-                                final item = filteredList[index];
-                                final nameHash = item['name'].hashCode;
-                                final nameColor =
-                                    nameColors[nameHash.abs() %
-                                        nameColors.length];
-                                return _chatItem(
-                                  item['platform'],
-                                  item['name'],
-                                  item['message'],
-                                  nameColor,
-                                  key: ValueKey(
-                                    'expanded_${item['name']}_${index}_${item['message']}',
-                                  ),
-                                );
-                              },
-                            );
+                            return Obx(() {
+                              final filteredList = _getFilteredComments(filter);
+                              return ListView.builder(
+                                key: ValueKey(
+                                  'expanded_chat_${filteredList.length}_${filter ?? 'all'}',
+                                ),
+                                controller: _expandedScrollController,
+                                padding: EdgeInsets.only(
+                                  bottom: 16.h + 20.h,
+                                ),
+                                itemCount: filteredList.length,
+                                reverse: false,
+                                addAutomaticKeepAlives: false,
+                                addRepaintBoundaries: false,
+                                itemBuilder: (context, index) {
+                                  final item = filteredList[index];
+                                  final nameHash = item['name'].hashCode;
+                                  final nameColor =
+                                      nameColors[nameHash.abs() %
+                                          nameColors.length];
+                                  return _chatItem(
+                                    item['platform'],
+                                    item['name'],
+                                    item['message'],
+                                    nameColor,
+                                    key: ValueKey(
+                                      'expanded_${item['name']}_${index}_${item['message']}',
+                                    ),
+                                  );
+                                },
+                              );
+                            });
                           },
                         ),
                       ),
@@ -1212,48 +1174,50 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                     ValueListenableBuilder<String?>(
                       valueListenable: widget.chatFilter,
                       builder: (context, filter, child) {
-                        final filteredList = _getFilteredComments(filter);
-                        final keyboardHeight = math.max(
-                          MediaQuery.of(context).viewInsets.bottom,
-                          _keyboardInset,
-                        );
-                        _logInsetChange('main.keyboardInset', keyboardHeight);
-                        return AnimatedPadding(
-                          padding: EdgeInsets.only(bottom: keyboardHeight),
-                          duration: const Duration(milliseconds: 100),
-                          child: ListView.builder(
-                            key: ValueKey(
-                              'main_chat_${_comments.length}_${filter ?? 'all'}',
+                        return Obx(() {
+                          final filteredList = _getFilteredComments(filter);
+                          final keyboardHeight = math.max(
+                            MediaQuery.of(context).viewInsets.bottom,
+                            _keyboardInset,
+                          );
+                          _logInsetChange('main.keyboardInset', keyboardHeight);
+                          return AnimatedPadding(
+                            padding: EdgeInsets.only(bottom: keyboardHeight),
+                            duration: const Duration(milliseconds: 100),
+                            child: ListView.builder(
+                              key: ValueKey(
+                                'main_chat_${filteredList.length}_${filter ?? 'all'}',
+                              ),
+                              controller: _mainScrollController,
+                              padding: EdgeInsets.only(
+                                left: 16.w,
+                                right: 16.w,
+                                bottom: 80.h + 20.h,
+                              ),
+                              itemCount: filteredList.length,
+                              reverse: false,
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: false,
+                              shrinkWrap: false,
+                              itemBuilder: (context, index) {
+                                final item = filteredList[index];
+                                final nameHash = item['name'].hashCode;
+                                final nameColor =
+                                    nameColors[nameHash.abs() %
+                                        nameColors.length];
+                                return _chatItem(
+                                  item['platform'],
+                                  item['name'],
+                                  item['message'],
+                                  nameColor,
+                                  key: ValueKey(
+                                    'main_${item['name']}_${index}_${item['message']}',
+                                  ),
+                                );
+                              },
                             ),
-                            controller: _mainScrollController,
-                            padding: EdgeInsets.only(
-                              left: 16.w,
-                              right: 16.w,
-                              bottom: 80.h + 20.h,
-                            ),
-                            itemCount: filteredList.length,
-                            reverse: false,
-                            addAutomaticKeepAlives: false,
-                            addRepaintBoundaries: false,
-                            shrinkWrap: false,
-                            itemBuilder: (context, index) {
-                              final item = filteredList[index];
-                              final nameHash = item['name'].hashCode;
-                              final nameColor =
-                                  nameColors[nameHash.abs() %
-                                      nameColors.length];
-                              return _chatItem(
-                                item['platform'],
-                                item['name'],
-                                item['message'],
-                                nameColor,
-                                key: ValueKey(
-                                  'main_${item['name']}_${index}_${item['message']}',
-                                ),
-                              );
-                            },
-                          ),
-                        );
+                          );
+                        });
                       },
                     ),
                     // Main view input bar (16.h above bottom; parent reserves nav bar space)

@@ -1,4 +1,3 @@
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,11 +6,13 @@ import 'package:get/get.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
+import '../../../controllers/chat_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../Invite/Invite_screen.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
+import 'widgets/stream_webview.dart';
 
 class Livestreaming extends StatefulWidget {
   const Livestreaming({super.key});
@@ -32,8 +33,6 @@ class _LivestreamingState extends State<Livestreaming> {
 
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
 
-  final ValueNotifier<int> _currentStreamingIndex = ValueNotifier<int>(0);
-
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
   double? _bottomSectionHeightBeforeActivityMore;
@@ -50,13 +49,6 @@ class _LivestreamingState extends State<Livestreaming> {
   static const double _activityMinHeight = 0.3;
   static const double _activityMaxHeight = 0.65;
   final ScrollController _activityScrollController = ScrollController();
-
-  final List<String> _streamingImages = [
-    'assets/images/streaming.png',
-    'assets/images/streaming2.png',
-    'assets/images/streaming3.png',
-    'assets/images/streaming4.png',
-  ];
 
   late final SettingsController _settingsCtrl;
 
@@ -93,7 +85,6 @@ class _LivestreamingState extends State<Livestreaming> {
     _titleSelected.dispose();
     _topBarImage.dispose();
     _chatFilter.dispose();
-    _currentStreamingIndex.dispose();
     _activityScrollController.dispose();
     super.dispose();
   }
@@ -739,91 +730,38 @@ class _LivestreamingState extends State<Livestreaming> {
                                           valueListenable: _showServiceCard,
                                           builder: (context, showCard, child) {
                                             if (!showCard) {
+                                              final chatCtrl =
+                                                  Get.find<ChatController>();
                                               return SizedBox(
                                                 height: streamPreviewHeight,
-                                                child: ValueListenableBuilder<
-                                                  int
-                                                >(
-                                                  valueListenable:
-                                                      _currentStreamingIndex,
-                                                  builder: (
-                                                    context,
-                                                    currentIndex,
-                                                    _,
-                                                  ) {
-                                                    return GestureDetector(
-                                                      behavior:
-                                                          HitTestBehavior
-                                                              .opaque,
-                                                      onVerticalDragStart:
-                                                          (_) {},
-                                                      onVerticalDragUpdate:
-                                                          (_) {},
-                                                      onVerticalDragEnd: (_) {},
-                                                      child: Stack(
-                                                        children: [
-                                                          CarouselSlider(
-                                                            options: CarouselOptions(
-                                                              height:
-                                                                  streamPreviewHeight,
-                                                              viewportFraction:
-                                                                  1.0,
-                                                              enableInfiniteScroll:
-                                                                  false,
-                                                              enlargeCenterPage:
-                                                                  false,
-                                                              onPageChanged: (
-                                                                index,
-                                                                reason,
-                                                              ) {
-                                                                _currentStreamingIndex
-                                                                        .value =
-                                                                    index;
-                                                              },
-                                                            ),
-                                                            items:
-                                                                _streamingImages.map((
-                                                                  imagePath,
-                                                                ) {
-                                                                  return Builder(
-                                                                    builder: (
-                                                                      BuildContext
-                                                                      context,
-                                                                    ) {
-                                                                      return Container(
-                                                                        width:
-                                                                            MediaQuery.of(
-                                                                              context,
-                                                                            ).size.width,
-                                                                        margin: EdgeInsets.symmetric(
-                                                                          horizontal:
-                                                                              5.w,
-                                                                        ),
-                                                                        decoration: BoxDecoration(
-                                                                          borderRadius: BorderRadius.circular(
-                                                                            24.r,
-                                                                          ),
-                                                                        ),
-                                                                        child: ClipRRect(
-                                                                          borderRadius: BorderRadius.circular(
-                                                                            24.r,
-                                                                          ),
-                                                                          child: Image.asset(
-                                                                            imagePath,
-                                                                            fit:
-                                                                                BoxFit.cover,
-                                                                          ),
-                                                                        ),
-                                                                      );
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                          ),
-                                                        ],
+                                                child: Obx(() {
+                                                  final url =
+                                                      chatCtrl.watchUrl.value ?? '';
+                                                  return Container(
+                                                    width: MediaQuery.of(
+                                                      context,
+                                                    ).size.width,
+                                                    margin: EdgeInsets
+                                                        .symmetric(
+                                                          horizontal: 5.w,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius
+                                                              .circular(24.r),
+                                                    ),
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius
+                                                              .circular(24.r),
+                                                      child: StreamWebView(
+                                                        url: url,
+                                                        height:
+                                                            streamPreviewHeight,
                                                       ),
-                                                    );
-                                                  },
-                                                ),
+                                                    ),
+                                                  );
+                                                }),
                                               );
                                             }
 
