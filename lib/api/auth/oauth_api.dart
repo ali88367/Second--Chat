@@ -18,7 +18,7 @@ class OAuthApi {
         ? '/api/v1/auth/${provider.backendKey}/link'
         : '/api/v1/auth/${provider.backendKey}/url';
 
-    print('This is redirect url${redirectUri}/${ApiConfig.oauthRedirectUri}');
+    // Use the provided redirectUri if supplied; otherwise fall back to config.
 
     final res = await _dio.get<dynamic>(
       path,

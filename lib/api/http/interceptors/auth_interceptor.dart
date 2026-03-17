@@ -64,6 +64,13 @@ class AuthInterceptor extends Interceptor {
 
       final response = await _dio.fetch<dynamic>(requestOptions);
       handler.resolve(response);
+    } on DioException catch (refreshErr) {
+      _refreshInFlight = null;
+      final status = refreshErr.response?.statusCode;
+      if (status == 401) {
+        await _tokenStore.clear();
+      }
+      handler.next(err);
     } catch (_) {
       _refreshInFlight = null;
       handler.next(err);
