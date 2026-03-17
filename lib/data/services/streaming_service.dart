@@ -8,6 +8,19 @@ class StreamingService {
 
   final Dio _dio;
 
+  int? _extractInt(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        final parsed = int.tryParse(value.trim());
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
   Future<StreamingOverview?> fetchOverview({
     required String platform,
     required String accessToken,
@@ -59,6 +72,29 @@ class StreamingService {
 
     final platformsList = map['platforms'];
     if (platformsList is List) {
+      final viewerCountsByPlatform = <String, int>{};
+      for (final p in platformsList) {
+        if (p is! Map) continue;
+        final m = p.cast<String, dynamic>();
+        final pNameRaw = (m['platform'] ?? m['name'] ?? '').toString().trim();
+        if (pNameRaw.isEmpty) continue;
+        final pKey = pNameRaw.toLowerCase();
+
+        // API field name varies across deployments.
+        final count = _extractInt(m, const [
+          'viewerCount',
+          'viewer_count',
+          'viewers',
+          'viewer_count_live',
+          'liveViewerCount',
+          'live_viewer_count',
+          'views',
+          'viewCount',
+          'view_count',
+        ]);
+        if (count != null) viewerCountsByPlatform[pKey] = count;
+      }
+
       final key = platform.toLowerCase();
       for (final p in platformsList) {
         if (p is! Map) continue;
@@ -83,6 +119,19 @@ class StreamingService {
         embedUrl ??= extractString(m, const ['embedUrl', 'embed_url']);
         watchUrl ??= extractString(m, const ['watchUrl', 'watch_url']);
 
+        final viewerCount = viewerCountsByPlatform[key] ??
+            _extractInt(m, const [
+              'viewerCount',
+              'viewer_count',
+              'viewers',
+              'viewer_count_live',
+              'liveViewerCount',
+              'live_viewer_count',
+              'views',
+              'viewCount',
+              'view_count',
+            ]);
+
         return StreamingOverview(
           platform: platform,
           live: live,
@@ -91,6 +140,8 @@ class StreamingService {
               : watchUrl,
           chatSocketUrl: socketUrl,
           chatSocketPath: socketPath,
+          viewerCount: viewerCount,
+          viewerCountsByPlatform: viewerCountsByPlatform,
           raw: map,
         );
       }
@@ -110,6 +161,18 @@ class StreamingService {
     }
     embedUrl ??= extractString(map, const ['embedUrl', 'embed_url']);
     watchUrl ??= extractString(map, const ['watchUrl', 'watch_url']);
+
+    final viewerCount = _extractInt(map, const [
+      'viewerCount',
+      'viewer_count',
+      'viewers',
+      'viewer_count_live',
+      'liveViewerCount',
+      'live_viewer_count',
+      'views',
+      'viewCount',
+      'view_count',
+    ]);
     return StreamingOverview(
       platform: platform,
       live: live,
@@ -118,6 +181,10 @@ class StreamingService {
           : watchUrl,
       chatSocketUrl: socketUrl,
       chatSocketPath: socketPath,
+      viewerCount: viewerCount,
+      viewerCountsByPlatform: viewerCount == null
+          ? const {}
+          : {platform.toLowerCase(): viewerCount},
       raw: map,
     );
   }
@@ -127,4 +194,3 @@ class StreamingService {
     return json;
   }
 }
-

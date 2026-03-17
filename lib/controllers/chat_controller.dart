@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
 import '../api/app_api.dart';
@@ -14,9 +13,10 @@ class ChatController extends GetxController {
     AppApi? api,
     PlatformTokenProvider? tokenProvider,
     ChatSocketService? socketService,
-  })  : _api = api ?? AppApi.create(),
-        _tokenProvider = tokenProvider ?? PlatformTokenProvider(),
-        _socket = socketService ?? Get.put(ChatSocketService(), permanent: true) {
+  }) : _api = api ?? AppApi.create(),
+       _tokenProvider = tokenProvider ?? PlatformTokenProvider(),
+       _socket =
+           socketService ?? Get.put(ChatSocketService(), permanent: true) {
     _streaming = StreamingService(_api.client.dio);
     _chat = ChatService(_api.client.dio);
   }
@@ -32,6 +32,7 @@ class ChatController extends GetxController {
   final RxnString watchUrl = RxnString();
   final RxBool isLive = false.obs;
   final Rxn<StreamingOverview> overview = Rxn<StreamingOverview>();
+  final RxMap<String, int> platformViewerCounts = <String, int>{}.obs;
 
   RxList<ChatMessage> get messages => _socket.messages;
   RxInt get viewerCount => _socket.viewerCount;
@@ -69,6 +70,11 @@ class ChatController extends GetxController {
         overview.value = ov;
         isLive.value = ov.live;
         watchUrl.value = ov.watchUrl;
+        if (ov.viewerCountsByPlatform.isNotEmpty) {
+          platformViewerCounts.assignAll(ov.viewerCountsByPlatform);
+        } else if (ov.viewerCount != null) {
+          platformViewerCounts[ov.platform.toLowerCase()] = ov.viewerCount!;
+        }
       }
 
       final socketUrl = ov?.chatSocketUrl;
@@ -93,7 +99,8 @@ class ChatController extends GetxController {
   Future<void> sendMessage(String text) async {
     final msg = text.trim();
     if (msg.isEmpty) return;
-    final token = _accessToken ?? await _tokenProvider.getAccessToken(platform.value);
+    final token =
+        _accessToken ?? await _tokenProvider.getAccessToken(platform.value);
     if (token == null || token.isEmpty) return;
 
     await _chat.sendMessage(
@@ -117,4 +124,3 @@ class ChatController extends GetxController {
     super.onClose();
   }
 }
-

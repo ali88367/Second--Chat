@@ -313,15 +313,18 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   List<Map<String, dynamic>> _getFilteredComments(String? filter) {
     // Prefer live controller messages, fall back to local list if empty.
-    final source = _chatCtrl.messages.isNotEmpty
-        ? _chatCtrl.messages
-            .map<Map<String, dynamic>>((m) => {
-                  'platform': _getPlatformAsset(m.platform),
-                  'name': m.userName,
-                  'message': m.message,
-                })
-            .toList(growable: false)
-        : _comments;
+    final source =
+        _chatCtrl.messages.isNotEmpty
+            ? _chatCtrl.messages
+                .map<Map<String, dynamic>>(
+                  (m) => {
+                    'platform': _getPlatformAsset(m.platform),
+                    'name': m.userName,
+                    'message': m.message,
+                  },
+                )
+                .toList(growable: false)
+            : _comments;
 
     if (filter == null) return source;
     return source.where((item) {
@@ -337,7 +340,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
     // Keep existing platform selection behavior.
     String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
+    if (widget.chatFilter.value == null &&
+        widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!;
     }
     _chatCtrl.platform.value = currentPlatform;
@@ -367,7 +371,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   /// Send emote directly to chat (not to text field)
   void _sendEmoteDirectly(String emoteName) {
     String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null && widget.selectedPlatform.value != null) {
+    if (widget.chatFilter.value == null &&
+        widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!;
     }
     _chatCtrl.platform.value = currentPlatform;
@@ -796,241 +801,238 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             behavior: HitTestBehavior.opaque,
             child: Column(
               children: [
-                  SizedBox(height: 10.h),
-                  Container(
-                    width: 40.w,
-                    height: 4.h,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade700,
-                      borderRadius: BorderRadius.circular(2.r),
-                    ),
+                SizedBox(height: 10.h),
+                Container(
+                  width: 40.w,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade700,
+                    borderRadius: BorderRadius.circular(2.r),
                   ),
-                  SizedBox(height: 16.h),
-                  // Header buttons
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24.w),
-                    child: Row(
-                      children: [
-                        ValueListenableBuilder<bool>(
-                          valueListenable: widget.titleSelected,
-                          builder: (context, val, _) {
-                            return GestureDetector(
-                              onTap: () {
-                                final newVal = !val;
-                                widget.titleSelected.value = newVal;
-                                if (newVal) {
-                                  widget.showActivity.value = false;
-                                }
-                                widget.showServiceCard.value =
-                                    newVal || widget.showActivity.value;
-                                setState(() {});
-                                setSheetState(() {});
-                              },
-                              child: pillButton(
-                                "Title",
-                                isActive: val,
-                                assetPath: 'assets/images/magic.png',
-                              ),
-                            );
-                          },
-                        ),
-                        SizedBox(width: 12.w),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: widget.showActivity,
-                          builder: (context, active, _) {
-                            return GestureDetector(
-                              onTap: () {
-                                final newVal = !active;
-                                widget.showActivity.value = newVal;
-                                if (newVal) {
-                                  widget.titleSelected.value = false;
-                                  widget.selectedPlatform.value = null;
-                                  widget.showServiceCard.value = true;
-                                } else {
-                                  widget.showServiceCard.value =
-                                      widget.titleSelected.value;
-                                }
-                                setState(() {});
-                                setSheetState(() {});
-                              },
-                              child: pillButton(
-                                "Activity",
-                                isActive: active,
-                                assetPath: 'assets/images/line.png',
-                              ),
-                            );
-                          },
-                        ),
-                        const Spacer(),
-                        SizedBox(width: 12.w),
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: SizedBox(
-                            height: 36.h,
-                            width: 36.w,
-                            child: Image.asset(
-                              'assets/images/expand.png',
-                              color: Colors.yellow,
+                ),
+                SizedBox(height: 16.h),
+                // Header buttons
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: Row(
+                    children: [
+                      ValueListenableBuilder<bool>(
+                        valueListenable: widget.titleSelected,
+                        builder: (context, val, _) {
+                          return GestureDetector(
+                            onTap: () {
+                              final newVal = !val;
+                              widget.titleSelected.value = newVal;
+                              if (newVal) {
+                                widget.showActivity.value = false;
+                              }
+                              widget.showServiceCard.value =
+                                  newVal || widget.showActivity.value;
+                              setState(() {});
+                              setSheetState(() {});
+                            },
+                            child: pillButton(
+                              "Title",
+                              isActive: val,
+                              assetPath: 'assets/images/magic.png',
                             ),
+                          );
+                        },
+                      ),
+                      SizedBox(width: 12.w),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: widget.showActivity,
+                        builder: (context, active, _) {
+                          return GestureDetector(
+                            onTap: () {
+                              final newVal = !active;
+                              widget.showActivity.value = newVal;
+                              if (newVal) {
+                                widget.titleSelected.value = false;
+                                widget.selectedPlatform.value = null;
+                                widget.showServiceCard.value = true;
+                              } else {
+                                widget.showServiceCard.value =
+                                    widget.titleSelected.value;
+                              }
+                              setState(() {});
+                              setSheetState(() {});
+                            },
+                            child: pillButton(
+                              "Activity",
+                              isActive: active,
+                              assetPath: 'assets/images/line.png',
+                            ),
+                          );
+                        },
+                      ),
+                      const Spacer(),
+                      SizedBox(width: 12.w),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: SizedBox(
+                          height: 36.h,
+                          width: 36.w,
+                          child: Image.asset(
+                            'assets/images/expand.png',
+                            color: Colors.yellow,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 16.h),
-                  // Chat list
-                  Expanded(
-                    child: GestureDetector(
-                      onHorizontalDragEnd:
-                          widget.onPlatformSwipe != null
-                              ? (details) {
-                                // Determine swipe direction based on velocity
-                                const swipeThreshold =
-                                    100.0; // Minimum velocity to trigger swipe
-                                if (details.primaryVelocity != null) {
-                                  if (details.primaryVelocity! >
-                                      swipeThreshold) {
-                                    // Swipe right
-                                    widget.onPlatformSwipe!(true);
-                                  } else if (details.primaryVelocity! <
-                                      -swipeThreshold) {
-                                    // Swipe left
-                                    widget.onPlatformSwipe!(false);
-                                  }
+                ),
+                SizedBox(height: 16.h),
+                // Chat list
+                Expanded(
+                  child: GestureDetector(
+                    onHorizontalDragEnd:
+                        widget.onPlatformSwipe != null
+                            ? (details) {
+                              // Determine swipe direction based on velocity
+                              const swipeThreshold =
+                                  100.0; // Minimum velocity to trigger swipe
+                              if (details.primaryVelocity != null) {
+                                if (details.primaryVelocity! > swipeThreshold) {
+                                  // Swipe right
+                                  widget.onPlatformSwipe!(true);
+                                } else if (details.primaryVelocity! <
+                                    -swipeThreshold) {
+                                  // Swipe left
+                                  widget.onPlatformSwipe!(false);
                                 }
                               }
-                              : null,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w),
-                        child: ValueListenableBuilder<String?>(
-                          valueListenable: widget.chatFilter,
-                          builder: (context, filter, child) {
-                            return Obx(() {
-                              final filteredList = _getFilteredComments(filter);
-                              return ListView.builder(
-                                key: ValueKey(
-                                  'expanded_chat_${filteredList.length}_${filter ?? 'all'}',
-                                ),
-                                controller: _expandedScrollController,
-                                padding: EdgeInsets.only(
-                                  bottom: 16.h + 20.h,
-                                ),
-                                itemCount: filteredList.length,
-                                reverse: false,
-                                addAutomaticKeepAlives: false,
-                                addRepaintBoundaries: false,
-                                itemBuilder: (context, index) {
-                                  final item = filteredList[index];
-                                  final nameHash = item['name'].hashCode;
-                                  final nameColor =
-                                      nameColors[nameHash.abs() %
-                                          nameColors.length];
-                                  return _chatItem(
-                                    item['platform'],
-                                    item['name'],
-                                    item['message'],
-                                    nameColor,
-                                    key: ValueKey(
-                                      'expanded_${item['name']}_${index}_${item['message']}',
-                                    ),
-                                  );
-                                },
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Input field
-                  AnimatedPadding(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                    padding: EdgeInsets.fromLTRB(
-                      16.w,
-                      8.h,
-                      16.w,
-                      16.h + keyboardInset,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(25.r),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          height: 55.h,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.black.withOpacity(0.4),
-                                Colors.black.withOpacity(0.2),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(25.r),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.18),
-                              width: 1.0.w,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                            }
+                            : null,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: widget.chatFilter,
+                        builder: (context, filter, child) {
+                          return Obx(() {
+                            final filteredList = _getFilteredComments(filter);
+                            return ListView.builder(
+                              key: ValueKey(
+                                'expanded_chat_${filteredList.length}_${filter ?? 'all'}',
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _messageController,
-                                  focusNode: _focusNode,
-                                  style: sfProText400(17.sp, Colors.white),
-                                  decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    disabledBorder: InputBorder.none,
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                    contentPadding: EdgeInsets.zero,
-                                    hintText: 'Text',
-                                    hintStyle: TextStyle(
-                                      color: const Color.fromRGBO(
-                                        235,
-                                        235,
-                                        245,
-                                        0.3,
-                                      ),
-                                      fontSize: 17.sp,
-                                    ),
+                              controller: _expandedScrollController,
+                              padding: EdgeInsets.only(bottom: 16.h + 20.h),
+                              itemCount: filteredList.length,
+                              reverse: false,
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: false,
+                              itemBuilder: (context, index) {
+                                final item = filteredList[index];
+                                final nameHash = item['name'].hashCode;
+                                final nameColor =
+                                    nameColors[nameHash.abs() %
+                                        nameColors.length];
+                                return _chatItem(
+                                  item['platform'],
+                                  item['name'],
+                                  item['message'],
+                                  nameColor,
+                                  key: ValueKey(
+                                    'expanded_${item['name']}_${index}_${item['message']}',
                                   ),
-                                  textInputAction: TextInputAction.send,
-                                  onSubmitted: (_) => _sendMessage(),
-                                ),
-                              ),
-                              // Emoji icon - shows emoji picker when tapped
-                              GestureDetector(
-                                onTap: () {
-                                  _showEmojiEmotePicker(context, setSheetState);
-                                },
-                                child: SizedBox(
-                                  height: 20.h,
-                                  width: 20.w,
-                                  child: Image.asset('assets/images/smile.png'),
-                                ),
-                              ),
-                              SizedBox(width: 9.w),
-                              _buildPlatformSelector(setSheetState),
-                              SizedBox(width: 8.w),
+                                );
+                              },
+                            );
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                // Input field
+                AnimatedPadding(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  padding: EdgeInsets.fromLTRB(
+                    16.w,
+                    8.h,
+                    16.w,
+                    16.h + keyboardInset,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25.r),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        height: 55.h,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.black.withOpacity(0.4),
+                              Colors.black.withOpacity(0.2),
                             ],
                           ),
+                          borderRadius: BorderRadius.circular(25.r),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.18),
+                            width: 1.0.w,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                focusNode: _focusNode,
+                                style: sfProText400(17.sp, Colors.white),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  filled: true,
+                                  fillColor: Colors.transparent,
+                                  contentPadding: EdgeInsets.zero,
+                                  hintText: 'Text',
+                                  hintStyle: TextStyle(
+                                    color: const Color.fromRGBO(
+                                      235,
+                                      235,
+                                      245,
+                                      0.3,
+                                    ),
+                                    fontSize: 17.sp,
+                                  ),
+                                ),
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) => _sendMessage(),
+                              ),
+                            ),
+                            // Emoji icon - shows emoji picker when tapped
+                            GestureDetector(
+                              onTap: () {
+                                _showEmojiEmotePicker(context, setSheetState);
+                              },
+                              child: SizedBox(
+                                height: 20.h,
+                                width: 20.w,
+                                child: Image.asset('assets/images/smile.png'),
+                              ),
+                            ),
+                            SizedBox(width: 9.w),
+                            _buildPlatformSelector(setSheetState),
+                            SizedBox(width: 8.w),
+                          ],
                         ),
                       ),
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -1045,22 +1047,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       onTap: () {
         _focusNode.unfocus();
       },
-      // Allow swiping anywhere on the sheet to resize
-      onVerticalDragUpdate:
-          widget.onResize != null
-              ? (details) {
-                widget.onResize!(details.delta.dy);
-              }
-              : null,
-      onVerticalDragEnd:
-          widget.onResizeEnd != null
-              ? (_) {
-                widget.onResizeEnd!();
-              }
-              : null,
-      onVerticalDragStart: (_) {
-        // Optional: Add haptic feedback or visual feedback on drag start
-      },
       behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
@@ -1070,16 +1056,31 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
         child: Column(
           children: [
             SizedBox(height: 10.h),
-            // Visual drag handle bar (no longer requires exact tap on bar)
-            Container(
-              padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
-              child: Center(
-                child: Container(
-                  width: 40.w,
-                  height: 4.h,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade700,
-                    borderRadius: BorderRadius.circular(2.r),
+            // Visual drag handle bar (only this area resizes the sheet)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate:
+                  widget.onResize != null
+                      ? (details) {
+                        widget.onResize!(details.delta.dy);
+                      }
+                      : null,
+              onVerticalDragEnd:
+                  widget.onResizeEnd != null
+                      ? (_) {
+                        widget.onResizeEnd!();
+                      }
+                      : null,
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
+                child: Center(
+                  child: Container(
+                    width: 40.w,
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade700,
+                      borderRadius: BorderRadius.circular(2.r),
+                    ),
                   ),
                 ),
               ),
