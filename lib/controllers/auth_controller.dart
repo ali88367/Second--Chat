@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -62,6 +63,11 @@ class AuthController extends GetxController {
     } catch (e) {
       lastError.value = 'Failed to load profile: $e';
       if (kDebugMode) debugPrint('API ERROR(me): $e');
+      if (e is DioException && e.response?.statusCode == 401) {
+        await _api.tokenStore.clear();
+        isAuthenticated.value = false;
+        me.value = null;
+      }
     }
   }
 
@@ -94,9 +100,14 @@ class AuthController extends GetxController {
 
   Future<bool> connectProvider(OAuthProvider provider) async {
     try {
+      final hasTokens = (await _api.tokenStore.read()) != null;
+      if (!hasTokens) {
+        isAuthenticated.value = false;
+        me.value = null;
+      }
       final authUrl = await oauthApi.getAuthUrl(
         provider: provider,
-        link: isAuthenticated.value,
+        link: hasTokens,
       );
 
       final callbackUri = await _oauthFlow.begin(
