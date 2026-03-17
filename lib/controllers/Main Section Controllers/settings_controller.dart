@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,8 +18,16 @@ class SettingsController extends GetxController {
   // General toggles
   RxBool notifications = true.obs;
   RxBool ledNotifications = false.obs;
+  RxBool ledNewFollowers = true.obs;
+  RxBool ledAllSubscribers = true.obs;
+  RxBool ledMilestoneSubscribers = true.obs;
+  RxInt ledMilestoneValue = 5.obs;
   RxBool lowPowerMode = false.obs;
   RxBool timeZoneDetection = true.obs;
+  RxBool multiScreenPreview = false.obs;
+  RxBool animations = true.obs;
+  RxBool fullActivityFilters = false.obs;
+  RxBool ttsAdvancedSettings = false.obs;
 
   // Chat / Viewer related toggles
   RxBool viewerCount = true.obs;
@@ -34,6 +43,7 @@ class SettingsController extends GetxController {
   RxString fontSize = "M".obs;
   RxString clockFormat = "12h".obs;
   RxString appLanguage = "English".obs;
+  RxString theme = "dark".obs;
 
   // Premium unlock state
   RxBool isPremiumUnlocked = false.obs;
@@ -42,6 +52,10 @@ class SettingsController extends GetxController {
   Rx<Color?> twitchColor = Rx<Color?>(null);
   Rx<Color?> kickColor = Rx<Color?>(null);
   Rx<Color?> youtubeColor = Rx<Color?>(null);
+  Timer? _patchTimer;
+  static const String _prefTwitchColor = 'second_chat.platform_color.twitch';
+  static const String _prefKickColor = 'second_chat.platform_color.kick';
+  static const String _prefYoutubeColor = 'second_chat.platform_color.youtube';
 
   // Helper methods to get platform colors (with defaults)
   Color getPlatformColor(String platform) {
@@ -63,14 +77,18 @@ class SettingsController extends GetxController {
     switch (platform.toLowerCase()) {
       case 'twitch':
         twitchColor.value = color;
+        unawaited(_savePlatformColorToPrefs(_prefTwitchColor, color));
         break;
       case 'kick':
         kickColor.value = color;
+        unawaited(_savePlatformColorToPrefs(_prefKickColor, color));
         break;
       case 'youtube':
         youtubeColor.value = color;
+        unawaited(_savePlatformColorToPrefs(_prefYoutubeColor, color));
         break;
     }
+    _scheduleFullSettingsPatch();
   }
 
   void setPlatform(String platform) {
@@ -161,121 +179,109 @@ class SettingsController extends GetxController {
 
   Future<void> updateToggle(String key, bool value) async {
     RxBool? target;
-    Map<String, dynamic>? patch;
 
     switch (key) {
       case 'notifications':
         target = notifications;
-        patch = {
-          'settings': {
-            'notifications': {'enabled': value}
-          }
-        };
         break;
       case 'ledNotifications':
         target = ledNotifications;
-        patch = {
-          'settings': {
-            'notifications': {'ledNotifications': value}
-          }
-        };
         break;
       case 'viewerCount':
         target = viewerCount;
-        patch = {
-          'settings': {
-            'chat': {'viewerCount': value}
-          }
-        };
         break;
       case 'hideViewerNames':
         target = hideViewerNames;
-        patch = {
-          'settings': {
-            'chat': {'hideViewerNames': value}
-          }
-        };
         break;
       case 'showSubscribersOnly':
         target = showSubscribersOnly;
-        patch = {
-          'settings': {
-            'chat': {'showSubscribersOnly': value}
-          }
-        };
         break;
       case 'showVipsOnly':
         target = showVipsOnly;
-        patch = {
-          'settings': {
-            'chat': {'showVipModsOnly': value}
-          }
-        };
         break;
       case 'multiChatMergedMode':
         target = multiChatMergedMode;
-        patch = {
-          'settings': {
-            'chat': {'multiChatMergedMode': value}
-          }
-        };
         break;
       case 'lowPowerMode':
         target = lowPowerMode;
-        patch = {
-          'settings': {
-            'other': {'lowPowerMode': value}
-          }
-        };
         break;
       case 'timeZoneDetection':
         target = timeZoneDetection;
-        patch = {
-          'settings': {
-            'language': {'timeZoneDetection': value}
-          }
-        };
+        break;
+      case 'multiScreenPreview':
+        target = multiScreenPreview;
+        break;
+      case 'animations':
+        target = animations;
+        break;
+      case 'fullActivityFilters':
+        target = fullActivityFilters;
+        break;
+      case 'ttsAdvancedSettings':
+        target = ttsAdvancedSettings;
         break;
     }
 
-    if (target == null || patch == null) return;
+    if (target == null) return;
     final prev = target.value;
     target.value = value;
-    final ok = await _patchSettings(patch);
+    final ok = await _patchSettings(_buildFullSettingsPatch());
     if (!ok) target.value = prev;
   }
 
   Future<void> updateFontSize(String value) async {
     final prev = fontSize.value;
     fontSize.value = value;
-    final ok = await _patchSettings({
-      'settings': {
-        'chat': {'fontSize': value}
-      }
-    });
+    final ok = await _patchSettings(_buildFullSettingsPatch());
     if (!ok) fontSize.value = prev;
   }
 
   Future<void> updateAppLanguage(String value) async {
     final prev = appLanguage.value;
     appLanguage.value = value;
-    final ok = await _patchSettings({
-      'settings': {
-        'language': {'appLanguage': value}
-      }
-    });
+    final ok = await _patchSettings(_buildFullSettingsPatch());
     if (!ok) appLanguage.value = prev;
   }
 
   Future<void> updateClockFormat(String value) async {
     final prev = clockFormat.value;
     clockFormat.value = value;
-    final ok = await _patchSettings({
-      'settings': {
-        'language': {'clock': value}
-      }
-    });
+    final ok = await _patchSettings(_buildFullSettingsPatch());
     if (!ok) clockFormat.value = prev;
+  }
+
+  Future<void> updateLedSetting(String key, bool value) async {
+    RxBool? target;
+    switch (key) {
+      case 'newFollowers':
+        target = ledNewFollowers;
+        break;
+      case 'allSubscribers':
+        target = ledAllSubscribers;
+        break;
+      case 'milestoneSubscribers':
+        target = ledMilestoneSubscribers;
+        break;
+    }
+    if (target == null) return;
+    final prev = target.value;
+    target.value = value;
+    final ok = await _patchSettings(_buildFullSettingsPatch());
+    if (!ok) target.value = prev;
+  }
+
+  Future<void> updateLedMilestoneValue(int value) async {
+    final prevValue = ledMilestoneValue.value;
+    final prevEnabled = ledMilestoneSubscribers.value;
+    ledMilestoneValue.value = value;
+    if (!ledMilestoneSubscribers.value) {
+      ledMilestoneSubscribers.value = true;
+    }
+    final ok = await _patchSettings(_buildFullSettingsPatch());
+    if (!ok) {
+      ledMilestoneValue.value = prevValue;
+      ledMilestoneSubscribers.value = prevEnabled;
+    }
   }
 
   Dio _buildDio() {
@@ -306,6 +312,19 @@ class SettingsController extends GetxController {
       notifications.value = _asBool(notif['enabled'], notifications.value);
       ledNotifications.value =
           _asBool(notif['ledNotifications'], ledNotifications.value);
+      final ledSettings = notif['ledSettings'];
+      if (ledSettings is Map) {
+        ledNewFollowers.value =
+            _asBool(ledSettings['newFollowers'], ledNewFollowers.value);
+        ledAllSubscribers.value =
+            _asBool(ledSettings['allSubscribers'], ledAllSubscribers.value);
+        ledMilestoneSubscribers.value = _asBool(
+          ledSettings['milestoneSubscribers'],
+          ledMilestoneSubscribers.value,
+        );
+        ledMilestoneValue.value =
+            _asInt(ledSettings['milestoneValue'], ledMilestoneValue.value);
+      }
     }
 
     final chat = settings['chat'];
@@ -336,6 +355,7 @@ class SettingsController extends GetxController {
 
     final appearance = settings['appearance'];
     if (appearance is Map) {
+      theme.value = _asString(appearance['theme'], theme.value);
       final platformColours = appearance['platformColours'];
       if (platformColours is Map) {
         final twitch = platformColours['twitch'];
@@ -348,9 +368,18 @@ class SettingsController extends GetxController {
         final tColor = _parseHexColor(twitchHex);
         final kColor = _parseHexColor(kickHex);
         final yColor = _parseHexColor(youtubeHex);
-        if (tColor != null) twitchColor.value = tColor;
-        if (kColor != null) kickColor.value = kColor;
-        if (yColor != null) youtubeColor.value = yColor;
+        if (tColor != null) {
+          twitchColor.value = tColor;
+          unawaited(_savePlatformColorToPrefs(_prefTwitchColor, tColor));
+        }
+        if (kColor != null) {
+          kickColor.value = kColor;
+          unawaited(_savePlatformColorToPrefs(_prefKickColor, kColor));
+        }
+        if (yColor != null) {
+          youtubeColor.value = yColor;
+          unawaited(_savePlatformColorToPrefs(_prefYoutubeColor, yColor));
+        }
       }
     }
 
@@ -364,7 +393,14 @@ class SettingsController extends GetxController {
 
     final other = settings['other'];
     if (other is Map) {
+      multiScreenPreview.value =
+          _asBool(other['multiScreenPreview'], multiScreenPreview.value);
+      animations.value = _asBool(other['animations'], animations.value);
       lowPowerMode.value = _asBool(other['lowPowerMode'], lowPowerMode.value);
+      fullActivityFilters.value =
+          _asBool(other['fullActivityFilters'], fullActivityFilters.value);
+      ttsAdvancedSettings.value =
+          _asBool(other['ttsAdvancedSettings'], ttsAdvancedSettings.value);
     }
 
     final account = payload['account'];
@@ -402,5 +438,151 @@ class SettingsController extends GetxController {
   String _titleCase(String value) {
     if (value.isEmpty) return value;
     return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
+
+  int _asInt(dynamic value, int fallback) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final parsed = int.tryParse(value.trim());
+      if (parsed != null) return parsed;
+    }
+    return fallback;
+  }
+
+  Map<String, dynamic> _buildFullSettingsPatch() {
+    final settingsBase = settingsPayload.value?['settings'];
+    final settingsMap = _copyMap(settingsBase);
+
+    final notificationsMap = _copyMap(settingsMap['notifications']);
+    notificationsMap['enabled'] = notifications.value;
+    notificationsMap['ledNotifications'] = ledNotifications.value;
+    final ledSettingsMap = _copyMap(notificationsMap['ledSettings']);
+    ledSettingsMap['newFollowers'] = ledNewFollowers.value;
+    ledSettingsMap['allSubscribers'] = ledAllSubscribers.value;
+    ledSettingsMap['milestoneSubscribers'] = ledMilestoneSubscribers.value;
+    ledSettingsMap['milestoneValue'] = ledMilestoneValue.value;
+    notificationsMap['ledSettings'] = ledSettingsMap;
+    settingsMap['notifications'] = notificationsMap;
+
+    final chatMap = _copyMap(settingsMap['chat']);
+    chatMap['fontSize'] = fontSize.value;
+    chatMap['showSubscribersOnly'] = showSubscribersOnly.value;
+    chatMap['showVipModsOnly'] = showVipsOnly.value;
+    chatMap['viewerCount'] = viewerCount.value;
+    chatMap['hideViewerNames'] = hideViewerNames.value;
+    chatMap['multiChatMergedMode'] = multiChatMergedMode.value;
+    settingsMap['chat'] = chatMap;
+
+    final appearanceMap = _copyMap(settingsMap['appearance']);
+    final fallbackTheme =
+        appearanceMap['theme']?.toString().trim().isNotEmpty == true
+            ? appearanceMap['theme']
+            : 'dark';
+    appearanceMap['theme'] =
+        theme.value.trim().isEmpty ? fallbackTheme : theme.value;
+    final platformColoursMap = _copyMap(appearanceMap['platformColours']);
+    platformColoursMap['twitch'] = _mergePlatformColor(
+      platformColoursMap['twitch'],
+      twitchColor.value,
+      '#9146FF',
+    );
+    platformColoursMap['kick'] = _mergePlatformColor(
+      platformColoursMap['kick'],
+      kickColor.value,
+      '#53FC18',
+    );
+    platformColoursMap['youtube'] = _mergePlatformColor(
+      platformColoursMap['youtube'],
+      youtubeColor.value,
+      '#FF0000',
+    );
+    appearanceMap['platformColours'] = platformColoursMap;
+    settingsMap['appearance'] = appearanceMap;
+
+    final languageMap = _copyMap(settingsMap['language']);
+    languageMap['appLanguage'] = appLanguage.value;
+    languageMap['timeZoneDetection'] = timeZoneDetection.value;
+    languageMap['clock'] = clockFormat.value;
+    settingsMap['language'] = languageMap;
+
+    final otherMap = _copyMap(settingsMap['other']);
+    otherMap['multiScreenPreview'] = multiScreenPreview.value;
+    otherMap['animations'] = animations.value;
+    otherMap['lowPowerMode'] = lowPowerMode.value;
+    otherMap['fullActivityFilters'] = fullActivityFilters.value;
+    otherMap['ttsAdvancedSettings'] = ttsAdvancedSettings.value;
+    settingsMap['other'] = otherMap;
+
+    return {'settings': settingsMap};
+  }
+
+  Map<String, dynamic> _copyMap(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return <String, dynamic>{};
+  }
+
+  Map<String, dynamic> _mergePlatformColor(
+    dynamic existing,
+    Color? color,
+    String fallbackHex,
+  ) {
+    final map = _copyMap(existing);
+    final existingHex = map['color']?.toString().trim();
+    final resolvedHex =
+        color != null ? _toHexColor(color) : (existingHex ?? fallbackHex);
+    map['color'] = resolvedHex;
+    map['mode'] = map['mode'] ?? 'grid';
+    map['opacity'] = map['opacity'] ?? 100;
+    return map;
+  }
+
+  String _toHexColor(Color color) {
+    final value = color.value & 0xFFFFFF;
+    return '#${value.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+
+  void _scheduleFullSettingsPatch() {
+    _patchTimer?.cancel();
+    _patchTimer = Timer(const Duration(milliseconds: 450), () async {
+      await _patchSettings(_buildFullSettingsPatch());
+    });
+  }
+
+  Future<void> _savePlatformColorToPrefs(String key, Color color) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hex = _toHexColor(color);
+    await prefs.setString(key, hex);
+    print('PLATFORM COLOR PREF SAVED: $key=$hex');
+  }
+
+  Future<void> _loadPlatformColorsFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tHex = prefs.getString(_prefTwitchColor);
+    final kHex = prefs.getString(_prefKickColor);
+    final yHex = prefs.getString(_prefYoutubeColor);
+    final tColor = _parseHexColor(tHex);
+    final kColor = _parseHexColor(kHex);
+    final yColor = _parseHexColor(yHex);
+    if (tColor != null) twitchColor.value = tColor;
+    if (kColor != null) kickColor.value = kColor;
+    if (yColor != null) youtubeColor.value = yColor;
+    print(
+      'PLATFORM COLOR PREF LOADED: twitch=$tHex kick=$kHex youtube=$yHex',
+    );
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    unawaited(_loadPlatformColorsFromPrefs());
+  }
+
+  @override
+  void onClose() {
+    _patchTimer?.cancel();
+    super.onClose();
   }
 }

@@ -111,11 +111,15 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "prefixImageAsset": screen_icon,
         "title": "Multi-Screen Preview",
         "isLocked": true,
+        "isSwitch": true,
+        "switchKey": "multiScreenPreview",
       },
       {
         "prefixImageAsset": animation_icon,
         "title": "Animations",
         "isLocked": true,
+        "isSwitch": true,
+        "switchKey": "animations",
       },
       {
         "prefixImageAsset": low_battery_icon,
@@ -127,11 +131,15 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "prefixImageAsset": filter_icon,
         "title": "Full Activity Filters",
         "isLocked": true,
+        "isSwitch": true,
+        "switchKey": "fullActivityFilters",
       },
       {
         "prefixImageAsset": speaker_icon,
         "title": "TTS Advanced settings",
         "isLocked": true,
+        "isSwitch": true,
+        "switchKey": "ttsAdvancedSettings",
       },
     ],
   };
@@ -396,6 +404,18 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           break;
         case "multiChatMergedMode":
           switchValue = controller.multiChatMergedMode;
+          break;
+        case "multiScreenPreview":
+          switchValue = controller.multiScreenPreview;
+          break;
+        case "animations":
+          switchValue = controller.animations;
+          break;
+        case "fullActivityFilters":
+          switchValue = controller.fullActivityFilters;
+          break;
+        case "ttsAdvancedSettings":
+          switchValue = controller.ttsAdvancedSettings;
           break;
       }
     }

@@ -2,22 +2,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import '../../../../core/themes/textstyles.dart';
 import '../../../../core/widgets/custom_switch.dart';
-
-// 1. Controller to manage the state
-class LedSettingsController extends GetxController {
-  final RxBool isMilestoneEnabled = true.obs;
-  final RxBool isStepEnabled = false.obs; // Initially OFF
-  final RxInt milestoneStep = 5.obs;
-  final RxInt customAmount = 0.obs;
-}
 
 class LedSettingsBottomSheet extends StatelessWidget {
   LedSettingsBottomSheet({super.key});
 
-  // Initialize the controller
-  final controller = Get.put(LedSettingsController());
+  final SettingsController controller = Get.find<SettingsController>();
 
   @override
   Widget build(BuildContext context) {
@@ -61,33 +53,59 @@ class LedSettingsBottomSheet extends StatelessWidget {
                 ),
                 SizedBox(height: 12.h),
 
-                _buildSettingGroup([_buildSwitchTile("New Followers", true.obs)]),
+                _buildSettingGroup([
+                  _buildSwitchTile(
+                    "New Followers",
+                    controller.ledNewFollowers,
+                    onChanged:
+                        (val) => controller.updateLedSetting('newFollowers', val),
+                  ),
+                ]),
                 SizedBox(height: 12.h),
 
-                _buildSettingGroup([_buildSwitchTile("All Subscribers", true.obs)]),
+                _buildSettingGroup([
+                  _buildSwitchTile(
+                    "All Subscribers",
+                    controller.ledAllSubscribers,
+                    onChanged: (val) =>
+                        controller.updateLedSetting('allSubscribers', val),
+                  ),
+                ]),
                 SizedBox(height: 12.h),
 
                 // Group 3: Milestones
                 _buildSettingGroup([
-                  _buildSwitchTile("Milestone Subscribers", controller.isMilestoneEnabled),
+                  _buildSwitchTile(
+                    "Milestone Subscribers",
+                    controller.ledMilestoneSubscribers,
+                    onChanged: (val) => controller.updateLedSetting(
+                      'milestoneSubscribers',
+                      val,
+                    ),
+                  ),
 
                   // TILE: The Preset Switch (5, 10, 20...)
-                  Obx(() => _buildSwitchTile(
-                    controller.milestoneStep.value.toString(),
-                    controller.isStepEnabled,
-                    isNested: true,
-                    onTap: () => _showPresetStepPicker(context),
-                    onChanged: (val) {
-                      controller.isStepEnabled.value = val;
-                      if (val) _showPresetStepPicker(context);
-                    },
-                  )),
+                  Obx(
+                    () => _buildSwitchTile(
+                      controller.ledMilestoneValue.value.toString(),
+                      controller.ledMilestoneSubscribers,
+                      isNested: true,
+                      onTap: () => _showPresetStepPicker(context),
+                      onChanged: (val) {
+                        if (val) {
+                          _showPresetStepPicker(context);
+                        } else {
+                          controller.updateLedSetting('milestoneSubscribers', false);
+                        }
+                      },
+                    ),
+                  ),
 
                   // TILE: The "New" Custom Number Wheel
                   Obx(() {
-                    String tileTitle = controller.customAmount.value == 0
+                    String tileTitle = controller.ledMilestoneValue.value == 0
                         ? "New"
-                        : controller.customAmount.value.toString();
+                        : controller.ledMilestoneValue.value.toString();
 
                     return _buildActionTile(
                       tileTitle,
@@ -123,8 +141,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: sfProText400(18.sp, Colors.white)),
                 onTap: () {
-                  controller.milestoneStep.value = step;
-                  controller.isStepEnabled.value = true;
+                  controller.updateLedMilestoneValue(step);
                   Get.back();
                 },
               );
@@ -141,6 +158,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
       backgroundColor: const Color(0XFF1E1D20),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (BuildContext context) {
+        int tempValue = controller.ledMilestoneValue.value;
         return Container(
           height: 250.h,
           child: Column(
@@ -149,15 +167,21 @@ class LedSettingsBottomSheet extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: TextButton(
-                  onPressed: () => Get.back(),
+                  onPressed: () {
+                    controller.updateLedMilestoneValue(tempValue);
+                    Get.back();
+                  },
                   child: Text("Done", style: TextStyle(color: const Color(0xFFE6C571), fontWeight: FontWeight.bold, fontSize: 16.sp)),
                 ),
               ),
               Expanded(
                 child: CupertinoPicker(
                   itemExtent: 40.h,
-                  scrollController: FixedExtentScrollController(initialItem: controller.customAmount.value),
-                  onSelectedItemChanged: (int index) => controller.customAmount.value = index,
+                  scrollController: FixedExtentScrollController(
+                    initialItem:
+                        tempValue < 0 ? 0 : (tempValue > 1000 ? 1000 : tempValue),
+                  ),
+                  onSelectedItemChanged: (int index) => tempValue = index,
                   children: List<Widget>.generate(1001, (index) => Center(
                     child: Text(index.toString(), style: TextStyle(color: Colors.white, fontSize: 20.sp)),
                   )),
