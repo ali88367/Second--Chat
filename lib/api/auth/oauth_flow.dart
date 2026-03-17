@@ -24,6 +24,16 @@ class OAuthFlow {
 
   static final Uri _redirectUri = Uri.parse(ApiConfig.oauthRedirectUri);
 
+  Future<void> _tryDismissBrowser() async {
+    // On iOS, the OAuth redirect can successfully open the app but leave SafariVC visible.
+    // Closing here makes the flow feel like a real "redirect back" like Android.
+    try {
+      await closeCustomTabs();
+    } catch (_) {
+      // ignore
+    }
+  }
+
   Map<String, String> _allParams(Uri uri) {
     final params = <String, String>{...uri.queryParameters};
     final frag = uri.fragment;
@@ -65,6 +75,8 @@ class OAuthFlow {
         return;
       }
       if (kDebugMode) debugPrint('OAUTH REDIRECT: $uri');
+      // Dismiss SafariVC/CustomTabs ASAP once we have the callback.
+      unawaited(_tryDismissBrowser());
       _pendingCompleter!.complete(uri);
     });
 
@@ -85,6 +97,7 @@ class OAuthFlow {
           !_pendingCompleter!.isCompleted &&
           _isExpectedRedirect(initial)) {
         _logRedirect('initial', initial);
+        unawaited(_tryDismissBrowser());
         _pendingCompleter!.complete(initial);
       }
     } catch (_) {
