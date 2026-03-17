@@ -19,7 +19,9 @@ class ConnectPlatformSetting extends StatelessWidget {
     required VoidCallback onPressed,
     bool isConnected = false, // Optional: dim if not connected
     bool isConnecting = false,
+    bool isDisconnecting = false,
   }) {
+    final isProcessing = isConnecting || isDisconnecting;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(15.w),
@@ -45,14 +47,14 @@ class ConnectPlatformSetting extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(30.r),
-              onTap: (isConnected || isConnecting) ? null : onPressed,
+              onTap: isProcessing ? null : onPressed,
               child: Container(
                 height: 50.h,
                 padding: isConnected
                     ? EdgeInsets.symmetric(horizontal: 14.w)
                     : EdgeInsets.zero,
                 decoration: BoxDecoration(
-                  color: (isConnected || isConnecting)
+                  color: (isConnected || isProcessing)
                       ? buttonColor.withOpacity(0.75)
                       : buttonColor,
                   borderRadius: BorderRadius.circular(30.r),
@@ -71,7 +73,7 @@ class ConnectPlatformSetting extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: sfProText600(18.sp, Colors.white),
                         ),
-                        if (isConnecting) ...[
+                        if (isProcessing) ...[
                           SizedBox(width: 8.w),
                           SizedBox(
                             width: 16.w,
@@ -117,6 +119,7 @@ class ConnectPlatformSetting extends StatelessWidget {
             final youtubeConnected =
                 ctrl.isConnected[OAuthProvider.youtube] ?? false;
             final connecting = ctrl.connectingProvider.value;
+            final disconnecting = ctrl.disconnectingProvider.value;
 
             return Column(
               children: [
@@ -152,7 +155,14 @@ class ConnectPlatformSetting extends StatelessWidget {
                         buttonColor: twitchPurple,
                         isConnected: twitchConnected,
                         isConnecting: connecting == OAuthProvider.twitch,
-                        onPressed: () => ctrl.connect(OAuthProvider.twitch),
+                        isDisconnecting:
+                            disconnecting == OAuthProvider.twitch,
+                        onPressed: () => _handlePlatformTap(
+                          context,
+                          ctrl,
+                          OAuthProvider.twitch,
+                          twitchConnected,
+                        ),
                       ),
                     ),
                     SizedBox(width: 12.w),
@@ -164,7 +174,14 @@ class ConnectPlatformSetting extends StatelessWidget {
                         buttonColor: kickGreen,
                         isConnected: kickConnected,
                         isConnecting: connecting == OAuthProvider.kick,
-                        onPressed: () => ctrl.connect(OAuthProvider.kick),
+                        isDisconnecting:
+                            disconnecting == OAuthProvider.kick,
+                        onPressed: () => _handlePlatformTap(
+                          context,
+                          ctrl,
+                          OAuthProvider.kick,
+                          kickConnected,
+                        ),
                       ),
                     ),
                   ],
@@ -177,7 +194,13 @@ class ConnectPlatformSetting extends StatelessWidget {
                   buttonColor: youtubeRed,
                   isConnected: youtubeConnected,
                   isConnecting: connecting == OAuthProvider.youtube,
-                  onPressed: () => ctrl.connect(OAuthProvider.youtube),
+                  isDisconnecting: disconnecting == OAuthProvider.youtube,
+                  onPressed: () => _handlePlatformTap(
+                    context,
+                    ctrl,
+                    OAuthProvider.youtube,
+                    youtubeConnected,
+                  ),
                 ),
 
                 SizedBox(height: 20.h),
@@ -186,6 +209,84 @@ class ConnectPlatformSetting extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+Future<void> _handlePlatformTap(
+  BuildContext context,
+  PlatformConnectController ctrl,
+  OAuthProvider provider,
+  bool isConnected,
+) async {
+  if (!isConnected) {
+    await ctrl.connect(provider);
+    return;
+  }
+
+  final confirmed = await Get.dialog<bool>(
+        AlertDialog(
+          backgroundColor: const Color(0xFF1E1D20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          title: Text(
+            'Disconnect Platform',
+            style: sfProText600(18.sp, Colors.white),
+          ),
+          content: Text(
+            'Do you want to disconnect this platform?',
+            style: sfProText400(14.sp, Colors.white70),
+          ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: Text(
+                'Cancel',
+                style: sfProText500(14.sp, Colors.white70),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+              ),
+              onPressed: () => Get.back(result: true),
+              child: Text(
+                'Disconnect',
+                style: sfProText600(14.sp, Colors.black),
+              ),
+            ),
+          ],
+        ),
+        barrierDismissible: true,
+      ) ??
+      false;
+
+  if (!confirmed) return;
+
+  final ok = await ctrl.disconnect(provider);
+  if (ok) {
+    Get.snackbar(
+      'Disconnected',
+      'Platform disconnected',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.black.withOpacity(0.7),
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(20),
+    );
+  } else {
+    Get.snackbar(
+      'Disconnect failed',
+      'Please try again.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.black.withOpacity(0.7),
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(20),
     );
   }
 }

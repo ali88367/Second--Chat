@@ -8,6 +8,7 @@ import 'package:second_chat/features/Invite/Invite_screen.dart';
 import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
 
@@ -192,7 +193,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
                     ),
                     SizedBox(height: 24.h),
                     Text(
-                      'You haven\'t started the\nstream yet, but in the\nmeantime you can',
+                      ' You haven\'t started the\nstream yet, but in the\nmeantime you can',
                       textAlign: TextAlign.center,
                       style: sfProDisplay400(
                         28.sp,
@@ -386,70 +387,73 @@ class GettingStartedCard extends StatefulWidget {
 }
 
 class _GettingStartedCardState extends State<GettingStartedCard> {
-  bool _notificationsEnabled = false;
   bool _streamServiceAdded = false;
   bool _settingsOpened = false;
   bool _streaksCustomized = false;
+  late final SettingsController _settingsCtrl;
 
-  // Count completed steps
-  int get _completedCount {
-    int count = 0;
-    if (_notificationsEnabled) count++;
-    if (_streamServiceAdded) count++;
-    if (_settingsOpened) count++;
-    if (_streaksCustomized) count++;
-    return count;
+  @override
+  void initState() {
+    super.initState();
+    _settingsCtrl = Get.isRegistered<SettingsController>()
+        ? Get.find<SettingsController>()
+        : Get.put(SettingsController());
+    _settingsCtrl.loadSettingsIfNeeded();
   }
-
-  // All done check
-  bool get _isAllCompleted => _completedCount == 4;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // 1. The Main Card Container
-        // FIX: Wrapped in Padding to reserve space for the hanging button.
-        // This ensures the button is inside the widget bounds for clicking.
-        Padding(
-          padding: EdgeInsets.only(bottom: 68.h),
-          child: Container(
-            padding: EdgeInsets.only(bottom: 1.h),
-            decoration: BoxDecoration(
-              color: const Color.fromRGBO(30, 29, 32, 1),
-              borderRadius: BorderRadius.circular(22.r),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                /// Header with progress percentage + indicator
-                Padding(
-                  padding: EdgeInsets.all(8.w),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Getting Started',
-                        style: sfProText600(
-                          17.sp,
-                          _isAllCompleted
-                              ? Colors.white
-                              : Color.fromRGBO(235, 235, 245, 0.3),
+    return Obx(() {
+      final notificationsEnabled = _settingsCtrl.notifications.value;
+      final completedCount = (notificationsEnabled ? 1 : 0) +
+          (_streamServiceAdded ? 1 : 0) +
+          (_settingsOpened ? 1 : 0) +
+          (_streaksCustomized ? 1 : 0);
+      final isAllCompleted = completedCount == 4;
+
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 1. The Main Card Container
+          // FIX: Wrapped in Padding to reserve space for the hanging button.
+          // This ensures the button is inside the widget bounds for clicking.
+          Padding(
+            padding: EdgeInsets.only(bottom: 68.h),
+            child: Container(
+              padding: EdgeInsets.only(bottom: 1.h),
+              decoration: BoxDecoration(
+                color: const Color.fromRGBO(30, 29, 32, 1),
+                borderRadius: BorderRadius.circular(22.r),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  /// Header with progress percentage + indicator
+                  Padding(
+                    padding: EdgeInsets.all(8.w),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Getting Started',
+                          style: sfProText600(
+                            17.sp,
+                            isAllCompleted
+                                ? Colors.white
+                                : Color.fromRGBO(235, 235, 245, 0.3),
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 10.w),
-                      SizedBox(
-                        width: 20.w,
-                        height: 20.w,
-                        child:
-                            _isAllCompleted
-                                ? Image.asset(
+                        SizedBox(width: 10.w),
+                        SizedBox(
+                          width: 20.w,
+                          height: 20.w,
+                          child: isAllCompleted
+                              ? Image.asset(
                                   'assets/images/check.png',
                                   fit: BoxFit.contain,
                                 )
-                                : CircularProgressIndicator(
-                                  value: _completedCount / 4.0,
+                              : CircularProgressIndicator(
+                                  value: completedCount / 4.0,
                                   strokeWidth: 3.0,
                                   color: const Color.fromRGBO(176, 218, 200, 1),
                                   backgroundColor: const Color.fromRGBO(
@@ -459,37 +463,37 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                                     0.36,
                                   ),
                                 ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color.fromRGBO(47, 46, 51, 1),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(18.r),
-                      topRight: Radius.circular(18.r),
-                      bottomLeft: Radius.circular(22.r),
-                      bottomRight: Radius.circular(22.r),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 1. Enable notifications
-                      _buildMenuItem(
-                        imagePath: 'assets/images/notification.png',
-                        title: 'Enable notifications',
-                        hasCheckbox: true,
-                        hasArrow: true,
-                        isChecked: _notificationsEnabled,
-                        onTap: () {
-                          setState(() {
-                            _notificationsEnabled = true;
-                          });
-                        },
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(47, 46, 51, 1),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(18.r),
+                        topRight: Radius.circular(18.r),
+                        bottomLeft: Radius.circular(22.r),
+                        bottomRight: Radius.circular(22.r),
                       ),
-                      _buildDivider(),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 1. Enable notifications
+                        _buildMenuItem(
+                          imagePath: 'assets/images/notification.png',
+                          title: 'Enable notifications',
+                          hasCheckbox: true,
+                          hasArrow: true,
+                          isChecked: notificationsEnabled,
+                          onTap: () {
+                            if (!notificationsEnabled) {
+                              _settingsCtrl.updateToggle('notifications', true);
+                            }
+                          },
+                        ),
+                        _buildDivider(),
 
                       // 2. Add new stream service
                       InkWell(
@@ -631,7 +635,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
         // Since we added 68.h padding to the container above, bottom: 0 here
         // is visually equivalent to bottom: -68.h in the old code,
         // but now it is valid for clicks.
-        if (_isAllCompleted)
+        if (isAllCompleted)
           Positioned(
             bottom: 0,
             left: 0,
@@ -653,7 +657,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
           ),
 
         // 3. The Skip Button - Shows only when not all tasks are completed
-        if (!_isAllCompleted)
+        if (!isAllCompleted)
           Positioned(
             bottom: 0,
             left: 0,
@@ -680,6 +684,9 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
           ),
       ],
     );
+  }
+    );
+
   }
 
   Widget _buildMenuItem({
