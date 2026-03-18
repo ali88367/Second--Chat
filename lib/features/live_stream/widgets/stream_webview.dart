@@ -17,6 +17,7 @@ class StreamWebView extends StatefulWidget {
 class _StreamWebViewState extends State<StreamWebView> {
   late final WebViewController _controller;
   String? _initialUrl;
+  Uri? _initialUri;
 
   @override
   void initState() {
@@ -28,18 +29,58 @@ class _StreamWebViewState extends State<StreamWebView> {
   void _setInitial(String url) {
     final trimmed = url.trim();
     _initialUrl = trimmed.isEmpty ? null : trimmed;
+    _initialUri = trimmed.isEmpty ? null : Uri.tryParse(trimmed);
     _controller.setNavigationDelegate(
       NavigationDelegate(
         onNavigationRequest: (req) {
           final init = _initialUrl;
           if (init == null || init.isEmpty) return NavigationDecision.prevent;
-          // Prevent leaving the embedded player. Allow only same-origin navigations
-          // under player.twitch.tv (and the initial URL itself).
+          // Prevent leaving the embedded player.
+          // Allow:
+          // - the initial URL itself
+          // - same-origin navigations (some platforms redirect www -> apex, etc.)
+          // - known player hosts (e.g. Twitch).
           final u = req.url;
           if (u == init) return NavigationDecision.navigate;
           final uri = Uri.tryParse(u);
           if (uri == null) return NavigationDecision.prevent;
-          if (uri.host.contains('player.twitch.tv')) return NavigationDecision.navigate;
+          final initUri = _initialUri;
+          bool sameOriginAllowed() {
+            if (initUri == null) return false;
+            final a = initUri.host.toLowerCase();
+            final b = uri.host.toLowerCase();
+            if (a.isEmpty || b.isEmpty) return false;
+            if (a == b) return true;
+            if (b.endsWith('.$a')) return true; // subdomain of initial
+            if (a.endsWith('.$b')) return true; // initial is a subdomain
+            // common redirects
+            if (a == 'kick.com' && b == 'www.kick.com') return true;
+            if (a == 'www.kick.com' && b == 'kick.com') return true;
+            if (a == 'youtube.com' && b == 'www.youtube.com') return true;
+            if (a == 'www.youtube.com' && b == 'youtube.com') return true;
+            return false;
+          }
+
+          final host = uri.host.toLowerCase();
+          final knownPlayerHosts = <String>{
+            'player.twitch.tv',
+            'twitch.tv',
+            'www.twitch.tv',
+            'kick.com',
+            'www.kick.com',
+            'youtube.com',
+            'www.youtube.com',
+            'm.youtube.com',
+            'youtu.be',
+          };
+
+          if (sameOriginAllowed()) return NavigationDecision.navigate;
+          if (knownPlayerHosts.contains(host)) return NavigationDecision.navigate;
+          if (host.endsWith('.twitch.tv') ||
+              host.endsWith('.kick.com') ||
+              host.endsWith('.youtube.com')) {
+            return NavigationDecision.navigate;
+          }
           return NavigationDecision.prevent;
         },
       ),

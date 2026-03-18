@@ -29,9 +29,13 @@ class ChatSocketService extends GetxService {
   /// Per-platform viewer counts from realtime events.
   final RxMap<String, int> viewerCountsByPlatform = <String, int>{}.obs;
   final RxMap<String, bool> liveByPlatform = <String, bool>{}.obs;
+  /// Per-platform preferred player URL from realtime events (`player.embedUrl` preferred).
+  final RxMap<String, String?> playerUrlByPlatform = <String, String?>{}.obs;
 
   io.Socket? _socket;
   Timer? _reconnectTimer;
+  Timer? _startHeartbeatTimer;
+  DateTime _lastStartEmit = DateTime.fromMillisecondsSinceEpoch(0);
   bool _manuallyDisconnected = false;
 
   // Prevent duplicate messages (bounded memory).
@@ -94,10 +98,12 @@ class ChatSocketService extends GetxService {
         isConnected.value = true;
         _logSocket('connect', {'baseUrl': baseUrl, 'path': path});
         _emitStart();
+        _startHeartbeat();
       });
 
       socket.on('disconnect', (reason) {
         _logSocket('disconnect', reason);
+        _stopHeartbeat();
       });
 
       socket.on('connect_error', (e) {
@@ -158,6 +164,18 @@ class ChatSocketService extends GetxService {
           if (liveRaw is bool) liveByPlatform[platform] = liveRaw;
           final vc = _parseViewerCount(m);
           if (vc != null) viewerCountsByPlatform[platform] = vc;
+
+          final playerAny = m['player'];
+          if (playerAny is Map) {
+            final player = playerAny.cast<String, dynamic>();
+            final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
+            final watchUrl = (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
+                ?.toString();
+            final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
+                ? embedUrl.trim()
+                : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);
+            if (preferred != null) playerUrlByPlatform[platform] = preferred;
+          }
         }
       });
 
@@ -170,6 +188,18 @@ class ChatSocketService extends GetxService {
         if (platform.isNotEmpty) {
           final vc = _parseViewerCount(m);
           if (vc != null) viewerCountsByPlatform[platform] = vc;
+
+          final playerAny = m['player'];
+          if (playerAny is Map) {
+            final player = playerAny.cast<String, dynamic>();
+            final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
+            final watchUrl = (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
+                ?.toString();
+            final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
+                ? embedUrl.trim()
+                : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);
+            if (preferred != null) playerUrlByPlatform[platform] = preferred;
+          }
         }
       });
 
@@ -201,6 +231,9 @@ class ChatSocketService extends GetxService {
           final m = _asMap(payload);
           final platform = (m?['platform'] ?? '').toString().toLowerCase();
           if (platform.isNotEmpty) viewerCountsByPlatform[platform] = v;
+          // If viewer counts are coming in but status is lagging, request a refresh.
+          // Debounced inside `_emitStart`.
+          _emitStart();
         }
       });
 
@@ -231,9 +264,39 @@ class ChatSocketService extends GetxService {
     }
   }
 
+  void _startHeartbeat() {
+    // Some backends only push fresh stream status after `chat:start`.
+    // Re-emitting periodically keeps multi-stream status/player URLs updating
+    // without requiring user to leave/re-enter the page.
+    _startHeartbeatTimer?.cancel();
+    var ticks = 0;
+    // Fast refresh for ~1 minute, then back off.
+    _startHeartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_manuallyDisconnected) return;
+      if (_socket?.connected != true) return;
+      _emitStart();
+      ticks++;
+      if (ticks >= 12) {
+        _startHeartbeatTimer?.cancel();
+        _startHeartbeatTimer =
+            Timer.periodic(const Duration(seconds: 20), (_) {
+          if (_manuallyDisconnected) return;
+          if (_socket?.connected != true) return;
+          _emitStart();
+        });
+      }
+    });
+  }
+
+  void _stopHeartbeat() {
+    _startHeartbeatTimer?.cancel();
+    _startHeartbeatTimer = null;
+  }
+
   Future<void> disconnect() async {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _stopHeartbeat();
     _manuallyDisconnected = true;
     try {
       _emitStop();
@@ -259,6 +322,10 @@ class ChatSocketService extends GetxService {
 
   void _emitStart() {
     try {
+      final now = DateTime.now();
+      // Debounce to avoid spamming the backend.
+      if (now.difference(_lastStartEmit) < const Duration(seconds: 2)) return;
+      _lastStartEmit = now;
       _logSocket('emit chat:start', null);
       _socket?.emit('chat:start');
     } catch (_) {}

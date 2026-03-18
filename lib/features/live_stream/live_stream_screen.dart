@@ -144,7 +144,7 @@ class _LivestreamingState extends State<Livestreaming> {
 
       final auth = Get.find<AuthController>();
       final tokens = await auth.api.tokenStore.read();
-      final accessToken = tokens?.accessToken?.trim();
+      final accessToken = tokens?.accessToken.trim();
       if (accessToken == null || accessToken.isEmpty) return;
 
       final res = await auth.api.client.dio.get<dynamic>(
@@ -255,6 +255,33 @@ class _LivestreamingState extends State<Livestreaming> {
     final v = (count / 1000000000);
     final s = v.toStringAsFixed(v < 10 ? 1 : 0);
     return '${s.endsWith('.0') ? s.substring(0, s.length - 2) : s}B';
+  }
+
+  String _assetForPlatform(String platform) {
+    switch (platform.toLowerCase()) {
+      case 'kick':
+        return 'assets/images/kick.png';
+      case 'youtube':
+        return 'assets/images/youtube1.png';
+      case 'twitch':
+      default:
+        return 'assets/images/twitch1.png';
+    }
+  }
+
+  String _formatTime(dynamic tsRaw) {
+    DateTime? ts;
+    if (tsRaw is String) ts = DateTime.tryParse(tsRaw);
+    if (tsRaw is int) {
+      ts = tsRaw > 1000000000000
+          ? DateTime.fromMillisecondsSinceEpoch(tsRaw, isUtc: true)
+          : DateTime.fromMillisecondsSinceEpoch(tsRaw * 1000, isUtc: true);
+    }
+    ts ??= DateTime.now().toUtc();
+    final local = ts.toLocal();
+    final h = local.hour.toString().padLeft(2, '0');
+    final m = local.minute.toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   double _bottomSectionMinHeight(double screenHeight) {
@@ -491,66 +518,54 @@ class _LivestreamingState extends State<Livestreaming> {
                             _isDraggingActivity
                                 ? const NeverScrollableScrollPhysics()
                                 : const BouncingScrollPhysics(),
-                        child: Column(
-                          children: [
-                            activityRow(
-                              'assets/images/kick.png',
-                              context.l10n.newFollower,
-                              '19:41',
-                              '',
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/kick.png',
-                              context.l10n.newFollower,
-                              '22:41',
-                              '',
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/kick.png',
-                              context.l10n.megaSupporter,
-                              '19:49',
-                              '\$50',
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/youtube1.png',
-                              'Fun',
-                              '19:49',
-                              context.l10n.subscribed,
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/youtube1.png',
-                              'Fun',
-                              '19:49',
-                              context.l10n.subscribed,
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/twitch1.png',
-                              'Ranen',
-                              '19:49',
-                              context.l10n.subscribed,
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/kick.png',
-                              context.l10n.newFollower,
-                              '20:15',
-                              '',
-                            ),
-                            SizedBox(height: 12.h),
-                            activityRow(
-                              'assets/images/twitch1.png',
-                              context.l10n.superFan,
-                              '20:30',
-                              '\$100',
-                            ),
-                            SizedBox(height: 12.h),
-                          ],
-                        ),
+                        child: Obx(() {
+                          final chatCtrl = Get.find<ChatController>();
+                          // Prefer controller activity list (wired to sockets).
+                          final events = chatCtrl.activityEvents;
+                          if (events.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          // Render newest first.
+                          final list = events.reversed.toList(growable: false);
+                          return Column(
+                            children: [
+                              for (var i = 0; i < list.length; i++) ...[
+                                Builder(
+                                  builder: (ctx) {
+                                    final e = list[i];
+                                    final platform =
+                                        (e['platform'] ?? '').toString();
+                                    final meta = e['metadata'];
+                                    final metaMap = meta is Map
+                                        ? meta.cast<String, dynamic>()
+                                        : const <String, dynamic>{};
+                                    final user = (metaMap['user'] ??
+                                            metaMap['username'] ??
+                                            metaMap['name'] ??
+                                            e['username'] ??
+                                            '')
+                                        .toString()
+                                        .trim();
+                                    final type =
+                                        (e['type'] ?? e['eventType'] ?? '')
+                                            .toString()
+                                            .trim();
+                                    final time = _formatTime(
+                                      e['timestamp'] ?? e['created_at'],
+                                    );
+                                    return activityRow(
+                                      _assetForPlatform(platform),
+                                      user.isNotEmpty ? user : type,
+                                      time,
+                                      user.isNotEmpty ? type : '',
+                                    );
+                                  },
+                                ),
+                                if (i != list.length - 1) SizedBox(height: 12.h),
+                              ],
+                            ],
+                          );
+                        }),
                       ),
                     ),
                   ),
@@ -1701,15 +1716,5 @@ class _LivestreamingState extends State<Livestreaming> {
         ],
       ),
     );
-  }
-}
-
-// ── Eager gesture recognizer ──────────────────────────────────────────
-class _EagerVerticalDragGestureRecognizer
-    extends VerticalDragGestureRecognizer {
-  @override
-  void addAllowedPointer(PointerDownEvent event) {
-    super.addAllowedPointer(event);
-    resolve(GestureDisposition.accepted);
   }
 }
