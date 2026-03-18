@@ -73,12 +73,20 @@ class StreamingService {
     final platformsList = map['platforms'];
     if (platformsList is List) {
       final viewerCountsByPlatform = <String, int>{};
+      final liveByPlatform = <String, bool>{};
+      final embedUrlByPlatform = <String, String?>{};
       for (final p in platformsList) {
         if (p is! Map) continue;
         final m = p.cast<String, dynamic>();
         final pNameRaw = (m['platform'] ?? m['name'] ?? '').toString().trim();
         if (pNameRaw.isEmpty) continue;
         final pKey = pNameRaw.toLowerCase();
+
+        final liveRaw = m['live'];
+        final live = liveRaw is bool
+            ? liveRaw
+            : (liveRaw?.toString().toLowerCase() == 'true');
+        liveByPlatform[pKey] = live;
 
         // API field name varies across deployments.
         final count = _extractInt(m, const [
@@ -93,6 +101,18 @@ class StreamingService {
           'view_count',
         ]);
         if (count != null) viewerCountsByPlatform[pKey] = count;
+
+        final playerAny = m['player'];
+        if (playerAny is Map) {
+          final embedUrl =
+              extractString(playerAny, const ['embedUrl', 'embed_url']);
+          final watchUrl =
+              extractString(playerAny, const ['watchUrl', 'watch_url', 'url']);
+          embedUrlByPlatform[pKey] =
+              (embedUrl != null && embedUrl.trim().isNotEmpty)
+                  ? embedUrl
+                  : watchUrl;
+        }
       }
 
       final key = platform.toLowerCase();
@@ -142,6 +162,8 @@ class StreamingService {
           chatSocketPath: socketPath,
           viewerCount: viewerCount,
           viewerCountsByPlatform: viewerCountsByPlatform,
+          liveByPlatform: liveByPlatform,
+          embedUrlByPlatform: embedUrlByPlatform,
           raw: map,
         );
       }
@@ -185,6 +207,12 @@ class StreamingService {
       viewerCountsByPlatform: viewerCount == null
           ? const {}
           : {platform.toLowerCase(): viewerCount},
+      liveByPlatform: {platform.toLowerCase(): live},
+      embedUrlByPlatform: {
+        platform.toLowerCase(): (embedUrl != null && embedUrl.trim().isNotEmpty)
+            ? embedUrl
+            : watchUrl
+      },
       raw: map,
     );
   }

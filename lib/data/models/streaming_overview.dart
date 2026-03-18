@@ -7,8 +7,12 @@ class StreamingOverview {
     required this.chatSocketPath,
     this.viewerCount,
     Map<String, int>? viewerCountsByPlatform,
+    Map<String, bool>? liveByPlatform,
+    Map<String, String?>? embedUrlByPlatform,
     this.raw,
-  }) : viewerCountsByPlatform = viewerCountsByPlatform ?? const {};
+  })  : viewerCountsByPlatform = viewerCountsByPlatform ?? const {},
+        liveByPlatform = liveByPlatform ?? const {},
+        embedUrlByPlatform = embedUrlByPlatform ?? const {};
 
   final String platform; // "twitch"
   final bool live;
@@ -17,5 +21,8 @@ class StreamingOverview {
   final String? chatSocketPath;
   final int? viewerCount;
   final Map<String, int> viewerCountsByPlatform;
+  final Map<String, bool> liveByPlatform;
+  /// Per-platform preferred playback URL (embedUrl if present, else watchUrl).
+  final Map<String, String?> embedUrlByPlatform;
   final Map<String, dynamic>? raw;
 }

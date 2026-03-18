@@ -15,24 +15,44 @@ class StreamWebView extends StatefulWidget {
 
 class _StreamWebViewState extends State<StreamWebView> {
   late final WebViewController _controller;
+  String? _initialUrl;
 
   @override
   void initState() {
     super.initState();
-    _controller =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setNavigationDelegate(NavigationDelegate(onPageFinished: (_) {}));
-    if (widget.url.trim().isNotEmpty) {
-      _controller.loadRequest(Uri.parse(widget.url));
+    _controller = WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted);
+    _setInitial(widget.url);
+  }
+
+  void _setInitial(String url) {
+    final trimmed = url.trim();
+    _initialUrl = trimmed.isEmpty ? null : trimmed;
+    _controller.setNavigationDelegate(
+      NavigationDelegate(
+        onNavigationRequest: (req) {
+          final init = _initialUrl;
+          if (init == null || init.isEmpty) return NavigationDecision.prevent;
+          // Prevent leaving the embedded player. Allow only same-origin navigations
+          // under player.twitch.tv (and the initial URL itself).
+          final u = req.url;
+          if (u == init) return NavigationDecision.navigate;
+          final uri = Uri.tryParse(u);
+          if (uri == null) return NavigationDecision.prevent;
+          if (uri.host.contains('player.twitch.tv')) return NavigationDecision.navigate;
+          return NavigationDecision.prevent;
+        },
+      ),
+    );
+    if (trimmed.isNotEmpty) {
+      _controller.loadRequest(Uri.parse(trimmed));
     }
   }
 
   @override
   void didUpdateWidget(StreamWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url && widget.url.trim().isNotEmpty) {
-      _controller.loadRequest(Uri.parse(widget.url));
+    if (oldWidget.url != widget.url) {
+      _setInitial(widget.url);
     }
   }
 
@@ -44,10 +64,16 @@ class _StreamWebViewState extends State<StreamWebView> {
         child: Container(
           color: Colors.black,
           alignment: Alignment.center,
-          child: const Icon(
-            Icons.videocam_off,
-            color: Colors.white38,
-            size: 48,
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam_off, color: Colors.white38, size: 48),
+              SizedBox(height: 10),
+              Text(
+                'No stream at the moment',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ],
           ),
         ),
       );

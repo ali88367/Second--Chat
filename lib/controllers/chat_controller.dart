@@ -33,6 +33,8 @@ class ChatController extends GetxController {
   final RxBool isLive = false.obs;
   final Rxn<StreamingOverview> overview = Rxn<StreamingOverview>();
   final RxMap<String, int> platformViewerCounts = <String, int>{}.obs;
+  final RxMap<String, bool> platformLive = <String, bool>{}.obs;
+  final RxMap<String, String?> platformEmbedUrls = <String, String?>{}.obs;
 
   RxList<ChatMessage> get messages => _socket.messages;
   RxInt get viewerCount => _socket.viewerCount;
@@ -62,21 +64,9 @@ class ChatController extends GetxController {
         _bumpScroll();
       }
 
-      final ov = await _streaming.fetchOverview(
-        platform: platform.value,
-        accessToken: _accessToken!,
-      );
-      if (ov != null) {
-        overview.value = ov;
-        isLive.value = ov.live;
-        watchUrl.value = ov.watchUrl;
-        if (ov.viewerCountsByPlatform.isNotEmpty) {
-          platformViewerCounts.assignAll(ov.viewerCountsByPlatform);
-        } else if (ov.viewerCount != null) {
-          platformViewerCounts[ov.platform.toLowerCase()] = ov.viewerCount!;
-        }
-      }
+      await refreshOverviewForPlatform(platform.value);
 
+      final ov = overview.value;
       final socketUrl = ov?.chatSocketUrl;
       final socketPath = ov?.chatSocketPath;
       if (socketUrl != null &&
@@ -90,10 +80,54 @@ class ChatController extends GetxController {
         );
       }
 
+      // Keep live/viewer state in sync with realtime events.
+      ever<Map<String, int>>(_socket.viewerCountsByPlatform, (m) {
+        if (m.isNotEmpty) platformViewerCounts.assignAll(m);
+      });
+      ever<Map<String, bool>>(_socket.liveByPlatform, (m) {
+        if (m.isNotEmpty) platformLive.assignAll(m);
+      });
+
       ever<List<ChatMessage>>(messages, (_) {
         _bumpScroll();
       });
     } catch (_) {}
+  }
+
+  Future<void> refreshOverviewForPlatform(String p) async {
+    try {
+      final token = _accessToken ?? await _tokenProvider.getAccessToken(p);
+      if (token == null || token.isEmpty) return;
+      final ov = await _streaming.fetchOverview(platform: p, accessToken: token);
+      if (ov == null) return;
+      overview.value = ov;
+      // selected platform state
+      platform.value = p;
+      isLive.value = ov.live;
+      watchUrl.value = ov.watchUrl;
+      // multi-platform state
+      if (ov.viewerCountsByPlatform.isNotEmpty) {
+        platformViewerCounts.assignAll(ov.viewerCountsByPlatform);
+      }
+      if (ov.liveByPlatform.isNotEmpty) {
+        platformLive.assignAll(ov.liveByPlatform);
+      } else {
+        platformLive[p.toLowerCase()] = ov.live;
+      }
+      if (ov.embedUrlByPlatform.isNotEmpty) {
+        platformEmbedUrls.assignAll(ov.embedUrlByPlatform);
+      } else {
+        platformEmbedUrls[p.toLowerCase()] = ov.watchUrl;
+      }
+    } catch (_) {}
+  }
+
+  bool isPlatformLive(String p) {
+    return platformLive[p.toLowerCase()] == true;
+  }
+
+  String? urlForPlatform(String p) {
+    return platformEmbedUrls[p.toLowerCase()];
   }
 
   Future<void> sendMessage(String text) async {

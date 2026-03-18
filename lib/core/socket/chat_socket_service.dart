@@ -10,6 +10,19 @@ class ChatSocketService extends GetxService {
   final RxList<ChatMessage> messages = <ChatMessage>[].obs;
   final RxInt viewerCount = 0.obs;
   final RxBool isConnected = false.obs;
+  final Rxn<Map<String, dynamic>> connected = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> settingsUpdate = Rxn<Map<String, dynamic>>();
+  final RxList<Map<String, dynamic>> activity = <Map<String, dynamic>>[].obs;
+  final Rxn<Map<String, dynamic>> streamStatus = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> streamInfoUpdate = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> ledNotification = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> streamSettingsApplied =
+      Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> socketError = Rxn<Map<String, dynamic>>();
+
+  /// Per-platform viewer counts from realtime events.
+  final RxMap<String, int> viewerCountsByPlatform = <String, int>{}.obs;
+  final RxMap<String, bool> liveByPlatform = <String, bool>{}.obs;
 
   io.Socket? _socket;
   Timer? _reconnectTimer;
@@ -35,6 +48,7 @@ class ChatSocketService extends GetxService {
             .setTransports(['websocket'])
             .setPath(path)
             .setAuth({'token': accessToken})
+            .enableForceNew()
             .disableAutoConnect()
             .enableReconnection()
             .setReconnectionAttempts(999999)
@@ -48,6 +62,66 @@ class ChatSocketService extends GetxService {
       socket.on('connect', (_) {
         isConnected.value = true;
         _emitStart();
+      });
+
+      // `connected`
+      socket.on('connected', (d) {
+        final m = _asMap(d);
+        if (m != null) connected.value = m;
+      });
+
+      // `settings:update`
+      socket.on('settings:update', (d) {
+        final m = _asMap(d);
+        if (m != null) settingsUpdate.value = m;
+      });
+
+      // `activity:sync` (sent once after chat:start)
+      socket.on('activity:sync', (d) {
+        final m = _asMap(d);
+        if (m == null) return;
+        final events = m['events'];
+        if (events is List) {
+          final list = <Map<String, dynamic>>[];
+          for (final e in events) {
+            final em = _asMap(e);
+            if (em != null) list.add(em);
+          }
+          activity.assignAll(list);
+        }
+      });
+
+      // `activity:event` (pushed live)
+      socket.on('activity:event', (d) {
+        final m = _asMap(d);
+        if (m == null) return;
+        activity.add(m);
+      });
+
+      // `stream:status`
+      socket.on('stream:status', (d) {
+        final m = _asMap(d);
+        if (m == null) return;
+        streamStatus.value = m;
+        final platform = (m['platform'] ?? '').toString().toLowerCase();
+        if (platform.isNotEmpty) {
+          final liveRaw = m['live'];
+          if (liveRaw is bool) liveByPlatform[platform] = liveRaw;
+          final vc = _parseViewerCount(m);
+          if (vc != null) viewerCountsByPlatform[platform] = vc;
+        }
+      });
+
+      // `stream:info:update`
+      socket.on('stream:info:update', (d) {
+        final m = _asMap(d);
+        if (m == null) return;
+        streamInfoUpdate.value = m;
+        final platform = (m['platform'] ?? '').toString().toLowerCase();
+        if (platform.isNotEmpty) {
+          final vc = _parseViewerCount(m);
+          if (vc != null) viewerCountsByPlatform[platform] = vc;
+        }
       });
 
       socket.on('disconnect', (_) {
@@ -73,7 +147,33 @@ class ChatSocketService extends GetxService {
 
       socket.on('viewer_count:update', (payload) {
         final v = _parseViewerCount(payload);
-        if (v != null) viewerCount.value = v;
+        if (v != null) {
+          viewerCount.value = v;
+          final m = _asMap(payload);
+          final platform = (m?['platform'] ?? '').toString().toLowerCase();
+          if (platform.isNotEmpty) viewerCountsByPlatform[platform] = v;
+        }
+      });
+
+      // `led:notification`
+      socket.on('led:notification', (d) {
+        final m = _asMap(d);
+        if (m != null) ledNotification.value = m;
+      });
+
+      // `stream:settings:applied`
+      socket.on('stream:settings:applied', (d) {
+        final m = _asMap(d);
+        if (m != null) streamSettingsApplied.value = m;
+      });
+
+      // Errors
+      socket.on('error', (d) {
+        final m = _asMap(d);
+        socketError.value = m ?? {'message': d.toString()};
+      });
+      socket.onError((e) {
+        socketError.value = {'message': e.toString()};
       });
 
       socket.connect();
@@ -168,6 +268,7 @@ class ChatSocketService extends GetxService {
           (map['platform'] ?? map['source'] ?? 'twitch').toString();
       final user = (map['sender_username'] ??
               map['senderUsername'] ??
+              map['username'] ??
               map['user'] ??
               map['username'] ??
               map['name'] ??
@@ -226,9 +327,24 @@ class ChatSocketService extends GetxService {
       if (payload is String) return int.tryParse(payload.trim());
       if (payload is Map) {
         final m = payload.cast<String, dynamic>();
-        final v = m['viewerCount'] ?? m['viewer_count'] ?? m['count'];
+        final v =
+            m['viewerCount'] ?? m['viewer_count'] ?? m['viewerCount'] ?? m['count'];
         if (v is num) return v.toInt();
         if (v is String) return int.tryParse(v.trim());
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic>? _asMap(dynamic payload) {
+    try {
+      if (payload is Map<String, dynamic>) return payload;
+      if (payload is Map) return payload.cast<String, dynamic>();
+      if (payload is String) {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map) return decoded.cast<String, dynamic>();
       }
       return null;
     } catch (_) {

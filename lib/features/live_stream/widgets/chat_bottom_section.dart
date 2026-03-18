@@ -327,7 +327,30 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                 .toList(growable: false)
             : _comments;
 
-    if (filter == null) return source;
+    // If no streams are live, hide chat entirely.
+    if (_chatCtrl.platformLive.isNotEmpty &&
+        !_chatCtrl.platformLive.values.any((v) => v == true)) {
+      return const [];
+    }
+
+    if (filter == null) {
+      // When showing All, keep messages only for platforms that are live (if known).
+      if (_chatCtrl.platformLive.isNotEmpty) {
+        return source.where((item) {
+          final platformPath = item['platform'].toString().toLowerCase();
+          if (platformPath.contains('twitch')) return _chatCtrl.isPlatformLive('twitch');
+          if (platformPath.contains('kick')) return _chatCtrl.isPlatformLive('kick');
+          if (platformPath.contains('youtube')) return _chatCtrl.isPlatformLive('youtube');
+          return true;
+        }).toList();
+      }
+      return source;
+    }
+
+    // If selected platform is offline, hide messages.
+    if (_chatCtrl.platformLive.isNotEmpty && !_chatCtrl.isPlatformLive(filter)) {
+      return const [];
+    }
     return source.where((item) {
       final platformPath = item['platform'].toString().toLowerCase();
       final filterKey = filter.toLowerCase();

@@ -99,6 +99,10 @@ class _LivestreamingState extends State<Livestreaming> {
     } else {
       _chatFilter.value = platformKey;
     }
+    // Refresh overview for the selected platform so stream/embed updates.
+    final chatCtrl = Get.find<ChatController>();
+    final selected = _chatFilter.value ?? 'twitch';
+    chatCtrl.refreshOverviewForPlatform(selected);
   }
 
   void _handlePlatformSwipe(bool swipeRight) {
@@ -113,6 +117,9 @@ class _LivestreamingState extends State<Livestreaming> {
           (currentIndex - 1 + platforms.length) % platforms.length;
       _chatFilter.value = platforms[prevIndex];
     }
+    final chatCtrl = Get.find<ChatController>();
+    final selected = _chatFilter.value ?? 'twitch';
+    chatCtrl.refreshOverviewForPlatform(selected);
   }
 
   void _log(String message) {
@@ -754,12 +761,125 @@ class _LivestreamingState extends State<Livestreaming> {
                                           builder: (context, showCard, child) {
                                             final chatCtrl =
                                                 Get.find<ChatController>();
+                                            final settingsCtrl =
+                                                Get.find<SettingsController>();
+
+                                            Widget buildSingle() {
+                                              final url =
+                                                  chatCtrl.watchUrl.value ?? '';
+                                              // If selected platform is offline, force placeholder.
+                                              final selected =
+                                                  _chatFilter.value ?? 'twitch';
+                                              final isLive =
+                                                  chatCtrl.isPlatformLive(
+                                                    selected,
+                                                  );
+                                              final resolvedUrl =
+                                                  isLive ? url : '';
+                                              return StreamWebView(
+                                                key: _streamWebViewKey,
+                                                url: resolvedUrl,
+                                                height: streamPreviewHeight,
+                                              );
+                                            }
+
+                                            Widget buildMulti() {
+                                              // Segmented layout: max 3 streams.
+                                              const allPlatforms = [
+                                                'twitch',
+                                                'kick',
+                                                'youtube',
+                                              ];
+                                              final platforms = allPlatforms;
+
+                                              final tileGap = 8.w;
+                                              const topFlex = 56;
+                                              const bottomFlex = 44;
+
+                                              Widget tile({
+                                                required String platform,
+                                                required BorderRadius radius,
+                                                required double height,
+                                              }) {
+                                                final url = chatCtrl
+                                                        .isPlatformLive(platform)
+                                                    ? (chatCtrl.urlForPlatform(
+                                                          platform,
+                                                        ) ??
+                                                        '')
+                                                    : '';
+                                                return ClipRRect(
+                                                  borderRadius: radius,
+                                                  child: StreamWebView(
+                                                    key: ValueKey('stream_$platform'),
+                                                    url: url,
+                                                    height: height,
+                                                  ),
+                                                );
+                                              }
+
+                                              // Three streams: top row 2 tiles (only one outer top corner each),
+                                              // bottom tile spans full width (only bottom corners).
+                                              return Column(
+                                                children: [
+                                                  Expanded(
+                                                    flex: topFlex,
+                                                    child: Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: tile(
+                                                            platform: platforms[0],
+                                                            radius: BorderRadius.only(
+                                                              topLeft:
+                                                                  Radius.circular(
+                                                                    16.r,
+                                                                  ),
+                                                            ),
+                                                            height: streamPreviewHeight,
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: tileGap),
+                                                        Expanded(
+                                                          child: tile(
+                                                            platform: platforms[1],
+                                                            radius: BorderRadius.only(
+                                                              topRight:
+                                                                  Radius.circular(
+                                                                    16.r,
+                                                                  ),
+                                                            ),
+                                                            height: streamPreviewHeight,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: tileGap),
+                                                  Expanded(
+                                                    flex: bottomFlex,
+                                                    child: tile(
+                                                      platform: platforms[2],
+                                                      radius: BorderRadius.only(
+                                                        bottomLeft:
+                                                            Radius.circular(16.r),
+                                                        bottomRight:
+                                                            Radius.circular(16.r),
+                                                      ),
+                                                      height: streamPreviewHeight,
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            }
+
                                             final webView = SizedBox(
                                               height: streamPreviewHeight,
                                               child: Obx(() {
-                                                final url =
-                                                    chatCtrl.watchUrl.value ??
-                                                    '';
+                                                final multi =
+                                                    settingsCtrl
+                                                        .multiScreenPreview
+                                                        .value ==
+                                                    true;
                                                 return Container(
                                                   width:
                                                       MediaQuery.of(
@@ -779,11 +899,13 @@ class _LivestreamingState extends State<Livestreaming> {
                                                         BorderRadius.circular(
                                                           24.r,
                                                         ),
-                                                    child: StreamWebView(
-                                                      key: _streamWebViewKey,
-                                                      url: url,
-                                                      height:
-                                                          streamPreviewHeight,
+                                                    child: Padding(
+                                                      padding: EdgeInsets.all(
+                                                        multi ? 8.w : 0,
+                                                      ),
+                                                      child: multi
+                                                          ? buildMulti()
+                                                          : buildSingle(),
                                                     ),
                                                   ),
                                                 );
