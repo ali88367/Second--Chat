@@ -58,6 +58,7 @@
   "couldntConnectPleaseTryAgain": "Wir konnten keine Verbindung herstellen. Bitte versuche es erneut.",
   "couldntOpenLoginPagePleaseTryAgain": "Wir konnten die Anmeldeseite nicht öffnen. Bitte versuche es erneut.",
   "loginTimedOutPleaseTryAgain": "Anmeldung abgelaufen. Bitte versuche es erneut.",
+  "authenticationCancelled": "Authentifizierung abgebrochen.",
   "missingAccessToken": "Zugriffstoken fehlt",
   "monthly": "Monatlich",
   "nameCategory": "Name / Kategorie",

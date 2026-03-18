@@ -22,6 +22,8 @@ class OAuthFlow {
 
   OAuthProvider? _pendingProvider;
   String? _pendingState;
+  bool _receivedRedirect = false;
+  Timer? _cancelTimer;
 
   static final Uri _redirectUri = Uri.parse(ApiConfig.oauthRedirectUri);
 
@@ -78,6 +80,7 @@ class OAuthFlow {
       if (kDebugMode) debugPrint('OAUTH REDIRECT: $uri');
       // Dismiss SafariVC/CustomTabs ASAP once we have the callback.
       unawaited(_tryDismissBrowser());
+      _receivedRedirect = true;
       _pendingCompleter!.complete(uri);
     });
 
@@ -99,6 +102,7 @@ class OAuthFlow {
           _isExpectedRedirect(initial)) {
         _logRedirect('initial', initial);
         unawaited(_tryDismissBrowser());
+        _receivedRedirect = true;
         _pendingCompleter!.complete(initial);
       }
     } catch (_) {
@@ -119,6 +123,8 @@ class OAuthFlow {
 
     _pendingProvider = provider;
     _pendingState = authorizationUrl.queryParameters['state'];
+    _receivedRedirect = false;
+    _cancelTimer?.cancel();
 
     _pendingCompleter = Completer<Uri>();
 
@@ -274,6 +280,18 @@ class OAuthFlow {
     _resetPending();
   }
 
+  void handleAppResumed({
+    Duration cancelDelay = const Duration(milliseconds: 600),
+  }) {
+    if (_pendingCompleter == null || _pendingCompleter!.isCompleted) return;
+    _cancelTimer?.cancel();
+    _cancelTimer = Timer(cancelDelay, () {
+      if (_pendingCompleter == null || _pendingCompleter!.isCompleted) return;
+      if (_receivedRedirect) return;
+      _resetPending();
+    });
+  }
+
   bool _isExpectedRedirect(Uri uri) {
     // Accept scheme/host match; path can vary a bit depending on platform and backend.
     return uri.scheme == _redirectUri.scheme &&
@@ -282,12 +300,15 @@ class OAuthFlow {
   }
 
   void _resetPending() {
+    _cancelTimer?.cancel();
+    _cancelTimer = null;
     if (_pendingCompleter != null && !_pendingCompleter!.isCompleted) {
       _pendingCompleter!.completeError(StateError('OAuth flow cancelled'));
     }
     _pendingCompleter = null;
     _pendingProvider = null;
     _pendingState = null;
+    _receivedRedirect = false;
   }
 }
 

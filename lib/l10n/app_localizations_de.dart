@@ -178,6 +178,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Anmeldung abgelaufen. Bitte versuche es erneut.';
 
   @override
+  String get authenticationCancelled => 'Authentifizierung abgebrochen.';
+
+  @override
   String get missingAccessToken => 'Zugriffstoken fehlt';
 
   @override

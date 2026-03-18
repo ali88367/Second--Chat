@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
@@ -17,7 +18,7 @@ import '../api/http/api_json.dart';
 import '../core/constants/app_colors/app_colors.dart';
 import '../core/localization/get_l10n.dart';
 
-class AuthController extends GetxController {
+class AuthController extends GetxController with WidgetsBindingObserver {
   AuthController({
     AppApi? api,
     OAuthFlow? oauthFlow,
@@ -40,6 +41,7 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_bootstrap());
   }
 
@@ -198,6 +200,16 @@ class AuthController extends GetxController {
       );
       return false;
     } catch (e) {
+      if (e is StateError && e.message == 'OAuth flow cancelled') {
+        lastError.value = 'OAuth flow cancelled';
+        final l10n = getAppL10n();
+        _showOauthError(
+          l10n?.authenticationCancelled ?? 'Authentication cancelled.',
+          title: l10n?.cancel ?? 'Cancel',
+          error: e,
+        );
+        return false;
+      }
       lastError.value = 'Failed to connect ${provider.name}: $e';
       if (kDebugMode) debugPrint('OAUTH ERROR(${provider.name}): $e');
       if (!(e is StateError &&
@@ -213,7 +225,7 @@ class AuthController extends GetxController {
     }
   }
 
-  void _showOauthError(String message, {Object? error}) {
+  void _showOauthError(String message, {Object? error, String? title}) {
     if (error != null) {
       debugPrint('OAUTH UI ERROR: $error');
     }
@@ -222,7 +234,7 @@ class AuthController extends GetxController {
     }
     final l10n = getAppL10n();
     Get.snackbar(
-      l10n?.connectionIssue ?? 'Connection issue',
+      title ?? (l10n?.connectionIssue ?? 'Connection issue'),
       message,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: blackbox.withOpacity(0.9),
@@ -301,8 +313,16 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
     _oauthFlow.dispose();
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _oauthFlow.handleAppResumed();
+    }
   }
 }
 

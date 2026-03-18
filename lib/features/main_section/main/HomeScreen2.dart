@@ -467,6 +467,27 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
       if (payload.containsKey('streak')) {
         return _extractStreakExists(payload['streak']);
       }
+      final status = payload['status'];
+      if (status is String && status.toLowerCase() == 'inactive') return false;
+
+      final targetDays =
+          payload['targetDaysPerWeek'] ?? payload['target_days_per_week'];
+      final selectedDays = payload['selectedDays'] ?? payload['selected_days'];
+      final hasSelectedDays =
+          selectedDays is List && selectedDays.isNotEmpty;
+      final hasTargetDays = targetDays is num && targetDays > 0;
+      final hasSelectedDaysKey = payload.containsKey('selectedDays') ||
+          payload.containsKey('selected_days');
+      final hasTargetDaysKey = payload.containsKey('targetDaysPerWeek') ||
+          payload.containsKey('target_days_per_week');
+
+      // If there are no configured days or targets (e.g. streak == 0), treat as
+      // no streak so the user can create one.
+      if ((hasSelectedDaysKey || hasTargetDaysKey) &&
+          !hasSelectedDays &&
+          !hasTargetDays) {
+        return false;
+      }
       if (payload['id'] != null) return true;
       return payload.isNotEmpty;
     }

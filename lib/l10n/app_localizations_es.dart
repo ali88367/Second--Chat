@@ -177,6 +177,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se agotó el tiempo de inicio de sesión. Por favor, inténtalo de nuevo.';
 
   @override
+  String get authenticationCancelled => 'Autenticación cancelada.';
+
+  @override
   String get missingAccessToken => 'Falta el token de acceso';
 
   @override

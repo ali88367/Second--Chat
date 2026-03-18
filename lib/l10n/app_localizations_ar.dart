@@ -174,6 +174,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'انتهت مهلة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
 
   @override
+  String get authenticationCancelled => 'تم إلغاء المصادقة.';
+
+  @override
   String get missingAccessToken => 'رمز الوصول مفقود';
 
   @override
