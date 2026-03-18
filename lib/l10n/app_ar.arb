@@ -58,6 +58,7 @@
   "couldntConnectPleaseTryAgain": "تعذر الاتصال. يرجى المحاولة مرة أخرى.",
   "couldntOpenLoginPagePleaseTryAgain": "تعذر فتح صفحة تسجيل الدخول. يرجى المحاولة مرة أخرى.",
   "loginTimedOutPleaseTryAgain": "انتهت مهلة تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+  "authenticationCancelled": "تم إلغاء المصادقة.",
   "missingAccessToken": "رمز الوصول مفقود",
   "monthly": "شهري",
   "nameCategory": "الاسم / الفئة",

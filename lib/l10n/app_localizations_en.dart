@@ -176,6 +176,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Login timed out. Please try again.';
 
   @override
+  String get authenticationCancelled => 'Authentication cancelled.';
+
+  @override
   String get missingAccessToken => 'Missing access token';
 
   @override
@@ -493,7 +496,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeStreamNotStartedMessage =>
-      'You haven\'t started the\\nstream yet, but in the\\nmeantime you can';
+      'You haven\'t started the stream yet, but in the meantime you can';
 
   @override
   String get startFreeTrial => 'Start Free Trial';

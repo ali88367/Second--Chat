@@ -58,6 +58,7 @@
   "couldntConnectPleaseTryAgain": "We couldn't connect. Please try again.",
   "couldntOpenLoginPagePleaseTryAgain": "We couldn't open the login page. Please try again.",
   "loginTimedOutPleaseTryAgain": "Login timed out. Please try again.",
+  "authenticationCancelled": "Authentication cancelled.",
   "missingAccessToken": "Missing access token",
   "monthly": "Monthly",
   "nameCategory": "Name Category",
@@ -170,7 +171,7 @@
   "availableLabel": "available",
   "freezesPerMonthLabel": "freezes per month",
   "oneMonthFreePremium": "1 month free Premium",
-  "homeStreamNotStartedMessage": "You haven't started the\\nstream yet, but in the\\nmeantime you can",
+  "homeStreamNotStartedMessage": "You haven't started the stream yet, but in the meantime you can",
   "startFreeTrial": "Start Free Trial",
   "unlockTheFullExperienceWith": "Unlock the full experience with {premium}",
   "@unlockTheFullExperienceWith": {

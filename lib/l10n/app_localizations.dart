@@ -424,6 +424,12 @@ abstract class AppLocalizations {
   /// **'Login timed out. Please try again.'**
   String get loginTimedOutPleaseTryAgain;
 
+  /// No description provided for @authenticationCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication cancelled.'**
+  String get authenticationCancelled;
+
   /// No description provided for @missingAccessToken.
   ///
   /// In en, this message translates to:
@@ -1039,7 +1045,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeStreamNotStartedMessage.
   ///
   /// In en, this message translates to:
-  /// **'You haven\'t started the\\nstream yet, but in the\\nmeantime you can'**
+  /// **'You haven\'t started the stream yet, but in the meantime you can'**
   String get homeStreamNotStartedMessage;
 
   /// No description provided for @startFreeTrial.

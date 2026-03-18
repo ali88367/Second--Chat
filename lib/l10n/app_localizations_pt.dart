@@ -179,6 +179,9 @@ class AppLocalizationsPt extends AppLocalizations {
       'O tempo de login expirou. Tente novamente.';
 
   @override
+  String get authenticationCancelled => 'Autenticação cancelada.';
+
+  @override
   String get missingAccessToken => 'Token de acesso ausente';
 
   @override

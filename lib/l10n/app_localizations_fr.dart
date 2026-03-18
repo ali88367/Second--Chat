@@ -171,14 +171,17 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get couldntOpenLoginPagePleaseTryAgain =>
-      'Nous n’avons pas pu ouvrir la page de connexion. Veuillez réessayer.';
+      'Nous n\'avons pas pu ouvrir la page de connexion. Veuillez réessayer.';
 
   @override
   String get loginTimedOutPleaseTryAgain =>
       'Délai de connexion dépassé. Veuillez réessayer.';
 
   @override
-  String get missingAccessToken => 'Jeton d’accès manquant';
+  String get authenticationCancelled => 'Authentification annulée.';
+
+  @override
+  String get missingAccessToken => 'Jeton d\'accès manquant';
 
   @override
   String get monthly => 'Mensuel';

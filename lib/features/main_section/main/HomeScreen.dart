@@ -93,7 +93,7 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(height: 24.h),
 
                 Text(
-                  'You haven\'t started the\nstream yet',
+                  'You haven\'t started the stream yet',
                   textAlign: TextAlign.center,
                   style: sfProDisplay400(
                     28.sp,

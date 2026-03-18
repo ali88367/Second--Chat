@@ -58,6 +58,7 @@
   "couldntConnectPleaseTryAgain": "Não foi possível conectar. Tente novamente.",
   "couldntOpenLoginPagePleaseTryAgain": "Não foi possível abrir a página de login. Tente novamente.",
   "loginTimedOutPleaseTryAgain": "O tempo de login expirou. Tente novamente.",
+  "authenticationCancelled": "Autenticação cancelada.",
   "missingAccessToken": "Token de acesso ausente",
   "monthly": "Mensal",
   "nameCategory": "Nome / categoria",
