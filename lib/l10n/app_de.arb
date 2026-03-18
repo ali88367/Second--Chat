@@ -183,5 +183,13 @@
     "placeholders": {
       "premium": {}
     }
-  }
+  },
+  "appName": "Second Chat",
+  "notificationCardMessage": "Neue Funktionen verfügbar!",
+  "notificationCardTime": "9:41 AM",
+  "notificationPermissionDisabledBody": "Benachrichtigungen sind deaktiviert. Sie können sie in den Systemeinstellungen aktivieren.",
+  "notificationPermissionDenied": "Benachrichtigungsberechtigung nicht erteilt.",
+  "notNow": "Nicht jetzt",
+  "notificationScreenAnotherTime": "Später",
+  "turnOnNotifications": "Benachrichtigungen einschalten"
 }

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Streaks/Last_streak.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
+import '../../controllers/auth_controller.dart';
 
 class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
   const StreakFreezeSingleRowPreviewBottomSheet({super.key});
@@ -23,6 +25,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   late Animation<double> _glowPulse;
   late Animation<double> _fireJitter;
   bool _framesPreloaded = false;
+  bool _isLoading = false;
+  _StreakHistoryWeek? _historyWeek;
+  late List<CellType> _rowData;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
@@ -32,6 +37,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   @override
   void initState() {
     super.initState();
+    _rowData = List.generate(days, (_) => CellType.cross);
     _fireController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -56,6 +62,8 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       begin: 0.0,
       end: -8.h,
     ).animate(CurvedAnimation(parent: _fireController, curve: Curves.bounceIn));
+
+    _loadHistory();
   }
 
   @override
@@ -176,10 +184,70 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
     );
   }
 
-  Widget _row(StreamStreaksController c, double totalWidth) {
-    // Obx removed to keep it static
-    final rowData = c.singleRowCells;
-    final groups = c.getTickGroups(rowData);
+  List<List<int>> _getTickGroups(List<CellType> row) {
+    final groups = <List<int>>[];
+    int start = -1;
+    for (int i = 0; i < row.length; i++) {
+      if (row[i] == CellType.tick) {
+        if (start == -1) start = i;
+      } else {
+        if (start != -1) {
+          groups.add([start, i - 1]);
+          start = -1;
+        }
+      }
+    }
+    if (start != -1) groups.add([start, row.length - 1]);
+    return groups;
+  }
+
+  Future<void> _loadHistory() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) return;
+
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak/history',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      final week = _StreakHistoryWeek.fromPayload(res.data);
+      _applyHistoryWeek(week);
+    } on DioException catch (e) {
+      debugPrint('STREAK HISTORY ERROR: ${e.response?.data ?? e.message}');
+    } catch (e) {
+      debugPrint('STREAK HISTORY ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _applyHistoryWeek(_StreakHistoryWeek? week) {
+    if (!mounted) return;
+    final nextRow = List.generate(days, (_) => CellType.cross);
+    if (week != null) {
+      const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      for (int i = 0; i < ordered.length; i++) {
+        if (week.completedDays.contains(ordered[i])) {
+          nextRow[i] = CellType.tick;
+        }
+      }
+    }
+    setState(() {
+      _historyWeek = week;
+      _rowData = nextRow;
+    });
+  }
+
+  Widget _row(List<CellType> rowData, double totalWidth) {
+    final groups = _getTickGroups(rowData);
 
     return SizedBox(
       height: rowHeight.h,
@@ -189,12 +257,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
           Row(
             children: List.generate(days, (i) {
               final cell = rowData[i];
-              final isLast = c.lastTappedCol.value == i;
-
               Widget icon;
               switch (cell) {
                 case CellType.tick:
-                  icon = _tick(highlighted: isLast);
+                  icon = _tick();
                   break;
                 case CellType.cross:
                   icon = _cross();
@@ -219,7 +285,6 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StreamStreaksController(), permanent: true);
     return Container(
       height: Get.height * 0.91,
       decoration: BoxDecoration(
@@ -391,6 +456,17 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                   context.l10n.dayStreak,
                   style: sfProDisplay600(34.sp, Colors.white),
                 ),
+                if (_isLoading) ...[
+                  SizedBox(height: 6.h),
+                  SizedBox(
+                    width: 18.w,
+                    height: 18.w,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
                 Text(
                   context.l10n.youVeNeverBeenHotterKeepStreakBurning,
                   style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
@@ -441,7 +517,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                                 }).toList(),
                           ),
                           SizedBox(height: 16.h),
-                          _row(controller, totalWidth),
+                          _row(_rowData, totalWidth),
                         ],
                       );
                     },
@@ -454,5 +530,59 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
         ),
       ),
     );
+  }
+}
+
+class _StreakHistoryWeek {
+  const _StreakHistoryWeek({
+    required this.weekStart,
+    required this.completedDays,
+    required this.status,
+  });
+
+  final DateTime? weekStart;
+  final List<String> completedDays;
+  final String status;
+
+  static _StreakHistoryWeek? fromPayload(dynamic payload) {
+    dynamic data = payload;
+    if (data is Map && data['data'] != null) {
+      data = data['data'];
+    }
+    if (data is Map && data['weeks'] is List) {
+      final weeks = data['weeks'] as List;
+      if (weeks.isEmpty) return null;
+      final parsedWeeks = <_StreakHistoryWeek>[];
+      for (final entry in weeks) {
+        if (entry is! Map) continue;
+        final completedRaw = entry['completedDays'];
+        final completedDays = completedRaw is List
+            ? completedRaw
+                .map((e) => e.toString().trim().toLowerCase())
+                .map((e) => e == 'thur' ? 'thu' : e)
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : <String>[];
+        final status = entry['status']?.toString() ?? '';
+        final weekStartRaw = entry['weekStart']?.toString() ?? '';
+        final weekStart =
+            weekStartRaw.isEmpty ? null : DateTime.tryParse(weekStartRaw);
+        parsedWeeks.add(
+          _StreakHistoryWeek(
+            weekStart: weekStart,
+            completedDays: completedDays,
+            status: status,
+          ),
+        );
+      }
+      if (parsedWeeks.isEmpty) return null;
+      parsedWeeks.sort((a, b) {
+        final aTime = a.weekStart?.millisecondsSinceEpoch ?? 0;
+        final bTime = b.weekStart?.millisecondsSinceEpoch ?? 0;
+        return bTime.compareTo(aTime);
+      });
+      return parsedWeeks.first;
+    }
+    return null;
   }
 }

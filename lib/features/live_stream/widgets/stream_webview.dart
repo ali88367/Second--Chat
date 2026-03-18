@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Renders the live stream in the same container as the stream images.
@@ -64,14 +65,18 @@ class _StreamWebViewState extends State<StreamWebView> {
         child: Container(
           color: Colors.black,
           alignment: Alignment.center,
-          child: const Column(
+          child:  Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.videocam_off, color: Colors.white38, size: 48),
-              SizedBox(height: 10),
-              Text(
-                'No stream at the moment',
-                style: TextStyle(color: Colors.white54),
+              Icon(Icons.videocam_off, color: Colors.white38, size:43.sp),
+              SizedBox(height: 7.h),
+              Center(
+                child: Text(
+                  'No stream at the moment',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white54,
+                  ),
+                ),
               ),
             ],
           ),

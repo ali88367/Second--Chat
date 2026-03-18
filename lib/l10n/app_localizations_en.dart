@@ -128,7 +128,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get freezeTagline =>
-      'Go ahead, freeze it. Commitment is \\noverrated anyway.';
+      'Go ahead, freeze it. Commitment is overrated anyway.';
 
   @override
   String get ignore => 'Ignore';
@@ -326,7 +326,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get streakInDangerHitFreezeButton =>
-      'Streak in danger?\\nHit the freeze button!';
+      'Streak in danger? Hit the freeze button!';
 
   @override
   String get streamStreaks => 'Stream Streaks';
@@ -507,4 +507,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String howYourPremiumFreeTrialWorks(Object premium) {
     return 'How your $premium\\nfree trial works';
   }
+
+  @override
+  String get appName => 'Second Chat';
+
+  @override
+  String get notificationCardMessage => 'New features available!';
+
+  @override
+  String get notificationCardTime => '9:41 AM';
+
+  @override
+  String get notificationPermissionDisabledBody =>
+      'Notifications are disabled. You can enable them in system settings.';
+
+  @override
+  String get notificationPermissionDenied =>
+      'Notification permission not granted.';
+
+  @override
+  String get notNow => 'Not now';
+
+  @override
+  String get notificationScreenAnotherTime => 'Another time';
+
+  @override
+  String get turnOnNotifications => 'Turn on notifications';
 }

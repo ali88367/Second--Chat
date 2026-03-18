@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
+import '../../controllers/auth_controller.dart';
 
 class StreakFreezeUseBottomSheet extends StatefulWidget {
   const StreakFreezeUseBottomSheet({super.key});
@@ -15,6 +17,122 @@ class StreakFreezeUseBottomSheet extends StatefulWidget {
       _StreakFreezeUseBottomSheetState();
 }
 
+class _StreakSnapshot {
+  const _StreakSnapshot({
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.selectedDays,
+    required this.targetDaysPerWeek,
+    required this.completedThisWeek,
+    required this.remainingThisWeek,
+    required this.freezeTokens,
+    required this.status,
+    required this.isInDanger,
+    required this.weekStartDate,
+  });
+
+  final int currentStreak;
+  final int longestStreak;
+  final List<String> selectedDays;
+  final int targetDaysPerWeek;
+  final int completedThisWeek;
+  final int remainingThisWeek;
+  final int freezeTokens;
+  final String status;
+  final bool isInDanger;
+  final DateTime? weekStartDate;
+
+  factory _StreakSnapshot.empty() => const _StreakSnapshot(
+        currentStreak: 0,
+        longestStreak: 0,
+        selectedDays: <String>[],
+        targetDaysPerWeek: 0,
+        completedThisWeek: 0,
+        remainingThisWeek: 0,
+        freezeTokens: 0,
+        status: '',
+        isInDanger: false,
+        weekStartDate: null,
+      );
+
+  factory _StreakSnapshot.fromPayload(dynamic payload) {
+    dynamic data = payload;
+    if (data is Map && data['data'] != null) {
+      data = data['data'];
+    }
+
+    if (data is Map) {
+      final selectedDays = _asStringList(data['selectedDays']);
+      final status = _asString(data['status']);
+      final isInDanger =
+          _asBool(data['isInDanger']) || status.toLowerCase() == 'danger';
+      final weekStartRaw = _asString(data['weekStartDate']);
+
+      return _StreakSnapshot(
+        currentStreak: _asInt(data['currentStreak']),
+        longestStreak: _asInt(data['longestStreak']),
+        selectedDays: selectedDays,
+        targetDaysPerWeek: _asInt(
+          data['targetDaysPerWeek'],
+          fallback: selectedDays.length,
+        ),
+        completedThisWeek: _asInt(data['completedThisWeek']),
+        remainingThisWeek: _asInt(data['remainingThisWeek']),
+        freezeTokens: _asInt(data['freezeTokens']),
+        status: status,
+        isInDanger: isInDanger,
+        weekStartDate:
+            weekStartRaw.isEmpty ? null : DateTime.tryParse(weekStartRaw),
+      );
+    }
+
+    return _StreakSnapshot.empty();
+  }
+
+  static int? extractRemainingFreezes(dynamic payload) {
+    if (payload is Map) {
+      final raw = payload['remainingFreezes'];
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw.trim());
+    }
+    return null;
+  }
+
+  static int _asInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim()) ?? fallback;
+    return fallback;
+  }
+
+  static bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final v = value.trim().toLowerCase();
+      return v == 'true' || v == '1' || v == 'yes';
+    }
+    return false;
+  }
+
+  static String _asString(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  static List<String> _asStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e.toString().trim().toLowerCase())
+          .map((e) => e == 'thur' ? 'thu' : e)
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+}
+
 class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     with TickerProviderStateMixin {
   late AnimationController _freezeController;
@@ -22,6 +140,11 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
   late Animation<double> _glowAnimation;
   late Animation<double> _floatAnimation;
   bool _framesPreloaded = false;
+  bool _isLoading = false;
+  bool _isFreezing = false;
+  _StreakSnapshot? _streak;
+  int? _remainingFreezes;
+  late List<CellType> _rowData;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
@@ -31,6 +154,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
   @override
   void initState() {
     super.initState();
+    _rowData = List.generate(days, (_) => CellType.cross);
     _freezeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2500),
@@ -54,6 +178,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     _floatAnimation = Tween<double>(begin: 0, end: -10.h).animate(
       CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutQuad),
     );
+
+    _loadStreak();
   }
 
   @override
@@ -152,7 +278,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     } else {
       decoration = BoxDecoration(
         color: const Color(0xFF3C3C43).withOpacity(0.6),
-        borderRadius: BorderRadius.circular(22.r),
+        borderRadius: count == 1 ? null : BorderRadius.circular(22.r),
         shape: count == 1 ? BoxShape.circle : BoxShape.rectangle,
       );
     }
@@ -171,9 +297,124 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     );
   }
 
+  List<List<int>> _getTickGroups(List<CellType> row) {
+    final groups = <List<int>>[];
+    int start = -1;
+    for (int i = 0; i < row.length; i++) {
+      if (row[i] == CellType.tick) {
+        if (start == -1) start = i;
+      } else {
+        if (start != -1) {
+          groups.add([start, i - 1]);
+          start = -1;
+        }
+      }
+    }
+    if (start != -1) groups.add([start, row.length - 1]);
+    return groups;
+  }
+
+  List<CellType> _buildRow(_StreakSnapshot snapshot) {
+    final selected = snapshot.selectedDays
+        .map((d) => d.toLowerCase().trim())
+        .map((d) => d == 'thur' ? 'thu' : d)
+        .where((d) => d.isNotEmpty)
+        .toSet();
+    const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    int completed = snapshot.completedThisWeek;
+
+    final row = <CellType>[];
+    for (final day in ordered) {
+      if (selected.contains(day)) {
+        if (completed > 0) {
+          row.add(CellType.tick);
+          completed--;
+        } else {
+          row.add(CellType.dot);
+        }
+      } else {
+        row.add(CellType.cross);
+      }
+    }
+    return row;
+  }
+
+  Future<void> _loadStreak() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) return;
+
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      final snapshot = _StreakSnapshot.fromPayload(res.data);
+      _applySnapshot(snapshot);
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404) {
+        debugPrint('STREAK LOAD ERROR: ${e.response?.data ?? e.message}');
+      }
+    } catch (e) {
+      debugPrint('STREAK LOAD ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _freezeStreak() async {
+    if (_isFreezing) return;
+    final available = _remainingFreezes ?? _streak?.freezeTokens ?? 0;
+    if (available <= 0) return;
+
+    setState(() => _isFreezing = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) return;
+
+      final res = await auth.api.client.dio.post<dynamic>(
+        '/api/v1/streak/freeze',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      final snapshot = _StreakSnapshot.fromPayload(res.data);
+      final remaining = _StreakSnapshot.extractRemainingFreezes(res.data);
+      _applySnapshot(snapshot, remainingFreezes: remaining);
+    } on DioException catch (e) {
+      debugPrint('STREAK FREEZE ERROR: ${e.response?.data ?? e.message}');
+    } catch (e) {
+      debugPrint('STREAK FREEZE ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isFreezing = false);
+      }
+    }
+  }
+
+  void _applySnapshot(_StreakSnapshot snapshot, {int? remainingFreezes}) {
+    if (!mounted) return;
+    setState(() {
+      _streak = snapshot;
+      _rowData = _buildRow(snapshot);
+      _remainingFreezes = remainingFreezes ?? _remainingFreezes;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<StreamStreaksController>();
+    final streak = _streak;
+    final available = _remainingFreezes ?? streak?.freezeTokens ?? 0;
 
     return Container(
       height: Get.height * 0.9,
@@ -309,57 +550,83 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         style: sfProDisplay600(22.sp, Colors.white),
                         textAlign: TextAlign.center,
                       ),
+                      if (streak != null) ...[
+                        SizedBox(height: 4.h),
+                        Text(
+                          '${streak.currentStreak} ${context.l10n.dayStreak}',
+                          style: sfProDisplay400(
+                            15.sp,
+                            const Color(0xFFB0B3B8),
+                          ),
+                        ),
+                      ],
+                      if (_isLoading) ...[
+                        SizedBox(height: 6.h),
+                        SizedBox(
+                          width: 18.w,
+                          height: 18.w,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                       SizedBox(height: 12.h),
-                      Obx(() {
-                        const int maxFreezesPerMonth = 3;
-                        final available =
-                            maxFreezesPerMonth - controller.manualFreezeCount.value;
-                        return Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 14.w,
-                            vertical: 4.h,
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF32393D),
+                          borderRadius: BorderRadius.circular(40.r),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF32393D),
-                            borderRadius: BorderRadius.circular(40.r),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              "assets/images/checkmark.circle.fill.png",
+                              width: 19.w,
+                              height: 24.h,
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                "assets/images/checkmark.circle.fill.png",
-                                width: 19.w,
-                                height: 24.h,
-                              ),
-                              SizedBox(width: 8.w),
-                              RichText(
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: '$available ',
-                                      style: sfProDisplay400(
-                                        15.sp,
-                                        Colors.white,
-                                      ),
+                            SizedBox(width: 8.w),
+                            RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: '$available ',
+                                    style: sfProDisplay400(
+                                      15.sp,
+                                      Colors.white,
                                     ),
-                                    TextSpan(
-                                      text: context.l10n.availableLabel,
-                                      style: sfProDisplay400(
-                                        15.sp,
-                                        const Color(0xFFB0B3B8),
-                                      ),
+                                  ),
+                                  TextSpan(
+                                    text: context.l10n.availableLabel,
+                                    style: sfProDisplay400(
+                                      15.sp,
+                                      const Color(0xFFB0B3B8),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (streak != null) ...[
+                        SizedBox(height: 8.h),
+                        Text(
+                          '${streak.completedThisWeek}/${streak.targetDaysPerWeek}',
+                          style: sfProDisplay400(
+                            14.sp,
+                            const Color(0xFFB0B3B8),
                           ),
-                        );
-                      }),
+                        ),
+                      ],
                       SizedBox(height: 20.h),
                       Container(
                         width: 361.w,
@@ -399,51 +666,38 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 final totalWidth = constraints.maxWidth;
+                                final groups = _getTickGroups(_rowData);
                                 return SizedBox(
                                   height: rowHeight.h,
-                                  child: Obx(() {
-                                    // Watching singleRowCells for changes
-                                    final rowData = controller.singleRowCells;
-                                    final groups = controller.getTickGroups(
-                                      rowData,
-                                    );
-                                    return Stack(
-                                      children: [
-                                        for (final g in groups)
-                                          _highlight(g[0], g[1], totalWidth),
-                                        Row(
-                                          children: List.generate(days, (i) {
-                                            final cell = rowData[i];
-                                            final isLatest =
-                                                controller
-                                                    .lastTappedCol
-                                                    .value ==
-                                                i;
-                                            Widget icon;
-                                            switch (cell) {
-                                              case CellType.tick:
-                                                icon = _tick(
-                                                  highlighted: isLatest,
-                                                );
-                                                break;
-                                              case CellType.cross:
-                                                icon = _cross();
-                                                break;
-                                              case CellType.freeze:
-                                                icon = _freeze();
-                                                break;
-                                              case CellType.dot:
-                                                icon = _dot();
-                                                break;
-                                            }
-                                            return Expanded(
-                                              child: Center(child: icon),
-                                            );
-                                          }),
-                                        ),
-                                      ],
-                                    );
-                                  }),
+                                  child: Stack(
+                                    children: [
+                                      for (final g in groups)
+                                        _highlight(g[0], g[1], totalWidth),
+                                      Row(
+                                        children: List.generate(days, (i) {
+                                          final cell = _rowData[i];
+                                          Widget icon;
+                                          switch (cell) {
+                                            case CellType.tick:
+                                              icon = _tick();
+                                              break;
+                                            case CellType.cross:
+                                              icon = _cross();
+                                              break;
+                                            case CellType.freeze:
+                                              icon = _freeze();
+                                              break;
+                                            case CellType.dot:
+                                              icon = _dot();
+                                              break;
+                                          }
+                                          return Expanded(
+                                            child: Center(child: icon),
+                                          );
+                                        }),
+                                      ),
+                                    ],
+                                  ),
                                 );
                               },
                             ),
@@ -498,37 +752,40 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                       SizedBox(
                         height: 50.h,
                         width: double.infinity,
-                        child: Obx(() {
-                          final canFreeze =
-                              (3 - controller.manualFreezeCount.value) > 0;
-                          return ElevatedButton(
-                            onPressed: canFreeze
-                                ? () {
-                                    controller.addFreezeAfterStreak();
-                                  }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: canFreeze
-                                  ? const Color(0xFF7EDDE4)
-                                  : Colors.grey.withOpacity(0.5),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25.r),
-                              ),
-                              padding: EdgeInsets.zero,
+                        child: ElevatedButton(
+                          onPressed: (available > 0 && !_isFreezing)
+                              ? _freezeStreak
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: available > 0
+                                ? const Color(0xFF7EDDE4)
+                                : Colors.grey.withOpacity(0.5),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25.r),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "Use 1 ",
-                                  style: sfProText600(17.sp, Colors.white),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: _isFreezing
+                              ? SizedBox(
+                                  width: 20.w,
+                                  height: 20.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      "Use 1 ",
+                                      style: sfProText600(17.sp, Colors.white),
+                                    ),
+                                    Image.asset('assets/images/Mask group.png'),
+                                  ],
                                 ),
-                                Image.asset('assets/images/Mask group.png'),
-                              ],
-                            ),
-                          );
-                        }),
+                        ),
                       ),
                     ],
                   ),

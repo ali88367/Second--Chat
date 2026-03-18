@@ -1,15 +1,19 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
+import '../../../controllers/auth_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
+import '../Streaks/Freeze_bottomsheet.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
@@ -36,6 +40,7 @@ class _LivestreamingState extends State<Livestreaming> {
   );
 
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
+  bool _streakCompletionChecked = false;
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
@@ -61,6 +66,7 @@ class _LivestreamingState extends State<Livestreaming> {
     super.initState();
     _settingsCtrl = Get.find<SettingsController>();
     _chatFilter.addListener(_updateImageBasedOnFilter);
+    _maybeCompleteStreakForToday();
   }
 
   void _updateImageBasedOnFilter() {
@@ -77,6 +83,103 @@ class _LivestreamingState extends State<Livestreaming> {
       default:
         _topBarImage.value = 'assets/images/topbarshade.png';
         break;
+    }
+  }
+
+  String _dateKey(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  String _weekdayKey(DateTime date) {
+    switch (date.weekday) {
+      case DateTime.monday:
+        return 'mon';
+      case DateTime.tuesday:
+        return 'tue';
+      case DateTime.wednesday:
+        return 'wed';
+      case DateTime.thursday:
+        return 'thu';
+      case DateTime.friday:
+        return 'fri';
+      case DateTime.saturday:
+        return 'sat';
+      case DateTime.sunday:
+        return 'sun';
+      default:
+        return 'mon';
+    }
+  }
+
+  List<String> _extractSelectedDays(dynamic payload) {
+    dynamic data = payload;
+    if (data is Map && data['data'] != null) {
+      data = data['data'];
+    }
+    if (data is Map) {
+      final raw = data['selectedDays'];
+      if (raw is List) {
+        return raw
+            .map((e) => e.toString().trim().toLowerCase())
+            .map((e) => e == 'thur' ? 'thu' : e)
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    }
+    return const [];
+  }
+
+  Future<void> _maybeCompleteStreakForToday() async {
+    if (_streakCompletionChecked) return;
+    _streakCompletionChecked = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final todayKey = _dateKey(DateTime.now());
+      const prefKey = 'second_chat.streak_complete_date';
+      if (prefs.getString(prefKey) == todayKey) return;
+
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) return;
+
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      final selectedDays = _extractSelectedDays(res.data);
+      final todayDay = _weekdayKey(DateTime.now());
+      if (!selectedDays.contains(todayDay)) return;
+
+      await auth.api.client.dio.post<dynamic>(
+        '/api/v1/streak/complete',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      await prefs.setString(prefKey, todayKey);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 404) {
+        return;
+      }
+      if (status == 409 || status == 400) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'second_chat.streak_complete_date',
+          _dateKey(DateTime.now()),
+        );
+      } else {
+        debugPrint('STREAK COMPLETE ERROR: ${e.response?.data ?? e.message}');
+      }
+    } catch (e) {
+      debugPrint('STREAK COMPLETE ERROR: $e');
     }
   }
 
@@ -586,10 +689,27 @@ class _LivestreamingState extends State<Livestreaming> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      buildImageButton(
-                        'assets/images/streak_icon.png',
-                        width: 72.w,
-                        height: 36.w,
+                      GestureDetector(
+                        onTap: () {
+                          Get.bottomSheet(
+                            const StreakFreezePreviewBottomSheet(),
+                            isDismissible: true,
+                            isScrollControlled: true,
+                            enableDrag: true,
+                            backgroundColor: Colors.transparent,
+                            enterBottomSheetDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            exitBottomSheetDuration: const Duration(
+                              milliseconds: 250,
+                            ),
+                          );
+                        },
+                        child: buildImageButton(
+                          'assets/images/streak_icon.png',
+                          width: 72.w,
+                          height: 36.w,
+                        ),
                       ),
                       Row(
                         children: [

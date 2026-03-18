@@ -506,4 +506,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String howYourPremiumFreeTrialWorks(Object premium) {
     return 'كيف تعمل النسخة التجريبية\\nالمجانية من $premium';
   }
+
+  @override
+  String get appName => 'Second Chat';
+
+  @override
+  String get notificationCardMessage => 'ميزات جديدة متاحة!';
+
+  @override
+  String get notificationCardTime => '9:41 AM';
+
+  @override
+  String get notificationPermissionDisabledBody =>
+      'الإشعارات معطّلة. يمكنك تفعيلها من إعدادات النظام.';
+
+  @override
+  String get notificationPermissionDenied => 'لم يتم منح إذن الإشعارات.';
+
+  @override
+  String get notNow => 'ليس الآن';
+
+  @override
+  String get notificationScreenAnotherTime => 'في وقت لاحق';
+
+  @override
+  String get turnOnNotifications => 'فعّل الإشعارات';
 }
