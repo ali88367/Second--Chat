@@ -505,6 +505,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String howYourPremiumFreeTrialWorks(Object premium) {
-    return 'How your $premium\nfree trial works';
+    return 'How your $premium\\nfree trial works';
   }
 }

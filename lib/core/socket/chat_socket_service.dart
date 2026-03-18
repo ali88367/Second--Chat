@@ -1,12 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../data/models/chat_message.dart';
 
 class ChatSocketService extends GetxService {
+  /// Enables verbose terminal logging for Socket.IO events.
+  ///
+  /// In debug builds this is `true` by default.
+  static bool verboseLogs = kDebugMode;
+
   final RxList<ChatMessage> messages = <ChatMessage>[].obs;
   final RxInt viewerCount = 0.obs;
   final RxBool isConnected = false.obs;
@@ -33,6 +39,25 @@ class ChatSocketService extends GetxService {
   static const int _seenMax = 600;
   static const Duration _seenTtl = Duration(minutes: 10);
 
+  void _logSocket(String event, dynamic payload) {
+    if (!verboseLogs) return;
+    try {
+      final pretty = _prettyJson(payload);
+      debugPrint('SOCKET <= $event $pretty');
+    } catch (_) {
+      debugPrint('SOCKET <= $event ${payload.toString()}');
+    }
+  }
+
+  String _prettyJson(dynamic payload) {
+    if (payload == null) return '';
+    if (payload is String) return payload;
+    if (payload is Map || payload is List) {
+      return jsonEncode(payload);
+    }
+    return payload.toString();
+  }
+
   Future<void> connect({
     required String baseUrl,
     required String path,
@@ -41,6 +66,12 @@ class ChatSocketService extends GetxService {
     try {
       _manuallyDisconnected = false;
       await disconnect(); // ensures clean slate
+
+      _logSocket('init', {
+        'baseUrl': baseUrl,
+        'path': path,
+        'hasToken': accessToken.trim().isNotEmpty,
+      });
 
       final socket = io.io(
         baseUrl,
@@ -61,8 +92,26 @@ class ChatSocketService extends GetxService {
 
       socket.on('connect', (_) {
         isConnected.value = true;
+        _logSocket('connect', {'baseUrl': baseUrl, 'path': path});
         _emitStart();
       });
+
+      socket.on('disconnect', (reason) {
+        _logSocket('disconnect', reason);
+      });
+
+      socket.on('connect_error', (e) {
+        _logSocket('connect_error', e);
+      });
+
+      // Log any event that we don't explicitly handle (and duplicates too).
+      try {
+        socket.onAny((event, data) {
+          _logSocket(event.toString(), data);
+        });
+      } catch (_) {
+        // Some versions/platforms may not support onAny.
+      }
 
       // `connected`
       socket.on('connected', (d) {
@@ -210,12 +259,14 @@ class ChatSocketService extends GetxService {
 
   void _emitStart() {
     try {
+      _logSocket('emit chat:start', null);
       _socket?.emit('chat:start');
     } catch (_) {}
   }
 
   void _emitStop() {
     try {
+      _logSocket('emit chat:stop', null);
       _socket?.emit('chat:stop');
     } catch (_) {}
   }
@@ -266,15 +317,28 @@ class ChatSocketService extends GetxService {
 
       final platform =
           (map['platform'] ?? map['source'] ?? 'twitch').toString();
-      final user = (map['sender_username'] ??
+      final metadata = map['metadata'];
+      final metaUser = metadata is Map
+          ? (metadata['user'] ??
+                  metadata['username'] ??
+                  metadata['sender_username'] ??
+                  metadata['senderUsername'] ??
+                  metadata['name'] ??
+                  metadata['displayName'])
+              ?.toString()
+          : null;
+
+      String user = (map['sender_username'] ??
               map['senderUsername'] ??
               map['username'] ??
               map['user'] ??
-              map['username'] ??
               map['name'] ??
               map['displayName'] ??
+              metaUser ??
               'Unknown')
-          .toString();
+          .toString()
+          .trim();
+      if (user.isEmpty) user = (metaUser ?? 'Unknown').toString().trim();
       final message = (map['message'] ?? map['text'] ?? '').toString();
       if (message.trim().isEmpty) return null;
 
@@ -284,7 +348,6 @@ class ChatSocketService extends GetxService {
               map['_id'] ??
               map['messageId'])
           ?.toString();
-      final metadata = map['metadata'];
       final tsRaw = (metadata is Map
               ? (metadata['timestamp'] ?? metadata['ts'] ?? metadata['time'])
               : null) ??
