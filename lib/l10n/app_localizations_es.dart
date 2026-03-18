@@ -512,4 +512,30 @@ class AppLocalizationsEs extends AppLocalizations {
   String howYourPremiumFreeTrialWorks(Object premium) {
     return 'Cómo funciona tu\\nprueba gratuita de $premium';
   }
+
+  @override
+  String get appName => 'Second Chat';
+
+  @override
+  String get notificationCardMessage => '¡Nuevas funciones disponibles!';
+
+  @override
+  String get notificationCardTime => '9:41 AM';
+
+  @override
+  String get notificationPermissionDisabledBody =>
+      'Las notificaciones están desactivadas. Puedes activarlas en los ajustes del sistema.';
+
+  @override
+  String get notificationPermissionDenied =>
+      'No se concedió el permiso de notificaciones.';
+
+  @override
+  String get notNow => 'Ahora no';
+
+  @override
+  String get notificationScreenAnotherTime => 'En otro momento';
+
+  @override
+  String get turnOnNotifications => 'Activar notificaciones';
 }

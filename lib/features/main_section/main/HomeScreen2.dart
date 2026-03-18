@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -9,6 +10,7 @@ import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
+import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
@@ -391,6 +393,8 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
   bool _streamServiceAdded = false;
   bool _settingsOpened = false;
   bool _streaksCustomized = false;
+  bool _streakExists = false;
+  bool _streakLoading = false;
   late final SettingsController _settingsCtrl;
 
   @override
@@ -400,6 +404,73 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
         ? Get.find<SettingsController>()
         : Get.put(SettingsController());
     _settingsCtrl.loadSettingsIfNeeded();
+    _checkStreakExists();
+  }
+
+  Future<void> _checkStreakExists() async {
+    if (_streakLoading) return;
+    setState(() => _streakLoading = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) {
+        _setStreakExists(false);
+        return;
+      }
+
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      final exists = _extractStreakExists(res.data);
+      _setStreakExists(exists);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        _setStreakExists(false);
+      } else {
+        debugPrint('STREAK CHECK ERROR: ${e.response?.data ?? e.message}');
+      }
+    } catch (e) {
+      debugPrint('STREAK CHECK ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _streakLoading = false);
+      }
+    }
+  }
+
+  void _setStreakExists(bool exists) {
+    if (!mounted) return;
+    setState(() {
+      _streakExists = exists;
+      _streaksCustomized = exists;
+    });
+  }
+
+  bool _extractStreakExists(dynamic payload) {
+    if (payload == null) return false;
+    if (payload is bool) return payload;
+    if (payload is List) return payload.isNotEmpty;
+    if (payload is Map) {
+      if (payload['success'] == false) return false;
+      final exists = payload['exists'];
+      if (exists is bool) return exists;
+      final hasStreak = payload['hasStreak'];
+      if (hasStreak is bool) return hasStreak;
+      if (payload.containsKey('data')) {
+        return _extractStreakExists(payload['data']);
+      }
+      if (payload.containsKey('streak')) {
+        return _extractStreakExists(payload['streak']);
+      }
+      if (payload['id'] != null) return true;
+      return payload.isNotEmpty;
+    }
+    return true;
   }
 
   @override
@@ -589,6 +660,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                       // 4. Customisable streaks
                       InkWell(
                         onTap: () {
+                          if (_streakLoading || _streakExists) return;
                           Get.bottomSheet(
                             Container(
                               height: Get.height * .9,
@@ -611,9 +683,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                               milliseconds: 250,
                             ),
                           ).then((_) {
-                            setState(() {
-                              _streaksCustomized = true;
-                            });
+                            _checkStreakExists();
                           });
                         },
                         child: _buildMenuItem(

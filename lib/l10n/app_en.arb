@@ -39,7 +39,7 @@
   "get": "Get",
   "getStarted": "Get Started",
   "gettingStarted": "Getting Started",
-  "freezeTagline": "Go ahead, freeze it. Commitment is \\noverrated anyway.",
+  "freezeTagline": "Go ahead, freeze it. Commitment is overrated anyway.",
   "ignore": "Ignore",
   "invites": "Invites",
   "invitesLeft": "{count} invites left",
@@ -107,7 +107,7 @@
   "settingsTitleViewerCount": "Viewer Count",
   "skip": "Skip",
   "startMy14DayFreeTrial": "Start My 14 Day Free Trial",
-  "streakInDangerHitFreezeButton": "Streak in danger?\\nHit the freeze button!",
+  "streakInDangerHitFreezeButton": "Streak in danger? Hit the freeze button!",
   "streamStreaks": "Stream Streaks",
   "streamStreak": "Stream Streak",
   "subscribe": "Subscribe",
@@ -183,5 +183,13 @@
     "placeholders": {
       "premium": {}
     }
-  }
+  },
+  "appName": "Second Chat",
+  "notificationCardMessage": "New features available!",
+  "notificationCardTime": "9:41 AM",
+  "notificationPermissionDisabledBody": "Notifications are disabled. You can enable them in system settings.",
+  "notificationPermissionDenied": "Notification permission not granted.",
+  "notNow": "Not now",
+  "notificationScreenAnotherTime": "Another time",
+  "turnOnNotifications": "Turn on notifications"
 }

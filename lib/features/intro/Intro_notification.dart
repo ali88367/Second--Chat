@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 
 import 'intro_screen3.dart';
@@ -17,6 +18,15 @@ class NotficationScreens extends StatefulWidget {
 class _NotficationScreensState extends State<NotficationScreens> {
   bool _isRequesting = false;
 
+  void _goToIntroScreen3() {
+    Get.to(
+      () => const IntroScreen3(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
   Future<void> _requestNotificationPermission() async {
     if (_isRequesting) return;
     setState(() => _isRequesting = true);
@@ -27,12 +37,7 @@ class _NotficationScreensState extends State<NotficationScreens> {
     setState(() => _isRequesting = false);
 
     if (status.isGranted) {
-      Get.to(
-        () => const IntroScreen3(),
-        transition: Transition.cupertino,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.fastOutSlowIn,
-      );
+      _goToIntroScreen3();
       return;
     }
 
@@ -40,18 +45,16 @@ class _NotficationScreensState extends State<NotficationScreens> {
       final openSettings = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Enable notifications'),
-          content: const Text(
-            'Notifications are disabled. You can enable them in system settings.',
-          ),
+          title: Text(context.l10n.enableNotifications),
+          content: Text(context.l10n.notificationPermissionDisabledBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Not now'),
+              child: Text(context.l10n.notNow),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Open settings'),
+              child: Text(context.l10n.openSettings),
             ),
           ],
         ),
@@ -64,7 +67,7 @@ class _NotficationScreensState extends State<NotficationScreens> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notification permission not granted.')),
+      SnackBar(content: Text(context.l10n.notificationPermissionDenied)),
     );
   }
 
@@ -75,79 +78,25 @@ class _NotficationScreensState extends State<NotficationScreens> {
       builder: (context, child) {
         return Scaffold(
           body: Stack(
+            alignment: Alignment.center,
             children: [
               // 🔹 Background Image
               SizedBox(
                 width: double.infinity,
                 height: double.infinity,
                 child: Image.asset(
-                  'assets/images/notscreen.jpeg',
+                  'assets/images/notback.jpeg',
                   fit: BoxFit.cover,
                 ),
               ),
 
-              // 🔹 Notification Card (TOP)
-              Positioned(
-                top: 320.h,
-                left: 16.w,
-                right: 16.w,
-                child: const NotificationCard(),
-              ),
 
-              // 🔹 Notification Card (TOP)
-              Positioned(
-                top: 240.h,
-                left: 16.w,
-                right: 16.w,
-                child: const NotificationCard(),
-              ),
 
-              // 🔹 Bell Image
-              Positioned(
-                bottom: 265.h,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    height: 130.h,
-                    width: 130.w,
-                    child: Image.asset('assets/images/bell1.jpeg'),
-                  ),
-                ),
-              ),
-
-              // 🔹 Title
-              Positioned(
-                bottom: 200.h,
-                left: 0,
-                right: 0,
-                child: Text(
-                  'Never Miss A Notification',
-                  textAlign: TextAlign.center,
-                  style: sfProDisplay600(15, Colors.white)
-                ),
-              ),
-
-              // 🔹 Subtitle
-              Positioned(
-                bottom: 170.h,
-                left: 0,
-                right: 0,
-                child: Text(
-                  'Be the first to know what’s happening',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 17.sp,
-                    color: Colors.white70,
-                  ),
-                ),
-              ),
 
               // 🔹 Button
               Positioned(
                 bottom: 100.h,
-                left: 60.w,
-                right: 60.w,
+
                 child: Opacity(
                   opacity: _isRequesting ? 0.6 : 1,
                   child: GestureDetector(
@@ -158,24 +107,23 @@ class _NotficationScreensState extends State<NotficationScreens> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(32.r),
                       ),
-                      child: Center(
-                        child: _isRequesting
-                            ? SizedBox(
-                                width: 20.w,
-                                height: 20.w,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.black,
+                      child: Padding(
+                        padding:  EdgeInsets.symmetric(horizontal: 15.w),
+                        child: Center(
+                          child: _isRequesting
+                              ? SizedBox(
+                                  width: 20.w,
+                                  height: 20.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : Text(
+                                  context.l10n.turnOnNotifications,
+                                  style: sfProDisplay600(16.sp, Colors.black),
                                 ),
-                              )
-                            : Text(
-                                'Turn on notifications',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontFamily: "",
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                        ),
                       ),
                     ),
                   ),
@@ -187,12 +135,12 @@ class _NotficationScreensState extends State<NotficationScreens> {
                 bottom: 60.h,
                 left: 0,
                 right: 0,
-                child: Text(
-                  'Another time',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 17.sp,
-                    color: Colors.white70,
+                child: GestureDetector(
+                  onTap: _isRequesting ? null : _goToIntroScreen3,
+                  child: Text(
+                    context.l10n.notificationScreenAnotherTime,
+                    textAlign: TextAlign.center,
+                    style: sfProDisplay400(16.sp, Colors.white70),
                   ),
                 ),
               ),
@@ -244,7 +192,7 @@ class NotificationCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Second Chat',
+                      context.l10n.appName,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 15.sp,
@@ -253,7 +201,7 @@ class NotificationCard extends StatelessWidget {
                     ),
 
                     Text(
-                      'New features available!',
+                      context.l10n.notificationCardMessage,
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14.sp,
@@ -268,7 +216,7 @@ class NotificationCard extends StatelessWidget {
 
               // 🔹 Time
               Text(
-                '9:41 AM',
+                context.l10n.notificationCardTime,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 14.sp,

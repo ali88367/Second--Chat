@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -8,6 +9,7 @@ import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/widgets/custom_switch.dart';
 
 import '../../3timewidget.dart';
+import '../../controllers/auth_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Freeze_bottomsheet.dart';
 
@@ -27,6 +29,7 @@ class _StreamStreakSetupBottomSheetState
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
   bool _framesPreloaded = false;
+  bool _isSubmitting = false;
 
   static const int totalFrames = 90; // Frames from 0001 to 0119
 
@@ -98,6 +101,83 @@ class _StreamStreakSetupBottomSheetState
     _glowController.dispose();
     _frameController.dispose();
     super.dispose();
+  }
+
+  List<String> _selectedDaysPayload(StreamStreaksController controller) {
+    const ordered = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
+    const map = {
+      'Mon': 'mon',
+      'Tue': 'tue',
+      'Wed': 'wed',
+      'Thur': 'thu',
+      'Fri': 'fri',
+      'Sat': 'sat',
+      'Sun': 'sun',
+    };
+    return ordered
+        .where((day) => controller.selectedDays[day] == true)
+        .map((day) => map[day]!)
+        .toList();
+  }
+
+  Future<bool> _createStreak(StreamStreaksController controller) async {
+    if (_isSubmitting) return false;
+    setState(() => _isSubmitting = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) {
+        final l10n = context.l10n;
+        Get.snackbar(
+          l10n.sessionMissing,
+          l10n.sessionMissingMessage,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFF2C2C2E),
+          colorText: Colors.white,
+          margin: EdgeInsets.all(12.w),
+          duration: const Duration(seconds: 2),
+        );
+        return false;
+      }
+
+      final selectedDays = _selectedDaysPayload(controller);
+      final targetDaysPerWeek = selectedDays.length;
+
+      await auth.api.client.dio.post<dynamic>(
+        '/api/v1/streak',
+        data: {
+          'selectedDays': selectedDays,
+          'targetDaysPerWeek': targetDaysPerWeek,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      return true;
+    } catch (e) {
+      final l10n = context.l10n;
+      Get.snackbar(
+        l10n.connectionIssue,
+        l10n.pleaseTryAgain,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF2C2C2E),
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12.w),
+        duration: const Duration(seconds: 2),
+      );
+      if (e is DioException) {
+        debugPrint('STREAK CREATE ERROR: ${e.response?.data}');
+      } else {
+        debugPrint('STREAK CREATE ERROR: $e');
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   // Widget for the drag handle (bottom sheet bar) - ALREADY PRESENT
@@ -308,7 +388,9 @@ class _StreamStreakSetupBottomSheetState
                   height: 50.h,
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: _isSubmitting
+                        ? null
+                        : () async {
                       if (!controller.isThreeTimesSelectionComplete) {
                         Get.snackbar(
                           context.l10n.pickYourDays,
@@ -323,12 +405,9 @@ class _StreamStreakSetupBottomSheetState
                         );
                         return;
                       }
+                      final ok = await _createStreak(controller);
+                      if (!ok || !mounted) return;
                       Get.back();
-                      Get.bottomSheet(
-                        const StreakFreezePreviewBottomSheet(),
-                        isScrollControlled: true,
-                        ignoreSafeArea: false,
-                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -337,10 +416,19 @@ class _StreamStreakSetupBottomSheetState
                       ),
                       padding: EdgeInsets.zero,
                     ),
-                    child: Text(
-                      context.l10n.next,
-                      style: sfProText600(17.sp, Colors.black),
-                    ),
+                    child: _isSubmitting
+                        ? SizedBox(
+                            width: 20.w,
+                            height: 20.w,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : Text(
+                            context.l10n.next,
+                            style: sfProText600(17.sp, Colors.black),
+                          ),
                   ),
                 ),
               ),

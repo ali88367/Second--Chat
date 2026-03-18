@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,7 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Compact_freeze.dart';
 
@@ -25,6 +27,10 @@ class _StreakFreezePreviewBottomSheetState
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
   bool _framesPreloaded = false;
+  bool _isLoading = false;
+  bool _isUpdating = false;
+  _StreakSnapshot? _streak;
+  late List<List<CellType>> _calendarRows;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
@@ -34,6 +40,7 @@ class _StreakFreezePreviewBottomSheetState
   @override
   void initState() {
     super.initState();
+    _calendarRows = _buildEmptyCalendarRows();
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -57,6 +64,8 @@ class _StreakFreezePreviewBottomSheetState
     _opacityAnimation = Tween<double>(begin: 0.1, end: 0.3).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _loadStreak();
   }
 
   @override
@@ -98,6 +107,195 @@ class _StreakFreezePreviewBottomSheetState
     _pulseController.dispose();
     _frameController.dispose();
     super.dispose();
+  }
+
+  List<List<CellType>> _buildEmptyCalendarRows() {
+    return List.generate(
+      4,
+      (_) => List.generate(days, (_) => CellType.cross),
+    );
+  }
+
+  List<List<CellType>> _buildCalendarRows(_StreakSnapshot snapshot) {
+    final selected = snapshot.selectedDays
+        .map((d) => d.toLowerCase().trim())
+        .where((d) => d.isNotEmpty)
+        .toSet();
+    final ordered = const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    int completed = snapshot.completedThisWeek;
+
+    final weekRow = <CellType>[];
+    for (final day in ordered) {
+      if (selected.contains(day)) {
+        if (completed > 0) {
+          weekRow.add(CellType.tick);
+          completed--;
+        } else {
+          weekRow.add(CellType.dot);
+        }
+      } else {
+        weekRow.add(CellType.cross);
+      }
+    }
+
+    return [
+      weekRow,
+      ...List.generate(
+        3,
+        (_) => List.generate(days, (_) => CellType.cross),
+      ),
+    ];
+  }
+
+  List<List<int>> _getTickGroups(List<CellType> row) {
+    final groups = <List<int>>[];
+    int start = -1;
+    for (int i = 0; i < row.length; i++) {
+      if (row[i] == CellType.tick) {
+        if (start == -1) start = i;
+      } else {
+        if (start != -1) {
+          groups.add([start, i - 1]);
+          start = -1;
+        }
+      }
+    }
+    if (start != -1) groups.add([start, row.length - 1]);
+    return groups;
+  }
+
+  Future<bool> _updateStreak(List<String> selectedDays) async {
+    if (_isUpdating) return false;
+    setState(() => _isUpdating = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) {
+        final l10n = context.l10n;
+        Get.snackbar(
+          l10n.sessionMissing,
+          l10n.sessionMissingMessage,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFF2C2C2E),
+          colorText: Colors.white,
+          margin: EdgeInsets.all(12.w),
+          duration: const Duration(seconds: 2),
+        );
+        return false;
+      }
+
+      await auth.api.client.dio.patch<dynamic>(
+        '/api/v1/streak',
+        data: {'selectedDays': selectedDays},
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      return true;
+    } on DioException catch (e) {
+      debugPrint('STREAK UPDATE ERROR: ${e.response?.data ?? e.message}');
+    } catch (e) {
+      debugPrint('STREAK UPDATE ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    }
+
+    final l10n = context.l10n;
+    Get.snackbar(
+      l10n.connectionIssue,
+      l10n.pleaseTryAgain,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFF2C2C2E),
+      colorText: Colors.white,
+      margin: EdgeInsets.all(12.w),
+      duration: const Duration(seconds: 2),
+    );
+    return false;
+  }
+
+  Future<void> _toggleSelectedDay(int dayIndex, CellType cell) async {
+    if (_isLoading || _isUpdating) return;
+    final streak = _streak;
+    if (streak == null) return;
+
+    const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    if (dayIndex < 0 || dayIndex >= ordered.length) return;
+
+    final dayKey = ordered[dayIndex];
+    final updatedDays = streak.selectedDays.toSet();
+    final wasSelected = updatedDays.contains(dayKey);
+    if (wasSelected) {
+      updatedDays.remove(dayKey);
+    } else {
+      updatedDays.add(dayKey);
+    }
+
+    final removedCompleted = wasSelected && cell == CellType.tick;
+    final nextCompleted = removedCompleted
+        ? (streak.completedThisWeek - 1).clamp(0, streak.completedThisWeek)
+        : streak.completedThisWeek;
+
+    final prev = streak;
+    final next = prev.copyWith(
+      selectedDays: updatedDays.toList(),
+      targetDaysPerWeek: updatedDays.length,
+      completedThisWeek: nextCompleted,
+      remainingThisWeek: (updatedDays.length - nextCompleted)
+          .clamp(0, updatedDays.length),
+    );
+
+    _applySnapshot(next);
+
+    final ok = await _updateStreak(updatedDays.toList());
+    if (!ok) {
+      _applySnapshot(prev);
+    }
+  }
+
+  Future<void> _loadStreak() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) {
+        _applySnapshot(_StreakSnapshot.empty());
+        return;
+      }
+
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      final snapshot = _StreakSnapshot.fromPayload(res.data);
+      _applySnapshot(snapshot);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        _applySnapshot(_StreakSnapshot.empty());
+      } else {
+        debugPrint('STREAK LOAD ERROR: ${e.response?.data ?? e.message}');
+      }
+    } catch (e) {
+      debugPrint('STREAK LOAD ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _applySnapshot(_StreakSnapshot snapshot) {
+    if (!mounted) return;
+    setState(() {
+      _streak = snapshot;
+      _calendarRows = _buildCalendarRows(snapshot);
+    });
   }
 
   // NEW: Widget for the drag handle (bottom sheet bar)
@@ -168,9 +366,8 @@ class _StreakFreezePreviewBottomSheetState
     );
   }
 
-  Widget _row(int rowIndex, StreamStreaksController c, double totalWidth) {
-    final rowData = c.calendarRows[rowIndex];
-    final groups = c.getTickGroups(rowData);
+  Widget _row(List<CellType> rowData, double totalWidth, int rowIndex) {
+    final groups = _getTickGroups(rowData);
 
     return SizedBox(
       height: rowHeight.h,
@@ -195,8 +392,17 @@ class _StreakFreezePreviewBottomSheetState
                   icon = _dot();
                   break;
               }
+              final canEdit = rowIndex == 0;
               return Expanded(
-                child: Center(child: icon), // Interaction removed
+                child: Center(
+                  child: canEdit
+                      ? GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _toggleSelectedDay(i, cell),
+                          child: icon,
+                        )
+                      : icon,
+                ),
               );
             }),
           ),
@@ -207,8 +413,11 @@ class _StreakFreezePreviewBottomSheetState
 
   @override
   Widget build(BuildContext context) {
-    // Controller is still needed to provide the initial data for the static view
-    final controller = Get.put(StreamStreaksController());
+    final streak = _streak;
+    final titleText = (streak?.isInDanger ?? false)
+        ? context.l10n.streakInDangerHitFreezeButton
+        : context.l10n.youVeNeverBeenHotterKeepStreakBurning;
+    final freezeTokens = streak?.freezeTokens ?? 0;
 
     return Container(
       height: Get.height * 0.9,
@@ -331,10 +540,32 @@ class _StreakFreezePreviewBottomSheetState
                     ),
                     SizedBox(height: 6.h),
                     Text(
-                      context.l10n.streakInDangerHitFreezeButton,
+                      titleText,
                       textAlign: TextAlign.center,
                       style: sfProDisplay600(22.sp, Colors.white),
                     ),
+                    if (streak != null) ...[
+                      SizedBox(height: 4.h),
+                      Text(
+                        '${streak.currentStreak} ${context.l10n.dayStreak}',
+                        textAlign: TextAlign.center,
+                        style: sfProDisplay400(
+                          15.sp,
+                          const Color(0xFFB0B3B8),
+                        ),
+                      ),
+                    ],
+                    if (_isLoading) ...[
+                      SizedBox(height: 6.h),
+                      SizedBox(
+                        width: 18.w,
+                        height: 18.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                     SizedBox(height: 6.h),
 
                     // Static Pill
@@ -363,7 +594,7 @@ class _StreakFreezePreviewBottomSheetState
                             text: TextSpan(
                               children: [
                                 TextSpan(
-                                  text: '3 ',
+                                  text: '$freezeTokens ',
                                   style: sfProDisplay400(15.sp, Colors.white),
                                 ),
                                 TextSpan(
@@ -422,13 +653,9 @@ class _StreakFreezePreviewBottomSheetState
                                     }).toList(),
                               ),
                               SizedBox(height: 16.h),
-                              for (
-                                int i = 0;
-                                i < controller.calendarRows.length;
-                                i++
-                              ) ...[
-                                _row(i, controller, totalWidth),
-                                if (i != controller.calendarRows.length - 1)
+                              for (int i = 0; i < _calendarRows.length; i++) ...[
+                                _row(_calendarRows[i], totalWidth, i),
+                                if (i != _calendarRows.length - 1)
                                   SizedBox(height: 12.h),
                               ],
                             ],
@@ -473,6 +700,137 @@ class _StreakFreezePreviewBottomSheetState
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StreakSnapshot {
+  const _StreakSnapshot({
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.selectedDays,
+    required this.targetDaysPerWeek,
+    required this.completedThisWeek,
+    required this.remainingThisWeek,
+    required this.freezeTokens,
+    required this.status,
+    required this.isInDanger,
+    required this.weekStartDate,
+  });
+
+  final int currentStreak;
+  final int longestStreak;
+  final List<String> selectedDays;
+  final int targetDaysPerWeek;
+  final int completedThisWeek;
+  final int remainingThisWeek;
+  final int freezeTokens;
+  final String status;
+  final bool isInDanger;
+  final DateTime? weekStartDate;
+
+  factory _StreakSnapshot.empty() => const _StreakSnapshot(
+        currentStreak: 0,
+        longestStreak: 0,
+        selectedDays: <String>[],
+        targetDaysPerWeek: 0,
+        completedThisWeek: 0,
+        remainingThisWeek: 0,
+        freezeTokens: 0,
+        status: '',
+        isInDanger: false,
+        weekStartDate: null,
+      );
+
+  factory _StreakSnapshot.fromPayload(dynamic payload) {
+    dynamic data = payload;
+    if (data is Map && data['data'] != null) {
+      data = data['data'];
+    }
+
+    if (data is Map) {
+      final selectedDays = _asStringList(data['selectedDays']);
+      final status = _asString(data['status']);
+      final isInDanger =
+          _asBool(data['isInDanger']) || status.toLowerCase() == 'danger';
+      final weekStartRaw = _asString(data['weekStartDate']);
+
+      return _StreakSnapshot(
+        currentStreak: _asInt(data['currentStreak']),
+        longestStreak: _asInt(data['longestStreak']),
+        selectedDays: selectedDays,
+        targetDaysPerWeek: _asInt(
+          data['targetDaysPerWeek'],
+          fallback: selectedDays.length,
+        ),
+        completedThisWeek: _asInt(data['completedThisWeek']),
+        remainingThisWeek: _asInt(data['remainingThisWeek']),
+        freezeTokens: _asInt(data['freezeTokens']),
+        status: status,
+        isInDanger: isInDanger,
+        weekStartDate:
+            weekStartRaw.isEmpty ? null : DateTime.tryParse(weekStartRaw),
+      );
+    }
+
+    return _StreakSnapshot.empty();
+  }
+
+  static int _asInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim()) ?? fallback;
+    return fallback;
+  }
+
+  static bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final v = value.trim().toLowerCase();
+      return v == 'true' || v == '1' || v == 'yes';
+    }
+    return false;
+  }
+
+  static String _asString(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  static List<String> _asStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e.toString().trim().toLowerCase())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  _StreakSnapshot copyWith({
+    int? currentStreak,
+    int? longestStreak,
+    List<String>? selectedDays,
+    int? targetDaysPerWeek,
+    int? completedThisWeek,
+    int? remainingThisWeek,
+    int? freezeTokens,
+    String? status,
+    bool? isInDanger,
+    DateTime? weekStartDate,
+  }) {
+    return _StreakSnapshot(
+      currentStreak: currentStreak ?? this.currentStreak,
+      longestStreak: longestStreak ?? this.longestStreak,
+      selectedDays: selectedDays ?? this.selectedDays,
+      targetDaysPerWeek: targetDaysPerWeek ?? this.targetDaysPerWeek,
+      completedThisWeek: completedThisWeek ?? this.completedThisWeek,
+      remainingThisWeek: remainingThisWeek ?? this.remainingThisWeek,
+      freezeTokens: freezeTokens ?? this.freezeTokens,
+      status: status ?? this.status,
+      isInDanger: isInDanger ?? this.isInDanger,
+      weekStartDate: weekStartDate ?? this.weekStartDate,
     );
   }
 }

@@ -343,7 +343,7 @@ abstract class AppLocalizations {
   /// No description provided for @freezeTagline.
   ///
   /// In en, this message translates to:
-  /// **'Go ahead, freeze it. Commitment is \\noverrated anyway.'**
+  /// **'Go ahead, freeze it. Commitment is overrated anyway.'**
   String get freezeTagline;
 
   /// No description provided for @ignore.
@@ -721,7 +721,7 @@ abstract class AppLocalizations {
   /// No description provided for @streakInDangerHitFreezeButton.
   ///
   /// In en, this message translates to:
-  /// **'Streak in danger?\\nHit the freeze button!'**
+  /// **'Streak in danger? Hit the freeze button!'**
   String get streakInDangerHitFreezeButton;
 
   /// No description provided for @streamStreaks.
@@ -1059,6 +1059,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'How your {premium}\\nfree trial works'**
   String howYourPremiumFreeTrialWorks(Object premium);
+
+  /// No description provided for @appName.
+  ///
+  /// In en, this message translates to:
+  /// **'Second Chat'**
+  String get appName;
+
+  /// No description provided for @notificationCardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'New features available!'**
+  String get notificationCardMessage;
+
+  /// No description provided for @notificationCardTime.
+  ///
+  /// In en, this message translates to:
+  /// **'9:41 AM'**
+  String get notificationCardTime;
+
+  /// No description provided for @notificationPermissionDisabledBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are disabled. You can enable them in system settings.'**
+  String get notificationPermissionDisabledBody;
+
+  /// No description provided for @notificationPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification permission not granted.'**
+  String get notificationPermissionDenied;
+
+  /// No description provided for @notNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get notNow;
+
+  /// No description provided for @notificationScreenAnotherTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Another time'**
+  String get notificationScreenAnotherTime;
+
+  /// No description provided for @turnOnNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on notifications'**
+  String get turnOnNotifications;
 }
 
 class _AppLocalizationsDelegate
