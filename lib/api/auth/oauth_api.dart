@@ -14,9 +14,11 @@ class OAuthApi {
     String? redirectUri,
     bool link = false,
   }) async {
-    final path = link
-        ? '/api/v1/auth/${provider.backendKey}/link'
-        : '/api/v1/auth/${provider.backendKey}/url';
+    final path = provider == OAuthProvider.youtube
+        ? '/api/v1/auth/youtube/url'
+        : (link
+            ? '/api/v1/auth/${provider.backendKey}/link'
+            : '/api/v1/auth/${provider.backendKey}/url');
 
     // Use the provided redirectUri if supplied; otherwise fall back to config.
 

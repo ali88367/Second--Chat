@@ -62,7 +62,7 @@ class _IntroScreen2State extends State<IntroScreen2> {
     if (!mounted) return;
     if (ok) {
       Get.to(
-        () => IntroScreenNotification2(),
+        () => NotficationScreens(),
         transition: Transition.cupertino,
         duration: const Duration(milliseconds: 250),
         curve: Curves.fastOutSlowIn,
