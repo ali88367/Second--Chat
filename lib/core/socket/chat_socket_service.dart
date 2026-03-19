@@ -21,6 +21,7 @@ class ChatSocketService extends GetxService {
   final RxList<Map<String, dynamic>> activity = <Map<String, dynamic>>[].obs;
   final Rxn<Map<String, dynamic>> streamStatus = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> streamInfoUpdate = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> streamLive = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> ledNotification = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> streamSettingsApplied =
       Rxn<Map<String, dynamic>>();
@@ -171,6 +172,31 @@ class ChatSocketService extends GetxService {
             final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
             final watchUrl = (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
                 ?.toString();
+            final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
+                ? embedUrl.trim()
+                : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);
+            if (preferred != null) playerUrlByPlatform[platform] = preferred;
+          }
+        }
+      });
+
+      // `stream:live` (emitted when stream transitions to live)
+      socket.on('stream:live', (d) {
+        final m = _asMap(d);
+        if (m == null) return;
+        streamLive.value = m;
+        final platform = (m['platform'] ?? '').toString().toLowerCase();
+        if (platform.isNotEmpty) {
+          final vc = _parseViewerCount(m);
+          if (vc != null) viewerCountsByPlatform[platform] = vc;
+
+          final playerAny = m['player'];
+          if (playerAny is Map) {
+            final player = playerAny.cast<String, dynamic>();
+            final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
+            final watchUrl =
+                (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
+                    ?.toString();
             final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
                 ? embedUrl.trim()
                 : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);

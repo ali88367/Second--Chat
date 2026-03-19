@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
@@ -22,8 +23,40 @@ class _StreamWebViewState extends State<StreamWebView> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted);
-    _setInitial(widget.url);
+    // Configure iOS autoplay/inline playback via WebKit params when available.
+    PlatformWebViewControllerCreationParams params;
+    try {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } catch (_) {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    _controller = WebViewController.fromPlatformCreationParams(params)
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+    _setInitial(_sanitizeUrl(widget.url));
+  }
+
+  String _sanitizeUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return trimmed;
+
+    // Twitch embed often fails if `parent=localhost` inside in-app WebViews.
+    // Prefer a stable parent (your backend domain).
+    if (uri.host.toLowerCase().contains('player.twitch.tv')) {
+      final qp = Map<String, String>.from(uri.queryParameters);
+      final parent = qp['parent'];
+      if (parent == null || parent.isEmpty || parent == 'localhost') {
+        qp['parent'] = 'cafe7bygasco.com';
+      }
+      return uri.replace(queryParameters: qp).toString();
+    }
+
+    return trimmed;
   }
 
   void _setInitial(String url) {
@@ -94,7 +127,7 @@ class _StreamWebViewState extends State<StreamWebView> {
   void didUpdateWidget(StreamWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _setInitial(widget.url);
+      _setInitial(_sanitizeUrl(widget.url));
     }
   }
 
