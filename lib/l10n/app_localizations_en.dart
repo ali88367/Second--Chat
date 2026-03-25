@@ -332,6 +332,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Streak in danger? Hit the freeze button!';
 
   @override
+  String get streakFrozen => 'Streak frozen.';
+
+  @override
   String get streamStreaks => 'Stream Streaks';
 
   @override
@@ -508,7 +511,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String howYourPremiumFreeTrialWorks(Object premium) {
-    return 'How your $premium\\nfree trial works';
+    return 'How your $premium free trial works';
   }
 
   @override

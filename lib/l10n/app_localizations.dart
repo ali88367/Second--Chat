@@ -730,6 +730,12 @@ abstract class AppLocalizations {
   /// **'Streak in danger? Hit the freeze button!'**
   String get streakInDangerHitFreezeButton;
 
+  /// No description provided for @streakFrozen.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak frozen.'**
+  String get streakFrozen;
+
   /// No description provided for @streamStreaks.
   ///
   /// In en, this message translates to:
@@ -1063,7 +1069,7 @@ abstract class AppLocalizations {
   /// No description provided for @howYourPremiumFreeTrialWorks.
   ///
   /// In en, this message translates to:
-  /// **'How your {premium}\\nfree trial works'**
+  /// **'How your {premium} free trial works'**
   String howYourPremiumFreeTrialWorks(Object premium);
 
   /// No description provided for @appName.

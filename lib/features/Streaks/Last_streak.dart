@@ -388,9 +388,25 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
         ),
       );
 
-      final snapshot = _StreakSnapshot.fromPayload(res.data);
-      final remaining = _StreakSnapshot.extractRemainingFreezes(res.data);
+      final data = res.data;
+      final snapshot = _StreakSnapshot.fromPayload(data);
+      final remaining = _StreakSnapshot.extractRemainingFreezes(data);
       _applySnapshot(snapshot, remainingFreezes: remaining);
+      if (mounted) {
+        final l10n = context.l10n;
+        final ok = data is Map ? data['success'] != false : true;
+        if (ok) {
+          Get.snackbar(
+            l10n.success,
+            l10n.streakFrozen,
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: const Color(0xFF2C2C2E),
+            colorText: Colors.white,
+            margin: EdgeInsets.all(12.w),
+            duration: const Duration(seconds: 2),
+          );
+        }
+      }
     } on DioException catch (e) {
       debugPrint('STREAK FREEZE ERROR: ${e.response?.data ?? e.message}');
     } catch (e) {

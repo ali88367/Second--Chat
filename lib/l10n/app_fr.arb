@@ -186,6 +186,7 @@
     }
   },
   "appName": "Second Chat",
+  "streakFrozen": "Série gelée.",
   "notificationCardMessage": "Nouvelles fonctionnalités disponibles !",
   "notificationCardTime": "9:41 AM",
   "notificationPermissionDisabledBody": "Les notifications sont désactivées. Vous pouvez les activer dans les réglages du système.",

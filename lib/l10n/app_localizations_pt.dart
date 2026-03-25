@@ -339,6 +339,9 @@ class AppLocalizationsPt extends AppLocalizations {
       'Sequência em perigo?\\nToque no botão de congelar!';
 
   @override
+  String get streakFrozen => 'Sequência congelada.';
+
+  @override
   String get streamStreaks => 'Sequências de stream';
 
   @override

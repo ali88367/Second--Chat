@@ -186,6 +186,7 @@
     }
   },
   "appName": "Second Chat",
+  "streakFrozen": "Streak eingefroren.",
   "notificationCardMessage": "Neue Funktionen verfügbar!",
   "notificationCardTime": "9:41 AM",
   "notificationPermissionDisabledBody": "Benachrichtigungen sind deaktiviert. Sie können sie in den Systemeinstellungen aktivieren.",
