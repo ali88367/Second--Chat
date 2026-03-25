@@ -19,6 +19,7 @@ class _StreamWebViewState extends State<StreamWebView> {
   late final WebViewController _controller;
   String? _initialUrl;
   Uri? _initialUri;
+  bool _restoringInitial = false;
 
   @override
   void initState() {
@@ -65,62 +66,49 @@ class _StreamWebViewState extends State<StreamWebView> {
     _initialUri = trimmed.isEmpty ? null : Uri.tryParse(trimmed);
     _controller.setNavigationDelegate(
       NavigationDelegate(
+        onPageStarted: (url) {
+          if (_isAllowedMainFrameNavigation(url)) return;
+          _restoreInitialUrl();
+        },
         onNavigationRequest: (req) {
-          final init = _initialUrl;
-          if (init == null || init.isEmpty) return NavigationDecision.prevent;
-          // Prevent leaving the embedded player.
-          // Allow:
-          // - the initial URL itself
-          // - same-origin navigations (some platforms redirect www -> apex, etc.)
-          // - known player hosts (e.g. Twitch).
-          final u = req.url;
-          if (u == init) return NavigationDecision.navigate;
-          final uri = Uri.tryParse(u);
-          if (uri == null) return NavigationDecision.prevent;
-          final initUri = _initialUri;
-          bool sameOriginAllowed() {
-            if (initUri == null) return false;
-            final a = initUri.host.toLowerCase();
-            final b = uri.host.toLowerCase();
-            if (a.isEmpty || b.isEmpty) return false;
-            if (a == b) return true;
-            if (b.endsWith('.$a')) return true; // subdomain of initial
-            if (a.endsWith('.$b')) return true; // initial is a subdomain
-            // common redirects
-            if (a == 'kick.com' && b == 'www.kick.com') return true;
-            if (a == 'www.kick.com' && b == 'kick.com') return true;
-            if (a == 'youtube.com' && b == 'www.youtube.com') return true;
-            if (a == 'www.youtube.com' && b == 'youtube.com') return true;
-            return false;
-          }
-
-          final host = uri.host.toLowerCase();
-          final knownPlayerHosts = <String>{
-            'player.twitch.tv',
-            'twitch.tv',
-            'www.twitch.tv',
-            'kick.com',
-            'www.kick.com',
-            'youtube.com',
-            'www.youtube.com',
-            'm.youtube.com',
-            'youtu.be',
-          };
-
-          if (sameOriginAllowed()) return NavigationDecision.navigate;
-          if (knownPlayerHosts.contains(host)) return NavigationDecision.navigate;
-          if (host.endsWith('.twitch.tv') ||
-              host.endsWith('.kick.com') ||
-              host.endsWith('.youtube.com')) {
-            return NavigationDecision.navigate;
-          }
-          return NavigationDecision.prevent;
+          final allowed = _isAllowedMainFrameNavigation(req.url);
+          if (!allowed) _restoreInitialUrl();
+          return allowed ? NavigationDecision.navigate : NavigationDecision.prevent;
         },
       ),
     );
     if (trimmed.isNotEmpty) {
       _controller.loadRequest(Uri.parse(trimmed));
     }
+  }
+
+  bool _isAllowedMainFrameNavigation(String rawUrl) {
+    final init = _initialUrl;
+    final initUri = _initialUri;
+    if (init == null || init.isEmpty || initUri == null) return false;
+    if (rawUrl == init || rawUrl == 'about:blank') return true;
+
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return false;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+
+    final sameHost = uri.host.toLowerCase() == initUri.host.toLowerCase();
+    if (!sameHost) return false;
+
+    final initPath = initUri.path.isEmpty ? '/' : initUri.path;
+    final path = uri.path.isEmpty ? '/' : uri.path;
+    if (path == initPath) return true;
+    return path.startsWith('$initPath/');
+  }
+
+  void _restoreInitialUrl() {
+    if (_restoringInitial) return;
+    final init = _initialUrl;
+    if (init == null || init.isEmpty) return;
+    _restoringInitial = true;
+    _controller.loadRequest(Uri.parse(init)).whenComplete(() {
+      _restoringInitial = false;
+    });
   }
 
   @override

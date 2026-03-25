@@ -50,6 +50,8 @@ class ChatController extends GetxController {
   Timer? _connectRetryTimer;
   bool _realtimeObserversWired = false;
   bool _socketConnecting = false;
+  final Set<String> _historyInFlight = <String>{};
+  final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
 
   RxList<ChatMessage> get messages => _socket.messages;
   RxInt get viewerCount => _socket.viewerCount;
@@ -102,14 +104,36 @@ class ChatController extends GetxController {
     });
     ever<Map<String, bool>>(_socket.liveByPlatform, (m) {
       if (m.isNotEmpty) platformLive.assignAll(m);
+      // If currently selected platform went offline, clear its stream + chat immediately.
+      final selected = platform.value.toLowerCase();
+      final isNowLive = m[selected] == true;
+      if (!isNowLive) {
+        // WebView should show "No stream at the moment"
+        isLive.value = false;
+        watchUrl.value = '';
+        // Clear messages for this platform (user requested).
+        messages.removeWhere(
+          (msg) => msg.platform.toLowerCase() == selected,
+        );
+        _bumpScroll();
+      } else {
+        isLive.value = true;
+        final u = platformEmbedUrls[selected];
+        if (u != null && u.trim().isNotEmpty) {
+          watchUrl.value = u;
+        }
+        // Stream live hote hi chat ko warm-up karo (history + socket).
+        unawaited(_ensureChatForLivePlatform(selected));
+      }
     });
     ever<Map<String, String?>>(_socket.playerUrlByPlatform, (m) {
       if (m.isNotEmpty) platformEmbedUrls.assignAll(m);
       // keep current webview URL updated if user is focused on a platform
       final selected = platform.value.toLowerCase();
       final u = m[selected];
-      if (u != null && u.trim().isNotEmpty) {
+      if (u != null && u.trim().isNotEmpty && isPlatformLive(selected)) {
         watchUrl.value = u;
+        isLive.value = true;
       }
     });
 
@@ -200,6 +224,18 @@ class ChatController extends GetxController {
 
   Future<void> _bootstrap() async {
     try {
+      // 1) App start: hit overview for each connected platform (tokens in SharedPrefs).
+      final connectedPlatforms = await _tokenProvider.getConnectedPlatforms();
+      if (connectedPlatforms.isNotEmpty) {
+        // Keep default selection as-is unless it's not connected.
+        final selected = platform.value.toLowerCase();
+        if (!connectedPlatforms.contains(selected)) {
+          platform.value = connectedPlatforms.first;
+        }
+        await refreshOverviewsForPlatforms(connectedPlatforms);
+      }
+
+      // Keep a main access token for socket auth (typically app JWT).
       _accessToken = await _tokenProvider.getAccessToken(platform.value);
       if (_accessToken == null || _accessToken!.isEmpty) return;
 
@@ -212,7 +248,10 @@ class ChatController extends GetxController {
         _bumpScroll();
       }
 
-      await refreshOverviewForPlatform(platform.value);
+      // Ensure we have socketUrl/path even if connectedPlatforms was empty.
+      if (overview.value == null) {
+        await refreshOverviewForPlatform(platform.value);
+      }
 
       final ov = overview.value;
       final socketUrl = ov?.chatSocketUrl;
@@ -347,6 +386,9 @@ class ChatController extends GetxController {
         final key = p.toLowerCase();
         isLive.value = platformLive[key] ?? isLive.value;
         watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
+        if (isLive.value == true) {
+          unawaited(_ensureChatForLivePlatform(key));
+        }
         return;
       }
 
@@ -374,6 +416,9 @@ class ChatController extends GetxController {
       } else {
         platformEmbedUrls[p.toLowerCase()] = ov.watchUrl;
       }
+      if (ov.live == true) {
+        unawaited(_ensureChatForLivePlatform(p.toLowerCase()));
+      }
     } catch (_) {}
   }
 
@@ -400,6 +445,55 @@ class ChatController extends GetxController {
     _bumpScroll();
   }
 
+  Future<void> _ensureChatForLivePlatform(String p) async {
+    final key = p.toLowerCase();
+    // 1) Socket ensure connect (no-op if already connected)
+    if (_socket.isConnected.value != true) {
+      await _tryConnectIfPossible();
+    }
+
+    // 2) History fetch with cooldown + in-flight guard (optimized)
+    if (_historyInFlight.contains(key)) return;
+    final now = DateTime.now().toUtc();
+    final last = _historyLastFetchAt[key];
+    // Avoid frequent history hits while stream status flaps.
+    if (last != null && now.difference(last) < const Duration(seconds: 20)) {
+      return;
+    }
+
+    final token = _accessToken ?? await _tokenProvider.getAccessToken(key);
+    if (token == null || token.isEmpty) return;
+
+    _historyInFlight.add(key);
+    try {
+      final history = await _chat.loadHistory(
+        platform: key,
+        accessToken: token,
+        limit: 100,
+        offset: 0,
+      );
+      if (history.isNotEmpty) {
+        // Merge without duplicates.
+        final existingKeys = messages
+            .map((m) => '${m.platform.toLowerCase()}|${m.id ?? ''}|${m.message}|${m.timestamp.toUtc().millisecondsSinceEpoch}')
+            .toSet();
+        final toAdd = history.where((m) {
+          final k = '${m.platform.toLowerCase()}|${m.id ?? ''}|${m.message}|${m.timestamp.toUtc().millisecondsSinceEpoch}';
+          return !existingKeys.contains(k);
+        }).toList(growable: false);
+        if (toAdd.isNotEmpty) {
+          messages.addAll(toAdd);
+          _bumpScroll();
+        }
+      }
+      _historyLastFetchAt[key] = now;
+    } catch (_) {
+      // silent
+    } finally {
+      _historyInFlight.remove(key);
+    }
+  }
+
   void _bumpScroll() {
     // Cheap observable tick for UI that can't easily diff RxList changes.
     scrollTick.value++;
@@ -409,6 +503,8 @@ class ChatController extends GetxController {
   void onClose() {
     _connectRetryTimer?.cancel();
     _connectRetryTimer = null;
+    _historyInFlight.clear();
+    _historyLastFetchAt.clear();
     try {
       _socket.disconnect();
     } catch (_) {}
