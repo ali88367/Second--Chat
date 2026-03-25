@@ -1,12 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../data/models/chat_message.dart';
 
 class ChatSocketService extends GetxService {
+  /// Enables verbose terminal logging for Socket.IO events.
+  ///
+  /// In debug builds this is `true` by default.
+  static bool verboseLogs = kDebugMode;
+
   final RxList<ChatMessage> messages = <ChatMessage>[].obs;
   final RxInt viewerCount = 0.obs;
   final RxBool isConnected = false.obs;
@@ -15,6 +21,7 @@ class ChatSocketService extends GetxService {
   final RxList<Map<String, dynamic>> activity = <Map<String, dynamic>>[].obs;
   final Rxn<Map<String, dynamic>> streamStatus = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> streamInfoUpdate = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> streamLive = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> ledNotification = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> streamSettingsApplied =
       Rxn<Map<String, dynamic>>();
@@ -23,15 +30,38 @@ class ChatSocketService extends GetxService {
   /// Per-platform viewer counts from realtime events.
   final RxMap<String, int> viewerCountsByPlatform = <String, int>{}.obs;
   final RxMap<String, bool> liveByPlatform = <String, bool>{}.obs;
+  /// Per-platform preferred player URL from realtime events (`player.embedUrl` preferred).
+  final RxMap<String, String?> playerUrlByPlatform = <String, String?>{}.obs;
 
   io.Socket? _socket;
   Timer? _reconnectTimer;
+  Timer? _startHeartbeatTimer;
+  DateTime _lastStartEmit = DateTime.fromMillisecondsSinceEpoch(0);
   bool _manuallyDisconnected = false;
 
   // Prevent duplicate messages (bounded memory).
   final Map<String, DateTime> _seen = <String, DateTime>{};
   static const int _seenMax = 600;
   static const Duration _seenTtl = Duration(minutes: 10);
+
+  void _logSocket(String event, dynamic payload) {
+    if (!verboseLogs) return;
+    try {
+      final pretty = _prettyJson(payload);
+      debugPrint('SOCKET <= $event $pretty');
+    } catch (_) {
+      debugPrint('SOCKET <= $event ${payload.toString()}');
+    }
+  }
+
+  String _prettyJson(dynamic payload) {
+    if (payload == null) return '';
+    if (payload is String) return payload;
+    if (payload is Map || payload is List) {
+      return jsonEncode(payload);
+    }
+    return payload.toString();
+  }
 
   Future<void> connect({
     required String baseUrl,
@@ -41,6 +71,12 @@ class ChatSocketService extends GetxService {
     try {
       _manuallyDisconnected = false;
       await disconnect(); // ensures clean slate
+
+      _logSocket('init', {
+        'baseUrl': baseUrl,
+        'path': path,
+        'hasToken': accessToken.trim().isNotEmpty,
+      });
 
       final socket = io.io(
         baseUrl,
@@ -61,8 +97,28 @@ class ChatSocketService extends GetxService {
 
       socket.on('connect', (_) {
         isConnected.value = true;
+        _logSocket('connect', {'baseUrl': baseUrl, 'path': path});
         _emitStart();
+        _startHeartbeat();
       });
+
+      socket.on('disconnect', (reason) {
+        _logSocket('disconnect', reason);
+        _stopHeartbeat();
+      });
+
+      socket.on('connect_error', (e) {
+        _logSocket('connect_error', e);
+      });
+
+      // Log any event that we don't explicitly handle (and duplicates too).
+      try {
+        socket.onAny((event, data) {
+          _logSocket(event.toString(), data);
+        });
+      } catch (_) {
+        // Some versions/platforms may not support onAny.
+      }
 
       // `connected`
       socket.on('connected', (d) {
@@ -109,6 +165,43 @@ class ChatSocketService extends GetxService {
           if (liveRaw is bool) liveByPlatform[platform] = liveRaw;
           final vc = _parseViewerCount(m);
           if (vc != null) viewerCountsByPlatform[platform] = vc;
+
+          final playerAny = m['player'];
+          if (playerAny is Map) {
+            final player = playerAny.cast<String, dynamic>();
+            final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
+            final watchUrl = (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
+                ?.toString();
+            final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
+                ? embedUrl.trim()
+                : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);
+            if (preferred != null) playerUrlByPlatform[platform] = preferred;
+          }
+        }
+      });
+
+      // `stream:live` (emitted when stream transitions to live)
+      socket.on('stream:live', (d) {
+        final m = _asMap(d);
+        if (m == null) return;
+        streamLive.value = m;
+        final platform = (m['platform'] ?? '').toString().toLowerCase();
+        if (platform.isNotEmpty) {
+          final vc = _parseViewerCount(m);
+          if (vc != null) viewerCountsByPlatform[platform] = vc;
+
+          final playerAny = m['player'];
+          if (playerAny is Map) {
+            final player = playerAny.cast<String, dynamic>();
+            final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
+            final watchUrl =
+                (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
+                    ?.toString();
+            final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
+                ? embedUrl.trim()
+                : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);
+            if (preferred != null) playerUrlByPlatform[platform] = preferred;
+          }
         }
       });
 
@@ -121,6 +214,18 @@ class ChatSocketService extends GetxService {
         if (platform.isNotEmpty) {
           final vc = _parseViewerCount(m);
           if (vc != null) viewerCountsByPlatform[platform] = vc;
+
+          final playerAny = m['player'];
+          if (playerAny is Map) {
+            final player = playerAny.cast<String, dynamic>();
+            final embedUrl = (player['embedUrl'] ?? player['embed_url'])?.toString();
+            final watchUrl = (player['watchUrl'] ?? player['watch_url'] ?? player['url'])
+                ?.toString();
+            final preferred = (embedUrl != null && embedUrl.trim().isNotEmpty)
+                ? embedUrl.trim()
+                : (watchUrl?.trim().isNotEmpty == true ? watchUrl!.trim() : null);
+            if (preferred != null) playerUrlByPlatform[platform] = preferred;
+          }
         }
       });
 
@@ -152,6 +257,9 @@ class ChatSocketService extends GetxService {
           final m = _asMap(payload);
           final platform = (m?['platform'] ?? '').toString().toLowerCase();
           if (platform.isNotEmpty) viewerCountsByPlatform[platform] = v;
+          // If viewer counts are coming in but status is lagging, request a refresh.
+          // Debounced inside `_emitStart`.
+          _emitStart();
         }
       });
 
@@ -182,9 +290,39 @@ class ChatSocketService extends GetxService {
     }
   }
 
+  void _startHeartbeat() {
+    // Some backends only push fresh stream status after `chat:start`.
+    // Re-emitting periodically keeps multi-stream status/player URLs updating
+    // without requiring user to leave/re-enter the page.
+    _startHeartbeatTimer?.cancel();
+    var ticks = 0;
+    // Fast refresh for ~1 minute, then back off.
+    _startHeartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_manuallyDisconnected) return;
+      if (_socket?.connected != true) return;
+      _emitStart();
+      ticks++;
+      if (ticks >= 12) {
+        _startHeartbeatTimer?.cancel();
+        _startHeartbeatTimer =
+            Timer.periodic(const Duration(seconds: 20), (_) {
+          if (_manuallyDisconnected) return;
+          if (_socket?.connected != true) return;
+          _emitStart();
+        });
+      }
+    });
+  }
+
+  void _stopHeartbeat() {
+    _startHeartbeatTimer?.cancel();
+    _startHeartbeatTimer = null;
+  }
+
   Future<void> disconnect() async {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _stopHeartbeat();
     _manuallyDisconnected = true;
     try {
       _emitStop();
@@ -210,12 +348,18 @@ class ChatSocketService extends GetxService {
 
   void _emitStart() {
     try {
+      final now = DateTime.now();
+      // Debounce to avoid spamming the backend.
+      if (now.difference(_lastStartEmit) < const Duration(seconds: 2)) return;
+      _lastStartEmit = now;
+      _logSocket('emit chat:start', null);
       _socket?.emit('chat:start');
     } catch (_) {}
   }
 
   void _emitStop() {
     try {
+      _logSocket('emit chat:stop', null);
       _socket?.emit('chat:stop');
     } catch (_) {}
   }
@@ -266,15 +410,28 @@ class ChatSocketService extends GetxService {
 
       final platform =
           (map['platform'] ?? map['source'] ?? 'twitch').toString();
-      final user = (map['sender_username'] ??
+      final metadata = map['metadata'];
+      final metaUser = metadata is Map
+          ? (metadata['user'] ??
+                  metadata['username'] ??
+                  metadata['sender_username'] ??
+                  metadata['senderUsername'] ??
+                  metadata['name'] ??
+                  metadata['displayName'])
+              ?.toString()
+          : null;
+
+      String user = (map['sender_username'] ??
               map['senderUsername'] ??
               map['username'] ??
               map['user'] ??
-              map['username'] ??
               map['name'] ??
               map['displayName'] ??
+              metaUser ??
               'Unknown')
-          .toString();
+          .toString()
+          .trim();
+      if (user.isEmpty) user = (metaUser ?? 'Unknown').toString().trim();
       final message = (map['message'] ?? map['text'] ?? '').toString();
       if (message.trim().isEmpty) return null;
 
@@ -284,7 +441,6 @@ class ChatSocketService extends GetxService {
               map['_id'] ??
               map['messageId'])
           ?.toString();
-      final metadata = map['metadata'];
       final tsRaw = (metadata is Map
               ? (metadata['timestamp'] ?? metadata['ts'] ?? metadata['time'])
               : null) ??

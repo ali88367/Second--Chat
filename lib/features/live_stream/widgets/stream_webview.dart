@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
@@ -17,29 +18,102 @@ class StreamWebView extends StatefulWidget {
 class _StreamWebViewState extends State<StreamWebView> {
   late final WebViewController _controller;
   String? _initialUrl;
+  Uri? _initialUri;
 
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted);
-    _setInitial(widget.url);
+    // Configure iOS autoplay/inline playback via WebKit params when available.
+    PlatformWebViewControllerCreationParams params;
+    try {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } catch (_) {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    _controller = WebViewController.fromPlatformCreationParams(params)
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+    _setInitial(_sanitizeUrl(widget.url));
+  }
+
+  String _sanitizeUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return trimmed;
+
+    // Twitch embed often fails if `parent=localhost` inside in-app WebViews.
+    // Prefer a stable parent (your backend domain).
+    if (uri.host.toLowerCase().contains('player.twitch.tv')) {
+      final qp = Map<String, String>.from(uri.queryParameters);
+      final parent = qp['parent'];
+      if (parent == null || parent.isEmpty || parent == 'localhost') {
+        qp['parent'] = 'cafe7bygasco.com';
+      }
+      return uri.replace(queryParameters: qp).toString();
+    }
+
+    return trimmed;
   }
 
   void _setInitial(String url) {
     final trimmed = url.trim();
     _initialUrl = trimmed.isEmpty ? null : trimmed;
+    _initialUri = trimmed.isEmpty ? null : Uri.tryParse(trimmed);
     _controller.setNavigationDelegate(
       NavigationDelegate(
         onNavigationRequest: (req) {
           final init = _initialUrl;
           if (init == null || init.isEmpty) return NavigationDecision.prevent;
-          // Prevent leaving the embedded player. Allow only same-origin navigations
-          // under player.twitch.tv (and the initial URL itself).
+          // Prevent leaving the embedded player.
+          // Allow:
+          // - the initial URL itself
+          // - same-origin navigations (some platforms redirect www -> apex, etc.)
+          // - known player hosts (e.g. Twitch).
           final u = req.url;
           if (u == init) return NavigationDecision.navigate;
           final uri = Uri.tryParse(u);
           if (uri == null) return NavigationDecision.prevent;
-          if (uri.host.contains('player.twitch.tv')) return NavigationDecision.navigate;
+          final initUri = _initialUri;
+          bool sameOriginAllowed() {
+            if (initUri == null) return false;
+            final a = initUri.host.toLowerCase();
+            final b = uri.host.toLowerCase();
+            if (a.isEmpty || b.isEmpty) return false;
+            if (a == b) return true;
+            if (b.endsWith('.$a')) return true; // subdomain of initial
+            if (a.endsWith('.$b')) return true; // initial is a subdomain
+            // common redirects
+            if (a == 'kick.com' && b == 'www.kick.com') return true;
+            if (a == 'www.kick.com' && b == 'kick.com') return true;
+            if (a == 'youtube.com' && b == 'www.youtube.com') return true;
+            if (a == 'www.youtube.com' && b == 'youtube.com') return true;
+            return false;
+          }
+
+          final host = uri.host.toLowerCase();
+          final knownPlayerHosts = <String>{
+            'player.twitch.tv',
+            'twitch.tv',
+            'www.twitch.tv',
+            'kick.com',
+            'www.kick.com',
+            'youtube.com',
+            'www.youtube.com',
+            'm.youtube.com',
+            'youtu.be',
+          };
+
+          if (sameOriginAllowed()) return NavigationDecision.navigate;
+          if (knownPlayerHosts.contains(host)) return NavigationDecision.navigate;
+          if (host.endsWith('.twitch.tv') ||
+              host.endsWith('.kick.com') ||
+              host.endsWith('.youtube.com')) {
+            return NavigationDecision.navigate;
+          }
           return NavigationDecision.prevent;
         },
       ),
@@ -53,7 +127,7 @@ class _StreamWebViewState extends State<StreamWebView> {
   void didUpdateWidget(StreamWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _setInitial(widget.url);
+      _setInitial(_sanitizeUrl(widget.url));
     }
   }
 

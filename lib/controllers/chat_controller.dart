@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../api/app_api.dart';
+import '../controllers/Main Section Controllers/settings_controller.dart';
 import '../core/socket/chat_socket_service.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
@@ -24,6 +29,7 @@ class ChatController extends GetxController {
   final AppApi _api;
   final PlatformTokenProvider _tokenProvider;
   final ChatSocketService _socket;
+  final SettingsController _settings = Get.find<SettingsController>();
   late final StreamingService _streaming;
   late final ChatService _chat;
 
@@ -35,6 +41,15 @@ class ChatController extends GetxController {
   final RxMap<String, int> platformViewerCounts = <String, int>{}.obs;
   final RxMap<String, bool> platformLive = <String, bool>{}.obs;
   final RxMap<String, String?> platformEmbedUrls = <String, String?>{}.obs;
+  final RxMap<String, String?> streamTitleByPlatform = <String, String?>{}.obs;
+  final RxMap<String, String?> streamCategoryByPlatform =
+      <String, String?>{}.obs;
+  final RxList<Map<String, dynamic>> activityEvents =
+      <Map<String, dynamic>>[].obs;
+
+  Timer? _connectRetryTimer;
+  bool _realtimeObserversWired = false;
+  bool _socketConnecting = false;
 
   RxList<ChatMessage> get messages => _socket.messages;
   RxInt get viewerCount => _socket.viewerCount;
@@ -48,6 +63,139 @@ class ChatController extends GetxController {
   void onInit() {
     super.onInit();
     _bootstrap();
+
+    // If tokens/overview are not ready at first app launch, connect may skip.
+    // Retry in background so socket starts without needing page navigation.
+    _startConnectRetry();
+
+    // Keep multi-preview links "hot" when user toggles the setting.
+    ever<bool>(_settings.multiScreenPreview, (enabled) {
+      if (enabled == true) {
+        unawaited(
+          refreshOverviewsForPlatforms(const ['twitch', 'kick', 'youtube']),
+        );
+      }
+    });
+  }
+
+  void _startConnectRetry() {
+    _connectRetryTimer?.cancel();
+    _connectRetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (_socket.isConnected.value == true) {
+        _connectRetryTimer?.cancel();
+        _connectRetryTimer = null;
+        return;
+      }
+      unawaited(_tryConnectIfPossible());
+    });
+  }
+
+  void _wireObserversOnce() {
+    if (_realtimeObserversWired) return;
+    _realtimeObserversWired = true;
+
+    _wireRealtime();
+
+    // Keep live/viewer state in sync with realtime events.
+    ever<Map<String, int>>(_socket.viewerCountsByPlatform, (m) {
+      if (m.isNotEmpty) platformViewerCounts.assignAll(m);
+    });
+    ever<Map<String, bool>>(_socket.liveByPlatform, (m) {
+      if (m.isNotEmpty) platformLive.assignAll(m);
+    });
+    ever<Map<String, String?>>(_socket.playerUrlByPlatform, (m) {
+      if (m.isNotEmpty) platformEmbedUrls.assignAll(m);
+      // keep current webview URL updated if user is focused on a platform
+      final selected = platform.value.toLowerCase();
+      final u = m[selected];
+      if (u != null && u.trim().isNotEmpty) {
+        watchUrl.value = u;
+      }
+    });
+
+    ever<List<ChatMessage>>(messages, (_) {
+      _bumpScroll();
+    });
+  }
+
+  Future<void> _tryConnectIfPossible() async {
+    if (_socketConnecting) return;
+    _socketConnecting = true;
+    try {
+      if (_socket.isConnected.value == true) return;
+
+      final token = _accessToken ?? await _tokenProvider.getAccessToken(platform.value);
+      if (token == null || token.trim().isEmpty) return;
+      _accessToken = token.trim();
+
+      // Ensure we have socketUrl/socketPath in `overview`.
+      final ov = overview.value;
+      final socketUrl = ov?.chatSocketUrl;
+      final socketPath = ov?.chatSocketPath;
+
+      final hasSocketFields = socketUrl != null &&
+          socketUrl.trim().isNotEmpty &&
+          socketPath != null &&
+          socketPath.trim().isNotEmpty;
+
+      if (!hasSocketFields) {
+        // Refresh only the selected platform overview; it also updates socketUrl/path.
+        await refreshOverviewForPlatform(platform.value);
+      }
+
+      final ov2 = overview.value;
+      final socketUrl2 = ov2?.chatSocketUrl;
+      final socketPath2 = ov2?.chatSocketPath;
+      if (socketUrl2 == null ||
+          socketUrl2.trim().isEmpty ||
+          socketPath2 == null ||
+          socketPath2.trim().isEmpty) {
+        return;
+      }
+
+      await _socket.connect(
+        baseUrl: socketUrl2.trim(),
+        path: socketPath2.trim(),
+        accessToken: _accessToken!,
+      );
+
+      _wireObserversOnce();
+    } catch (_) {
+      // ignore; periodic retry will handle.
+    } finally {
+      _socketConnecting = false;
+    }
+  }
+
+  void _wireRealtime() {
+    // Activity (sync + live)
+    ever<List<Map<String, dynamic>>>(_socket.activity, (list) {
+      if (list.isNotEmpty) {
+        activityEvents.assignAll(list);
+      }
+    });
+
+    // Stream meta (title/category) from realtime events.
+    void applyMeta(Map<String, dynamic>? m) {
+      if (m == null) return;
+      final platform = (m['platform'] ?? '').toString().toLowerCase();
+      if (platform.isEmpty) return;
+
+      Map<String, dynamic>? meta;
+      final rawMeta = m['meta'];
+      if (rawMeta is Map) meta = rawMeta.cast<String, dynamic>();
+
+      final title = (meta?['title'] ?? m['title'])?.toString().trim();
+      final category = (meta?['category'] ?? m['category'])?.toString().trim();
+      if (title != null && title.isNotEmpty)
+        streamTitleByPlatform[platform] = title;
+      if (category != null && category.isNotEmpty) {
+        streamCategoryByPlatform[platform] = category;
+      }
+    }
+
+    ever<Map<String, dynamic>?>(_socket.streamStatus, applyMeta);
+    ever<Map<String, dynamic>?>(_socket.streamInfoUpdate, applyMeta);
   }
 
   Future<void> _bootstrap() async {
@@ -80,25 +228,132 @@ class ChatController extends GetxController {
         );
       }
 
-      // Keep live/viewer state in sync with realtime events.
-      ever<Map<String, int>>(_socket.viewerCountsByPlatform, (m) {
-        if (m.isNotEmpty) platformViewerCounts.assignAll(m);
-      });
-      ever<Map<String, bool>>(_socket.liveByPlatform, (m) {
-        if (m.isNotEmpty) platformLive.assignAll(m);
-      });
-
-      ever<List<ChatMessage>>(messages, (_) {
-        _bumpScroll();
-      });
+      _wireRealtime();
+      _wireObserversOnce();
     } catch (_) {}
+  }
+
+  Future<void> refreshOverviewsForPlatforms(List<String> platforms) async {
+    try {
+      if (kDebugMode) {
+        debugPrint(
+          '[ChatController] refreshOverviewsForPlatforms platforms=$platforms',
+        );
+      }
+      final normalized = platforms
+          .map((e) => e.toLowerCase().trim())
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+      if (normalized.isEmpty) return;
+
+      final results = <String, StreamingOverview>{};
+      // Fallback token (some backends accept the same JWT for all platforms).
+      final fallbackToken =
+          (_accessToken?.trim().isNotEmpty == true)
+              ? _accessToken!.trim()
+              : null;
+      for (final p in normalized) {
+        // Each platform has its own token.
+        final pToken = await _tokenProvider.getAccessToken(p);
+        final effectiveToken =
+            (pToken != null && pToken.trim().isNotEmpty)
+                ? pToken.trim()
+                : fallbackToken;
+        if (kDebugMode) {
+          debugPrint(
+            '[ChatController] overview token platform=$p present=${pToken != null && pToken.trim().isNotEmpty} '
+            'fallbackUsed=${(pToken == null || pToken.trim().isEmpty) && (fallbackToken != null)} '
+            'token=${_maskToken(effectiveToken)}',
+          );
+        }
+        if (effectiveToken == null || effectiveToken.isEmpty) continue;
+        final ov = await _streaming.fetchOverview(
+          platform: p,
+          accessToken: effectiveToken,
+        );
+        if (kDebugMode) {
+          debugPrint(
+            '[ChatController] overview result platform=$p ok=${ov != null} live=${ov?.live} url=${ov?.embedUrlByPlatform[p] ?? ov?.watchUrl} vc=${ov?.viewerCount}',
+          );
+        }
+        if (ov != null) results[p] = ov;
+      }
+      if (results.isEmpty) return;
+
+      final mergedViewer = <String, int>{};
+      final mergedLive = <String, bool>{};
+      final mergedEmbed = <String, String?>{};
+      String? socketUrl;
+      String? socketPath;
+
+      for (final ov in results.values) {
+        socketUrl ??= ov.chatSocketUrl;
+        socketPath ??= ov.chatSocketPath;
+        mergedViewer.addAll(ov.viewerCountsByPlatform);
+        mergedLive.addAll(ov.liveByPlatform);
+        mergedEmbed.addAll(ov.embedUrlByPlatform);
+        // also ensure the requested platform has a url if backend didn't provide platforms list
+        mergedEmbed[ov.platform.toLowerCase()] ??= ov.watchUrl;
+      }
+
+      // Keep current selected platform overview as the "primary" overview object.
+      final current = platform.value.toLowerCase();
+      final primary = results[current] ?? results.values.first;
+      overview.value = StreamingOverview(
+        platform: primary.platform,
+        live: primary.live,
+        watchUrl: primary.watchUrl,
+        chatSocketUrl: socketUrl ?? primary.chatSocketUrl,
+        chatSocketPath: socketPath ?? primary.chatSocketPath,
+        viewerCount: primary.viewerCount,
+        viewerCountsByPlatform: mergedViewer,
+        liveByPlatform: mergedLive,
+        embedUrlByPlatform: mergedEmbed,
+        raw: primary.raw,
+      );
+
+      if (mergedViewer.isNotEmpty) platformViewerCounts.assignAll(mergedViewer);
+      if (mergedLive.isNotEmpty) platformLive.assignAll(mergedLive);
+      if (mergedEmbed.isNotEmpty) platformEmbedUrls.assignAll(mergedEmbed);
+
+      // Update currently selected stream URL.
+      final currentUrl = mergedEmbed[current] ?? primary.watchUrl;
+      watchUrl.value = currentUrl;
+      isLive.value = mergedLive[current] ?? primary.live;
+    } catch (_) {}
+  }
+
+  String _maskToken(String? token) {
+    final t = token?.trim() ?? '';
+    if (t.isEmpty) return '(empty)';
+    if (t.length <= 10) return '(${t.length} chars)';
+    return '${t.substring(0, 6)}…${t.substring(t.length - 4)} (${t.length} chars)';
   }
 
   Future<void> refreshOverviewForPlatform(String p) async {
     try {
       final token = _accessToken ?? await _tokenProvider.getAccessToken(p);
       if (token == null || token.isEmpty) return;
-      final ov = await _streaming.fetchOverview(platform: p, accessToken: token);
+
+      // If multi-preview mode is enabled, refresh all platforms so the top streams stay "hot".
+      if (_settings.multiScreenPreview.value == true) {
+        if (kDebugMode) {
+          debugPrint('[ChatController] multiScreenPreview=ON; refreshing all');
+        }
+        await refreshOverviewsForPlatforms(const ['twitch', 'kick', 'youtube']);
+        // selected platform state still needs to update.
+        platform.value = p;
+        final key = p.toLowerCase();
+        isLive.value = platformLive[key] ?? isLive.value;
+        watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
+        return;
+      }
+
+      final ov = await _streaming.fetchOverview(
+        platform: p,
+        accessToken: token,
+      );
       if (ov == null) return;
       overview.value = ov;
       // selected platform state
@@ -152,6 +407,8 @@ class ChatController extends GetxController {
 
   @override
   void onClose() {
+    _connectRetryTimer?.cancel();
+    _connectRetryTimer = null;
     try {
       _socket.disconnect();
     } catch (_) {}
