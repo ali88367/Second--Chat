@@ -9,7 +9,7 @@ import 'package:second_chat/core/localization/l10n.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
-import 'Compact_freeze.dart';
+import 'Last_streak.dart';
 
 class StreakFreezePreviewBottomSheet extends StatefulWidget {
   const StreakFreezePreviewBottomSheet({super.key});
@@ -678,7 +678,7 @@ class _StreakFreezePreviewBottomSheetState
                     onPressed: () {
                       Get.back();
                       Get.bottomSheet(
-                        const StreakFreezeSingleRowPreviewBottomSheet(),
+                        const StreakFreezeUseBottomSheet(),
                         isScrollControlled: true,
                       );
                     },

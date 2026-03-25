@@ -340,6 +340,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Streak in Gefahr?\\nDrück den Freeze-Button!';
 
   @override
+  String get streakFrozen => 'Streak eingefroren.';
+
+  @override
   String get streamStreaks => 'Stream-Streaks';
 
   @override

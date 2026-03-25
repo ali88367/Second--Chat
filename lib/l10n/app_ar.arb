@@ -186,6 +186,7 @@
     }
   },
   "appName": "Second Chat",
+  "streakFrozen": "تم تجميد السلسلة.",
   "notificationCardMessage": "ميزات جديدة متاحة!",
   "notificationCardTime": "9:41 AM",
   "notificationPermissionDisabledBody": "الإشعارات معطّلة. يمكنك تفعيلها من إعدادات النظام.",

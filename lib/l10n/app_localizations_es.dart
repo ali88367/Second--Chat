@@ -336,6 +336,9 @@ class AppLocalizationsEs extends AppLocalizations {
       '¿Racha en peligro?\\n¡Pulsa el botón de congelar!';
 
   @override
+  String get streakFrozen => 'Racha congelada.';
+
+  @override
   String get streamStreaks => 'Rachas de stream';
 
   @override

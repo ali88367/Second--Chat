@@ -338,6 +338,9 @@ class AppLocalizationsFr extends AppLocalizations {
       'Série en danger ?\\nAppuyez sur le bouton de gel !';
 
   @override
+  String get streakFrozen => 'Série gelée.';
+
+  @override
   String get streamStreaks => 'Séries de stream';
 
   @override

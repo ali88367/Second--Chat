@@ -331,6 +331,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'السلسلة في خطر؟\\nاضغط زر التجميد!';
 
   @override
+  String get streakFrozen => 'تم تجميد السلسلة.';
+
+  @override
   String get streamStreaks => 'سلاسل البث';
 
   @override

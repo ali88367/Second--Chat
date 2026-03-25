@@ -186,6 +186,7 @@
     }
   },
   "appName": "Second Chat",
+  "streakFrozen": "Sequência congelada.",
   "notificationCardMessage": "Novos recursos disponíveis!",
   "notificationCardTime": "9:41 AM",
   "notificationPermissionDisabledBody": "As notificações estão desativadas. Você pode ativá-las nas configurações do sistema.",

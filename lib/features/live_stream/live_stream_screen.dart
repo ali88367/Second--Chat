@@ -13,6 +13,7 @@ import '../../../controllers/auth_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
+import '../Streaks/Compact_freeze.dart';
 import '../Streaks/Freeze_bottomsheet.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
@@ -41,6 +42,7 @@ class _LivestreamingState extends State<Livestreaming> {
 
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
   bool _streakCompletionChecked = false;
+  bool _streakSheetOpening = false;
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
@@ -132,6 +134,29 @@ class _LivestreamingState extends State<Livestreaming> {
     return const [];
   }
 
+  bool _extractIsInDanger(dynamic payload) {
+    dynamic data = payload;
+    if (data is Map && data['data'] != null) {
+      data = data['data'];
+    }
+    if (data is Map) {
+      bool asBool(dynamic v) {
+        if (v is bool) return v;
+        if (v is num) return v != 0;
+        if (v is String) {
+          final s = v.trim().toLowerCase();
+          return s == 'true' || s == '1' || s == 'yes';
+        }
+        return false;
+      }
+
+      final status = (data['status'] ?? '').toString().trim().toLowerCase();
+      final raw = data['isInDanger'];
+      return asBool(raw) || status == 'danger';
+    }
+    return false;
+  }
+
   Future<void> _maybeCompleteStreakForToday() async {
     if (_streakCompletionChecked) return;
     _streakCompletionChecked = true;
@@ -180,6 +205,87 @@ class _LivestreamingState extends State<Livestreaming> {
       }
     } catch (e) {
       debugPrint('STREAK COMPLETE ERROR: $e');
+    }
+  }
+
+  Future<void> _openStreakSheet() async {
+    if (_streakSheetOpening) return;
+    _streakSheetOpening = true;
+    try {
+      final auth = Get.find<AuthController>();
+      final tokens = await auth.api.tokenStore.read();
+      final accessToken = tokens?.accessToken?.trim();
+      if (accessToken == null || accessToken.isEmpty) {
+        final l10n = context.l10n;
+        Get.snackbar(
+          l10n.sessionMissing,
+          l10n.sessionMissingMessage,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFF2C2C2E),
+          colorText: Colors.white,
+          margin: EdgeInsets.all(12.w),
+          duration: const Duration(seconds: 2),
+        );
+        return;
+      }
+
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      final inDanger = _extractIsInDanger(res.data);
+      if (!mounted) return;
+
+      if (inDanger) {
+        Get.bottomSheet(
+          const StreakFreezePreviewBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+      } else {
+        Get.bottomSheet(
+          const StreakFreezeSingleRowPreviewBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('STREAK STATUS ERROR: ${e.response?.data ?? e.message}');
+      final l10n = context.l10n;
+      Get.snackbar(
+        l10n.connectionIssue,
+        l10n.pleaseTryAgain,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF2C2C2E),
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12.w),
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      debugPrint('STREAK STATUS ERROR: $e');
+      final l10n = context.l10n;
+      Get.snackbar(
+        l10n.connectionIssue,
+        l10n.pleaseTryAgain,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF2C2C2E),
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12.w),
+        duration: const Duration(seconds: 2),
+      );
+    } finally {
+      _streakSheetOpening = false;
     }
   }
 
@@ -690,21 +796,7 @@ class _LivestreamingState extends State<Livestreaming> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          Get.bottomSheet(
-                            const StreakFreezePreviewBottomSheet(),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            backgroundColor: Colors.transparent,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          );
-                        },
+                        onTap: _openStreakSheet,
                         child: buildImageButton(
                           'assets/images/streak_icon.png',
                           width: 72.w,

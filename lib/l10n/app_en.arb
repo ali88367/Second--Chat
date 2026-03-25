@@ -109,6 +109,7 @@
   "skip": "Skip",
   "startMy14DayFreeTrial": "Start My 14 Day Free Trial",
   "streakInDangerHitFreezeButton": "Streak in danger? Hit the freeze button!",
+  "streakFrozen": "Streak frozen.",
   "streamStreaks": "Stream Streaks",
   "streamStreak": "Stream Streak",
   "subscribe": "Subscribe",
@@ -179,7 +180,7 @@
       "premium": {}
     }
   },
-  "howYourPremiumFreeTrialWorks": "How your {premium}\\nfree trial works",
+  "howYourPremiumFreeTrialWorks": "How your {premium} free trial works",
   "@howYourPremiumFreeTrialWorks": {
     "placeholders": {
       "premium": {}
