@@ -164,6 +164,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get loadingSettings => 'Carregando configurações…';
 
   @override
+  String get checkingSession => 'Verificando sessão…';
+
+  @override
   String get connectionIssue => 'Problema de conexão';
 
   @override

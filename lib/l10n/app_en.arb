@@ -54,6 +54,7 @@
   "letsGo": "Let's go",
   "loadingEmotes": "Loading emotes...",
   "loadingSettings": "Loading settings...",
+  "checkingSession": "Checking session...",
   "connectionIssue": "Connection issue",
   "couldntConnectPleaseTryAgain": "We couldn't connect. Please try again.",
   "couldntOpenLoginPagePleaseTryAgain": "We couldn't open the login page. Please try again.",

@@ -10,11 +10,12 @@ import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
+import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
 import 'core/constants/constants.dart';
+import 'core/localization/l10n.dart';
 import 'core/utils/debug_tokens.dart';
 
 void main() async {
@@ -280,40 +281,170 @@ class StartupGate extends StatefulWidget {
 }
 
 class _StartupGateState extends State<StartupGate> {
-  late final Future<bool> _hasTokensFuture;
+  @override
+  Widget build(BuildContext context) {
+    final auth = Get.find<AuthController>();
+    return Obx(() {
+      if (!auth.isReady.value) {
+        return const _SessionCheckLoader();
+      }
+
+      if (auth.isAuthenticated.value) {
+        return const Livestreaming();
+      }
+
+      return IntroScreen1(initialController: widget.introVideoController);
+    });
+  }
+}
+
+class _SessionCheckLoader extends StatefulWidget {
+  const _SessionCheckLoader();
 
   @override
-  void initState() {
-    super.initState();
-    _hasTokensFuture = _hasStoredTokens();
-  }
+  State<_SessionCheckLoader> createState() => _SessionCheckLoaderState();
+}
 
-  Future<bool> _hasStoredTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    final accessToken = prefs.getString('second_chat.access_token') ?? '';
-    final refreshToken = prefs.getString('second_chat.refresh_token') ?? '';
-    return accessToken.isNotEmpty && refreshToken.isNotEmpty;
+class _SessionCheckLoaderState extends State<_SessionCheckLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat();
+
+  late final Animation<double> _rotate = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.linear,
+  );
+
+  late final Animation<double> _pulse = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOut,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _hasTokensFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF0A0A0A),
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final hasTokens = snapshot.data == true;
-        if (hasTokens) {
-          return const HomeScreen2();
-        }
-
-        return IntroScreen1(initialController: widget.introVideoController);
-      },
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.2),
+            radius: 1.1,
+            colors: [
+              Color(0xFF1B1B25),
+              Color(0xFF0A0A0A),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 160.w,
+                  height: 160.w,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ScaleTransition(
+                        scale: Tween<double>(begin: 0.9, end: 1.1).animate(
+                          _pulse,
+                        ),
+                        child: Container(
+                          width: 140.w,
+                          height: 140.w,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                const Color(0xFFFFE6A7).withOpacity(0.25),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 90.w,
+                        height: 90.w,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFFFE6A7),
+                            width: 3.w,
+                          ),
+                        ),
+                      ),
+                      RotationTransition(
+                        turns: _rotate,
+                        child: SizedBox(
+                          width: 90.w,
+                          height: 90.w,
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Container(
+                              width: 7.w,
+                              height: 7.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFFFE6A7),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFE6A7)
+                                        .withOpacity(0.7),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 58.w,
+                        height: 58.w,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: goldGradient,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFE6A7).withOpacity(0.5),
+                              blurRadius: 18,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(12.w),
+                          child: Image.asset('assets/icons/loader_icon.png'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                Text(
+                  context.l10n.checkingSession,
+                  style: TextStyle(
+                    color: textInverse.withOpacity(0.78),
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

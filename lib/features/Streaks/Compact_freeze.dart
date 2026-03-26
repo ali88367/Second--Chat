@@ -1,5 +1,3 @@
-import 'package:dio/dio.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -7,7 +5,7 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
-import '../../controllers/auth_controller.dart';
+import 'Freeze_bottomsheet.dart';
 
 class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
   const StreakFreezeSingleRowPreviewBottomSheet({super.key});
@@ -25,9 +23,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   late Animation<double> _glowPulse;
   late Animation<double> _fireJitter;
   bool _framesPreloaded = false;
-  bool _isLoading = false;
-  _StreakSnapshot? _streak;
-  late List<CellType> _rowData;
+  late final StreamStreaksController _streakCtrl;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
@@ -37,7 +33,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   @override
   void initState() {
     super.initState();
-    _rowData = List.generate(days, (_) => CellType.cross);
+    _streakCtrl = Get.find<StreamStreaksController>();
     _fireController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -63,7 +59,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       end: -8.h,
     ).animate(CurvedAnimation(parent: _fireController, curve: Curves.bounceIn));
 
-    _loadStreak();
+    _streakCtrl.fetchCurrentStreak(silent: true);
   }
 
   @override
@@ -205,62 +201,6 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
     return groups;
   }
 
-  Future<void> _loadStreak() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-    try {
-      final auth = Get.find<AuthController>();
-      final tokens = await auth.api.tokenStore.read();
-      final accessToken = tokens?.accessToken?.trim();
-      if (accessToken == null || accessToken.isEmpty) return;
-
-      final res = await auth.api.client.dio.get<dynamic>(
-        '/api/v1/streak',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
-      );
-      final snapshot = _StreakSnapshot.fromPayload(res.data);
-      _applySnapshot(snapshot);
-    } on DioException catch (e) {
-      debugPrint('STREAK LOAD ERROR: ${e.response?.data ?? e.message}');
-    } catch (e) {
-      debugPrint('STREAK LOAD ERROR: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _applySnapshot(_StreakSnapshot snapshot) {
-    if (!mounted) return;
-    setState(() {
-      _streak = snapshot;
-      _rowData = _buildRow(snapshot);
-    });
-  }
-
-  List<CellType> _buildRow(_StreakSnapshot snapshot) {
-    const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-    final selected = snapshot.selectedDays
-        .map((d) => d.toLowerCase().trim())
-        .where((d) => d.isNotEmpty)
-        .toSet();
-    int completed = snapshot.completedThisWeek;
-
-    return ordered.map((day) {
-      if (selected.contains(day)) {
-        if (completed > 0) {
-          completed--;
-          return CellType.tick;
-        }
-        return CellType.dot;
-      }
-      return CellType.cross;
-    }).toList();
-  }
-
   Widget _row(List<CellType> rowData, double totalWidth) {
     final groups = _getTickGroups(rowData);
 
@@ -300,73 +240,78 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
 
   @override
   Widget build(BuildContext context) {
-    final longestStreak = _streak?.longestStreak ?? 0;
-    return Container(
-      height: Get.height * 0.91,
-      decoration: BoxDecoration(
-        color: bottomSheetGrey,
-        // UPDATED: Increased border radius for better visibility
-        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
-      ),
-      child: ClipRRect(
-        // UPDATED: Increased border radius for better visibility
-        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          bottomSheet: Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              left: 16.w,
-              right: 16.w,
-              bottom: MediaQuery.of(context).viewPadding.bottom,
-            ),
-            color: bottomSheetGrey,
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                height: 50.h,
-                child: ElevatedButton(
-                  onPressed: () => Get.back(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(36.r),
+    return Obx(() {
+      final streak = _streakCtrl.streak;
+      final longestStreak = streak?.longestStreak ?? 0;
+      final rowData = _streakCtrl.buildCurrentWeekRow();
+      final isLoading = _streakCtrl.isLoading.value;
+
+      return Container(
+        height: Get.height * 0.91,
+        decoration: BoxDecoration(
+          color: bottomSheetGrey,
+          // UPDATED: Increased border radius for better visibility
+          borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
+        ),
+        child: ClipRRect(
+          // UPDATED: Increased border radius for better visibility
+          borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            bottomSheet: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                left: 16.w,
+                right: 16.w,
+                bottom: MediaQuery.of(context).viewPadding.bottom,
+              ),
+              color: bottomSheetGrey,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: 50.h,
+                  child: ElevatedButton(
+                    onPressed: () => Get.back(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(36.r),
+                      ),
+                      padding: EdgeInsets.zero,
                     ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: Text(
-                    context.l10n.done,
-                    style: sfProText600(17.sp, Colors.black),
+                    child: Text(
+                      context.l10n.done,
+                      style: sfProText600(17.sp, Colors.black),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.only(
-              bottom: 80.h + MediaQuery.of(context).viewPadding.bottom,
-            ),
-            child: Column(
-              children: [
-                _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
-                // SizedBox(height: 12.h), // Removed/Adjusted for drag handle
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      InkWell(
-                        onTap: () => Get.back(),
-                        child: Image.asset(
-                          'assets/icons/x_icon.png',
-                          height: 44.h,
+            body: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.only(
+                bottom: 80.h + MediaQuery.of(context).viewPadding.bottom,
+              ),
+              child: Column(
+                children: [
+                  _buildDragHandle(), // ADDED: Drag handle (bottom sheet bar)
+                  // SizedBox(height: 12.h), // Removed/Adjusted for drag handle
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        InkWell(
+                          onTap: () => Get.back(),
+                          child: Image.asset(
+                            'assets/icons/x_icon.png',
+                            height: 44.h,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 44.w),
-                    ],
+                        SizedBox(width: 44.w),
+                      ],
+                    ),
                   ),
-                ),
 
                 // --- ANIMATED FIRE SECTION ---
                 RepaintBoundary(
@@ -479,10 +424,12 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                 SizedBox(height: 10.h),
 
                 Text(
-                  context.l10n.dayStreak,
+                  streak == null
+                      ? context.l10n.dayStreak
+                      : '${streak.currentStreak} ${context.l10n.dayStreak}',
                   style: sfProDisplay600(34.sp, Colors.white),
                 ),
-                if (_isLoading) ...[
+                if (isLoading) ...[
                   SizedBox(height: 6.h),
                   SizedBox(
                     width: 18.w,
@@ -501,52 +448,73 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                 SizedBox(height: 20.h),
 
                 // --- CALENDAR CARD (Static) ---
-                Container(
-                  width: 361.w,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding.w,
-                    vertical: 16.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1D20),
-                    borderRadius: BorderRadius.circular(24.r),
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final totalWidth = constraints.maxWidth;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children:
-                                [
-                                  'Mon',
-                                  'Tue',
-                                  'Wed',
-                                  'Thur',
-                                  'Fri',
-                                  'Sat',
-                                  'Sun',
-                                ].map((d) {
-                                  return Expanded(
-                                    child: Center(
-                                      child: Text(
-                                        d,
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          color: const Color(0xFF8E8E93),
-                                          fontSize: 13.sp,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap:
+                      streak == null
+                          ? null
+                          : () {
+                            Get.bottomSheet(
+                              const StreakFreezePreviewBottomSheet(),
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              enableDrag: true,
+                              backgroundColor: Colors.transparent,
+                              enterBottomSheetDuration: const Duration(
+                                milliseconds: 300,
+                              ),
+                              exitBottomSheetDuration: const Duration(
+                                milliseconds: 250,
+                              ),
+                            );
+                          },
+                  child: Container(
+                    width: 361.w,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding.w,
+                      vertical: 16.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1D20),
+                      borderRadius: BorderRadius.circular(24.r),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final totalWidth = constraints.maxWidth;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children:
+                                  [
+                                    'Mon',
+                                    'Tue',
+                                    'Wed',
+                                    'Thur',
+                                    'Fri',
+                                    'Sat',
+                                    'Sun',
+                                  ].map((d) {
+                                    return Expanded(
+                                      child: Center(
+                                        child: Text(
+                                          d,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            color: const Color(0xFF8E8E93),
+                                            fontSize: 13.sp,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                }).toList(),
-                          ),
-                          SizedBox(height: 16.h),
-                          _row(_rowData, totalWidth),
-                        ],
-                      );
-                    },
+                                    );
+                                  }).toList(),
+                            ),
+                            SizedBox(height: 16.h),
+                            _row(rowData, totalWidth),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
                 SizedBox(height: 40.h),
@@ -554,62 +522,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StreakSnapshot {
-  const _StreakSnapshot({
-    required this.currentStreak,
-    required this.longestStreak,
-    required this.selectedDays,
-    required this.completedThisWeek,
-  });
-
-  final int currentStreak;
-  final int longestStreak;
-  final List<String> selectedDays;
-  final int completedThisWeek;
-
-  factory _StreakSnapshot.empty() => const _StreakSnapshot(
-        currentStreak: 0,
-        longestStreak: 0,
-        selectedDays: <String>[],
-        completedThisWeek: 0,
-      );
-
-  factory _StreakSnapshot.fromPayload(dynamic payload) {
-    dynamic data = payload;
-    if (data is Map && data['data'] != null) {
-      data = data['data'];
-    }
-    if (data is Map) {
-      return _StreakSnapshot(
-        currentStreak: _asInt(data['currentStreak']),
-        longestStreak: _asInt(data['longestStreak']),
-        selectedDays: _asStringList(data['selectedDays']),
-        completedThisWeek: _asInt(data['completedThisWeek']),
-      );
-    }
-    return _StreakSnapshot.empty();
-  }
-
-  static int _asInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value.trim()) ?? fallback;
-    return fallback;
-  }
-
-  static List<String> _asStringList(dynamic value) {
-    if (value is List) {
-      return value
-          .map((e) => e.toString().trim().toLowerCase())
-          .map((e) => e == 'thur' ? 'thu' : e)
-          .where((e) => e.isNotEmpty)
-          .toList();
-    }
-    return const [];
+      ));
+    });
   }
 }

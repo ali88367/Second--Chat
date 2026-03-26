@@ -163,6 +163,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loadingSettings => 'Chargement des paramètres…';
 
   @override
+  String get checkingSession => 'Vérification de la session…';
+
+  @override
   String get connectionIssue => 'Problème de connexion';
 
   @override

@@ -400,6 +400,12 @@ abstract class AppLocalizations {
   /// **'Loading settings...'**
   String get loadingSettings;
 
+  /// No description provided for @checkingSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking session...'**
+  String get checkingSession;
+
   /// No description provided for @connectionIssue.
   ///
   /// In en, this message translates to:

@@ -163,6 +163,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loadingSettings => 'Einstellungen werden geladen…';
 
   @override
+  String get checkingSession => 'Sitzung wird überprüft…';
+
+  @override
   String get connectionIssue => 'Verbindungsproblem';
 
   @override

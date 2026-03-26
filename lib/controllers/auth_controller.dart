@@ -48,14 +48,83 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   Future<void> _bootstrap() async {
     await _oauthFlow.init();
 
-    final tokens = await _api.tokenStore.read();
-    isAuthenticated.value = tokens != null;
-
-    if (tokens != null) {
+    final hasSession = await ensureValidSession(refreshIfExpired: true);
+    if (hasSession) {
       await refreshMe(silent: true);
     }
 
     isReady.value = true;
+  }
+
+  static const Duration _tokenExpiryLeeway = Duration(seconds: 30);
+
+  bool _isTokenExpired(SessionTokens tokens) {
+    final expiresAt = tokens.accessTokenExpiresAt;
+    if (expiresAt == null) return false;
+    final now = DateTime.now().toUtc();
+    return expiresAt.toUtc().isBefore(now.add(_tokenExpiryLeeway));
+  }
+
+  Future<void> _persistSessionTokensToPrefs(SessionTokens tokens) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPrefsAccessToken, tokens.accessToken);
+    await prefs.setString(_kPrefsRefreshToken, tokens.refreshToken);
+  }
+
+  Future<void> _clearSessionTokensFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kPrefsAccessToken);
+    await prefs.remove(_kPrefsRefreshToken);
+  }
+
+  Future<bool> ensureValidSession({bool refreshIfExpired = true}) async {
+    final tokens = await _api.tokenStore.read();
+    if (tokens == null) {
+      isAuthenticated.value = false;
+      me.value = null;
+      await _clearSessionTokensFromPrefs();
+      return false;
+    }
+
+    if (_isTokenExpired(tokens)) {
+      if (!refreshIfExpired) {
+        await _api.tokenStore.clear();
+        await _clearSessionTokensFromPrefs();
+        isAuthenticated.value = false;
+        me.value = null;
+        return false;
+      }
+
+      try {
+        final refreshed = await authApi.refresh(tokens.refreshToken);
+        await _api.tokenStore.write(refreshed);
+        await _persistSessionTokensToPrefs(refreshed);
+        isAuthenticated.value = true;
+        return true;
+      } on DioException catch (e) {
+        final status = e.response?.statusCode;
+        if (status == 401 || status == 403) {
+          await _api.tokenStore.clear();
+          await _clearSessionTokensFromPrefs();
+          isAuthenticated.value = false;
+          me.value = null;
+          return false;
+        }
+        if (kDebugMode) debugPrint('API ERROR(refresh): $e');
+        isAuthenticated.value = true;
+        return true;
+      } catch (e) {
+        if (kDebugMode) debugPrint('API ERROR(refresh): $e');
+        await _api.tokenStore.clear();
+        await _clearSessionTokensFromPrefs();
+        isAuthenticated.value = false;
+        me.value = null;
+        return false;
+      }
+    }
+
+    isAuthenticated.value = true;
+    return true;
   }
 
   Future<void> refreshMe({bool silent = false}) async {
@@ -68,6 +137,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       if (kDebugMode) debugPrint('API ERROR(me): $e');
       if (e is DioException && e.response?.statusCode == 401) {
         await _api.tokenStore.clear();
+        await _clearSessionTokensFromPrefs();
         isAuthenticated.value = false;
         me.value = null;
       }
@@ -81,6 +151,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     try {
       final tokens = await authApi.login(email: email, password: password);
       await _api.tokenStore.write(tokens);
+      await _persistSessionTokensToPrefs(tokens);
       isAuthenticated.value = true;
       lastError.value = null;
       await refreshMe(silent: true);
@@ -96,6 +167,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       await authApi.logout();
     } catch (_) {}
     await _api.tokenStore.clear();
+    await _clearSessionTokensFromPrefs();
     isAuthenticated.value = false;
     me.value = null;
     lastError.value = null;

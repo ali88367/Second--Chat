@@ -1,20 +1,19 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
-import '../../../controllers/auth_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
 import '../Streaks/Compact_freeze.dart';
 import '../Streaks/Freeze_bottomsheet.dart';
+import '../Streaks/Streaksbottomsheet.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
@@ -62,11 +61,13 @@ class _LivestreamingState extends State<Livestreaming> {
   final ScrollController _activityScrollController = ScrollController();
 
   late final SettingsController _settingsCtrl;
+  late final StreamStreaksController _streakCtrl;
 
   @override
   void initState() {
     super.initState();
     _settingsCtrl = Get.find<SettingsController>();
+    _streakCtrl = Get.find<StreamStreaksController>();
     _chatFilter.addListener(_updateImageBasedOnFilter);
     _maybeCompleteStreakForToday();
   }
@@ -88,121 +89,15 @@ class _LivestreamingState extends State<Livestreaming> {
     }
   }
 
-  String _dateKey(DateTime date) {
-    final y = date.year.toString().padLeft(4, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final d = date.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
-  }
-
-  String _weekdayKey(DateTime date) {
-    switch (date.weekday) {
-      case DateTime.monday:
-        return 'mon';
-      case DateTime.tuesday:
-        return 'tue';
-      case DateTime.wednesday:
-        return 'wed';
-      case DateTime.thursday:
-        return 'thu';
-      case DateTime.friday:
-        return 'fri';
-      case DateTime.saturday:
-        return 'sat';
-      case DateTime.sunday:
-        return 'sun';
-      default:
-        return 'mon';
-    }
-  }
-
-  List<String> _extractSelectedDays(dynamic payload) {
-    dynamic data = payload;
-    if (data is Map && data['data'] != null) {
-      data = data['data'];
-    }
-    if (data is Map) {
-      final raw = data['selectedDays'];
-      if (raw is List) {
-        return raw
-            .map((e) => e.toString().trim().toLowerCase())
-            .map((e) => e == 'thur' ? 'thu' : e)
-            .where((e) => e.isNotEmpty)
-            .toList();
-      }
-    }
-    return const [];
-  }
-
-  bool _extractIsInDanger(dynamic payload) {
-    dynamic data = payload;
-    if (data is Map && data['data'] != null) {
-      data = data['data'];
-    }
-    if (data is Map) {
-      bool asBool(dynamic v) {
-        if (v is bool) return v;
-        if (v is num) return v != 0;
-        if (v is String) {
-          final s = v.trim().toLowerCase();
-          return s == 'true' || s == '1' || s == 'yes';
-        }
-        return false;
-      }
-
-      final status = (data['status'] ?? '').toString().trim().toLowerCase();
-      final raw = data['isInDanger'];
-      return asBool(raw) || status == 'danger';
-    }
-    return false;
-  }
-
   Future<void> _maybeCompleteStreakForToday() async {
     if (_streakCompletionChecked) return;
     _streakCompletionChecked = true;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final todayKey = _dateKey(DateTime.now());
-      const prefKey = 'second_chat.streak_complete_date';
-      if (prefs.getString(prefKey) == todayKey) return;
-
-      final auth = Get.find<AuthController>();
-      final tokens = await auth.api.tokenStore.read();
-      final accessToken = tokens?.accessToken.trim();
-      if (accessToken == null || accessToken.isEmpty) return;
-
-      final res = await auth.api.client.dio.get<dynamic>(
-        '/api/v1/streak',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+      await _streakCtrl.markStreakComplete(
+        date: DateTime.now(),
+        showErrors: false,
       );
-      final selectedDays = _extractSelectedDays(res.data);
-      final todayDay = _weekdayKey(DateTime.now());
-      if (!selectedDays.contains(todayDay)) return;
-
-      await auth.api.client.dio.post<dynamic>(
-        '/api/v1/streak/complete',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
-      );
-      await prefs.setString(prefKey, todayKey);
-    } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      if (status == 404) {
-        return;
-      }
-      if (status == 409 || status == 400) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-          'second_chat.streak_complete_date',
-          _dateKey(DateTime.now()),
-        );
-      } else {
-        debugPrint('STREAK COMPLETE ERROR: ${e.response?.data ?? e.message}');
-      }
     } catch (e) {
       debugPrint('STREAK COMPLETE ERROR: $e');
     }
@@ -212,34 +107,28 @@ class _LivestreamingState extends State<Livestreaming> {
     if (_streakSheetOpening) return;
     _streakSheetOpening = true;
     try {
-      final auth = Get.find<AuthController>();
-      final tokens = await auth.api.tokenStore.read();
-      final accessToken = tokens?.accessToken?.trim();
-      if (accessToken == null || accessToken.isEmpty) {
-        final l10n = context.l10n;
-        Get.snackbar(
-          l10n.sessionMissing,
-          l10n.sessionMissingMessage,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF2C2C2E),
-          colorText: Colors.white,
-          margin: EdgeInsets.all(12.w),
-          duration: const Duration(seconds: 2),
-        );
-        return;
-      }
+      final hasSession = await _streakCtrl.ensureSession(showErrors: true);
+      if (!hasSession || !mounted) return;
 
-      final res = await auth.api.client.dio.get<dynamic>(
-        '/api/v1/streak',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+      final streak = await _streakCtrl.fetchCurrentStreak(
+        force: true,
+        silent: false,
       );
-
-      final inDanger = _extractIsInDanger(res.data);
       if (!mounted) return;
 
-      if (inDanger) {
+      if (streak == null) {
+        Get.bottomSheet(
+          const StreamStreakSetupBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        ).then((_) {
+          _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+        });
+      } else if (streak.isInDanger) {
         Get.bottomSheet(
           const StreakFreezePreviewBottomSheet(),
           isDismissible: true,
@@ -260,30 +149,6 @@ class _LivestreamingState extends State<Livestreaming> {
           exitBottomSheetDuration: const Duration(milliseconds: 250),
         );
       }
-    } on DioException catch (e) {
-      debugPrint('STREAK STATUS ERROR: ${e.response?.data ?? e.message}');
-      final l10n = context.l10n;
-      Get.snackbar(
-        l10n.connectionIssue,
-        l10n.pleaseTryAgain,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF2C2C2E),
-        colorText: Colors.white,
-        margin: EdgeInsets.all(12.w),
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      debugPrint('STREAK STATUS ERROR: $e');
-      final l10n = context.l10n;
-      Get.snackbar(
-        l10n.connectionIssue,
-        l10n.pleaseTryAgain,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF2C2C2E),
-        colorText: Colors.white,
-        margin: EdgeInsets.all(12.w),
-        duration: const Duration(seconds: 2),
-      );
     } finally {
       _streakSheetOpening = false;
     }

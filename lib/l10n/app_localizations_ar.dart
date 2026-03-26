@@ -159,6 +159,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loadingSettings => 'جارٍ تحميل الإعدادات...';
 
   @override
+  String get checkingSession => 'جارٍ التحقق من الجلسة...';
+
+  @override
   String get connectionIssue => 'مشكلة في الاتصال';
 
   @override

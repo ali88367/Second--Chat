@@ -162,6 +162,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get loadingSettings => 'Cargando configuración…';
 
   @override
+  String get checkingSession => 'Comprobando sesión…';
+
+  @override
   String get connectionIssue => 'Problema de conexión';
 
   @override

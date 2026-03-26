@@ -54,6 +54,7 @@
   "letsGo": "Los geht’s",
   "loadingEmotes": "Emotes werden geladen…",
   "loadingSettings": "Einstellungen werden geladen…",
+  "checkingSession": "Sitzung wird überprüft…",
   "connectionIssue": "Verbindungsproblem",
   "couldntConnectPleaseTryAgain": "Wir konnten keine Verbindung herstellen. Bitte versuche es erneut.",
   "couldntOpenLoginPagePleaseTryAgain": "Wir konnten die Anmeldeseite nicht öffnen. Bitte versuche es erneut.",

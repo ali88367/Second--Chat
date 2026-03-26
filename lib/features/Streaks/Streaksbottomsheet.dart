@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -9,9 +8,7 @@ import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/widgets/custom_switch.dart';
 
 import '../../3timewidget.dart';
-import '../../controllers/auth_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
-import 'Freeze_bottomsheet.dart';
 
 class StreamStreakSetupBottomSheet extends StatefulWidget {
   const StreamStreakSetupBottomSheet({super.key});
@@ -30,12 +27,15 @@ class _StreamStreakSetupBottomSheetState
   late Animation<double> _opacityAnimation;
   bool _framesPreloaded = false;
   bool _isSubmitting = false;
+  late final StreamStreaksController _streakCtrl;
 
   static const int totalFrames = 90; // Frames from 0001 to 0119
 
   @override
   void initState() {
     super.initState();
+    _streakCtrl = Get.find<StreamStreaksController>();
+    _streakCtrl.resetSelection();
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -103,76 +103,17 @@ class _StreamStreakSetupBottomSheetState
     super.dispose();
   }
 
-  List<String> _selectedDaysPayload(StreamStreaksController controller) {
-    const ordered = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
-    const map = {
-      'Mon': 'mon',
-      'Tue': 'tue',
-      'Wed': 'wed',
-      'Thur': 'thu',
-      'Fri': 'fri',
-      'Sat': 'sat',
-      'Sun': 'sun',
-    };
-    return ordered
-        .where((day) => controller.selectedDays[day] == true)
-        .map((day) => map[day]!)
-        .toList();
-  }
-
   Future<bool> _createStreak(StreamStreaksController controller) async {
     if (_isSubmitting) return false;
     setState(() => _isSubmitting = true);
     try {
-      final auth = Get.find<AuthController>();
-      final tokens = await auth.api.tokenStore.read();
-      final accessToken = tokens?.accessToken?.trim();
-      if (accessToken == null || accessToken.isEmpty) {
-        final l10n = context.l10n;
-        Get.snackbar(
-          l10n.sessionMissing,
-          l10n.sessionMissingMessage,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF2C2C2E),
-          colorText: Colors.white,
-          margin: EdgeInsets.all(12.w),
-          duration: const Duration(seconds: 2),
-        );
-        return false;
-      }
-
-      final selectedDays = _selectedDaysPayload(controller);
+      final selectedDays = controller.selectedDaysPayload();
       final targetDaysPerWeek = selectedDays.length;
-
-      await auth.api.client.dio.post<dynamic>(
-        '/api/v1/streak',
-        data: {
-          'selectedDays': selectedDays,
-          'targetDaysPerWeek': targetDaysPerWeek,
-        },
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+      return await controller.createStreak(
+        selectedDays: selectedDays,
+        targetDaysPerWeek: targetDaysPerWeek,
+        showErrors: true,
       );
-
-      return true;
-    } catch (e) {
-      final l10n = context.l10n;
-      Get.snackbar(
-        l10n.connectionIssue,
-        l10n.pleaseTryAgain,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF2C2C2E),
-        colorText: Colors.white,
-        margin: EdgeInsets.all(12.w),
-        duration: const Duration(seconds: 2),
-      );
-      if (e is DioException) {
-        debugPrint('STREAK CREATE ERROR: ${e.response?.data}');
-      } else {
-        debugPrint('STREAK CREATE ERROR: $e');
-      }
-      return false;
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -199,7 +140,7 @@ class _StreamStreakSetupBottomSheetState
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StreamStreaksController());
+    final controller = _streakCtrl;
 
     return Container(
       height: Get.height * 0.9,

@@ -1,16 +1,17 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
+import 'package:second_chat/features/Streaks/Compact_freeze.dart';
+import 'package:second_chat/features/Streaks/Freeze_bottomsheet.dart';
 import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
-import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
@@ -30,6 +31,95 @@ class _HomeScreen2State extends State<HomeScreen2> {
       119; // FIreAnimation2 frames from 0001 to 0119
   static const int streamStreakFrames =
       90; // Fire3 frames used in StreamStreakSetupBottomSheet
+  late final StreamStreaksController _streakCtrl;
+  bool _streakSheetOpening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _streakCtrl = Get.find<StreamStreaksController>();
+    _loadStreakOnLaunch();
+  }
+
+  Future<void> _loadStreakOnLaunch() async {
+    final hasSession = await _streakCtrl.ensureSession(showErrors: false);
+    if (!hasSession) return;
+
+    final streak = await _streakCtrl.fetchCurrentStreak(
+      force: true,
+      silent: true,
+    );
+    if (!mounted || streak != null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _streakSheetOpening) return;
+      _streakSheetOpening = true;
+      try {
+        await Get.bottomSheet(
+          const StreamStreakSetupBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+      } finally {
+        _streakSheetOpening = false;
+        _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+      }
+    });
+  }
+
+  Future<void> _openStreakSheet() async {
+    if (_streakSheetOpening) return;
+    _streakSheetOpening = true;
+    try {
+      final hasSession = await _streakCtrl.ensureSession(showErrors: true);
+      if (!hasSession || !mounted) return;
+
+      final streak = await _streakCtrl.fetchCurrentStreak(
+        force: true,
+        silent: false,
+      );
+      if (!mounted) return;
+
+      if (streak == null) {
+        await Get.bottomSheet(
+          const StreamStreakSetupBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+        await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+      } else if (streak.isInDanger) {
+        await Get.bottomSheet(
+          const StreakFreezePreviewBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+      } else {
+        await Get.bottomSheet(
+          const StreakFreezeSingleRowPreviewBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+      }
+    } finally {
+      _streakSheetOpening = false;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -250,30 +340,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
                   Row(
                     children: [
                       InkWell(
-                        onTap: () {
-                          Get.bottomSheet(
-                            Container(
-                              height: Get.height * .8,
-                              decoration: BoxDecoration(
-                                color: bottomSheetGrey,
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(18.r),
-                                  topLeft: Radius.circular(18.r),
-                                ),
-                              ),
-                              child: StreamStreakSetupBottomSheet(),
-                            ),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          );
-                        },
+                        onTap: _openStreakSheet,
                         child: _buildImageButton(
                           'assets/images/streak_icon.png',
                           width: 72.w,
@@ -393,9 +460,9 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
   bool _streamServiceAdded = false;
   bool _settingsOpened = false;
   bool _streaksCustomized = false;
-  bool _streakExists = false;
   bool _streakLoading = false;
   late final SettingsController _settingsCtrl;
+  late final StreamStreaksController _streakCtrl;
 
   @override
   void initState() {
@@ -403,6 +470,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     _settingsCtrl = Get.isRegistered<SettingsController>()
         ? Get.find<SettingsController>()
         : Get.put(SettingsController());
+    _streakCtrl = Get.find<StreamStreaksController>();
     _settingsCtrl.loadSettingsIfNeeded();
     _checkStreakExists();
   }
@@ -411,31 +479,11 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     if (_streakLoading) return;
     setState(() => _streakLoading = true);
     try {
-      final auth = Get.find<AuthController>();
-      final tokens = await auth.api.tokenStore.read();
-      final accessToken = tokens?.accessToken?.trim();
-      if (accessToken == null || accessToken.isEmpty) {
-        _setStreakExists(false);
-        return;
-      }
-
-      final res = await auth.api.client.dio.get<dynamic>(
-        '/api/v1/streak',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+      final streak = await _streakCtrl.fetchCurrentStreak(
+        force: true,
+        silent: true,
       );
-
-      final exists = _extractStreakExists(res.data);
-      _setStreakExists(exists);
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
-        _setStreakExists(false);
-      } else {
-        debugPrint('STREAK CHECK ERROR: ${e.response?.data ?? e.message}');
-      }
-    } catch (e) {
-      debugPrint('STREAK CHECK ERROR: $e');
+      _setStreakExists(streak != null);
     } finally {
       if (mounted) {
         setState(() => _streakLoading = false);
@@ -446,62 +494,20 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
   void _setStreakExists(bool exists) {
     if (!mounted) return;
     setState(() {
-      _streakExists = exists;
       _streaksCustomized = exists;
     });
-  }
-
-  bool _extractStreakExists(dynamic payload) {
-    if (payload == null) return false;
-    if (payload is bool) return payload;
-    if (payload is List) return payload.isNotEmpty;
-    if (payload is Map) {
-      if (payload['success'] == false) return false;
-      final exists = payload['exists'];
-      if (exists is bool) return exists;
-      final hasStreak = payload['hasStreak'];
-      if (hasStreak is bool) return hasStreak;
-      if (payload.containsKey('data')) {
-        return _extractStreakExists(payload['data']);
-      }
-      if (payload.containsKey('streak')) {
-        return _extractStreakExists(payload['streak']);
-      }
-      final status = payload['status'];
-      if (status is String && status.toLowerCase() == 'inactive') return false;
-
-      final targetDays =
-          payload['targetDaysPerWeek'] ?? payload['target_days_per_week'];
-      final selectedDays = payload['selectedDays'] ?? payload['selected_days'];
-      final hasSelectedDays =
-          selectedDays is List && selectedDays.isNotEmpty;
-      final hasTargetDays = targetDays is num && targetDays > 0;
-      final hasSelectedDaysKey = payload.containsKey('selectedDays') ||
-          payload.containsKey('selected_days');
-      final hasTargetDaysKey = payload.containsKey('targetDaysPerWeek') ||
-          payload.containsKey('target_days_per_week');
-
-      // If there are no configured days or targets (e.g. streak == 0), treat as
-      // no streak so the user can create one.
-      if ((hasSelectedDaysKey || hasTargetDaysKey) &&
-          !hasSelectedDays &&
-          !hasTargetDays) {
-        return false;
-      }
-      if (payload['id'] != null) return true;
-      return payload.isNotEmpty;
-    }
-    return true;
   }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final notificationsEnabled = _settingsCtrl.notifications.value;
+      final hasStreak = _streakCtrl.hasStreak;
+      final streaksCustomized = hasStreak || _streaksCustomized;
       final completedCount = (notificationsEnabled ? 1 : 0) +
           (_streamServiceAdded ? 1 : 0) +
           (_settingsOpened ? 1 : 0) +
-          (_streaksCustomized ? 1 : 0);
+          (streaksCustomized ? 1 : 0);
       final isAllCompleted = completedCount == 4;
 
       return Stack(
@@ -681,7 +687,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                       // 4. Customisable streaks
                       InkWell(
                         onTap: () {
-                          if (_streakLoading || _streakExists) return;
+                          if (_streakLoading || hasStreak) return;
                           Get.bottomSheet(
                             Container(
                               height: Get.height * .9,
@@ -711,7 +717,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                           imagePath: 'assets/images/calendar.png',
                           title: context.l10n.customisableStreaks,
                           hasArrow: true,
-                          isChecked: _streaksCustomized,
+                          isChecked: streaksCustomized,
                         ),
                       ),
                     ],
@@ -782,9 +788,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
           ),
       ],
     );
-  }
-    );
-
+  });
   }
 
   Widget _buildMenuItem({

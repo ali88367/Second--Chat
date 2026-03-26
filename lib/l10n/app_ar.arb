@@ -54,6 +54,7 @@
   "letsGo": "هيا بنا",
   "loadingEmotes": "جارٍ تحميل الإيموتات...",
   "loadingSettings": "جارٍ تحميل الإعدادات...",
+  "checkingSession": "جارٍ التحقق من الجلسة...",
   "connectionIssue": "مشكلة في الاتصال",
   "couldntConnectPleaseTryAgain": "تعذر الاتصال. يرجى المحاولة مرة أخرى.",
   "couldntOpenLoginPagePleaseTryAgain": "تعذر فتح صفحة تسجيل الدخول. يرجى المحاولة مرة أخرى.",
