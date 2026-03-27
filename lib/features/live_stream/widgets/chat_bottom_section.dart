@@ -535,7 +535,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                     maxWidth: 200.w,
                   ),
                   child: CustomBlackGlassWidget(
-                    items: const ["All", "Twitch", "Kick", "YouTube"],
+                    items: [
+                      context.l10n.all,
+                      'Twitch',
+                      'Kick',
+                      'YouTube',
+                    ],
                     isWeek: false,
                     onItemSelected: (selected) {
                       // Convert selection to filter value
@@ -613,7 +618,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "All",
+                    context.l10n.all,
                     style: TextStyle(color: Colors.white, fontSize: 16.sp),
                   ),
                   Icon(
@@ -883,7 +888,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               setSheetState(() {});
                             },
                             child: pillButton(
-                              "Activity",
+                              context.l10n.activity,
                               isActive: active,
                               assetPath: 'assets/images/line.png',
                             ),
@@ -1153,7 +1158,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                           }
                         },
                         child: pillButton(
-                          "Activity",
+                          context.l10n.activity,
                           isActive: active,
                           assetPath: 'assets/images/line.png',
                         ),

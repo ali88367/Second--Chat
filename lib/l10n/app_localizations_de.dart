@@ -206,6 +206,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noRecentEmotes => 'Keine kürzlich verwendeten Emotes';
 
   @override
+  String get noStreamAtTheMoment => 'Derzeit kein Stream';
+
+  @override
   String get recent => '⭐ Zuletzt';
 
   @override

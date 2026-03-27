@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -74,7 +77,24 @@ void main() async {
     introVideoController = null;
   }
 
-  runApp(MyApp(introVideoController: introVideoController));
+  runZonedGuarded(() {
+    runApp(MyApp(introVideoController: introVideoController));
+  }, (Object error, StackTrace stack) {
+    // Ignore known WebView teardown race:
+    // "Unable to establish connection on channel: PigeonInternalInstanceManager.removeStrongReference"
+    // and similar WKWebView plugin channel messages.
+    if (error is PlatformException &&
+        error.message != null &&
+        (error.message!.contains(
+                'PigeonInternalInstanceManager.removeStrongReference') ||
+            error.message!.contains('PigeonInternalInstanceManager.clear') ||
+            error.message!.contains('WKWebViewConfiguration'))) {
+      return;
+    }
+    FlutterError.reportError(
+      FlutterErrorDetails(exception: error, stack: stack),
+    );
+  });
 }
 
 class MyApp extends StatelessWidget {

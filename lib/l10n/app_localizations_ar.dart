@@ -201,6 +201,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noRecentEmotes => 'لا توجد إيموتات حديثة';
 
   @override
+  String get noStreamAtTheMoment => 'لا يوجد بث في الوقت الحالي';
+
+  @override
   String get recent => '⭐ الأحدث';
 
   @override

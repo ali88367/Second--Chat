@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/models/session_tokens.dart';
 import 'token_store.dart';
@@ -15,19 +16,46 @@ class SecureTokenStore implements TokenStore {
 
   @override
   Future<SessionTokens?> read() async {
-    final accessToken = await _storage.read(key: _kAccessToken);
-    final refreshToken = await _storage.read(key: _kRefreshToken);
-    if (accessToken == null || accessToken.isEmpty) return null;
-    if (refreshToken == null || refreshToken.isEmpty) return null;
+    // 1) Try secure storage first.
+    final secureAccessToken = await _storage.read(key: _kAccessToken);
+    final secureRefreshToken = await _storage.read(key: _kRefreshToken);
+    if (secureAccessToken != null &&
+        secureAccessToken.isNotEmpty &&
+        secureRefreshToken != null &&
+        secureRefreshToken.isNotEmpty) {
+      final expiresAtRaw =
+          await _storage.read(key: _kAccessTokenExpiresAt);
+      final expiresAt = expiresAtRaw == null || expiresAtRaw.isEmpty
+          ? null
+          : DateTime.tryParse(expiresAtRaw);
 
-    final expiresAtRaw = await _storage.read(key: _kAccessTokenExpiresAt);
+      return SessionTokens(
+        accessToken: secureAccessToken,
+        refreshToken: secureRefreshToken,
+        accessTokenExpiresAt: expiresAt,
+      );
+    }
+
+    // 2) Fallback to SharedPreferences when secure storage is empty.
+    // This allows the app to recover tokens and refresh them.
+    final prefs = await SharedPreferences.getInstance();
+    final prefsAccessToken = prefs.getString(_kAccessToken)?.trim();
+    final prefsRefreshToken = prefs.getString(_kRefreshToken)?.trim();
+    if (prefsAccessToken == null ||
+        prefsAccessToken.isEmpty ||
+        prefsRefreshToken == null ||
+        prefsRefreshToken.isEmpty) {
+      return null;
+    }
+
+    final expiresAtRaw = prefs.getString(_kAccessTokenExpiresAt);
     final expiresAt = expiresAtRaw == null || expiresAtRaw.isEmpty
         ? null
         : DateTime.tryParse(expiresAtRaw);
 
     return SessionTokens(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
+      accessToken: prefsAccessToken,
+      refreshToken: prefsRefreshToken,
       accessTokenExpiresAt: expiresAt,
     );
   }
@@ -40,6 +68,16 @@ class SecureTokenStore implements TokenStore {
       key: _kAccessTokenExpiresAt,
       value: tokens.accessTokenExpiresAt?.toIso8601String() ?? '',
     );
+
+    // Also mirror into SharedPreferences so other app parts can work even
+    // if secure storage is not available/cleared.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kAccessToken, tokens.accessToken);
+    await prefs.setString(_kRefreshToken, tokens.refreshToken);
+    await prefs.setString(
+      _kAccessTokenExpiresAt,
+      tokens.accessTokenExpiresAt?.toIso8601String() ?? '',
+    );
   }
 
   @override
@@ -47,6 +85,11 @@ class SecureTokenStore implements TokenStore {
     await _storage.delete(key: _kAccessToken);
     await _storage.delete(key: _kRefreshToken);
     await _storage.delete(key: _kAccessTokenExpiresAt);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kAccessToken);
+    await prefs.remove(_kRefreshToken);
+    await prefs.remove(_kAccessTokenExpiresAt);
   }
 }
 

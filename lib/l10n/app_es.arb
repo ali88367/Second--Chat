@@ -67,6 +67,7 @@
   "noEmotesFound": "No se encontraron emoticonos",
   "noInvitesAvailableRightNow": "No hay invitaciones disponibles en este momento.",
   "noRecentEmotes": "No hay emoticonos recientes",
+  "noStreamAtTheMoment": "No hay transmisión en este momento",
   "recent": "⭐ Recientes",
   "unexpectedResponseFormat": "Formato de respuesta inesperado",
   "oauthHandledInBrowser": "OAuth se gestiona en tu navegador.",

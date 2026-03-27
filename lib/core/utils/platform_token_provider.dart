@@ -46,6 +46,43 @@ class PlatformTokenProvider {
     return token.isEmpty ? null : token;
   }
 
+  /// Updates platform tokens inside SharedPreferences `second_chat.platform_tokens`.
+  ///
+  /// Backend-refresh result tokens are mirrored here so subsequent socket
+  /// connections authenticate successfully for that platform.
+  Future<void> setPlatformTokens({
+    required String platform,
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    final p = platform.toLowerCase().trim();
+    if (p.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(platformTokensKey);
+
+    Map<String, dynamic> map;
+    if (raw != null && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        map = decoded is Map<String, dynamic>
+            ? decoded
+            : Map<String, dynamic>.from(decoded as Map);
+      } catch (_) {
+        map = <String, dynamic>{};
+      }
+    } else {
+      map = <String, dynamic>{};
+    }
+
+    map[p] = <String, dynamic>{
+      accessTokenKey: accessToken,
+      refreshTokenKey: refreshToken,
+    };
+
+    await prefs.setString(platformTokensKey, jsonEncode(map));
+  }
+
   Future<Map<String, dynamic>?> _readPlatformTokenMap(String platform) async {
     try {
       final prefs = await SharedPreferences.getInstance();
