@@ -21,63 +21,63 @@ import 'core/constants/constants.dart';
 import 'core/localization/l10n.dart';
 import 'core/utils/debug_tokens.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  VideoPlayerController? introVideoController;
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    VideoPlayerController? introVideoController;
 
-  // Lock orientation
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+    // Lock orientation
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  // System UI style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+    // System UI style
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
 
-  // Global controllers
-  Get.put(SettingsController());
-  Get.put(StreamStreaksController());
-  Get.put(AuthController(), permanent: true);
-  Get.put(ChatController(), permanent: true);
-  Get.put(PlatformConnectController(), permanent: true);
+    // Global controllers
+    Get.put(SettingsController());
+    Get.put(StreamStreaksController());
+    Get.put(AuthController(), permanent: true);
+    Get.put(ChatController(), permanent: true);
+    Get.put(PlatformConnectController(), permanent: true);
 
-  // Load persisted locale (if any) before building the app.
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString(AppConstants.keyLanguage)?.trim();
-    if (code != null && code.isNotEmpty) {
-      Get.updateLocale(Locale(code));
+    // Load persisted locale (if any) before building the app.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final code = prefs.getString(AppConstants.keyLanguage)?.trim();
+      if (code != null && code.isNotEmpty) {
+        Get.updateLocale(Locale(code));
+      }
+      final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
+      if (fs != null && fs.isNotEmpty) {
+        try {
+          Get.find<SettingsController>().fontSize.value = fs.toUpperCase();
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    await debugPrintTokensOnce();
+
+    // Pre-initialize intro video so first screen does not show a loader.
+    try {
+      introVideoController = VideoPlayerController.asset('assets/intro.mp4');
+      await introVideoController.initialize();
+      introVideoController
+        ..setLooping(true)
+        ..setVolume(0);
+    } catch (_) {
+      await introVideoController?.dispose();
+      introVideoController = null;
     }
-    final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
-    if (fs != null && fs.isNotEmpty) {
-      try {
-        Get.find<SettingsController>().fontSize.value = fs.toUpperCase();
-      } catch (_) {}
-    }
-  } catch (_) {}
 
-  await debugPrintTokensOnce();
-
-  // Pre-initialize intro video so first screen does not show a loader.
-  try {
-    introVideoController = VideoPlayerController.asset('assets/intro.mp4');
-    await introVideoController.initialize();
-    introVideoController
-      ..setLooping(true)
-      ..setVolume(0);
-  } catch (_) {
-    await introVideoController?.dispose();
-    introVideoController = null;
-  }
-
-  runZonedGuarded(() {
     runApp(MyApp(introVideoController: introVideoController));
   }, (Object error, StackTrace stack) {
     // Ignore known WebView teardown race:

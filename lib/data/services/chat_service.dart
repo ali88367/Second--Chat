@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/chat_message.dart';
 
@@ -37,6 +38,17 @@ class ChatService {
     int limit = 100,
     int offset = 0,
   }) async {
+    final platformKey = platform.trim().toLowerCase();
+    final kickDebug = platformKey == 'kick' && kDebugMode;
+
+    if (kickDebug) {
+      debugPrint(
+        '[SC_CHAT_HISTORY_KICK] → GET /api/v1/chat/history '
+        'platform=$platform limit=$limit offset=$offset '
+        '(auth present=${accessToken.trim().isNotEmpty})',
+      );
+    }
+
     try {
       final res = await _dio.get<dynamic>(
         '/api/v1/chat/history',
@@ -53,11 +65,32 @@ class ChatService {
       );
 
       final json = res.data;
+      if (kickDebug) {
+        final top = json is Map ? json.keys.join(',') : json.runtimeType.toString();
+        debugPrint(
+          '[SC_CHAT_HISTORY_KICK] ← HTTP ${res.statusCode} bodyTop=$top',
+        );
+      }
+
       dynamic data = json;
       if (data is Map && data['data'] != null) data = data['data'];
       if (data is Map && data['messages'] != null) data = data['messages'];
 
-      if (data is! List) return const [];
+      if (data is! List) {
+        if (kickDebug) {
+          debugPrint(
+            '[SC_CHAT_HISTORY_KICK] ⚠ no List in response (got ${data.runtimeType}), returning 0',
+          );
+        }
+        return const [];
+      }
+
+      if (kickDebug) {
+        debugPrint(
+          '[SC_CHAT_HISTORY_KICK] raw rows=${data.length} before parse',
+        );
+      }
+
       final out = <ChatMessage>[];
       for (final item in data) {
         if (item is! Map) continue;
@@ -87,7 +120,7 @@ class ChatService {
                 m['_id'] ??
                 m['messageId'])
             ?.toString();
-        final p = (m['platform'] ?? platform).toString();
+        final p = (m['platform'] ?? platform).toString().trim().toLowerCase();
         out.add(
           ChatMessage(
             platform: p,
@@ -99,8 +132,31 @@ class ChatService {
           ),
         );
       }
+
+      if (kickDebug) {
+        debugPrint(
+          '[SC_CHAT_HISTORY_KICK] ✓ parsed=${out.length} ChatMessage(s)',
+        );
+        final n = out.length < 3 ? out.length : 3;
+        for (var i = 0; i < n; i++) {
+          final msg = out[i];
+          final preview = msg.message.length > 48
+              ? '${msg.message.substring(0, 48)}…'
+              : msg.message;
+          debugPrint(
+            '[SC_CHAT_HISTORY_KICK]   [$i] user=${msg.userName} '
+            'platformField=${msg.platform} id=${msg.id ?? '(none)'} '
+            'ts=${msg.timestamp.toIso8601String()} msg="$preview"',
+          );
+        }
+      }
+
       return out;
-    } catch (_) {
+    } catch (e, st) {
+      if (kickDebug) {
+        debugPrint('[SC_CHAT_HISTORY_KICK] ✗ error: $e');
+        debugPrint('[SC_CHAT_HISTORY_KICK] stack: $st');
+      }
       return const [];
     }
   }

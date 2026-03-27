@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import 'auth_controller.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
@@ -36,6 +37,11 @@ class ChatController extends GetxController {
   final RxList<Map<String, dynamic>> activityEvents =
       <Map<String, dynamic>>[].obs;
 
+  /// Per-platform chat lists. The UI reads [messages] which is the current
+  /// selected platform list (swapped on platform changes).
+  final RxMap<String, List<ChatMessage>> platformMessages =
+      <String, List<ChatMessage>>{}.obs;
+
   Timer? _connectRetryTimer;
   bool _realtimeObserversWired = false;
   bool _socketConnecting = false;
@@ -43,6 +49,12 @@ class ChatController extends GetxController {
   DateTime _lastPlatformSocketSwitchAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   final Set<String> _historyInFlight = <String>{};
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
+
+  /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
+  final Set<String> _activityChatSourceDedupeIds = <String>{};
+
+  /// Own messages: show immediately, then replace with the socket echo (same text).
+  final List<_PendingLocalChatEcho> _pendingLocalChatEchoes = [];
 
   final RxList<ChatMessage> messages = <ChatMessage>[].obs;
   final RxInt viewerCount = 0.obs;
@@ -59,6 +71,9 @@ class ChatController extends GetxController {
     super.onInit();
     _wireServiceCallbacks();
     _bootstrap();
+    ever<String>(platform, (p) {
+      unawaited(_swapToPlatformAndRefresh(p));
+    });
 
     // If tokens/overview are not ready at first app launch, connect may skip.
     // Retry in background so socket starts without needing page navigation.
@@ -175,14 +190,7 @@ class ChatController extends GetxController {
       _accessToken = await _tokenProvider.getAccessToken(platform.value);
       if (_accessToken == null || _accessToken!.isEmpty) return;
 
-      final history = await _live.loadHistory(
-        platform: platform.value,
-        accessToken: _accessToken!,
-      );
-      if (history.isNotEmpty) {
-        messages.assignAll(history);
-        _bumpScroll();
-      }
+      await _swapToPlatformAndRefresh(platform.value, forceHistory: true);
 
       // Ensure we have socketUrl/path even if connectedPlatforms was empty.
       if (overview.value == null) {
@@ -419,30 +427,263 @@ class ChatController extends GetxController {
         _accessToken ?? await _tokenProvider.getAccessToken(platform.value);
     if (token == null || token.isEmpty) return;
 
-    await _live.sendMessage(platform: platform.value, accessToken: token, message: msg);
+    final p = platform.value.toLowerCase().trim();
+    _purgeStalePendingEchoes();
+
+    final localId = 'local:${DateTime.now().microsecondsSinceEpoch}';
+    _pendingLocalChatEchoes.add(
+      _PendingLocalChatEcho(
+        platform: p,
+        normalizedText: msg.toLowerCase(),
+        localMessageId: localId,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    );
+
+    final optimistic = ChatMessage(
+      platform: p,
+      userName: _outgoingChatDisplayName(),
+      message: msg,
+      timestamp: DateTime.now().toUtc(),
+      id: localId,
+      raw: const <String, dynamic>{},
+    );
+    _appendAndSortPlatformMessages(p, optimistic);
+
+    try {
+      await _live.sendMessage(
+        platform: platform.value,
+        accessToken: token,
+        message: msg,
+      );
+    } catch (_) {
+      // Drop optimistic row if send fails.
+      _pendingLocalChatEchoes.removeWhere((e) => e.localMessageId == localId);
+      _removeMessageById(p, localId);
+    }
     _bumpScroll();
   }
 
-  Future<void> _ensureChatForLivePlatform(String p) async {
-    final key = p.toLowerCase();
-    // 1) Socket ensure connect (no-op if already connected)
-    if (isConnected.value != true) {
-      await _tryConnectIfPossible();
+  String _outgoingChatDisplayName() {
+    try {
+      final me = Get.find<AuthController>().me.value;
+      final u = me?['username']?.toString().trim();
+      if (u != null && u.isNotEmpty) return u;
+    } catch (_) {}
+    return 'You';
+  }
+
+  void _purgeStalePendingEchoes() {
+    final now = DateTime.now().toUtc();
+    _pendingLocalChatEchoes.removeWhere((e) {
+      if (now.difference(e.createdAt) <= const Duration(seconds: 120)) {
+        return false;
+      }
+      _removeMessageById(e.platform, e.localMessageId);
+      return true;
+    });
+  }
+
+  void _removeMessageById(String platformKey, String id) {
+    final p = platformKey.toLowerCase().trim();
+    final list = List<ChatMessage>.from(platformMessages[p] ?? []);
+    final before = list.length;
+    list.removeWhere((m) => m.id == id);
+    if (list.length == before) return;
+    platformMessages[p] = list;
+    _syncVisibleMessagesIfSelected(p);
+  }
+
+  void _appendAndSortPlatformMessages(String p, ChatMessage m) {
+    final list = List<ChatMessage>.from(platformMessages[p] ?? []);
+    list.add(m);
+    list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    platformMessages[p] = _collapseNearDuplicates(list);
+    _syncVisibleMessagesIfSelected(p);
+    _bumpScroll();
+  }
+
+  void _syncVisibleMessagesIfSelected(String p) {
+    if (platform.value.toLowerCase() == p) {
+      messages.assignAll(platformMessages[p] ?? []);
+    }
+  }
+
+  bool _isLocalEchoId(String? id) =>
+      id != null && id.startsWith('local:');
+
+  /// Same line twice in a short window (socket echo + optimistic, or double socket).
+  bool _isNearbyDuplicateContent(ChatMessage a, ChatMessage b) {
+    if (a.platform.toLowerCase().trim() != b.platform.toLowerCase().trim()) {
+      return false;
+    }
+    if (a.message.trim() != b.message.trim()) return false;
+    final dt =
+        (b.timestamp.toUtc().difference(a.timestamp.toUtc())).abs().inSeconds;
+    if (dt > 25) return false;
+    final ua = a.userName.trim().toLowerCase();
+    final ub = b.userName.trim().toLowerCase();
+    if (ua == ub) return true;
+    if (_isLocalEchoId(a.id) || _isLocalEchoId(b.id)) return true;
+    return false;
+  }
+
+  List<ChatMessage> _collapseNearDuplicates(List<ChatMessage> sortedAsc) {
+    if (sortedAsc.length < 2) return sortedAsc;
+    final out = <ChatMessage>[sortedAsc.first];
+    for (var i = 1; i < sortedAsc.length; i++) {
+      final m = sortedAsc[i];
+      final prev = out.last;
+      if (_isNearbyDuplicateContent(prev, m)) {
+        if (_isLocalEchoId(prev.id) && !_isLocalEchoId(m.id)) {
+          out[out.length - 1] = m;
+        }
+        continue;
+      }
+      out.add(m);
+    }
+    return out;
+  }
+
+  bool _shouldSuppressSocketNearDuplicate(
+    List<ChatMessage> existing,
+    ChatMessage incoming,
+  ) {
+    final incTs = incoming.timestamp.toUtc();
+    for (final m in existing.reversed.take(30)) {
+      if (m.platform.toLowerCase().trim() !=
+          incoming.platform.toLowerCase().trim()) {
+        continue;
+      }
+      if (m.message.trim() != incoming.message.trim()) continue;
+      if ((incTs.difference(m.timestamp.toUtc())).abs().inSeconds > 20) {
+        continue;
+      }
+      final u1 = m.userName.trim().toLowerCase();
+      final u2 = incoming.userName.trim().toLowerCase();
+      if (u1 == u2) {
+        if (m.id != null &&
+            incoming.id != null &&
+            m.id == incoming.id) {
+          return true;
+        }
+        if (m.id != incoming.id) return true;
+        return true;
+      }
+      if (_isLocalEchoId(m.id) || _isLocalEchoId(incoming.id)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static String _chatMessagePayloadType(ChatMessage msg) {
+    final t = msg.raw?['type']?.toString().trim().toLowerCase();
+    if (t == null || t.isEmpty) return 'normal';
+    return t;
+  }
+
+  static bool _isNormalChatMessage(ChatMessage msg) {
+    return _chatMessagePayloadType(msg) == 'normal';
+  }
+
+  void _appendActivityFromChatMessage(ChatMessage msg) {
+    final id = msg.id?.trim();
+    final dedupe = id != null && id.isNotEmpty
+        ? 'id:$id'
+        : 'h:${msg.platform}|${msg.timestamp.toUtc().millisecondsSinceEpoch}|${msg.message.hashCode}|${_chatMessagePayloadType(msg)}';
+    if (_activityChatSourceDedupeIds.contains(dedupe)) return;
+    if (_activityChatSourceDedupeIds.length > 2500) {
+      _activityChatSourceDedupeIds.clear();
+    }
+    _activityChatSourceDedupeIds.add(dedupe);
+
+    activityEvents.add(<String, dynamic>{
+      'id': id,
+      'platform': msg.platform,
+      'type': _chatMessagePayloadType(msg),
+      'metadata': <String, dynamic>{
+        'user': msg.userName,
+        'username': msg.userName,
+        'message': msg.message,
+      },
+      'timestamp': msg.timestamp.toUtc().toIso8601String(),
+      'created_at': msg.timestamp.toUtc().toIso8601String(),
+    });
+  }
+
+  void _handleIncomingChatMessage(ChatMessage msg) {
+    if (!_isNormalChatMessage(msg)) {
+      _appendActivityFromChatMessage(msg);
+      return;
     }
 
-    // 2) History fetch with cooldown + in-flight guard (optimized)
+    final p = msg.platform.toLowerCase().trim();
+    _purgeStalePendingEchoes();
+
+    final norm = msg.message.trim().toLowerCase();
+    final pendingIdx = _pendingLocalChatEchoes.indexWhere(
+      (e) => e.platform == p && e.normalizedText == norm,
+    );
+
+    if (pendingIdx != -1) {
+      final echo = _pendingLocalChatEchoes.removeAt(pendingIdx);
+      var list = List<ChatMessage>.from(platformMessages[p] ?? []);
+      list.removeWhere((m) => m.id == echo.localMessageId);
+      list.add(msg);
+      list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      list = _collapseNearDuplicates(list);
+      platformMessages[p] = list;
+      _syncVisibleMessagesIfSelected(p);
+      _bumpScroll();
+      return;
+    }
+
+    final existing = List<ChatMessage>.from(platformMessages[p] ?? []);
+    if (_shouldSuppressSocketNearDuplicate(existing, msg)) {
+      return;
+    }
+
+    final merged = _mergeUniqueByDedupeKey(existing, <ChatMessage>[msg]);
+    merged.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    platformMessages[p] = _collapseNearDuplicates(merged);
+    _syncVisibleMessagesIfSelected(p);
+    _bumpScroll();
+  }
+
+  Future<void> _swapToPlatformAndRefresh(
+    String p, {
+    bool forceHistory = false,
+  }) async {
+    final key = p.toLowerCase().trim();
+    if (key.isEmpty) return;
+
+    // 1) Swap visible list instantly.
+    final existing = platformMessages[key] ?? const <ChatMessage>[];
+    if (messages.isEmpty || !identical(messages, existing)) {
+      messages.assignAll(existing);
+      _bumpScroll();
+    }
+
+    // 2) Fetch latest history for that platform (fast + safe).
+    await _refreshHistoryForPlatform(key, force: forceHistory);
+  }
+
+  Future<void> _refreshHistoryForPlatform(String platformKey, {bool force = false}) async {
+    final key = platformKey.toLowerCase().trim();
+    if (key.isEmpty) return;
+
     if (_historyInFlight.contains(key)) return;
     final now = DateTime.now().toUtc();
     final last = _historyLastFetchAt[key];
-    // Avoid frequent history hits while stream status flaps.
-    if (last != null && now.difference(last) < const Duration(seconds: 20)) {
+    if (!force && last != null && now.difference(last) < const Duration(seconds: 15)) {
       return;
     }
 
     final token = _accessToken ??
         await _live.ensureFreshPlatformAccessToken(platform: key) ??
         await _tokenProvider.getAccessToken(key);
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.trim().isEmpty) return;
 
     _historyInFlight.add(key);
     try {
@@ -452,17 +693,25 @@ class ChatController extends GetxController {
         limit: 100,
         offset: 0,
       );
+
       if (history.isNotEmpty) {
-        // Merge without duplicates.
-        final existingKeys = messages
-            .map((m) => '${m.platform.toLowerCase()}|${m.id ?? ''}|${m.message}|${m.timestamp.toUtc().millisecondsSinceEpoch}')
-            .toSet();
-        final toAdd = history.where((m) {
-          final k = '${m.platform.toLowerCase()}|${m.id ?? ''}|${m.message}|${m.timestamp.toUtc().millisecondsSinceEpoch}';
-          return !existingKeys.contains(k);
-        }).toList(growable: false);
-        if (toAdd.isNotEmpty) {
-          messages.addAll(toAdd);
+        final normalOnly = <ChatMessage>[];
+        for (final m in history) {
+          if (_isNormalChatMessage(m)) {
+            normalOnly.add(m);
+          } else {
+            _appendActivityFromChatMessage(m);
+          }
+        }
+        final merged = _mergeUniqueByDedupeKey(
+          platformMessages[key] ?? const <ChatMessage>[],
+          normalOnly,
+        );
+        merged.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        final collapsed = _collapseNearDuplicates(merged);
+        platformMessages[key] = collapsed;
+        if (platform.value.toLowerCase() == key) {
+          messages.assignAll(collapsed);
           _bumpScroll();
         }
       }
@@ -472,6 +721,36 @@ class ChatController extends GetxController {
     } finally {
       _historyInFlight.remove(key);
     }
+  }
+
+  List<ChatMessage> _mergeUniqueByDedupeKey(
+    List<ChatMessage> a,
+    List<ChatMessage> b,
+  ) {
+    final out = <ChatMessage>[];
+    final seen = <String>{};
+    void addAll(List<ChatMessage> list) {
+      for (final m in list) {
+        final k = m.dedupeKey;
+        if (seen.add(k)) out.add(m);
+      }
+    }
+
+    // Prefer keeping existing realtime ordering, then add any missing from history.
+    addAll(a);
+    addAll(b);
+    return out;
+  }
+
+  Future<void> _ensureChatForLivePlatform(String p) async {
+    final key = p.toLowerCase();
+    // 1) Socket ensure connect (no-op if already connected)
+    if (isConnected.value != true) {
+      await _tryConnectIfPossible();
+    }
+
+    // 2) History refresh (per-platform list)
+    await _refreshHistoryForPlatform(key);
   }
 
   void _bumpScroll() {
@@ -513,7 +792,8 @@ class ChatController extends GetxController {
       if (!live) {
         isLive.value = false;
         watchUrl.value = '';
-        messages.removeWhere((msg) => msg.platform.toLowerCase() == selected);
+        platformMessages[selected] = const <ChatMessage>[];
+        messages.clear();
         _bumpScroll();
       } else {
         isLive.value = true;
@@ -549,16 +829,14 @@ class ChatController extends GetxController {
     }
     _live.onStreamStatus = applyMeta;
     _live.onStreamInfoUpdate = applyMeta;
-    _live.onChatMessage = (msg) {
-      messages.add(msg);
-      _bumpScroll();
-    };
+    _live.onChatMessage = _handleIncomingChatMessage;
   }
 
   @override
   void onClose() {
     _connectRetryTimer?.cancel();
     _connectRetryTimer = null;
+    _pendingLocalChatEchoes.clear();
     _historyInFlight.clear();
     _historyLastFetchAt.clear();
     try {
@@ -566,4 +844,17 @@ class ChatController extends GetxController {
     } catch (_) {}
     super.onClose();
   }
+}
+
+class _PendingLocalChatEcho {
+  _PendingLocalChatEcho({
+    required this.platform,
+    required this.normalizedText,
+    required this.localMessageId,
+    required this.createdAt,
+  });
+  final String platform;
+  final String normalizedText;
+  final String localMessageId;
+  final DateTime createdAt;
 }

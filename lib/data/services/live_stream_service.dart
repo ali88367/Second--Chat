@@ -384,7 +384,8 @@ class LiveStreamService {
       }
       if (map == null) return null;
 
-      final platform = (map['platform'] ?? map['source'] ?? 'twitch').toString();
+      final platform =
+          (map['platform'] ?? map['source'] ?? 'twitch').toString().trim().toLowerCase();
       final metadata = map['metadata'];
       final metaUser = metadata is Map
           ? (metadata['user'] ??

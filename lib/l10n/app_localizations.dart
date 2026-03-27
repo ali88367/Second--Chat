@@ -484,6 +484,18 @@ abstract class AppLocalizations {
   /// **'No stream at the moment'**
   String get noStreamAtTheMoment;
 
+  /// No description provided for @noActivityYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity yet'**
+  String get noActivityYet;
+
+  /// No description provided for @streamMetaEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get streamMetaEmpty;
+
   /// No description provided for @recent.
   ///
   /// In en, this message translates to:

@@ -204,6 +204,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noStreamAtTheMoment => 'لا يوجد بث في الوقت الحالي';
 
   @override
+  String get noActivityYet => 'لا يوجد نشاط بعد';
+
+  @override
+  String get streamMetaEmpty => '—';
+
+  @override
   String get recent => '⭐ الأحدث';
 
   @override

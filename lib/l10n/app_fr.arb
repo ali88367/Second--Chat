@@ -68,6 +68,8 @@
   "noInvitesAvailableRightNow": "Aucune invitation disponible pour le moment.",
   "noRecentEmotes": "Aucun emote récent",
   "noStreamAtTheMoment": "Aucun stream pour le moment",
+  "noActivityYet": "Aucune activité pour le moment",
+  "streamMetaEmpty": "—",
   "recent": "⭐ Récents",
   "unexpectedResponseFormat": "Format de réponse inattendu",
   "oauthHandledInBrowser": "OAuth est géré dans votre navigateur.",

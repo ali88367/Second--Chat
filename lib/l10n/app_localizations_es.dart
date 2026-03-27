@@ -208,6 +208,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noStreamAtTheMoment => 'No hay transmisión en este momento';
 
   @override
+  String get noActivityYet => 'Aún no hay actividad';
+
+  @override
+  String get streamMetaEmpty => '—';
+
+  @override
   String get recent => '⭐ Recientes';
 
   @override

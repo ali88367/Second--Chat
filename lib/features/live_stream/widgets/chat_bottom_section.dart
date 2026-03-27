@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/core/localization/l10n.dart';
+import 'package:second_chat/data/models/chat_message.dart';
 
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
@@ -312,20 +313,69 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
+  bool _isNormalChatLine(ChatMessage m) {
+    final t = m.raw?['type']?.toString().trim().toLowerCase();
+    if (t == null || t.isEmpty) return true;
+    return t == 'normal';
+  }
+
+  List<Map<String, dynamic>> _commentsWithNamePrivacy(bool hideNames) {
+    if (!hideNames) return List<Map<String, dynamic>>.from(_comments);
+    return _comments
+        .map(
+          (e) => Map<String, dynamic>.from(e)..['name'] = '',
+        )
+        .toList(growable: false);
+  }
+
   List<Map<String, dynamic>> _getFilteredComments(String? filter) {
+    // Obx callers depend on reading these reactives here.
+    final hideNames = _settingsController.hideViewerNames.value;
+    final merged = _settingsController.multiChatMergedMode.value;
+
     // Prefer live controller messages, fall back to local list if empty.
-    final source =
-        _chatCtrl.messages.isNotEmpty
-            ? _chatCtrl.messages
-                .map<Map<String, dynamic>>(
-                  (m) => {
-                    'platform': _getPlatformAsset(m.platform),
-                    'name': m.userName,
-                    'message': m.message,
-                  },
-                )
-                .toList(growable: false)
-            : _comments;
+    // Non-normal chat lines (subs, raids, etc.) go to the activity feed only.
+    List<Map<String, dynamic>> source;
+    if (merged) {
+      final rows = <Map<String, dynamic>>[];
+      for (final entry in _chatCtrl.platformMessages.entries) {
+        for (final m in entry.value.where(_isNormalChatLine)) {
+          rows.add({
+            'platform': _getPlatformAsset(m.platform),
+            'name': hideNames ? '' : m.userName,
+            'message': m.message,
+            '_ts': m.timestamp,
+          });
+        }
+      }
+      if (rows.isNotEmpty) {
+        rows.sort(
+          (a, b) =>
+              (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime),
+        );
+        for (final r in rows) {
+          r.remove('_ts');
+        }
+        source = rows;
+      } else {
+        source = _commentsWithNamePrivacy(hideNames);
+      }
+    } else {
+      final normalMessages =
+          _chatCtrl.messages.where(_isNormalChatLine).toList(growable: false);
+      source =
+          normalMessages.isNotEmpty
+              ? normalMessages
+                  .map<Map<String, dynamic>>(
+                    (m) => {
+                      'platform': _getPlatformAsset(m.platform),
+                      'name': hideNames ? '' : m.userName,
+                      'message': m.message,
+                    },
+                  )
+                  .toList(growable: false)
+              : _commentsWithNamePrivacy(hideNames);
+    }
 
     // If no streams are live, hide chat entirely.
     if (_chatCtrl.platformLive.isNotEmpty &&
@@ -725,11 +775,11 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                         ),
                       ),
                     ),
-                    // Username
-                    TextSpan(
-                      text: "$name: ",
-                      style: sfProText500(12.sp, nameColor),
-                    ),
+                    if (name.isNotEmpty)
+                      TextSpan(
+                        text: "$name: ",
+                        style: sfProText500(12.sp, nameColor),
+                      ),
                     // Message with emotes
                     ...messageSpans,
                   ],

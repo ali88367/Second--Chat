@@ -68,6 +68,8 @@
   "noInvitesAvailableRightNow": "لا توجد دعوات متاحة حاليًا.",
   "noRecentEmotes": "لا توجد إيموتات حديثة",
   "noStreamAtTheMoment": "لا يوجد بث في الوقت الحالي",
+  "noActivityYet": "لا يوجد نشاط بعد",
+  "streamMetaEmpty": "—",
   "recent": "⭐ الأحدث",
   "unexpectedResponseFormat": "تنسيق الاستجابة غير متوقع",
   "oauthHandledInBrowser": "يتم التعامل مع OAuth في متصفحك.",

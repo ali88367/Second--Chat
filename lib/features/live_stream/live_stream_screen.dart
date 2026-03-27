@@ -509,9 +509,30 @@ class _LivestreamingState extends State<Livestreaming> {
                         child: Obx(() {
                           final chatCtrl = Get.find<ChatController>();
                           // Prefer controller activity list (wired to sockets).
-                          final events = chatCtrl.activityEvents;
+                          // Chat "normal" lines stay in chat; activity = everything else.
+                          final events = chatCtrl.activityEvents
+                              .where((e) {
+                                final t = (e['type'] ?? e['eventType'] ?? '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase();
+                                return t != 'normal';
+                              })
+                              .toList(growable: false);
                           if (events.isEmpty) {
-                            return const SizedBox.shrink();
+                            return Center(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 24.h),
+                                child: Text(
+                                  context.l10n.noActivityYet,
+                                  textAlign: TextAlign.center,
+                                  style: sfProText400(
+                                    13.sp,
+                                    Colors.white54,
+                                  ),
+                                ),
+                              ),
+                            );
                           }
                           // Render newest first.
                           final list = events.reversed.toList(growable: false);
@@ -1153,296 +1174,48 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                             height:
                                                                                 16.h,
                                                                           ),
-                                                                          panelRow(
-                                                                            context.l10n.titleExample,
-                                                                          ),
-                                                                          SizedBox(
-                                                                            height:
-                                                                                12.h,
-                                                                          ),
-                                                                          panelRow(
-                                                                            context.l10n.nameCategory,
-                                                                            showChevron:
-                                                                                true,
-                                                                            onTap: () {
-                                                                              showModalBottomSheet(
-                                                                                context:
-                                                                                    context,
-                                                                                isScrollControlled:
-                                                                                    true,
-                                                                                backgroundColor:
-                                                                                    Colors.transparent,
-                                                                                builder: (
-                                                                                  ctx,
+                                                                          ValueListenableBuilder<String?>(
+                                                                            valueListenable: _chatFilter,
+                                                                            builder:
+                                                                                (
+                                                                                  context,
+                                                                                  chatFilter,
+                                                                                  _,
                                                                                 ) {
-                                                                                  return Padding(
-                                                                                    padding: EdgeInsets.only(
-                                                                                      bottom:
-                                                                                          MediaQuery.of(
-                                                                                            ctx,
-                                                                                          ).viewInsets.bottom,
+                                                                              return Obx(() {
+                                                                                final metaKey =
+                                                                                    (chatFilter ?? platform ?? 'twitch')
+                                                                                        .toString()
+                                                                                        .toLowerCase();
+                                                                                final titleLive =
+                                                                                    (chatCtrl.streamTitleByPlatform[metaKey] ?? '')
+                                                                                        .trim();
+                                                                                final categoryLive =
+                                                                                    (chatCtrl.streamCategoryByPlatform[metaKey] ?? '')
+                                                                                        .trim();
+                                                                                final titlePanel =
+                                                                                    titleLive.isNotEmpty
+                                                                                        ? titleLive
+                                                                                        : context.l10n.streamMetaEmpty;
+                                                                                final categoryPanel =
+                                                                                    categoryLive.isNotEmpty
+                                                                                        ? categoryLive
+                                                                                        : context.l10n.streamMetaEmpty;
+                                                                                return Column(
+                                                                                  mainAxisSize:
+                                                                                      MainAxisSize.min,
+                                                                                  children: [
+                                                                                    panelRow(titlePanel),
+                                                                                    SizedBox(height: 12.h),
+                                                                                    // Category row: no chevron / picker (disabled).
+                                                                                    panelRow(
+                                                                                      categoryPanel,
+                                                                                      showChevron: false,
+                                                                                      onTap: null,
                                                                                     ),
-                                                                                    child: FractionallySizedBox(
-                                                                                      heightFactor:
-                                                                                          0.8,
-                                                                                      child: AnimatedPadding(
-                                                                                        padding: EdgeInsets.only(
-                                                                                          bottom:
-                                                                                              MediaQuery.of(
-                                                                                                ctx,
-                                                                                              ).viewInsets.bottom,
-                                                                                        ),
-                                                                                        duration: const Duration(
-                                                                                          milliseconds:
-                                                                                              250,
-                                                                                        ),
-                                                                                        curve:
-                                                                                            Curves.easeOut,
-                                                                                        child: Container(
-                                                                                          decoration: BoxDecoration(
-                                                                                            color: const Color.fromRGBO(
-                                                                                              20,
-                                                                                              18,
-                                                                                              18,
-                                                                                              1,
-                                                                                            ),
-                                                                                            borderRadius: const BorderRadius.vertical(
-                                                                                              top: Radius.circular(
-                                                                                                38,
-                                                                                              ),
-                                                                                            ),
-                                                                                          ),
-                                                                                          child: Stack(
-                                                                                            children: [
-                                                                                              Column(
-                                                                                                children: [
-                                                                                                  SizedBox(
-                                                                                                    height:
-                                                                                                        10.h,
-                                                                                                  ),
-                                                                                                  Padding(
-                                                                                                    padding: EdgeInsets.symmetric(
-                                                                                                      horizontal:
-                                                                                                          18.w,
-                                                                                                      vertical:
-                                                                                                          10,
-                                                                                                    ),
-                                                                                                    child: Row(
-                                                                                                      children: [
-                                                                                                        GestureDetector(
-                                                                                                          onTap:
-                                                                                                              () =>
-                                                                                                                  Navigator.of(
-                                                                                                                    ctx,
-                                                                                                                  ).pop(),
-                                                                                                          child: Container(
-                                                                                                            padding: EdgeInsets.all(
-                                                                                                              8.w,
-                                                                                                            ),
-                                                                                                            decoration: const BoxDecoration(
-                                                                                                              color: Color.fromRGBO(
-                                                                                                                120,
-                                                                                                                120,
-                                                                                                                128,
-                                                                                                                0.16,
-                                                                                                              ),
-                                                                                                              shape:
-                                                                                                                  BoxShape.circle,
-                                                                                                            ),
-                                                                                                            child: Center(
-                                                                                                              child: Transform.translate(
-                                                                                                                offset: const Offset(
-                                                                                                                  2.5,
-                                                                                                                  0,
-                                                                                                                ),
-                                                                                                                child: Icon(
-                                                                                                                  Icons.arrow_back_ios,
-                                                                                                                  color:
-                                                                                                                      Colors.white,
-                                                                                                                  size:
-                                                                                                                      18,
-                                                                                                                ),
-                                                                                                              ),
-                                                                                                            ),
-                                                                                                          ),
-                                                                                                        ),
-                                                                                                        const Spacer(),
-                                                                                                        Text(
-                                                                                                          context.l10n.category,
-                                                                                                          style: sfProText600(
-                                                                                                            18.sp,
-                                                                                                            Colors.white,
-                                                                                                          ),
-                                                                                                        ),
-                                                                                                        const Spacer(),
-                                                                                                        SizedBox(
-                                                                                                          width:
-                                                                                                              40.w,
-                                                                                                        ),
-                                                                                                      ],
-                                                                                                    ),
-                                                                                                  ),
-                                                                                                  SizedBox(
-                                                                                                    height:
-                                                                                                        12.h,
-                                                                                                  ),
-                                                                                                  Expanded(
-                                                                                                    child: ListView.separated(
-                                                                                                      padding: EdgeInsets.only(
-                                                                                                        left:
-                                                                                                            16.w,
-                                                                                                        right:
-                                                                                                            16.w,
-                                                                                                        top:
-                                                                                                            8.h,
-                                                                                                        bottom:
-                                                                                                            100.h,
-                                                                                                      ),
-                                                                                                      itemCount:
-                                                                                                          3,
-                                                                                                      separatorBuilder:
-                                                                                                          (
-                                                                                                            _,
-                                                                                                            __,
-                                                                                                          ) => SizedBox(
-                                                                                                            height:
-                                                                                                                12.h,
-                                                                                                          ),
-                                                                                                      itemBuilder: (
-                                                                                                        c,
-                                                                                                        i,
-                                                                                                      ) {
-                                                                                                        return InkWell(
-                                                                                                          onTap:
-                                                                                                              () {},
-                                                                                                          borderRadius: BorderRadius.circular(
-                                                                                                            32.r,
-                                                                                                          ),
-                                                                                                          child: Container(
-                                                                                                            padding: EdgeInsets.symmetric(
-                                                                                                              horizontal:
-                                                                                                                  20.w,
-                                                                                                              vertical:
-                                                                                                                  13.h,
-                                                                                                            ),
-                                                                                                            decoration: BoxDecoration(
-                                                                                                              color: const Color.fromRGBO(
-                                                                                                                37,
-                                                                                                                37,
-                                                                                                                37,
-                                                                                                                1,
-                                                                                                              ),
-                                                                                                              borderRadius: BorderRadius.circular(
-                                                                                                                28.r,
-                                                                                                              ),
-                                                                                                            ),
-                                                                                                            child: Row(
-                                                                                                              children: [
-                                                                                                                Text(
-                                                                                                                  context.l10n.nameCategory,
-                                                                                                                  style: sfProText400(
-                                                                                                                    13.sp,
-                                                                                                                    Colors.white,
-                                                                                                                  ),
-                                                                                                                ),
-                                                                                                                const Spacer(),
-                                                                                                                Container(
-                                                                                                                  width:
-                                                                                                                      25.w,
-                                                                                                                  height:
-                                                                                                                      25.w,
-                                                                                                                  decoration: BoxDecoration(
-                                                                                                                    color:
-                                                                                                                        Colors.grey.shade900,
-                                                                                                                    borderRadius: BorderRadius.circular(
-                                                                                                                      18.r,
-                                                                                                                    ),
-                                                                                                                  ),
-                                                                                                                  child: Icon(
-                                                                                                                    Icons.arrow_forward_ios,
-                                                                                                                    color:
-                                                                                                                        Colors.grey.shade500,
-                                                                                                                    size:
-                                                                                                                        10.sp,
-                                                                                                                  ),
-                                                                                                                ),
-                                                                                                              ],
-                                                                                                            ),
-                                                                                                          ),
-                                                                                                        );
-                                                                                                      },
-                                                                                                    ),
-                                                                                                  ),
-                                                                                                ],
-                                                                                              ),
-                                                                                              Positioned(
-                                                                                                bottom:
-                                                                                                    18.h,
-                                                                                                left:
-                                                                                                    74.w,
-                                                                                                right:
-                                                                                                    74.w,
-                                                                                                child: Container(
-                                                                                                  height:
-                                                                                                      56.h,
-                                                                                                  padding: EdgeInsets.symmetric(
-                                                                                                    horizontal:
-                                                                                                        16.w,
-                                                                                                  ),
-                                                                                                  decoration: BoxDecoration(
-                                                                                                    color:
-                                                                                                        Colors.black,
-                                                                                                    borderRadius: BorderRadius.circular(
-                                                                                                      28.r,
-                                                                                                    ),
-                                                                                                  ),
-                                                                                                  child: Row(
-                                                                                                    children: [
-                                                                                                      Icon(
-                                                                                                        Icons.search,
-                                                                                                        color:
-                                                                                                            Colors.white,
-                                                                                                        size:
-                                                                                                            22.sp,
-                                                                                                      ),
-                                                                                                      SizedBox(
-                                                                                                        width:
-                                                                                                            12.w,
-                                                                                                      ),
-                                                                                                        Expanded(
-                                                                                                        child: Text(
-                                                                                                          context.l10n.search,
-                                                                                                          style: sfProText400(
-                                                                                                            18.sp,
-                                                                                                            Colors.white.withOpacity(
-                                                                                                              0.6,
-                                                                                                            ),
-                                                                                                          ),
-                                                                                                        ),
-                                                                                                      ),
-                                                                                                      SizedBox(
-                                                                                                        width:
-                                                                                                            8.w,
-                                                                                                      ),
-                                                                                                      Icon(
-                                                                                                        Icons.mic,
-                                                                                                        color:
-                                                                                                            Colors.white,
-                                                                                                        size:
-                                                                                                            22.sp,
-                                                                                                      ),
-                                                                                                    ],
-                                                                                                  ),
-                                                                                                ),
-                                                                                              ),
-                                                                                            ],
-                                                                                          ),
-                                                                                        ),
-                                                                                      ),
-                                                                                    ),
-                                                                                  );
-                                                                                },
-                                                                              );
+                                                                                  ],
+                                                                                );
+                                                                              });
                                                                             },
                                                                           ),
                                                                         ],
