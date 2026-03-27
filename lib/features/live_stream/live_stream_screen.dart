@@ -13,7 +13,6 @@ import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
 import '../Streaks/Compact_freeze.dart';
 import '../Streaks/Freeze_bottomsheet.dart';
-import '../Streaks/Streaksbottomsheet.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
@@ -116,19 +115,9 @@ class _LivestreamingState extends State<Livestreaming> {
       );
       if (!mounted) return;
 
-      if (streak == null) {
-        Get.bottomSheet(
-          const StreamStreakSetupBottomSheet(),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        ).then((_) {
-          _streakCtrl.fetchCurrentStreak(force: true, silent: true);
-        });
-      } else if (streak.isInDanger) {
+      if (streak == null) return;
+
+      if (streak.isInDanger) {
         Get.bottomSheet(
           const StreakFreezePreviewBottomSheet(),
           isDismissible: true,

@@ -252,7 +252,8 @@ class _StreakFreezePreviewBottomSheetState
                   icon = _dot();
                   break;
               }
-              final canEdit = rowIndex == 0;
+              final canEdit =
+                  rowIndex == 0 && _streakCtrl.supportsDayEditing;
               return Expanded(
                 child: Center(
                   child: canEdit
@@ -278,7 +279,7 @@ class _StreakFreezePreviewBottomSheetState
       final titleText = (streak?.isInDanger ?? false)
           ? context.l10n.streakInDangerHitFreezeButton
           : context.l10n.youVeNeverBeenHotterKeepStreakBurning;
-      final freezeTokens = streak?.freezeTokens ?? 0;
+      final freezeAllowance = streak?.freezeAllowancePerMonth ?? 0;
       final isLoading =
           _streakCtrl.isLoading.value || _streakCtrl.isHistoryLoading.value;
       final calendarRows = _streakCtrl.buildCalendarRows(maxRows: 4);
@@ -469,7 +470,7 @@ class _StreakFreezePreviewBottomSheetState
                               text: TextSpan(
                                 children: [
                                   TextSpan(
-                                    text: '$freezeTokens ',
+                                  text: '$freezeAllowance ',
                                     style: sfProDisplay400(15.sp, Colors.white),
                                   ),
                                   TextSpan(
