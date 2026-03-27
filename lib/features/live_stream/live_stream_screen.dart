@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +41,7 @@ class _LivestreamingState extends State<Livestreaming> {
   );
 
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
+  Timer? _chatFilterRefreshDebounce;
   bool _streakCompletionChecked = false;
   bool _streakSheetOpening = false;
 
@@ -68,7 +71,18 @@ class _LivestreamingState extends State<Livestreaming> {
     _settingsCtrl = Get.find<SettingsController>();
     _streakCtrl = Get.find<StreamStreaksController>();
     _chatFilter.addListener(_updateImageBasedOnFilter);
+    _chatFilter.addListener(_refreshStreamingForChatFilter);
     _maybeCompleteStreakForToday();
+  }
+
+  void _refreshStreamingForChatFilter() {
+    // Any platform change (chips, swipe, popup) should trigger the same refresh logic.
+    _chatFilterRefreshDebounce?.cancel();
+    _chatFilterRefreshDebounce = Timer(const Duration(milliseconds: 250), () {
+      final chatCtrl = Get.find<ChatController>();
+      final selected = _chatFilter.value ?? 'twitch';
+      chatCtrl.refreshOverviewForPlatform(selected);
+    });
   }
 
   void _updateImageBasedOnFilter() {
@@ -109,15 +123,8 @@ class _LivestreamingState extends State<Livestreaming> {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
 
-      final streak = await _streakCtrl.fetchCurrentStreak(
-        force: true,
-        silent: false,
-      );
-      if (!mounted) return;
-
-      if (streak == null) return;
-
-      if (streak.isInDanger) {
+      final cached = _streakCtrl.streak;
+      if (cached?.isInDanger == true) {
         Get.bottomSheet(
           const StreakFreezePreviewBottomSheet(),
           isDismissible: true,
@@ -146,6 +153,9 @@ class _LivestreamingState extends State<Livestreaming> {
   @override
   void dispose() {
     _chatFilter.removeListener(_updateImageBasedOnFilter);
+    _chatFilter.removeListener(_refreshStreamingForChatFilter);
+    _chatFilterRefreshDebounce?.cancel();
+    _chatFilterRefreshDebounce = null;
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
     _showActivity.dispose();

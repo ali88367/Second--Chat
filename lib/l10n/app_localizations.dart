@@ -478,6 +478,12 @@ abstract class AppLocalizations {
   /// **'No recent emotes'**
   String get noRecentEmotes;
 
+  /// No description provided for @noStreamAtTheMoment.
+  ///
+  /// In en, this message translates to:
+  /// **'No stream at the moment'**
+  String get noStreamAtTheMoment;
+
   /// No description provided for @recent.
   ///
   /// In en, this message translates to:

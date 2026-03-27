@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
@@ -121,6 +124,11 @@ class StreakData {
   }
 
   factory StreakData.fromPayload(dynamic payload) {
+    final overviewData = _extractOverviewData(payload);
+    if (overviewData != null) {
+      final parsed = _fromOverviewData(overviewData);
+      if (parsed != null) return parsed;
+    }
     final map = _extractStreakMap(payload);
     final settings = _asMap(
       map['settings'] ?? map['setting'] ?? map['config'],
@@ -203,24 +211,34 @@ class StreakData {
     final currentStreak = _asInt(
       state['currentStreak'] ??
           state['current_streak'] ??
+          state['current'] ??
           map['currentStreak'] ??
-          map['current_streak'],
+          map['current_streak'] ??
+          map['current'],
     );
     final longestStreak = _asInt(
       state['bestStreak'] ??
           state['best_streak'] ??
+          state['best'] ??
           map['bestStreak'] ??
           map['best_streak'] ??
+          map['best'] ??
           map['longestStreak'] ??
           map['longest_streak'],
     );
     final targetDaysPerWeek = _asInt(
       settings['weeklyGoal'] ??
           settings['weekly_goal'] ??
+          settings['timesPerWeek'] ??
+          settings['times_per_week'] ??
           map['weeklyGoal'] ??
           map['weekly_goal'] ??
+          map['timesPerWeek'] ??
+          map['times_per_week'] ??
           state['weeklyGoal'] ??
           state['weekly_goal'] ??
+          state['timesPerWeek'] ??
+          state['times_per_week'] ??
           map['targetDaysPerWeek'] ??
           map['target_days_per_week'],
       fallback: selectedDays.length,
@@ -401,6 +419,7 @@ class StreamStreaksController extends GetxController {
         ),
       );
 
+      _logStreakResponse('GET /api/v1/streaks/overview', res.data);
       final snapshot = StreakData.fromPayload(res.data);
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
@@ -514,6 +533,7 @@ class StreamStreaksController extends GetxController {
         ),
       );
 
+      _logStreakResponse('POST /api/v1/streaks/check-in', res.data);
       final snapshot = StreakData.fromPayload(res.data);
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
@@ -572,6 +592,7 @@ class StreamStreaksController extends GetxController {
         ),
       );
 
+      _logStreakResponse('POST /api/v1/streaks/freeze/use', res.data);
       final snapshot = StreakData.fromPayload(res.data);
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
@@ -823,6 +844,14 @@ class StreamStreaksController extends GetxController {
 
     return null;
   }
+
+  void _logStreakResponse(String label, dynamic data) {
+    if (!kDebugMode) return;
+    final str = _stringifyResponse(data);
+    const maxLen = 2000;
+    final snippet = str.length > maxLen ? '${str.substring(0, maxLen)}...' : str;
+    debugPrint('STREAK API RESPONSE $label: $snippet');
+  }
 }
 
 const List<String> _orderedDays = <String>[
@@ -1003,6 +1032,154 @@ List<dynamic> _extractHistoryList(dynamic payload) {
     }
   }
   return const <dynamic>[];
+}
+
+Map<String, dynamic>? _extractOverviewData(dynamic payload) {
+  if (payload is Map) {
+    dynamic data = payload;
+    if (data['data'] is Map) {
+      data = data['data'];
+    }
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      final hasStreak = map['streak'] is Map;
+      final hasWeeklyGoal =
+          map['weeklyGoal'] is Map || map['weekly_goal'] is Map;
+      final hasFreeze = map['freeze'] is Map;
+      if (hasStreak || hasWeeklyGoal || hasFreeze) {
+        return map;
+      }
+    }
+  }
+  return null;
+}
+
+StreakData? _fromOverviewData(Map<String, dynamic> data) {
+  final streakMap = _asMap(data['streak']);
+  final weeklyGoal =
+      _asMap(data['weeklyGoal'] ?? data['weekly_goal']);
+  final freezeMap = _asMap(data['freeze']);
+  if (streakMap.isEmpty && weeklyGoal.isEmpty && freezeMap.isEmpty) {
+    return null;
+  }
+
+  final currentStreak = _asInt(
+    streakMap['current'] ??
+        streakMap['currentStreak'] ??
+        streakMap['current_streak'],
+  );
+  final longestStreak = _asInt(
+    streakMap['best'] ??
+        streakMap['bestStreak'] ??
+        streakMap['best_streak'] ??
+        streakMap['longestStreak'] ??
+        streakMap['longest_streak'],
+  );
+  final status = _asString(data['status'] ?? streakMap['status']);
+  final isInDanger =
+      _asBool(
+        streakMap['inDanger'] ??
+            streakMap['isInDanger'] ??
+            streakMap['in_danger'] ??
+            data['inDanger'] ??
+            data['isInDanger'] ??
+            data['in_danger'],
+      ) ||
+      status.toLowerCase() == 'danger';
+
+  final targetDaysPerWeek = _asInt(
+    weeklyGoal['timesPerWeek'] ??
+        weeklyGoal['times_per_week'] ??
+        weeklyGoal['targetDaysPerWeek'] ??
+        weeklyGoal['target_days_per_week'],
+  );
+  final completedThisWeek = _asInt(
+    weeklyGoal['completedThisWeek'] ?? weeklyGoal['completed_this_week'],
+  );
+  final remainingThisWeek = _asInt(
+    weeklyGoal['remainingThisWeek'] ?? weeklyGoal['remaining_this_week'],
+    fallback:
+        (targetDaysPerWeek - completedThisWeek) < 0
+            ? 0
+            : (targetDaysPerWeek - completedThisWeek),
+  );
+
+  final weekList =
+      weeklyGoal['week'] ??
+      weeklyGoal['days'] ??
+      weeklyGoal['weekDays'] ??
+      weeklyGoal['week_days'];
+  var weekGrid = const <CellType>[];
+  final completedDates = <DateTime>[];
+  final frozenDates = <DateTime>[];
+  DateTime? weekStartDate;
+  DateTime? lastCompletedDate;
+  if (weekList is List) {
+    final row = List<CellType>.filled(7, CellType.cross);
+    for (var i = 0; i < weekList.length && i < 7; i++) {
+      final day = _asMap(weekList[i]);
+      final completed = _asBool(day['completed']);
+      final frozen = _asBool(day['frozen']);
+      final date = _parseDate(day['date']);
+      final cell =
+          frozen ? CellType.freeze : (completed ? CellType.tick : CellType.cross);
+      final idx = date != null ? _weekdayIndexFromDate(date) : i;
+      row[idx] = cell;
+      if (date != null) {
+        weekStartDate ??= _startOfWeek(date);
+        if (completed) {
+          completedDates.add(date);
+          if (lastCompletedDate == null ||
+              lastCompletedDate!.isBefore(date)) {
+            lastCompletedDate = date;
+          }
+        }
+        if (frozen) {
+          frozenDates.add(date);
+        }
+      }
+    }
+    weekGrid = _normalizeRow(row);
+  }
+
+  weekStartDate ??= _parseDate(
+    weeklyGoal['weekStart'] ?? weeklyGoal['week_start'],
+  );
+
+  final freezeAllowancePerMonth = _asInt(
+    freezeMap['allowancePerMonth'] ??
+        freezeMap['allowance_per_month'],
+  );
+  final freezeUsedThisMonth = _asInt(
+    freezeMap['usedThisMonth'] ?? freezeMap['used_this_month'],
+  );
+  final freezeAvailable = _asInt(
+    freezeMap['available'],
+    fallback:
+        (freezeAllowancePerMonth - freezeUsedThisMonth) < 0
+            ? 0
+            : (freezeAllowancePerMonth - freezeUsedThisMonth),
+  );
+
+  return StreakData(
+    currentStreak: currentStreak,
+    longestStreak: longestStreak,
+    selectedDays: const <String>[],
+    targetDaysPerWeek: targetDaysPerWeek,
+    completedThisWeek: completedThisWeek,
+    remainingThisWeek: remainingThisWeek,
+    freezeTokens: freezeAvailable,
+    freezeAllowancePerMonth: freezeAllowancePerMonth,
+    freezeUsedThisMonth: freezeUsedThisMonth,
+    status: status,
+    isInDanger: isInDanger,
+    weekStartDate: weekStartDate,
+    lastCompletedDate: lastCompletedDate,
+    completedDates: completedDates,
+    frozenDates: frozenDates,
+    weekGrid: weekGrid,
+    raw: data,
+  );
 }
 
 List<CellType>? _extractWeekGrid(Map<String, dynamic> map) {
@@ -1325,4 +1502,18 @@ List<List<CellType>> _buildHistoryRowsFromDates(StreakData data) {
   final keys = rowsByWeek.keys.toList()
     ..sort((a, b) => b.compareTo(a));
   return keys.map((k) => _normalizeRow(rowsByWeek[k]!)).toList();
+}
+
+String _stringifyResponse(dynamic data) {
+  if (data == null) return 'null';
+  if (data is String) return data;
+  try {
+    return const JsonEncoder.withIndent('  ').convert(data);
+  } catch (_) {
+    try {
+      return data.toString();
+    } catch (_) {
+      return 'unprintable_response';
+    }
+  }
 }

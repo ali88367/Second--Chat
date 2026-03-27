@@ -34,9 +34,12 @@ class ChatSocketService extends GetxService {
   final RxMap<String, String?> playerUrlByPlatform = <String, String?>{}.obs;
 
   io.Socket? _socket;
+  String _label = 'socket';
+  int _connectSeq = 0;
   Timer? _reconnectTimer;
   Timer? _startHeartbeatTimer;
   DateTime _lastStartEmit = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastStopEmit = DateTime.fromMillisecondsSinceEpoch(0);
   bool _manuallyDisconnected = false;
 
   // Prevent duplicate messages (bounded memory).
@@ -48,9 +51,9 @@ class ChatSocketService extends GetxService {
     if (!verboseLogs) return;
     try {
       final pretty = _prettyJson(payload);
-      debugPrint('SOCKET <= $event $pretty');
+      debugPrint('SOCKET($_label#$_connectSeq) <= $event $pretty');
     } catch (_) {
-      debugPrint('SOCKET <= $event ${payload.toString()}');
+      debugPrint('SOCKET($_label#$_connectSeq) <= $event ${payload.toString()}');
     }
   }
 
@@ -67,9 +70,12 @@ class ChatSocketService extends GetxService {
     required String baseUrl,
     required String path,
     required String accessToken,
+    String? label,
   }) async {
     try {
       _manuallyDisconnected = false;
+      _label = (label == null || label.trim().isEmpty) ? 'socket' : label.trim();
+      _connectSeq++;
       await disconnect(); // ensures clean slate
 
       _logSocket('init', {
@@ -109,6 +115,8 @@ class ChatSocketService extends GetxService {
 
       socket.on('connect_error', (e) {
         _logSocket('connect_error', e);
+        final m = _asMap(e);
+        socketError.value = m ?? {'message': e.toString()};
       });
 
       // Log any event that we don't explicitly handle (and duplicates too).
@@ -359,6 +367,9 @@ class ChatSocketService extends GetxService {
 
   void _emitStop() {
     try {
+      final now = DateTime.now();
+      if (now.difference(_lastStopEmit) < const Duration(milliseconds: 800)) return;
+      _lastStopEmit = now;
       _logSocket('emit chat:stop', null);
       _socket?.emit('chat:stop');
     } catch (_) {}

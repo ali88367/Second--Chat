@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+import 'package:second_chat/core/localization/l10n.dart';
 
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
@@ -25,13 +27,20 @@ class _StreamWebViewState extends State<StreamWebView> {
   void initState() {
     super.initState();
     // Configure iOS autoplay/inline playback via WebKit params when available.
-    PlatformWebViewControllerCreationParams params;
-    try {
-      params = WebKitWebViewControllerCreationParams(
-        allowsInlineMediaPlayback: true,
-        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
-      );
-    } catch (_) {
+    // IMPORTANT: WKWebView params cause platform channel errors on Android, so
+    // we only create them on iOS.
+    final bool isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    late final PlatformWebViewControllerCreationParams params;
+    if (isIOS) {
+      try {
+        params = WebKitWebViewControllerCreationParams(
+          allowsInlineMediaPlayback: true,
+          mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+        );
+      } catch (_) {
+        params = const PlatformWebViewControllerCreationParams();
+      }
+    } else {
       params = const PlatformWebViewControllerCreationParams();
     }
 
@@ -122,22 +131,22 @@ class _StreamWebViewState extends State<StreamWebView> {
   @override
   Widget build(BuildContext context) {
     if (widget.url.trim().isEmpty) {
+      final l10n = context.l10n;
       return SizedBox(
         height: widget.height,
         child: Container(
           color: Colors.black,
           alignment: Alignment.center,
-          child:  Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.videocam_off, color: Colors.white38, size:43.sp),
               SizedBox(height: 7.h),
               Center(
                 child: Text(
-                  'No stream at the moment',
+                  l10n.noStreamAtTheMoment,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54,
-                  ),
+                  style: const TextStyle(color: Colors.white54),
                 ),
               ),
             ],

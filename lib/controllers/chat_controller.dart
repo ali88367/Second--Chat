@@ -1,37 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../api/app_api.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
-import '../core/socket/chat_socket_service.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/streaming_overview.dart';
-import '../data/services/chat_service.dart';
-import '../data/services/streaming_service.dart';
+import '../data/services/live_stream_service.dart';
 
 class ChatController extends GetxController {
   ChatController({
-    AppApi? api,
     PlatformTokenProvider? tokenProvider,
-    ChatSocketService? socketService,
-  }) : _api = api ?? AppApi.create(),
-       _tokenProvider = tokenProvider ?? PlatformTokenProvider(),
-       _socket =
-           socketService ?? Get.put(ChatSocketService(), permanent: true) {
-    _streaming = StreamingService(_api.client.dio);
-    _chat = ChatService(_api.client.dio);
-  }
+    LiveStreamService? liveStreamService,
+  }) : _tokenProvider = tokenProvider ?? PlatformTokenProvider(),
+       _live =
+           liveStreamService ??
+           LiveStreamService(tokenProvider: tokenProvider ?? PlatformTokenProvider());
 
-  final AppApi _api;
   final PlatformTokenProvider _tokenProvider;
-  final ChatSocketService _socket;
   final SettingsController _settings = Get.find<SettingsController>();
-  late final StreamingService _streaming;
-  late final ChatService _chat;
+  final LiveStreamService _live;
 
   final RxString platform = 'twitch'.obs;
 
@@ -50,20 +39,25 @@ class ChatController extends GetxController {
   Timer? _connectRetryTimer;
   bool _realtimeObserversWired = false;
   bool _socketConnecting = false;
+  DateTime _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastPlatformSocketSwitchAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   final Set<String> _historyInFlight = <String>{};
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
 
-  RxList<ChatMessage> get messages => _socket.messages;
-  RxInt get viewerCount => _socket.viewerCount;
-  RxBool get isConnected => _socket.isConnected;
+  final RxList<ChatMessage> messages = <ChatMessage>[].obs;
+  final RxInt viewerCount = 0.obs;
+  final RxBool isConnected = false.obs;
 
   final RxInt scrollTick = 0.obs; // UI can observe this to auto-scroll.
 
   String? _accessToken;
+  String? _socketBaseUrl;
+  String? _socketPath;
 
   @override
   void onInit() {
     super.onInit();
+    _wireServiceCallbacks();
     _bootstrap();
 
     // If tokens/overview are not ready at first app launch, connect may skip.
@@ -83,7 +77,7 @@ class ChatController extends GetxController {
   void _startConnectRetry() {
     _connectRetryTimer?.cancel();
     _connectRetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (_socket.isConnected.value == true) {
+      if (isConnected.value == true) {
         _connectRetryTimer?.cancel();
         _connectRetryTimer = null;
         return;
@@ -98,45 +92,6 @@ class ChatController extends GetxController {
 
     _wireRealtime();
 
-    // Keep live/viewer state in sync with realtime events.
-    ever<Map<String, int>>(_socket.viewerCountsByPlatform, (m) {
-      if (m.isNotEmpty) platformViewerCounts.assignAll(m);
-    });
-    ever<Map<String, bool>>(_socket.liveByPlatform, (m) {
-      if (m.isNotEmpty) platformLive.assignAll(m);
-      // If currently selected platform went offline, clear its stream + chat immediately.
-      final selected = platform.value.toLowerCase();
-      final isNowLive = m[selected] == true;
-      if (!isNowLive) {
-        // WebView should show "No stream at the moment"
-        isLive.value = false;
-        watchUrl.value = '';
-        // Clear messages for this platform (user requested).
-        messages.removeWhere(
-          (msg) => msg.platform.toLowerCase() == selected,
-        );
-        _bumpScroll();
-      } else {
-        isLive.value = true;
-        final u = platformEmbedUrls[selected];
-        if (u != null && u.trim().isNotEmpty) {
-          watchUrl.value = u;
-        }
-        // Stream live hote hi chat ko warm-up karo (history + socket).
-        unawaited(_ensureChatForLivePlatform(selected));
-      }
-    });
-    ever<Map<String, String?>>(_socket.playerUrlByPlatform, (m) {
-      if (m.isNotEmpty) platformEmbedUrls.assignAll(m);
-      // keep current webview URL updated if user is focused on a platform
-      final selected = platform.value.toLowerCase();
-      final u = m[selected];
-      if (u != null && u.trim().isNotEmpty && isPlatformLive(selected)) {
-        watchUrl.value = u;
-        isLive.value = true;
-      }
-    });
-
     ever<List<ChatMessage>>(messages, (_) {
       _bumpScroll();
     });
@@ -146,16 +101,24 @@ class ChatController extends GetxController {
     if (_socketConnecting) return;
     _socketConnecting = true;
     try {
-      if (_socket.isConnected.value == true) return;
+      if (isConnected.value == true) return;
 
-      final token = _accessToken ?? await _tokenProvider.getAccessToken(platform.value);
+      // Debounce socket connect attempts to avoid spam when multiple watchers fire.
+      final now = DateTime.now();
+      if (now.difference(_lastSocketConnectAttempt) < const Duration(seconds: 3)) {
+        return;
+      }
+      _lastSocketConnectAttempt = now;
+
+      final token = _accessToken ??
+          await _live.ensureFreshPlatformAccessToken(platform: platform.value) ??
+          await _tokenProvider.getAccessToken(platform.value);
       if (token == null || token.trim().isEmpty) return;
       _accessToken = token.trim();
 
       // Ensure we have socketUrl/socketPath in `overview`.
-      final ov = overview.value;
-      final socketUrl = ov?.chatSocketUrl;
-      final socketPath = ov?.chatSocketPath;
+      var socketUrl = _socketBaseUrl;
+      var socketPath = _socketPath;
 
       final hasSocketFields = socketUrl != null &&
           socketUrl.trim().isNotEmpty &&
@@ -165,22 +128,22 @@ class ChatController extends GetxController {
       if (!hasSocketFields) {
         // Refresh only the selected platform overview; it also updates socketUrl/path.
         await refreshOverviewForPlatform(platform.value);
+        socketUrl = _socketBaseUrl;
+        socketPath = _socketPath;
       }
 
-      final ov2 = overview.value;
-      final socketUrl2 = ov2?.chatSocketUrl;
-      final socketPath2 = ov2?.chatSocketPath;
-      if (socketUrl2 == null ||
-          socketUrl2.trim().isEmpty ||
-          socketPath2 == null ||
-          socketPath2.trim().isEmpty) {
+      if (socketUrl == null ||
+          socketUrl.trim().isEmpty ||
+          socketPath == null ||
+          socketPath.trim().isEmpty) {
         return;
       }
 
-      await _socket.connect(
-        baseUrl: socketUrl2.trim(),
-        path: socketPath2.trim(),
+      await _live.connect(
+        baseUrl: socketUrl.trim(),
+        path: socketPath.trim(),
         accessToken: _accessToken!,
+        label: platform.value.toLowerCase(),
       );
 
       _wireObserversOnce();
@@ -192,34 +155,7 @@ class ChatController extends GetxController {
   }
 
   void _wireRealtime() {
-    // Activity (sync + live)
-    ever<List<Map<String, dynamic>>>(_socket.activity, (list) {
-      if (list.isNotEmpty) {
-        activityEvents.assignAll(list);
-      }
-    });
-
-    // Stream meta (title/category) from realtime events.
-    void applyMeta(Map<String, dynamic>? m) {
-      if (m == null) return;
-      final platform = (m['platform'] ?? '').toString().toLowerCase();
-      if (platform.isEmpty) return;
-
-      Map<String, dynamic>? meta;
-      final rawMeta = m['meta'];
-      if (rawMeta is Map) meta = rawMeta.cast<String, dynamic>();
-
-      final title = (meta?['title'] ?? m['title'])?.toString().trim();
-      final category = (meta?['category'] ?? m['category'])?.toString().trim();
-      if (title != null && title.isNotEmpty)
-        streamTitleByPlatform[platform] = title;
-      if (category != null && category.isNotEmpty) {
-        streamCategoryByPlatform[platform] = category;
-      }
-    }
-
-    ever<Map<String, dynamic>?>(_socket.streamStatus, applyMeta);
-    ever<Map<String, dynamic>?>(_socket.streamInfoUpdate, applyMeta);
+    // Wiring is callback-based inside LiveStreamService.
   }
 
   Future<void> _bootstrap() async {
@@ -239,7 +175,7 @@ class ChatController extends GetxController {
       _accessToken = await _tokenProvider.getAccessToken(platform.value);
       if (_accessToken == null || _accessToken!.isEmpty) return;
 
-      final history = await _chat.loadHistory(
+      final history = await _live.loadHistory(
         platform: platform.value,
         accessToken: _accessToken!,
       );
@@ -253,21 +189,20 @@ class ChatController extends GetxController {
         await refreshOverviewForPlatform(platform.value);
       }
 
-      final ov = overview.value;
-      final socketUrl = ov?.chatSocketUrl;
-      final socketPath = ov?.chatSocketPath;
+      final socketUrl = _socketBaseUrl;
+      final socketPath = _socketPath;
       if (socketUrl != null &&
           socketUrl.trim().isNotEmpty &&
           socketPath != null &&
           socketPath.trim().isNotEmpty) {
-        await _socket.connect(
+        await _live.connect(
           baseUrl: socketUrl.trim(),
           path: socketPath.trim(),
           accessToken: _accessToken!,
+          label: platform.value.toLowerCase(),
         );
       }
 
-      _wireRealtime();
       _wireObserversOnce();
     } catch (_) {}
   }
@@ -307,7 +242,7 @@ class ChatController extends GetxController {
           );
         }
         if (effectiveToken == null || effectiveToken.isEmpty) continue;
-        final ov = await _streaming.fetchOverview(
+        final ov = await _live.fetchOverview(
           platform: p,
           accessToken: effectiveToken,
         );
@@ -335,6 +270,9 @@ class ChatController extends GetxController {
         // also ensure the requested platform has a url if backend didn't provide platforms list
         mergedEmbed[ov.platform.toLowerCase()] ??= ov.watchUrl;
       }
+
+      _socketBaseUrl = socketUrl ?? _socketBaseUrl;
+      _socketPath = socketPath ?? _socketPath;
 
       // Keep current selected platform overview as the "primary" overview object.
       final current = platform.value.toLowerCase();
@@ -372,8 +310,10 @@ class ChatController extends GetxController {
 
   Future<void> refreshOverviewForPlatform(String p) async {
     try {
-      final token = _accessToken ?? await _tokenProvider.getAccessToken(p);
+      final token = await _live.ensureFreshPlatformAccessToken(platform: p) ??
+          await _tokenProvider.getAccessToken(p);
       if (token == null || token.isEmpty) return;
+      _accessToken = token.trim();
 
       // If multi-preview mode is enabled, refresh all platforms so the top streams stay "hot".
       if (_settings.multiScreenPreview.value == true) {
@@ -383,6 +323,7 @@ class ChatController extends GetxController {
         await refreshOverviewsForPlatforms(const ['twitch', 'kick', 'youtube']);
         // selected platform state still needs to update.
         platform.value = p;
+        unawaited(_switchSocketToPlatform(p));
         final key = p.toLowerCase();
         isLive.value = platformLive[key] ?? isLive.value;
         watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
@@ -392,14 +333,17 @@ class ChatController extends GetxController {
         return;
       }
 
-      final ov = await _streaming.fetchOverview(
+      final ov = await _live.fetchOverview(
         platform: p,
         accessToken: token,
       );
       if (ov == null) return;
       overview.value = ov;
+      _socketBaseUrl = ov.chatSocketUrl ?? _socketBaseUrl;
+      _socketPath = ov.chatSocketPath ?? _socketPath;
       // selected platform state
       platform.value = p;
+      unawaited(_switchSocketToPlatform(p));
       isLive.value = ov.live;
       watchUrl.value = ov.watchUrl;
       // multi-platform state
@@ -422,6 +366,44 @@ class ChatController extends GetxController {
     } catch (_) {}
   }
 
+  Future<void> _switchSocketToPlatform(String p) async {
+    final key = p.toLowerCase().trim();
+    if (key.isEmpty) return;
+    // Debounce platform socket switching (chip tap + swipe can fire quickly).
+    final now = DateTime.now();
+    if (now.difference(_lastPlatformSocketSwitchAttempt) <
+        const Duration(milliseconds: 600)) {
+      return;
+    }
+    _lastPlatformSocketSwitchAttempt = now;
+
+    final token = await _live.ensureFreshPlatformAccessToken(platform: key) ??
+        await _tokenProvider.getAccessToken(key);
+    if (token == null || token.trim().isEmpty) return;
+    _accessToken = token.trim();
+
+    // Ensure socket url/path is available (from last overview fetch).
+    final socketUrl = _socketBaseUrl;
+    final socketPath = _socketPath;
+    if (socketUrl == null ||
+        socketUrl.trim().isEmpty ||
+        socketPath == null ||
+        socketPath.trim().isEmpty) {
+      return;
+    }
+
+    // Disconnect previous socket and connect again with new platform token.
+    try {
+      await _live.disconnect();
+    } catch (_) {}
+    await _live.connect(
+      baseUrl: socketUrl.trim(),
+      path: socketPath.trim(),
+      accessToken: _accessToken!,
+      label: key,
+    );
+  }
+
   bool isPlatformLive(String p) {
     return platformLive[p.toLowerCase()] == true;
   }
@@ -437,18 +419,14 @@ class ChatController extends GetxController {
         _accessToken ?? await _tokenProvider.getAccessToken(platform.value);
     if (token == null || token.isEmpty) return;
 
-    await _chat.sendMessage(
-      platform: platform.value,
-      accessToken: token,
-      message: msg,
-    );
+    await _live.sendMessage(platform: platform.value, accessToken: token, message: msg);
     _bumpScroll();
   }
 
   Future<void> _ensureChatForLivePlatform(String p) async {
     final key = p.toLowerCase();
     // 1) Socket ensure connect (no-op if already connected)
-    if (_socket.isConnected.value != true) {
+    if (isConnected.value != true) {
       await _tryConnectIfPossible();
     }
 
@@ -461,12 +439,14 @@ class ChatController extends GetxController {
       return;
     }
 
-    final token = _accessToken ?? await _tokenProvider.getAccessToken(key);
+    final token = _accessToken ??
+        await _live.ensureFreshPlatformAccessToken(platform: key) ??
+        await _tokenProvider.getAccessToken(key);
     if (token == null || token.isEmpty) return;
 
     _historyInFlight.add(key);
     try {
-      final history = await _chat.loadHistory(
+      final history = await _live.loadHistory(
         platform: key,
         accessToken: token,
         limit: 100,
@@ -499,6 +479,82 @@ class ChatController extends GetxController {
     scrollTick.value++;
   }
 
+  void _wireServiceCallbacks() {
+    _live.onSocketConnected = () {
+      isConnected.value = true;
+    };
+    _live.onSocketDisconnected = (_) {
+      isConnected.value = false;
+    };
+    _live.onSocketError = (m) async {
+      final msg = (m['message'] ?? '').toString();
+      if (msg.contains('Invalid authentication token') ||
+          msg.contains('Authentication token required')) {
+        // Refresh platform token and retry connect quickly.
+        final selected = platform.value.toLowerCase();
+        final fresh =
+            await _live.ensureFreshPlatformAccessToken(platform: selected);
+        if (fresh != null && fresh.trim().isNotEmpty) {
+          _accessToken = fresh.trim();
+          await refreshOverviewForPlatform(selected);
+          unawaited(_tryConnectIfPossible());
+        }
+      }
+    };
+    _live.onViewerCountUpdate = (p, vc) {
+      platformViewerCounts[p] = vc;
+      if (p == platform.value.toLowerCase()) viewerCount.value = vc;
+    };
+    _live.onLiveUpdate = (p, live) {
+      platformLive[p] = live;
+      final selected = platform.value.toLowerCase();
+      if (p != selected) return;
+
+      if (!live) {
+        isLive.value = false;
+        watchUrl.value = '';
+        messages.removeWhere((msg) => msg.platform.toLowerCase() == selected);
+        _bumpScroll();
+      } else {
+        isLive.value = true;
+        final u = platformEmbedUrls[selected];
+        if (u != null && u.trim().isNotEmpty) watchUrl.value = u;
+        unawaited(_ensureChatForLivePlatform(selected));
+      }
+    };
+    _live.onPlayerUrlUpdate = (p, url) {
+      platformEmbedUrls[p] = url;
+      final selected = platform.value.toLowerCase();
+      if (p == selected && (url?.trim().isNotEmpty == true) && isPlatformLive(selected)) {
+        watchUrl.value = url;
+        isLive.value = true;
+      }
+    };
+    _live.onActivitySync = (events) {
+      if (events.isNotEmpty) activityEvents.assignAll(events);
+    };
+    _live.onActivityEvent = (e) {
+      activityEvents.add(e);
+    };
+    void applyMeta(Map<String, dynamic> m) {
+      final p = (m['platform'] ?? '').toString().toLowerCase();
+      if (p.isEmpty) return;
+      Map<String, dynamic>? meta;
+      final rawMeta = m['meta'];
+      if (rawMeta is Map) meta = rawMeta.cast<String, dynamic>();
+      final title = (meta?['title'] ?? m['title'])?.toString().trim();
+      final category = (meta?['category'] ?? m['category'])?.toString().trim();
+      if (title != null && title.isNotEmpty) streamTitleByPlatform[p] = title;
+      if (category != null && category.isNotEmpty) streamCategoryByPlatform[p] = category;
+    }
+    _live.onStreamStatus = applyMeta;
+    _live.onStreamInfoUpdate = applyMeta;
+    _live.onChatMessage = (msg) {
+      messages.add(msg);
+      _bumpScroll();
+    };
+  }
+
   @override
   void onClose() {
     _connectRetryTimer?.cancel();
@@ -506,7 +562,7 @@ class ChatController extends GetxController {
     _historyInFlight.clear();
     _historyLastFetchAt.clear();
     try {
-      _socket.disconnect();
+      _live.disconnect();
     } catch (_) {}
     super.onClose();
   }

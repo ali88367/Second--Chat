@@ -8,6 +8,7 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
 import 'package:second_chat/features/Streaks/Compact_freeze.dart';
 import 'package:second_chat/features/Streaks/Freeze_bottomsheet.dart';
+import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
@@ -59,7 +60,21 @@ class _HomeScreen2State extends State<HomeScreen2> {
       );
       if (!mounted) return;
 
-      if (streak == null) return;
+      if (streak == null) {
+        await Get.bottomSheet(
+          const StreamStreakSetupBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+        if (mounted) {
+          await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+        }
+        return;
+      }
 
       if (streak.isInDanger) {
         await Get.bottomSheet(
@@ -470,7 +485,22 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
       force: true,
       silent: false,
     );
-    if (!mounted || streak == null) return;
+    if (!mounted) return;
+    if (streak == null) {
+      await Get.bottomSheet(
+        const StreamStreakSetupBottomSheet(),
+        isDismissible: true,
+        isScrollControlled: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 300),
+        exitBottomSheetDuration: const Duration(milliseconds: 250),
+      );
+      if (mounted) {
+        await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+      }
+      return;
+    }
 
     if (streak.isInDanger) {
       await Get.bottomSheet(
