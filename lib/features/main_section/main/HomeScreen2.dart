@@ -44,31 +44,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
   Future<void> _loadStreakOnLaunch() async {
     final hasSession = await _streakCtrl.ensureSession(showErrors: false);
     if (!hasSession) return;
-
-    final streak = await _streakCtrl.fetchCurrentStreak(
-      force: true,
-      silent: true,
-    );
-    if (!mounted || streak != null) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || _streakSheetOpening) return;
-      _streakSheetOpening = true;
-      try {
-        await Get.bottomSheet(
-          const StreamStreakSetupBottomSheet(),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-      } finally {
-        _streakSheetOpening = false;
-        _streakCtrl.fetchCurrentStreak(force: true, silent: true);
-      }
-    });
+    await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
   }
 
   Future<void> _openStreakSheet() async {
@@ -94,8 +70,13 @@ class _HomeScreen2State extends State<HomeScreen2> {
           enterBottomSheetDuration: const Duration(milliseconds: 300),
           exitBottomSheetDuration: const Duration(milliseconds: 250),
         );
-        await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
-      } else if (streak.isInDanger) {
+        if (mounted) {
+          await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+        }
+        return;
+      }
+
+      if (streak.isInDanger) {
         await Get.bottomSheet(
           const StreakFreezePreviewBottomSheet(),
           isDismissible: true,
@@ -498,6 +479,52 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     });
   }
 
+  Future<void> _openStreakOverview() async {
+    if (_streakLoading) return;
+    final streak = await _streakCtrl.fetchCurrentStreak(
+      force: true,
+      silent: false,
+    );
+    if (!mounted) return;
+    if (streak == null) {
+      await Get.bottomSheet(
+        const StreamStreakSetupBottomSheet(),
+        isDismissible: true,
+        isScrollControlled: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 300),
+        exitBottomSheetDuration: const Duration(milliseconds: 250),
+      );
+      if (mounted) {
+        await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+      }
+      return;
+    }
+
+    if (streak.isInDanger) {
+      await Get.bottomSheet(
+        const StreakFreezePreviewBottomSheet(),
+        isDismissible: true,
+        isScrollControlled: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 300),
+        exitBottomSheetDuration: const Duration(milliseconds: 250),
+      );
+    } else {
+      await Get.bottomSheet(
+        const StreakFreezeSingleRowPreviewBottomSheet(),
+        isDismissible: true,
+        isScrollControlled: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 300),
+        exitBottomSheetDuration: const Duration(milliseconds: 250),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -686,33 +713,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
 
                       // 4. Customisable streaks
                       InkWell(
-                        onTap: () {
-                          if (_streakLoading || hasStreak) return;
-                          Get.bottomSheet(
-                            Container(
-                              height: Get.height * .9,
-                              decoration: BoxDecoration(
-                                color: bottomSheetGrey,
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(18.r),
-                                  topLeft: Radius.circular(18.r),
-                                ),
-                              ),
-                              child: StreamStreakSetupBottomSheet(),
-                            ),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          ).then((_) {
-                            _checkStreakExists();
-                          });
-                        },
+                        onTap: _openStreakOverview,
                         child: _buildMenuItem(
                           imagePath: 'assets/images/calendar.png',
                           title: context.l10n.customisableStreaks,

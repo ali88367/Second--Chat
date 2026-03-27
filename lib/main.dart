@@ -13,7 +13,7 @@ import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
-import 'package:second_chat/features/live_stream/live_stream_screen.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
@@ -310,7 +310,7 @@ class _StartupGateState extends State<StartupGate> {
       }
 
       if (auth.isAuthenticated.value) {
-        return const Livestreaming();
+        return const HomeScreen2();
       }
 
       return IntroScreen1(initialController: widget.introVideoController);

@@ -395,21 +395,21 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                             bottom: 0.h,
                             child: SizedBox(
                               width: 155.w,
-                              height: 100.h,
+                              height: 75.h,
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  Image.asset(
-                                    'assets/images/Streak number.png',
-                                    width: 155.w,
-                                    height: 100.h,
-                                    fit: BoxFit.contain,
-                                  ),
+                                  // Image.asset(
+                                  //   'assets/images/Streak number.png',
+                                  //   width: 155.w,
+                                  //   height: 100.h,
+                                  //   fit: BoxFit.contain,
+                                  // ),
                                   Text(
                                     '$longestStreak',
                                     style: sfProDisplay600(
-                                      40.sp,
-                                      const Color(0xFF1E1D20),
+                                      55.sp,
+                                      Colors.white
                                     ),
                                   ),
                                 ],
