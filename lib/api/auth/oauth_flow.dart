@@ -11,9 +11,7 @@ import '../../core/localization/get_l10n.dart';
 import 'oauth_provider.dart';
 
 class OAuthFlow {
-  OAuthFlow({
-    AppLinks? appLinks,
-  }) : _appLinks = appLinks ?? AppLinks();
+  OAuthFlow({AppLinks? appLinks}) : _appLinks = appLinks ?? AppLinks();
 
   final AppLinks _appLinks;
 
@@ -122,14 +120,18 @@ class OAuthFlow {
     }
 
     _pendingProvider = provider;
-    _pendingState = authorizationUrl.queryParameters['state'];
+    final freshAuthorizationUrl = _makeFreshAuthorizationUrl(
+      provider: provider,
+      authorizationUrl: authorizationUrl,
+    );
+    _pendingState = freshAuthorizationUrl.queryParameters['state'];
     _receivedRedirect = false;
     _cancelTimer?.cancel();
 
     _pendingCompleter = Completer<Uri>();
 
     try {
-      await _launchCustomTab(authorizationUrl);
+      await _launchCustomTab(freshAuthorizationUrl);
     } catch (_) {
       _resetPending();
       throw StateError('Failed to open OAuth browser view');
@@ -144,6 +146,48 @@ class OAuthFlow {
       _resetPending();
       rethrow;
     }
+  }
+
+  Uri _makeFreshAuthorizationUrl({
+    required OAuthProvider provider,
+    required Uri authorizationUrl,
+  }) {
+    switch (provider) {
+      case OAuthProvider.twitch:
+        // Twitch: force auth screen even if the browser already has an active session.
+        return _upsertQueryParams(authorizationUrl, const {
+          'force_verify': 'true',
+        });
+      case OAuthProvider.youtube:
+        return _withGoogleFreshPrompt(authorizationUrl);
+      case OAuthProvider.kick:
+        return authorizationUrl;
+    }
+  }
+
+  Uri _withGoogleFreshPrompt(Uri authorizationUrl) {
+    final params = <String, String>{...authorizationUrl.queryParameters};
+    final promptValues = <String>{};
+    final current = params['prompt'];
+    if (current != null && current.trim().isNotEmpty) {
+      for (final value in current.split(RegExp(r'[\s,]+'))) {
+        final trimmed = value.trim();
+        if (trimmed.isNotEmpty) {
+          promptValues.add(trimmed);
+        }
+      }
+    }
+    // Google: always show account picker and consent for a fresh OAuth choice.
+    promptValues
+      ..add('select_account')
+      ..add('consent');
+    params['prompt'] = promptValues.join(' ');
+    return authorizationUrl.replace(queryParameters: params);
+  }
+
+  Uri _upsertQueryParams(Uri url, Map<String, String> updates) {
+    final params = <String, String>{...url.queryParameters, ...updates};
+    return url.replace(queryParameters: params);
   }
 
   Future<void> _launchCustomTab(Uri authorizationUrl) async {
@@ -209,7 +253,8 @@ class OAuthFlow {
     }
 
     final successRaw = params['success']?.toLowerCase();
-    final isSuccess = successRaw == 'true' || successRaw == '1' || successRaw == 'yes';
+    final isSuccess =
+        successRaw == 'true' || successRaw == '1' || successRaw == 'yes';
     final linkedPlatform = params['linked'];
     if (isSuccess && (linkedPlatform != null && linkedPlatform.isNotEmpty)) {
       final provider = _pendingProvider;
@@ -265,7 +310,9 @@ class OAuthFlow {
     final provider = _pendingProvider;
     _resetPending();
 
-    if (provider == null) return OAuthCallback(error: 'Missing pending provider');
+    if (provider == null) {
+      return OAuthCallback(error: 'Missing pending provider');
+    }
     return OAuthCallback(
       provider: provider,
       code: code,

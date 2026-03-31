@@ -238,7 +238,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     try {
       await Get.find<PlatformConnectController>().refreshConnections();
     } catch (_) {}
-    Get.until((route) => route.isFirst);
+    Get.offAllNamed('/');
   }
 
   @override
