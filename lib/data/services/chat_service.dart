@@ -60,6 +60,10 @@ class ChatService {
         options: Options(
           headers: {
             'Authorization': 'Bearer $accessToken',
+            // Ensure intermediaries/browsers do not cache chat history responses.
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
           },
         ),
       );

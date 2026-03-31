@@ -49,6 +49,7 @@ class ChatController extends GetxController {
   DateTime _lastPlatformSocketSwitchAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   final Set<String> _historyInFlight = <String>{};
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
+  static const Duration _historyMinRefreshInterval = Duration(seconds: 0);
 
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
@@ -73,6 +74,8 @@ class ChatController extends GetxController {
     _bootstrap();
     ever<String>(platform, (p) {
       unawaited(_swapToPlatformAndRefresh(p));
+      // Also refresh overview so the WebView/player URL switches instantly.
+      unawaited(refreshOverviewForPlatform(p));
     });
 
     // If tokens/overview are not ready at first app launch, connect may skip.
@@ -330,13 +333,21 @@ class ChatController extends GetxController {
         }
         await refreshOverviewsForPlatforms(const ['twitch', 'kick', 'youtube']);
         // selected platform state still needs to update.
-        platform.value = p;
+        if (platform.value.toLowerCase().trim() != p.toLowerCase().trim()) {
+          platform.value = p;
+        }
         unawaited(_switchSocketToPlatform(p));
         final key = p.toLowerCase();
         isLive.value = platformLive[key] ?? isLive.value;
         watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
         if (isLive.value == true) {
           unawaited(_ensureChatForLivePlatform(key));
+        } else {
+          platformMessages[key] = const <ChatMessage>[];
+          if (platform.value.toLowerCase().trim() == key) {
+            messages.clear();
+            _bumpScroll();
+          }
         }
         return;
       }
@@ -350,7 +361,9 @@ class ChatController extends GetxController {
       _socketBaseUrl = ov.chatSocketUrl ?? _socketBaseUrl;
       _socketPath = ov.chatSocketPath ?? _socketPath;
       // selected platform state
-      platform.value = p;
+      if (platform.value.toLowerCase().trim() != p.toLowerCase().trim()) {
+        platform.value = p;
+      }
       unawaited(_switchSocketToPlatform(p));
       isLive.value = ov.live;
       watchUrl.value = ov.watchUrl;
@@ -370,6 +383,13 @@ class ChatController extends GetxController {
       }
       if (ov.live == true) {
         unawaited(_ensureChatForLivePlatform(p.toLowerCase()));
+      } else {
+        final key = p.toLowerCase().trim();
+        platformMessages[key] = const <ChatMessage>[];
+        if (platform.value.toLowerCase().trim() == key) {
+          messages.clear();
+          _bumpScroll();
+        }
       }
     } catch (_) {}
   }
@@ -658,6 +678,25 @@ class ChatController extends GetxController {
     final key = p.toLowerCase().trim();
     if (key.isEmpty) return;
 
+    // 0) Instant player/chat switch: never keep previous platform stream visible.
+    final cachedLive = platformLive[key];
+    if (cachedLive == false) {
+      isLive.value = false;
+      watchUrl.value = '';
+      platformMessages[key] = const <ChatMessage>[];
+      if (platform.value.toLowerCase().trim() == key) {
+        messages.clear();
+      }
+      _bumpScroll();
+    } else if (cachedLive == true) {
+      isLive.value = true;
+      final u = platformEmbedUrls[key];
+      watchUrl.value = (u != null && u.trim().isNotEmpty) ? u : '';
+    } else {
+      // Unknown state: avoid showing old stream while we fetch.
+      watchUrl.value = '';
+    }
+
     // 1) Swap visible list instantly.
     final existing = platformMessages[key] ?? const <ChatMessage>[];
     if (messages.isEmpty || !identical(messages, existing)) {
@@ -676,7 +715,9 @@ class ChatController extends GetxController {
     if (_historyInFlight.contains(key)) return;
     final now = DateTime.now().toUtc();
     final last = _historyLastFetchAt[key];
-    if (!force && last != null && now.difference(last) < const Duration(seconds: 15)) {
+    if (!force &&
+        last != null &&
+        now.difference(last) < _historyMinRefreshInterval) {
       return;
     }
 
@@ -793,6 +834,10 @@ class ChatController extends GetxController {
   void _wireServiceCallbacks() {
     _live.onSocketConnected = () {
       isConnected.value = true;
+      final selected = platform.value.toLowerCase().trim();
+      if (selected.isNotEmpty) {
+        unawaited(_refreshHistoryForPlatform(selected, force: true));
+      }
     };
     _live.onSocketDisconnected = (_) {
       isConnected.value = false;
@@ -862,6 +907,14 @@ class ChatController extends GetxController {
     _live.onStreamStatus = applyMeta;
     _live.onStreamInfoUpdate = applyMeta;
     _live.onChatMessage = _handleIncomingChatMessage;
+  }
+
+  /// Public: always fetch latest chat history from server (no UI caching).
+  /// Socket messages are still appended in realtime, but this ensures you don't
+  /// miss messages after reconnect or backgrounding.
+  Future<void> refreshChatHistory({String? forPlatform, bool force = true}) {
+    final key = (forPlatform ?? platform.value).toLowerCase().trim();
+    return _refreshHistoryForPlatform(key, force: force);
   }
 
   @override
