@@ -38,6 +38,7 @@
   "free": "Gratuit",
   "get": "Obtenez",
   "getStarted": "Commencer",
+  "logout": "Se déconnecter",
   "gettingStarted": "Bien démarrer",
   "freezeTagline": "Allez-y, figez-le. S’engager, c’est \\nsurévalué de toute façon.",
   "ignore": "Ignorer",
@@ -197,5 +198,30 @@
   "notificationPermissionDenied": "L'autorisation de notifications n'a pas été accordée.",
   "notNow": "Pas maintenant",
   "notificationScreenAnotherTime": "Une autre fois",
-  "turnOnNotifications": "Activer les notifications"
+  "turnOnNotifications": "Activer les notifications",
+  "settingsTitleProfile": "Profil",
+  "profileAccount": "Compte",
+  "profileEmail": "E-mail",
+  "profileUsername": "Nom d’utilisateur",
+  "profileRole": "Rôle",
+  "profileMemberSince": "Membre depuis",
+  "profileStreamStreaks": "Séries de stream",
+  "profileCurrentStreak": "Série actuelle",
+  "profileLongestStreak": "Plus longue série",
+  "profileThisWeek": "Cette semaine",
+  "profilePlatforms": "Plateformes",
+  "profileNotConnected": "Aucune plateforme liée pour l’instant.",
+  "profileStreakPlaceholder": "Les stats de série s’afficheront quand des données seront disponibles.",
+  "profileFreezeTokens": "Jetons de gel",
+  "profileWeekProgress": "{completed} sur {target} jours",
+  "@profileWeekProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  }
 }

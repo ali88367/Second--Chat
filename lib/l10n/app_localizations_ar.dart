@@ -123,6 +123,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get getStarted => 'ابدأ';
 
   @override
+  String get logout => 'تسجيل الخروج';
+
+  @override
   String get gettingStarted => 'البدء';
 
   @override
@@ -549,4 +552,52 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get turnOnNotifications => 'فعّل الإشعارات';
+
+  @override
+  String get settingsTitleProfile => 'الملف الشخصي';
+
+  @override
+  String get profileAccount => 'الحساب';
+
+  @override
+  String get profileEmail => 'البريد';
+
+  @override
+  String get profileUsername => 'اسم المستخدم';
+
+  @override
+  String get profileRole => 'الدور';
+
+  @override
+  String get profileMemberSince => 'عضو منذ';
+
+  @override
+  String get profileStreamStreaks => 'سلاسل البث';
+
+  @override
+  String get profileCurrentStreak => 'السلسلة الحالية';
+
+  @override
+  String get profileLongestStreak => 'أطول سلسلة';
+
+  @override
+  String get profileThisWeek => 'هذا الأسبوع';
+
+  @override
+  String get profilePlatforms => 'المنصات';
+
+  @override
+  String get profileNotConnected => 'لا توجد منصات مرتبطة بعد.';
+
+  @override
+  String get profileStreakPlaceholder =>
+      'ستظهر إحصائيات السلسلة عند توفر البيانات.';
+
+  @override
+  String get profileFreezeTokens => 'رموز التجميد';
+
+  @override
+  String profileWeekProgress(int completed, int target) {
+    return '$completed من $target أيام';
+  }
 }

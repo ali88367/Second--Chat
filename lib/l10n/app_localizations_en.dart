@@ -124,6 +124,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get getStarted => 'Get Started';
 
   @override
+  String get logout => 'Log out';
+
+  @override
   String get gettingStarted => 'Getting Started';
 
   @override
@@ -551,4 +554,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get turnOnNotifications => 'Turn on notifications';
+
+  @override
+  String get settingsTitleProfile => 'Profile';
+
+  @override
+  String get profileAccount => 'Account';
+
+  @override
+  String get profileEmail => 'Email';
+
+  @override
+  String get profileUsername => 'Username';
+
+  @override
+  String get profileRole => 'Role';
+
+  @override
+  String get profileMemberSince => 'Member since';
+
+  @override
+  String get profileStreamStreaks => 'Stream streaks';
+
+  @override
+  String get profileCurrentStreak => 'Current streak';
+
+  @override
+  String get profileLongestStreak => 'Longest streak';
+
+  @override
+  String get profileThisWeek => 'This week';
+
+  @override
+  String get profilePlatforms => 'Platforms';
+
+  @override
+  String get profileNotConnected => 'No platforms linked yet.';
+
+  @override
+  String get profileStreakPlaceholder =>
+      'Streak stats will show here when your account has streak data.';
+
+  @override
+  String get profileFreezeTokens => 'Freeze tokens';
+
+  @override
+  String profileWeekProgress(int completed, int target) {
+    return '$completed of $target days';
+  }
 }

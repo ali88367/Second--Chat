@@ -39,8 +39,14 @@ class AuthApi {
     return _parseTokens(res.data, fallbackRefreshToken: refreshToken);
   }
 
-  Future<void> logout() async {
-    await _dio.post<dynamic>('/api/v1/auth/logout');
+  /// Pass [accessToken] as `Authorization: Bearer` (required by backend for logout).
+  Future<Response<dynamic>> logout({String? accessToken}) async {
+    final trimmed = accessToken?.trim();
+    final opts =
+        trimmed != null && trimmed.isNotEmpty
+            ? Options(headers: {'Authorization': 'Bearer $trimmed'})
+            : Options();
+    return _dio.post<dynamic>('/api/v1/auth/logout', options: opts);
   }
 
   Future<Map<String, dynamic>> me() async {

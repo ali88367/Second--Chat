@@ -125,6 +125,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get getStarted => 'Empezar';
 
   @override
+  String get logout => 'Cerrar sesión';
+
+  @override
   String get gettingStarted => 'Primeros pasos';
 
   @override
@@ -556,4 +559,52 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get turnOnNotifications => 'Activar notificaciones';
+
+  @override
+  String get settingsTitleProfile => 'Perfil';
+
+  @override
+  String get profileAccount => 'Cuenta';
+
+  @override
+  String get profileEmail => 'Correo';
+
+  @override
+  String get profileUsername => 'Usuario';
+
+  @override
+  String get profileRole => 'Rol';
+
+  @override
+  String get profileMemberSince => 'Miembro desde';
+
+  @override
+  String get profileStreamStreaks => 'Rachas de stream';
+
+  @override
+  String get profileCurrentStreak => 'Racha actual';
+
+  @override
+  String get profileLongestStreak => 'Racha más larga';
+
+  @override
+  String get profileThisWeek => 'Esta semana';
+
+  @override
+  String get profilePlatforms => 'Plataformas';
+
+  @override
+  String get profileNotConnected => 'Aún no hay plataformas vinculadas.';
+
+  @override
+  String get profileStreakPlaceholder =>
+      'Las estadísticas de racha aparecerán cuando haya datos.';
+
+  @override
+  String get profileFreezeTokens => 'Congelaciones';
+
+  @override
+  String profileWeekProgress(int completed, int target) {
+    return '$completed de $target días';
+  }
 }

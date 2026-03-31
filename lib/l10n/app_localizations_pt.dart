@@ -127,6 +127,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get getStarted => 'Começar';
 
   @override
+  String get logout => 'Sair';
+
+  @override
   String get gettingStarted => 'Primeiros passos';
 
   @override
@@ -558,4 +561,52 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get turnOnNotifications => 'Ativar notificações';
+
+  @override
+  String get settingsTitleProfile => 'Perfil';
+
+  @override
+  String get profileAccount => 'Conta';
+
+  @override
+  String get profileEmail => 'E-mail';
+
+  @override
+  String get profileUsername => 'Nome de usuário';
+
+  @override
+  String get profileRole => 'Função';
+
+  @override
+  String get profileMemberSince => 'Membro desde';
+
+  @override
+  String get profileStreamStreaks => 'Sequências de stream';
+
+  @override
+  String get profileCurrentStreak => 'Sequência atual';
+
+  @override
+  String get profileLongestStreak => 'Maior sequência';
+
+  @override
+  String get profileThisWeek => 'Esta semana';
+
+  @override
+  String get profilePlatforms => 'Plataformas';
+
+  @override
+  String get profileNotConnected => 'Nenhuma plataforma vinculada ainda.';
+
+  @override
+  String get profileStreakPlaceholder =>
+      'As estatísticas de sequência aparecem quando houver dados.';
+
+  @override
+  String get profileFreezeTokens => 'Congelamentos';
+
+  @override
+  String profileWeekProgress(int completed, int target) {
+    return '$completed de $target dias';
+  }
 }

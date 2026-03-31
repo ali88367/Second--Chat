@@ -334,6 +334,12 @@ abstract class AppLocalizations {
   /// **'Get Started'**
   String get getStarted;
 
+  /// No description provided for @logout.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get logout;
+
   /// No description provided for @gettingStarted.
   ///
   /// In en, this message translates to:
@@ -1143,6 +1149,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Turn on notifications'**
   String get turnOnNotifications;
+
+  /// No description provided for @settingsTitleProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get settingsTitleProfile;
+
+  /// No description provided for @profileAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get profileAccount;
+
+  /// No description provided for @profileEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get profileEmail;
+
+  /// No description provided for @profileUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get profileUsername;
+
+  /// No description provided for @profileRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get profileRole;
+
+  /// No description provided for @profileMemberSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Member since'**
+  String get profileMemberSince;
+
+  /// No description provided for @profileStreamStreaks.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream streaks'**
+  String get profileStreamStreaks;
+
+  /// No description provided for @profileCurrentStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Current streak'**
+  String get profileCurrentStreak;
+
+  /// No description provided for @profileLongestStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest streak'**
+  String get profileLongestStreak;
+
+  /// No description provided for @profileThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get profileThisWeek;
+
+  /// No description provided for @profilePlatforms.
+  ///
+  /// In en, this message translates to:
+  /// **'Platforms'**
+  String get profilePlatforms;
+
+  /// No description provided for @profileNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'No platforms linked yet.'**
+  String get profileNotConnected;
+
+  /// No description provided for @profileStreakPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak stats will show here when your account has streak data.'**
+  String get profileStreakPlaceholder;
+
+  /// No description provided for @profileFreezeTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Freeze tokens'**
+  String get profileFreezeTokens;
+
+  /// No description provided for @profileWeekProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{completed} of {target} days'**
+  String profileWeekProgress(int completed, int target);
 }
 
 class _AppLocalizationsDelegate

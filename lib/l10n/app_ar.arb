@@ -38,6 +38,7 @@
   "free": "مجاني",
   "get": "احصل على",
   "getStarted": "ابدأ",
+  "logout": "تسجيل الخروج",
   "gettingStarted": "البدء",
   "freezeTagline": "تفضل، جمّدها. الالتزام \\nمبالغ فيه على أي حال.",
   "ignore": "تجاهل",
@@ -197,5 +198,30 @@
   "notificationPermissionDenied": "لم يتم منح إذن الإشعارات.",
   "notNow": "ليس الآن",
   "notificationScreenAnotherTime": "في وقت لاحق",
-  "turnOnNotifications": "فعّل الإشعارات"
+  "turnOnNotifications": "فعّل الإشعارات",
+  "settingsTitleProfile": "الملف الشخصي",
+  "profileAccount": "الحساب",
+  "profileEmail": "البريد",
+  "profileUsername": "اسم المستخدم",
+  "profileRole": "الدور",
+  "profileMemberSince": "عضو منذ",
+  "profileStreamStreaks": "سلاسل البث",
+  "profileCurrentStreak": "السلسلة الحالية",
+  "profileLongestStreak": "أطول سلسلة",
+  "profileThisWeek": "هذا الأسبوع",
+  "profilePlatforms": "المنصات",
+  "profileNotConnected": "لا توجد منصات مرتبطة بعد.",
+  "profileStreakPlaceholder": "ستظهر إحصائيات السلسلة عند توفر البيانات.",
+  "profileFreezeTokens": "رموز التجميد",
+  "profileWeekProgress": "{completed} من {target} أيام",
+  "@profileWeekProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  }
 }

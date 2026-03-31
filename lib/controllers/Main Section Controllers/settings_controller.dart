@@ -119,6 +119,13 @@ class SettingsController extends GetxController {
     loadSettings(force: true);
   }
 
+  /// After full logout + prefs wipe; next settings open will refetch.
+  void resetAfterLogout() {
+    settingsPayload.value = null;
+    settingsError.value = null;
+    _settingsRequested = false;
+  }
+
   Future<void> loadSettings({bool force = false}) async {
     if (_settingsRequested && !force) return;
     _settingsRequested = true;

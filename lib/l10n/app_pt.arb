@@ -38,6 +38,7 @@
   "free": "Grátis",
   "get": "Obtenha",
   "getStarted": "Começar",
+  "logout": "Sair",
   "gettingStarted": "Primeiros passos",
   "freezeTagline": "Vá em frente, congele. Compromisso é \\nsuperestimado mesmo.",
   "ignore": "Ignorar",
@@ -197,5 +198,30 @@
   "notificationPermissionDenied": "Permissão de notificação não concedida.",
   "notNow": "Agora não",
   "notificationScreenAnotherTime": "Outra hora",
-  "turnOnNotifications": "Ativar notificações"
+  "turnOnNotifications": "Ativar notificações",
+  "settingsTitleProfile": "Perfil",
+  "profileAccount": "Conta",
+  "profileEmail": "E-mail",
+  "profileUsername": "Nome de usuário",
+  "profileRole": "Função",
+  "profileMemberSince": "Membro desde",
+  "profileStreamStreaks": "Sequências de stream",
+  "profileCurrentStreak": "Sequência atual",
+  "profileLongestStreak": "Maior sequência",
+  "profileThisWeek": "Esta semana",
+  "profilePlatforms": "Plataformas",
+  "profileNotConnected": "Nenhuma plataforma vinculada ainda.",
+  "profileStreakPlaceholder": "As estatísticas de sequência aparecem quando houver dados.",
+  "profileFreezeTokens": "Congelamentos",
+  "profileWeekProgress": "{completed} de {target} dias",
+  "@profileWeekProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -38,6 +38,7 @@
   "free": "Free",
   "get": "Get",
   "getStarted": "Get Started",
+  "logout": "Log out",
   "gettingStarted": "Getting Started",
   "freezeTagline": "Go ahead, freeze it. Commitment is overrated anyway.",
   "ignore": "Ignore",
@@ -197,5 +198,30 @@
   "notificationPermissionDenied": "Notification permission not granted.",
   "notNow": "Not now",
   "notificationScreenAnotherTime": "Another time",
-  "turnOnNotifications": "Turn on notifications"
+  "turnOnNotifications": "Turn on notifications",
+  "settingsTitleProfile": "Profile",
+  "profileAccount": "Account",
+  "profileEmail": "Email",
+  "profileUsername": "Username",
+  "profileRole": "Role",
+  "profileMemberSince": "Member since",
+  "profileStreamStreaks": "Stream streaks",
+  "profileCurrentStreak": "Current streak",
+  "profileLongestStreak": "Longest streak",
+  "profileThisWeek": "This week",
+  "profilePlatforms": "Platforms",
+  "profileNotConnected": "No platforms linked yet.",
+  "profileStreakPlaceholder": "Streak stats will show here when your account has streak data.",
+  "profileFreezeTokens": "Freeze tokens",
+  "profileWeekProgress": "{completed} of {target} days",
+  "@profileWeekProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  }
 }

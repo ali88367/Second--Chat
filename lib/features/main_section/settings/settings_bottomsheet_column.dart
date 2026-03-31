@@ -1,11 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:second_chat/controllers/auth_controller.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/features/main_section/settings/Led_settings.dart';
+import 'package:second_chat/features/main_section/settings/profile_settings_bottomsheet.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/platform_color_settings.dart';
 
@@ -71,6 +75,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         return context.l10n.settingsTitleTtsAdvancedSettings;
       case 'Disconnect Platform':
         return context.l10n.disconnectPlatform;
+      case 'Logout':
+        return context.l10n.logout;
+      case 'Profile':
+        return context.l10n.settingsTitleProfile;
       default:
         return raw;
     }
@@ -93,6 +101,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       },
     ],
     "": [
+      {
+        "prefixFlutterIcon": Icons.person_outline,
+        "title": "Profile",
+        "isForward": true,
+      },
       {
         "prefixImageAsset": linking_icon,
         "title": "Connect Other Platforms",
@@ -203,7 +216,30 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         "switchKey": "ttsAdvancedSettings",
       },
     ],
+    "LOGOUT": [
+      {
+        "prefixFlutterIcon": Icons.logout,
+        "title": "Logout",
+        "isLogoutAction": true,
+      },
+    ],
   };
+
+  Future<void> _runLogoutFlow() async {
+    Get.back();
+    final auth = Get.find<AuthController>();
+    await auth.logoutAndClearAllStoredData();
+    try {
+      await Get.find<ChatController>().resetForLogout();
+    } catch (_) {}
+    try {
+      Get.find<SettingsController>().resetAfterLogout();
+    } catch (_) {}
+    try {
+      await Get.find<PlatformConnectController>().refreshConnections();
+    } catch (_) {}
+    Get.until((route) => route.isFirst);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -274,7 +310,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (sectionTitle.isNotEmpty &&
-                          sectionTitle != "Notifications")
+                          sectionTitle != "Notifications" &&
+                          sectionTitle != "LOGOUT")
                         Padding(
                           padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
                           child: Text(
@@ -287,6 +324,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                         )
                       else if (sectionTitle.isEmpty)
                         SizedBox(height: 6.h)
+                      else if (sectionTitle == "LOGOUT")
+                        SizedBox(height: 16.h)
                       else
                         SizedBox(height: 2.h),
 
@@ -617,6 +656,10 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           ),
           child: InkWell(
             onTap: () {
+              if (tile["isLogoutAction"] == true) {
+                _runLogoutFlow();
+                return;
+              }
               if (isActuallyLocked) {
                 Get.bottomSheet(
                   Padding(
@@ -659,6 +702,41 @@ class SettingsBottomsheetColumn extends StatelessWidget {
 
               if (customForwardIcon == "assets/images/changer.png") {
                 showGlassSelector();
+                return;
+              }
+
+              if (tile["title"] == "Profile") {
+                Get.bottomSheet(
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: 12.w,
+                      right: 12.w,
+                      bottom: 15.h,
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: 361.w,
+                        constraints: BoxConstraints(
+                          maxHeight:
+                              MediaQuery.sizeOf(context).height * 0.88,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2C2C2E),
+                          borderRadius: BorderRadius.circular(36.r),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(36.r),
+                          child: const ProfileSettingsBottomSheet(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  isDismissible: true,
+                  isScrollControlled: true,
+                  enableDrag: true,
+                  backgroundColor: Colors.transparent,
+                );
                 return;
               }
 
@@ -710,7 +788,14 @@ class SettingsBottomsheetColumn extends StatelessWidget {
             },
             child: Row(
               children: [
-                if (sectionTitle == "CHAT")
+                if ((tile["prefixFlutterIcon"] as IconData?) != null)
+                  Icon(
+                    (tile["prefixFlutterIcon"] as IconData?)!,
+                    size: 24.sp,
+                    color: const Color.fromRGBO(255, 230, 167, 1)
+                        .withOpacity(opacity),
+                  )
+                else if (sectionTitle == "CHAT")
                   Obx(
                     () => Image.asset(
                       tile["prefixImageAsset"],

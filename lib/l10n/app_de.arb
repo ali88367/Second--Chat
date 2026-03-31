@@ -38,6 +38,7 @@
   "free": "Kostenlos",
   "get": "Hol dir",
   "getStarted": "Loslegen",
+  "logout": "Abmelden",
   "gettingStarted": "Erste Schritte",
   "freezeTagline": "Nur zu, frier es ein. Verpflichtung ist \\nehin überbewertet.",
   "ignore": "Ignorieren",
@@ -197,5 +198,30 @@
   "notificationPermissionDenied": "Benachrichtigungsberechtigung nicht erteilt.",
   "notNow": "Nicht jetzt",
   "notificationScreenAnotherTime": "Später",
-  "turnOnNotifications": "Benachrichtigungen einschalten"
+  "turnOnNotifications": "Benachrichtigungen einschalten",
+  "settingsTitleProfile": "Profil",
+  "profileAccount": "Konto",
+  "profileEmail": "E-Mail",
+  "profileUsername": "Benutzername",
+  "profileRole": "Rolle",
+  "profileMemberSince": "Mitglied seit",
+  "profileStreamStreaks": "Stream-Serien",
+  "profileCurrentStreak": "Aktuelle Serie",
+  "profileLongestStreak": "Längste Serie",
+  "profileThisWeek": "Diese Woche",
+  "profilePlatforms": "Plattformen",
+  "profileNotConnected": "Noch keine Plattformen verknüpft.",
+  "profileStreakPlaceholder": "Serien-Infos erscheinen hier, sobald Daten vorliegen.",
+  "profileFreezeTokens": "Freeze-Token",
+  "profileWeekProgress": "{completed} von {target} Tagen",
+  "@profileWeekProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  }
 }

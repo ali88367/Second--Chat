@@ -163,11 +163,27 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> logout() async {
+    await logoutAndClearAllStoredData();
+  }
+
+  /// Ends the server session, clears secure token store and **all** SharedPreferences.
+  Future<void> logoutAndClearAllStoredData() async {
+    final tokens = await _api.tokenStore.read();
+    final accessToken = tokens?.accessToken;
+
     try {
-      await authApi.logout();
-    } catch (_) {}
+      final res = await authApi.logout(accessToken: accessToken);
+      // ignore: avoid_print
+      print(
+        'LOGOUT API response: status=${res.statusCode} data=${res.data}',
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('LOGOUT API error: $e');
+    }
+
     await _api.tokenStore.clear();
-    await _clearSessionTokensFromPrefs();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
     isAuthenticated.value = false;
     me.value = null;
     lastError.value = null;

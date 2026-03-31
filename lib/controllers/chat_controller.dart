@@ -758,6 +758,38 @@ class ChatController extends GetxController {
     scrollTick.value++;
   }
 
+  /// Disconnect realtime chat and clear lists after full logout.
+  Future<void> resetForLogout() async {
+    _connectRetryTimer?.cancel();
+    _connectRetryTimer = null;
+    _pendingLocalChatEchoes.clear();
+    _historyInFlight.clear();
+    _historyLastFetchAt.clear();
+    _activityChatSourceDedupeIds.clear();
+    _realtimeObserversWired = false;
+    try {
+      await _live.disconnect();
+    } catch (_) {}
+    _accessToken = null;
+    _socketBaseUrl = null;
+    _socketPath = null;
+    platformMessages.clear();
+    messages.clear();
+    activityEvents.clear();
+    platformViewerCounts.clear();
+    platformLive.clear();
+    platformEmbedUrls.clear();
+    streamTitleByPlatform.clear();
+    streamCategoryByPlatform.clear();
+    overview.value = null;
+    watchUrl.value = null;
+    isLive.value = false;
+    viewerCount.value = 0;
+    isConnected.value = false;
+    scrollTick.value = 0;
+    _startConnectRetry();
+  }
+
   void _wireServiceCallbacks() {
     _live.onSocketConnected = () {
       isConnected.value = true;
