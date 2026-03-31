@@ -917,6 +917,31 @@ class ChatController extends GetxController {
     return _refreshHistoryForPlatform(key, force: force);
   }
 
+  /// Switch selected platform and clear the current stream immediately.
+  /// This is intentionally synchronous to guarantee the UI clears in the same frame
+  /// (before any async overview/history calls complete).
+  void selectPlatformInstant(String p) {
+    final key = p.toLowerCase().trim();
+    if (key.isEmpty) return;
+
+    // Clear current player immediately so previous platform stream doesn't linger.
+    watchUrl.value = '';
+    isLive.value = false;
+
+    // Clear visible chat immediately (history/socket will repopulate if live).
+    platformMessages[key] = const <ChatMessage>[];
+    messages.clear();
+    _bumpScroll();
+
+    if (platform.value.toLowerCase().trim() != key) {
+      platform.value = key;
+    } else {
+      // If selecting the same platform again, still force refresh so stream updates.
+      unawaited(_swapToPlatformAndRefresh(key, forceHistory: true));
+      unawaited(refreshOverviewForPlatform(key));
+    }
+  }
+
   @override
   void onClose() {
     _connectRetryTimer?.cancel();

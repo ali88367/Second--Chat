@@ -172,10 +172,10 @@ class _LivestreamingState extends State<Livestreaming> {
     } else {
       _chatFilter.value = platformKey;
     }
-    // Refresh overview for the selected platform so stream/embed updates.
+    // Instant: clear old stream + switch selected platform immediately.
     final chatCtrl = Get.find<ChatController>();
     final selected = _chatFilter.value ?? 'twitch';
-    chatCtrl.refreshOverviewForPlatform(selected);
+    chatCtrl.selectPlatformInstant(selected);
   }
 
   void _handlePlatformSwipe(bool swipeRight) {
@@ -192,7 +192,7 @@ class _LivestreamingState extends State<Livestreaming> {
     }
     final chatCtrl = Get.find<ChatController>();
     final selected = _chatFilter.value ?? 'twitch';
-    chatCtrl.refreshOverviewForPlatform(selected);
+    chatCtrl.selectPlatformInstant(selected);
   }
 
   void _log(String message) {
