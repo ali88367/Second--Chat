@@ -238,7 +238,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     try {
       await Get.find<PlatformConnectController>().refreshConnections();
     } catch (_) {}
-    Get.until((route) => route.isFirst);
+    Get.offAllNamed('/');
   }
 
   @override
@@ -303,8 +303,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     return FreePlanWidget(controller: controller);
                   }
                   int sectionIndex = index - 1;
-                  String sectionTitle = settingsData.keys.elementAt(sectionIndex);
-                  List<Map<String, dynamic>> tiles = settingsData[sectionTitle]!;
+                  String sectionTitle = settingsData.keys.elementAt(
+                    sectionIndex,
+                  );
+                  List<Map<String, dynamic>> tiles =
+                      settingsData[sectionTitle]!;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,17 +344,18 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16.r),
                         ),
                         child: Column(
-                          children: tiles.asMap().entries.map((entry) {
-                            int tileIndex = entry.key;
-                            Map<String, dynamic> tile = entry.value;
-                            return _buildTile(
-                              tile,
-                              controller,
-                              tileIndex,
-                              sectionTitle,
-                              context,
-                            );
-                          }).toList(),
+                          children:
+                              tiles.asMap().entries.map((entry) {
+                                int tileIndex = entry.key;
+                                Map<String, dynamic> tile = entry.value;
+                                return _buildTile(
+                                  tile,
+                                  controller,
+                                  tileIndex,
+                                  sectionTitle,
+                                  context,
+                                );
+                              }).toList(),
                         ),
                       ),
                     ],
@@ -376,55 +380,56 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       'failedToLoadSettings' => context.l10n.failedToLoadSettings,
       _ => context.l10n.failedToLoadSettings,
     };
-    final Widget content = error != null
-        ? GestureDetector(
-            onTap: () => controller.loadSettings(force: true),
-            child: Container(
+    final Widget content =
+        error != null
+            ? GestureDetector(
+              onTap: () => controller.loadSettings(force: true),
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 24.w),
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: onBottomSheetGrey,
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      errorMessage,
+                      style: sfProDisplay600(16.sp, Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      context.l10n.tapToRetry,
+                      style: sfProText400(13.sp, Colors.white60),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            : Container(
               margin: EdgeInsets.symmetric(horizontal: 24.w),
-              padding: EdgeInsets.all(16.w),
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
               decoration: BoxDecoration(
                 color: onBottomSheetGrey,
                 borderRadius: BorderRadius.circular(20.r),
               ),
-              child: Column(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    errorMessage,
-                    style: sfProDisplay600(16.sp, Colors.white),
+                  SizedBox(
+                    width: 18.w,
+                    height: 18.w,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(height: 6.h),
+                  SizedBox(width: 10.w),
                   Text(
-                    context.l10n.tapToRetry,
-                    style: sfProText400(13.sp, Colors.white60),
+                    context.l10n.loadingSettings,
+                    style: sfProText500(14.sp, Colors.white70),
                   ),
                 ],
               ),
-            ),
-          )
-        : Container(
-            margin: EdgeInsets.symmetric(horizontal: 24.w),
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-            decoration: BoxDecoration(
-              color: onBottomSheetGrey,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 18.w,
-                  height: 18.w,
-                  child: const CircularProgressIndicator(strokeWidth: 2),
-                ),
-                SizedBox(width: 10.w),
-                Text(
-                  context.l10n.loadingSettings,
-                  style: sfProText500(14.sp, Colors.white70),
-                ),
-              ],
-            ),
-          );
+            );
 
     return SafeArea(
       top: false,
@@ -461,9 +466,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
             ),
           ),
           SizedBox(height: 10.h),
-          Expanded(
-            child: Center(child: content),
-          ),
+          Expanded(child: Center(child: content)),
         ],
       ),
     );
@@ -533,9 +536,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     }
 
     Color getBaseColor() {
-      if (sectionTitle != "CHAT") return const Color.fromRGBO(255, 230, 167, 1);
       final platform = controller.selectedPlatform.value;
-      if (platform == "All") return const Color.fromRGBO(255, 230, 167, 1);
+      if (platform.toLowerCase() == "all") {
+        // Keep a neutral readable accent in feed when "All" is selected.
+        return const Color.fromRGBO(255, 230, 167, 1);
+      }
       return controller.getPlatformColor(platform);
     }
 
@@ -718,8 +723,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       child: Container(
                         width: 361.w,
                         constraints: BoxConstraints(
-                          maxHeight:
-                              MediaQuery.sizeOf(context).height * 0.88,
+                          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2C2C2E),
@@ -766,7 +770,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                           borderRadius: BorderRadius.circular(36.r),
                           child:
                               tile["title"] == "LED Notifications"
-                                  ?  LedSettingsBottomSheet()
+                                  ? LedSettingsBottomSheet()
                                   : openAsBottomSheet == "connect"
                                   ? ConnectPlatformSetting()
                                   : PlatformColorSettings(),
@@ -788,34 +792,22 @@ class SettingsBottomsheetColumn extends StatelessWidget {
             },
             child: Row(
               children: [
-                if ((tile["prefixFlutterIcon"] as IconData?) != null)
-                  Icon(
-                    (tile["prefixFlutterIcon"] as IconData?)!,
-                    size: 24.sp,
-                    color: const Color.fromRGBO(255, 230, 167, 1)
-                        .withOpacity(opacity),
-                  )
-                else if (sectionTitle == "CHAT")
-                  Obx(
-                    () => Image.asset(
-                      tile["prefixImageAsset"],
-                      width: 24.w,
-                      height: 24.h,
-                      color: getBaseColor().withOpacity(opacity),
-                    ),
-                  )
-                else
-                  Image.asset(
+                Obx(() {
+                  final iconColor = getBaseColor().withOpacity(opacity);
+                  if ((tile["prefixFlutterIcon"] as IconData?) != null) {
+                    return Icon(
+                      (tile["prefixFlutterIcon"] as IconData?)!,
+                      size: 24.sp,
+                      color: iconColor,
+                    );
+                  }
+                  return Image.asset(
                     tile["prefixImageAsset"],
                     width: 24.w,
                     height: 24.h,
-                    color: const Color.fromRGBO(
-                      255,
-                      230,
-                      167,
-                      1,
-                    ).withOpacity(opacity),
-                  ),
+                    color: iconColor,
+                  );
+                }),
                 SizedBox(width: 12.w),
                 Expanded(
                   child: Text(
@@ -836,7 +828,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                       ),
                     if (shouldShowSwitch)
                       _buildSwitch(
-                        sectionTitle,
                         switchValue!,
                         getBaseColor,
                         controller,
@@ -896,17 +887,13 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   }
 
   Widget _buildSwitch(
-    String sectionTitle,
     RxBool switchValue,
     Color Function() getBaseColor,
     SettingsController controller,
     String? switchKey,
   ) {
     return Obx(() {
-      final baseColor =
-          sectionTitle == "CHAT"
-              ? getBaseColor()
-              : const Color.fromRGBO(255, 230, 167, 1);
+      final baseColor = getBaseColor();
       return CustomSwitch(
         value: switchValue.value,
         onChanged: (val) {
@@ -1000,37 +987,35 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
               AnimatedSize(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
-                child: _showSubscribe
-                    ? Column(
-                        children: [
-                          SizedBox(height: 12.h),
-                          GestureDetector(
-                            onTap: () {
-                              // TODO: Navigate to subscription page
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.symmetric(vertical: 12.h),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    beige,
-                                    beige,
-                                  ],
+                child:
+                    _showSubscribe
+                        ? Column(
+                          children: [
+                            SizedBox(height: 12.h),
+                            GestureDetector(
+                              onTap: () {
+                                // TODO: Navigate to subscription page
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(vertical: 12.h),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [beige, beige],
+                                  ),
+                                  borderRadius: BorderRadius.circular(14.r),
                                 ),
-                                borderRadius: BorderRadius.circular(14.r),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  context.l10n.subscribe,
-                                  style: sfProText600(15.sp, Colors.white),
+                                child: Center(
+                                  child: Text(
+                                    context.l10n.subscribe,
+                                    style: sfProText600(15.sp, Colors.white),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      )
-                    : const SizedBox.shrink(),
+                          ],
+                        )
+                        : const SizedBox.shrink(),
               ),
             ],
           ),
@@ -1049,7 +1034,7 @@ class ChatPlatformTabs extends StatelessWidget {
     final List<String> tabs = ["All", "Twitch", "Kick", "YouTube"];
 
     return Container(
-      height: 36.h,
+      height: 40.h,
       width: double.infinity,
       decoration: BoxDecoration(
         color: onBottomSheetGrey,
@@ -1060,51 +1045,82 @@ class ChatPlatformTabs extends StatelessWidget {
         final selected = controller.selectedPlatform.value;
         return Row(
           children: [
-            for (int i = 0; i < tabs.length; i++) ...[
+            for (int i = 0; i < tabs.length; i++)
               Expanded(
-                child: GestureDetector(
-                  onTap: () => controller.selectedPlatform.value = tabs[i],
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color:
-                          selected == tabs[i]
-                              ? _getPlatformColor(controller, "All")
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16.r),
-                    ),
-                    child: Text(
-                      tabs[i],
-                      style: TextStyle(
-                        color:
-                            tabs[i] == "All"
-                                ? Colors.white
-                                : _getPlatformColor(controller, tabs[i]),
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w600,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2.w),
+                  child: GestureDetector(
+                    onTap: () => controller.selectedPlatform.value = tabs[i],
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOut,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _tabBackgroundColor(
+                          controller,
+                          tabs[i],
+                          isSelected: selected == tabs[i],
+                        ),
+                        borderRadius: BorderRadius.circular(14.r),
+                        border: Border.all(
+                          color:
+                              selected == tabs[i]
+                                  ? Colors.white.withOpacity(0.24)
+                                  : Colors.white.withOpacity(0.08),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        tabs[i],
+                        style: TextStyle(
+                          color: _tabTextColor(
+                            controller,
+                            tabs[i],
+                            isSelected: selected == tabs[i],
+                          ),
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-              if (i != tabs.length - 1)
-                Container(
-                  width: 1.w,
-                  height: 18.h,
-                  color:
-                      selected == tabs[i] || selected == tabs[i + 1]
-                          ? Colors.transparent
-                          : Colors.grey.withOpacity(0.3),
-                  margin: EdgeInsets.symmetric(horizontal: 2.w),
-                ),
-            ],
           ],
         );
       }),
     );
   }
 
-  Color _getPlatformColor(SettingsController controller, String tab) {
+  Color _tabBackgroundColor(
+    SettingsController controller,
+    String tab, {
+    required bool isSelected,
+  }) {
+    const neutralBlack = Color.fromRGBO(22, 22, 22, 1);
+    if (!isSelected) return neutralBlack;
+    if (tab.toLowerCase() == 'all') return neutralBlack;
     return controller.getPlatformColor(tab);
+  }
+
+  Color _tabTextColor(
+    SettingsController controller,
+    String tab, {
+    required bool isSelected,
+  }) {
+    if (!isSelected) {
+      return Colors.white.withOpacity(0.82);
+    }
+    final background = _tabBackgroundColor(
+      controller,
+      tab,
+      isSelected: isSelected,
+    );
+    return _readableTextColor(background);
+  }
+
+  Color _readableTextColor(Color background) {
+    // Guarantee text never blends with selected tab background.
+    return background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
   }
 }

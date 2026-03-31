@@ -85,7 +85,7 @@ class SettingsController extends GetxController {
       case 'youtube':
         return youtubeColor.value ?? youtubeRed;
       case 'all':
-        return youtubeColor.value ?? const Color.fromRGBO(22, 22, 22, 1);
+        return const Color.fromRGBO(22, 22, 22, 1);
       default:
         return Colors.white;
     }
@@ -299,7 +299,8 @@ class SettingsController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       final code = prefs.getString(AppConstants.keyLanguage)?.trim();
       if (code != null && code.isNotEmpty) {
-        appLanguage.value = _languageCodeToName[code.toLowerCase()] ?? appLanguage.value;
+        appLanguage.value =
+            _languageCodeToName[code.toLowerCase()] ?? appLanguage.value;
       }
       final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
       if (fs != null && fs.isNotEmpty) {
