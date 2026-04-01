@@ -50,7 +50,21 @@ class _HomeScreen2State extends State<HomeScreen2> {
   Future<void> _openStreakSheet() async {
     if (_streakSheetOpening) return;
     _streakSheetOpening = true;
+    var loadingSheetOpen = false;
     try {
+      if (!mounted) return;
+      Get.bottomSheet(
+        const _StreakLoadingBottomSheet(),
+        isDismissible: false,
+        isScrollControlled: true,
+        enableDrag: false,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 120),
+        exitBottomSheetDuration: const Duration(milliseconds: 120),
+      );
+      loadingSheetOpen = true;
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
 
@@ -61,6 +75,11 @@ class _HomeScreen2State extends State<HomeScreen2> {
       if (!mounted) return;
 
       final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+      if (loadingSheetOpen && (Get.isBottomSheetOpen ?? false)) {
+        Get.back();
+        loadingSheetOpen = false;
+      }
+
       if (!hasCreatedStreak) {
         await Get.bottomSheet(
           const StreamStreakSetupBottomSheet(),
@@ -99,6 +118,9 @@ class _HomeScreen2State extends State<HomeScreen2> {
         );
       }
     } finally {
+      if (loadingSheetOpen && (Get.isBottomSheetOpen ?? false)) {
+        Get.back();
+      }
       _streakSheetOpening = false;
     }
   }
@@ -427,6 +449,40 @@ class _HomeScreen2State extends State<HomeScreen2> {
       width: width,
       height: height,
       child: Image.asset(assetPath, fit: BoxFit.contain),
+    );
+  }
+}
+
+class _StreakLoadingBottomSheet extends StatelessWidget {
+  const _StreakLoadingBottomSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: Get.height * 0.9,
+      decoration: BoxDecoration(
+        color: bottomSheetGrey,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(
+              strokeWidth: 2.8,
+              color: Colors.white,
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              'Loading streak...',
+              style: sfProText600(
+                15.sp,
+                const Color.fromRGBO(235, 235, 245, 0.85),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
