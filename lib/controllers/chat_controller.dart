@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'auth_controller.dart';
+import 'edge_glow_notification_controller.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
@@ -21,6 +22,8 @@ class ChatController extends GetxController {
 
   final PlatformTokenProvider _tokenProvider;
   final SettingsController _settings = Get.find<SettingsController>();
+  final EdgeGlowNotificationController _edgeGlow =
+      Get.find<EdgeGlowNotificationController>();
   final LiveStreamService _live;
 
   final RxString platform = 'twitch'.obs;
@@ -53,6 +56,7 @@ class ChatController extends GetxController {
 
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
+  final Map<String, DateTime> _edgeGlowEventSeenAt = <String, DateTime>{};
 
   /// Own messages: show immediately, then replace with the socket echo (same text).
   final List<_PendingLocalChatEcho> _pendingLocalChatEchoes = [];
@@ -607,7 +611,120 @@ class ChatController extends GetxController {
     return _chatMessagePayloadType(msg) == 'normal';
   }
 
-  void _appendActivityFromChatMessage(ChatMessage msg) {
+  static String _normalizePlatformKey(String? raw) {
+    final value = (raw ?? '').toLowerCase().trim();
+    if (value.isEmpty) return '';
+    if (value.contains('youtube') || value == 'yt' || value == 'google') {
+      return 'youtube';
+    }
+    if (value.contains('twitch')) return 'twitch';
+    if (value.contains('kick')) return 'kick';
+    if (value.contains('tiktok')) return 'tiktok';
+    return value;
+  }
+
+  static String _normalizeActivityType(String? rawType) {
+    return (rawType ?? '').toLowerCase().trim();
+  }
+
+  static bool _isActivityType(String? rawType) {
+    final type = _normalizeActivityType(rawType);
+    if (type.isEmpty) return false;
+    if (type == 'normal' ||
+        type == 'message' ||
+        type == 'chat' ||
+        type == 'chat_message' ||
+        type == 'chat:message') {
+      return false;
+    }
+    return true;
+  }
+
+  static bool _isActivityPayload(Map<String, dynamic> payload) {
+    return _isActivityType(payload['type']?.toString());
+  }
+
+  String _edgeGlowDedupeKeyForActivity(
+    Map<String, dynamic> event, {
+    required String platformKey,
+  }) {
+    final id = event['id']?.toString().trim();
+    final metadata = event['metadata'];
+    String messageId = '';
+    if (metadata is Map) {
+      messageId = (metadata['messageId'] ??
+                  metadata['message_id'] ??
+                  metadata['id'] ??
+                  '')
+              .toString()
+              .trim();
+    }
+    final type = _normalizeActivityType(event['type']?.toString());
+    final ts = (event['timestamp'] ?? event['created_at'] ?? '')
+        .toString()
+        .trim();
+
+    if (id != null && id.isNotEmpty) return '$platformKey|id:$id';
+    if (messageId.isNotEmpty) return '$platformKey|mid:$messageId|$type';
+    if (ts.isNotEmpty) return '$platformKey|$type|$ts';
+    return '$platformKey|$type|${event.hashCode}';
+  }
+
+  bool _seenEdgeGlowRecently(String key) {
+    final now = DateTime.now().toUtc();
+    _edgeGlowEventSeenAt.removeWhere(
+      (_, ts) => now.difference(ts) > const Duration(seconds: 12),
+    );
+    if (_edgeGlowEventSeenAt.containsKey(key)) return true;
+    _edgeGlowEventSeenAt[key] = now;
+    if (_edgeGlowEventSeenAt.length > 600) {
+      final oldestKeys = _edgeGlowEventSeenAt.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      for (final entry in oldestKeys.take(100)) {
+        _edgeGlowEventSeenAt.remove(entry.key);
+      }
+    }
+    return false;
+  }
+
+  void _maybeTriggerEdgeGlowForActivity(Map<String, dynamic> event) {
+    if (!_settings.notifications.value || !_settings.ledNotifications.value) {
+      return;
+    }
+    if (!_isActivityPayload(event)) return;
+
+    final selectedPlatform = _normalizePlatformKey(platform.value);
+    final eventPlatform = _normalizePlatformKey(event['platform']?.toString());
+
+    if (selectedPlatform.isNotEmpty &&
+        eventPlatform.isNotEmpty &&
+        selectedPlatform != eventPlatform) {
+      return;
+    }
+
+    final glowPlatform =
+        selectedPlatform.isNotEmpty ? selectedPlatform : eventPlatform;
+    if (glowPlatform.isEmpty) return;
+
+    final dedupeKey = _edgeGlowDedupeKeyForActivity(
+      event,
+      platformKey: glowPlatform,
+    );
+    if (_seenEdgeGlowRecently(dedupeKey)) return;
+
+    _edgeGlow.triggerForPlatform(glowPlatform);
+  }
+
+  void _handleIncomingActivityEvent(Map<String, dynamic> event) {
+    if (!_isActivityPayload(event)) return;
+    activityEvents.add(event);
+    _maybeTriggerEdgeGlowForActivity(event);
+  }
+
+  void _appendActivityFromChatMessage(
+    ChatMessage msg, {
+    bool triggerEdgeGlow = true,
+  }) {
     final id = msg.id?.trim();
     final dedupe = id != null && id.isNotEmpty
         ? 'id:$id'
@@ -618,7 +735,7 @@ class ChatController extends GetxController {
     }
     _activityChatSourceDedupeIds.add(dedupe);
 
-    activityEvents.add(<String, dynamic>{
+    final activityPayload = <String, dynamic>{
       'id': id,
       'platform': msg.platform,
       'type': _chatMessagePayloadType(msg),
@@ -629,7 +746,11 @@ class ChatController extends GetxController {
       },
       'timestamp': msg.timestamp.toUtc().toIso8601String(),
       'created_at': msg.timestamp.toUtc().toIso8601String(),
-    });
+    };
+    activityEvents.add(activityPayload);
+    if (triggerEdgeGlow) {
+      _maybeTriggerEdgeGlowForActivity(activityPayload);
+    }
   }
 
   void _handleIncomingChatMessage(ChatMessage msg) {
@@ -741,7 +862,7 @@ class ChatController extends GetxController {
           if (_isNormalChatMessage(m)) {
             normalOnly.add(m);
           } else {
-            _appendActivityFromChatMessage(m);
+            _appendActivityFromChatMessage(m, triggerEdgeGlow: false);
           }
         }
         final merged = _mergeUniqueByDedupeKey(
@@ -807,6 +928,7 @@ class ChatController extends GetxController {
     _historyInFlight.clear();
     _historyLastFetchAt.clear();
     _activityChatSourceDedupeIds.clear();
+    _edgeGlowEventSeenAt.clear();
     _realtimeObserversWired = false;
     try {
       await _live.disconnect();
@@ -888,10 +1010,28 @@ class ChatController extends GetxController {
       }
     };
     _live.onActivitySync = (events) {
-      if (events.isNotEmpty) activityEvents.assignAll(events);
+      if (events.isEmpty) return;
+      final filtered = events
+          .where((e) => _isActivityPayload(e))
+          .toList(growable: false);
+      if (filtered.isNotEmpty) {
+        activityEvents.assignAll(filtered);
+      }
     };
     _live.onActivityEvent = (e) {
-      activityEvents.add(e);
+      _handleIncomingActivityEvent(e);
+    };
+    _live.onLedNotification = (payload) {
+      final event = <String, dynamic>{...payload};
+      event['platform'] = (event['platform'] ?? platform.value).toString();
+      event['type'] =
+          (event['type'] ??
+                  event['eventType'] ??
+                  event['kind'] ??
+                  event['event'] ??
+                  'notification')
+              .toString();
+      _maybeTriggerEdgeGlowForActivity(event);
     };
     void applyMeta(Map<String, dynamic> m) {
       final p = (m['platform'] ?? '').toString().toLowerCase();
@@ -949,6 +1089,7 @@ class ChatController extends GetxController {
     _pendingLocalChatEchoes.clear();
     _historyInFlight.clear();
     _historyLastFetchAt.clear();
+    _edgeGlowEventSeenAt.clear();
     try {
       _live.disconnect();
     } catch (_) {}

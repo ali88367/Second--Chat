@@ -12,8 +12,11 @@ import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_cont
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/controllers/edge_glow_notification_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
+import 'package:second_chat/notifications.dart';
+import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
@@ -44,6 +47,7 @@ void main() {
 
     // Global controllers
     Get.put(SettingsController());
+    Get.put(EdgeGlowNotificationController(), permanent: true);
     Get.put(StreamStreaksController());
     Get.put(AuthController(), permanent: true);
     Get.put(ChatController(), permanent: true);
@@ -128,7 +132,13 @@ class MyApp extends StatelessWidget {
                   data: media.copyWith(textScaler: TextScaler.linear(scale)),
                   child: Directionality(
                     textDirection: TextDirection.ltr,
-                    child: child ?? const SizedBox.shrink(),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        child ?? const SizedBox.shrink(),
+                        const GlobalEdgeGlowOverlay(),
+                      ],
+                    ),
                   ),
                 );
               });
@@ -258,6 +268,10 @@ class MyApp extends StatelessWidget {
               GetPage(
                 name: '/auth/callback',
                 page: () => const _OAuthCallbackPlaceholder(),
+              ),
+              GetPage(
+                name: '/edge-glow-demo',
+                page: () => const EdgeGlowNotificationPage(),
               ),
             ],
             unknownRoute: GetPage(

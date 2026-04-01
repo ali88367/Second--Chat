@@ -196,6 +196,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
 
   Future<void> _freezeStreak() async {
     if (_isFreezing) return;
+    final isInDanger = _streakCtrl.streak?.isInDanger ?? false;
+    if (!isInDanger) return;
     final available = _streakCtrl.streak?.freezeTokens ?? 0;
     if (available <= 0) return;
 
@@ -228,6 +230,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     return Obx(() {
       final streak = _streakCtrl.streak;
       final available = streak?.freezeTokens ?? 0;
+      final isInDanger = streak?.isInDanger ?? false;
       final rowData = _streakCtrl.buildCurrentWeekRow();
       final isLoading = _streakCtrl.isLoading.value;
 
@@ -578,12 +581,12 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed:
-                                (available > 0 && !_isFreezing)
+                                (available > 0 && isInDanger && !_isFreezing)
                                     ? _freezeStreak
                                     : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
-                                  available > 0
+                                  (available > 0 && isInDanger)
                                       ? const Color(0xFF7EDDE4)
                                       : Colors.grey.withOpacity(0.5),
                               elevation: 0,

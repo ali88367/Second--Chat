@@ -284,13 +284,13 @@ class _StreakFreezePreviewBottomSheetState
     return Obx(() {
       final streak = _streakCtrl.streak;
       final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+      final isInDanger = streak?.isInDanger ?? false;
+      final canProceedToFreeze = hasCreatedStreak && isInDanger;
       final currentStreakCount = streak?.currentStreak ?? 0;
       final titleText = (streak?.isInDanger ?? false)
           ? context.l10n.streakInDangerHitFreezeButton
           : context.l10n.youVeNeverBeenHotterKeepStreakBurning;
       final freezeAllowance = streak?.freezeAllowancePerMonth ?? 0;
-      final isLoading =
-          _streakCtrl.isLoading.value || _streakCtrl.isHistoryLoading.value;
       final calendarRows = _streakCtrl.buildCalendarRows(maxRows: 4);
 
       return Container(
@@ -440,17 +440,6 @@ class _StreakFreezePreviewBottomSheetState
                           ),
                         ),
                       ],
-                      if (isLoading) ...[
-                        SizedBox(height: 6.h),
-                        SizedBox(
-                          width: 18.w,
-                          height: 18.w,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
                       SizedBox(height: 6.h),
 
                       // Static Pill
@@ -567,30 +556,42 @@ class _StreakFreezePreviewBottomSheetState
                       .of(context)
                       .viewPadding
                       .bottom,
-                  child: SizedBox(
-                    height: 50.h,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Get.back();
-                        Get.bottomSheet(
-                          const StreakFreezeUseBottomSheet(),
-                          isScrollControlled: true,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(36.r),
+                    child: SizedBox(
+                      height: 50.h,
+                      child: ElevatedButton(
+                        onPressed: canProceedToFreeze
+                            ? () {
+                                Get.back();
+                                Get.bottomSheet(
+                                  const StreakFreezeUseBottomSheet(),
+                                  isScrollControlled: true,
+                                );
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: canProceedToFreeze
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.5),
+                          disabledBackgroundColor: Colors.white.withOpacity(
+                            0.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(36.r),
+                          ),
+                          padding: EdgeInsets.zero,
                         ),
-                        padding: EdgeInsets.zero,
-                      ),
-                      child: Text(
-                        context.l10n.letsGo,
-                        style: sfProText600(17.sp, Colors.black),
+                        child: Text(
+                          context.l10n.letsGo,
+                          style: sfProText600(
+                            17.sp,
+                            canProceedToFreeze
+                                ? Colors.black
+                                : Colors.black.withOpacity(0.45),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
