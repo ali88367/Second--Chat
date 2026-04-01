@@ -189,7 +189,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     lastError.value = null;
   }
 
-  Future<bool> connectProvider(OAuthProvider provider) async {
+  Future<bool> connectProvider(
+    OAuthProvider provider, {
+    bool forceVerify = false,
+  }) async {
     try {
       final hasTokens = (await _api.tokenStore.read()) != null;
       if (!hasTokens) {
@@ -199,7 +202,13 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       final authUrl = await oauthApi.getAuthUrl(
         provider: provider,
         link: hasTokens,
+        forceVerify: forceVerify,
       );
+      if (kDebugMode) {
+        debugPrint(
+          'OAUTH AUTH URL REQUEST(${provider.name}): link=$hasTokens force_verify=$forceVerify',
+        );
+      }
 
       final callbackUri = await _oauthFlow.begin(
         provider: provider,

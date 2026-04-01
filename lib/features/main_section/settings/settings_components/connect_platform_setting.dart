@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
+import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/localization/l10n.dart';
@@ -225,7 +226,10 @@ Future<void> _handlePlatformTap(
   bool isConnected,
 ) async {
   if (!isConnected) {
-    await ctrl.connect(provider);
+    final ok = await ctrl.connect(provider);
+    if (ok) {
+      await _refreshSettingsPayload();
+    }
     return;
   }
 
@@ -276,6 +280,7 @@ Future<void> _handlePlatformTap(
 
   final ok = await ctrl.disconnect(provider);
   if (ok) {
+    await _refreshSettingsPayload();
     Get.snackbar(
       context.l10n.disconnected,
       context.l10n.platformDisconnected,
@@ -294,4 +299,11 @@ Future<void> _handlePlatformTap(
       margin: const EdgeInsets.all(20),
     );
   }
+}
+
+Future<void> _refreshSettingsPayload() async {
+  if (!Get.isRegistered<SettingsController>()) return;
+  try {
+    await Get.find<SettingsController>().loadSettings(force: true);
+  } catch (_) {}
 }

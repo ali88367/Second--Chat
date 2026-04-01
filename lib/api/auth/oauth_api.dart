@@ -13,6 +13,7 @@ class OAuthApi {
     required OAuthProvider provider,
     String? redirectUri,
     bool link = false,
+    bool forceVerify = false,
   }) async {
     final path = provider == OAuthProvider.youtube
         ? '/api/v1/auth/youtube/url'
@@ -26,6 +27,7 @@ class OAuthApi {
       path,
       queryParameters: {
         'redirectUri': redirectUri ?? ApiConfig.oauthRedirectUri,
+        if (forceVerify) 'force_verify': 'true',
       },
     );
 

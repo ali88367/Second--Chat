@@ -27,6 +27,7 @@ class PlatformConnectController extends GetxController {
   final Rxn<OAuthProvider> disconnectingProvider = Rxn<OAuthProvider>();
   final RxMap<OAuthProvider, bool> isConnected = <OAuthProvider, bool>{}.obs;
   final RxSet<OAuthProvider> optimisticLinked = <OAuthProvider>{}.obs;
+  final Set<OAuthProvider> _forceVerifyProviders = <OAuthProvider>{};
 
   @override
   void onInit() {
@@ -310,12 +311,49 @@ class PlatformConnectController extends GetxController {
     return token;
   }
 
+  Future<bool> _hasStoredTokensForProvider(OAuthProvider provider) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kPrefsPlatformTokens);
+    if (raw == null || raw.isEmpty) return false;
+    try {
+      final decoded = jsonDecode(raw);
+      final map = decoded is Map<String, dynamic>
+          ? decoded
+          : Map<String, dynamic>.from(decoded as Map);
+      final entry = map[provider.name];
+      if (entry is Map) {
+        final access = entry['accessToken']?.toString().trim();
+        final refresh = entry['refreshToken']?.toString().trim();
+        return (access != null && access.isNotEmpty) ||
+            (refresh != null && refresh.isNotEmpty);
+      }
+      if (entry is String) return entry.trim().isNotEmpty;
+      return entry != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _shouldForceVerifyOnConnect(OAuthProvider provider) async {
+    if (_forceVerifyProviders.contains(provider)) return true;
+    return _hasStoredTokensForProvider(provider);
+  }
+
   Future<bool> connect(OAuthProvider provider) async {
     if (connectingProvider.value != null) return false;
     connectingProvider.value = provider;
     bool ok = false;
     try {
-      ok = await _auth.connectProvider(provider);
+      final forceVerify = await _shouldForceVerifyOnConnect(provider);
+      if (kDebugMode) {
+        debugPrint(
+          'PLATFORMS CONNECT(${provider.name}) force_verify=$forceVerify',
+        );
+      }
+      ok = await _auth.connectProvider(
+        provider,
+        forceVerify: forceVerify,
+      );
       if (ok) {
         optimisticLinked.add(provider);
         isConnected[provider] = true;
@@ -364,6 +402,7 @@ class PlatformConnectController extends GetxController {
       if (ok) {
         isConnected[provider] = false;
         optimisticLinked.remove(provider);
+        _forceVerifyProviders.add(provider);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('PLATFORMS DISCONNECT ERROR: $e');

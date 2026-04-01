@@ -121,53 +121,16 @@ class _LivestreamingState extends State<Livestreaming> {
     if (_streakSheetOpening) return;
     _streakSheetOpening = true;
     try {
-      final hasSession = await _streakCtrl.ensureSession(showErrors: true);
-      if (!hasSession || !mounted) return;
-
-      final streak = await _streakCtrl.fetchCurrentStreak(
-        force: true,
-        silent: false,
-      );
       if (!mounted) return;
-
-      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
-      if (!hasCreatedStreak) {
-        await Get.bottomSheet(
-          const StreamStreakSetupBottomSheet(),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-        if (mounted) {
-          await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
-        }
-        return;
-      }
-
-      if (streak?.isInDanger == true) {
-        await Get.bottomSheet(
-          const StreakFreezePreviewBottomSheet(),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-      } else {
-        await Get.bottomSheet(
-          const StreakFreezeSingleRowPreviewBottomSheet(),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-      }
+      await Get.bottomSheet(
+        _LiveStreamStreakEntryBottomSheet(streakCtrl: _streakCtrl),
+        isDismissible: true,
+        isScrollControlled: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 120),
+        exitBottomSheetDuration: const Duration(milliseconds: 120),
+      );
     } finally {
       _streakSheetOpening = false;
     }
@@ -1468,5 +1431,94 @@ class _LivestreamingState extends State<Livestreaming> {
         ],
       ),
     );
+  }
+}
+
+enum _StreakEntryView { loading, setup, danger, normal }
+
+class _LiveStreamStreakEntryBottomSheet extends StatefulWidget {
+  const _LiveStreamStreakEntryBottomSheet({required this.streakCtrl});
+
+  final StreamStreaksController streakCtrl;
+
+  @override
+  State<_LiveStreamStreakEntryBottomSheet> createState() =>
+      _LiveStreamStreakEntryBottomSheetState();
+}
+
+class _LiveStreamStreakEntryBottomSheetState
+    extends State<_LiveStreamStreakEntryBottomSheet> {
+  _StreakEntryView _view = _StreakEntryView.loading;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveSheetView();
+  }
+
+  Future<void> _resolveSheetView() async {
+    final hasSession = await widget.streakCtrl.ensureSession(showErrors: true);
+    if (!mounted) return;
+    if (!hasSession) {
+      if (Get.isBottomSheetOpen ?? false) {
+        Get.back();
+      }
+      return;
+    }
+
+    final streak = await widget.streakCtrl.fetchCurrentStreak(
+      force: true,
+      silent: false,
+    );
+    if (!mounted) return;
+
+    final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+    final isInDanger = streak?.isInDanger == true;
+    setState(() {
+      if (!hasCreatedStreak) {
+        _view = _StreakEntryView.setup;
+      } else {
+        _view = isInDanger ? _StreakEntryView.danger : _StreakEntryView.normal;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_view) {
+      case _StreakEntryView.setup:
+        return const StreamStreakSetupBottomSheet();
+      case _StreakEntryView.danger:
+        return const StreakFreezePreviewBottomSheet(fetchOnInit: false);
+      case _StreakEntryView.normal:
+        return const StreakFreezeSingleRowPreviewBottomSheet(fetchOnInit: false);
+      case _StreakEntryView.loading:
+        return Container(
+          height: Get.height * 0.9,
+          decoration: BoxDecoration(
+            color: bottomSheetGrey,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(
+                  strokeWidth: 2.8,
+                  color: Colors.white,
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  'Loading streak...',
+                  style: sfProText600(
+                    15.sp,
+                    const Color.fromRGBO(235, 235, 245, 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+    }
   }
 }

@@ -8,6 +8,7 @@ import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_co
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
+import 'package:second_chat/features/intro/intro_screen2.dart';
 import 'package:second_chat/features/main_section/settings/Led_settings.dart';
 import 'package:second_chat/features/main_section/settings/profile_settings_bottomsheet.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
@@ -225,20 +226,78 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     ],
   };
 
-  Future<void> _runLogoutFlow() async {
-    Get.back();
+  Future<void> _runLogoutFlow(BuildContext context) async {
+    final confirmed =
+        await Get.dialog<bool>(
+          AlertDialog(
+            backgroundColor: const Color(0xFF1E1D20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            title: Text(
+              context.l10n.logout,
+              style: sfProText600(18.sp, Colors.white),
+            ),
+            content: Text(
+              'Are you sure you want to log out?',
+              style: sfProText400(14.sp, Colors.white70),
+            ),
+            actionsPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text(
+                  context.l10n.cancel,
+                  style: sfProText500(14.sp, Colors.white70),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                ),
+                onPressed: () => Get.back(result: true),
+                child: Text(
+                  context.l10n.logout,
+                  style: sfProText600(14.sp, Colors.black),
+                ),
+              ),
+            ],
+          ),
+          barrierDismissible: true,
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    Get.dialog(
+      const _LogoutLoadingDialog(),
+      barrierDismissible: false,
+      useSafeArea: false,
+    );
+
     final auth = Get.find<AuthController>();
-    await auth.logoutAndClearAllStoredData();
     try {
-      await Get.find<ChatController>().resetForLogout();
-    } catch (_) {}
-    try {
-      Get.find<SettingsController>().resetAfterLogout();
-    } catch (_) {}
-    try {
-      await Get.find<PlatformConnectController>().refreshConnections();
-    } catch (_) {}
-    Get.offAllNamed('/');
+      await auth.logoutAndClearAllStoredData();
+      try {
+        await Get.find<ChatController>().resetForLogout();
+      } catch (_) {}
+      try {
+        Get.find<SettingsController>().resetAfterLogout();
+      } catch (_) {}
+      try {
+        await Get.find<PlatformConnectController>().refreshConnections();
+      } catch (_) {}
+    } finally {
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+    }
+
+    Get.offAll(() => const IntroScreen2());
   }
 
   @override
@@ -662,7 +721,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
           child: InkWell(
             onTap: () {
               if (tile["isLogoutAction"] == true) {
-                _runLogoutFlow();
+                _runLogoutFlow(context);
                 return;
               }
               if (isActuallyLocked) {
@@ -906,6 +965,114 @@ class SettingsBottomsheetColumn extends StatelessWidget {
         activeColor: baseColor,
       );
     });
+  }
+}
+
+class _LogoutLoadingDialog extends StatelessWidget {
+  const _LogoutLoadingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = beige;
+    return PopScope(
+      canPop: false,
+      child: Material(
+        color: const Color.fromRGBO(0, 0, 0, 0.62),
+        child: Center(
+          child: Container(
+            width: 286.w,
+            constraints: BoxConstraints(minHeight: 220.h),
+            padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 18.h),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2C2C2E), Color(0xFF1C1C1E)],
+              ),
+              borderRadius: BorderRadius.circular(22.r),
+              border: Border.all(
+                color: const Color.fromRGBO(255, 255, 255, 0.08),
+                width: 1,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color.fromRGBO(0, 0, 0, 0.35),
+                  blurRadius: 24,
+                  offset: Offset(0, 16),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 78.w,
+                  height: 78.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        accent.withValues(alpha: 0.35),
+                        const Color.fromRGBO(255, 255, 255, 0.0),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 48.w,
+                      height: 48.w,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            strokeWidth: 2.8,
+                            valueColor: AlwaysStoppedAnimation<Color>(accent),
+                            backgroundColor: const Color.fromRGBO(
+                              255,
+                              255,
+                              255,
+                              0.15,
+                            ),
+                          ),
+                          Icon(
+                            Icons.logout_rounded,
+                            size: 19.sp,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 14.h),
+                Text(
+                  'Logging out...',
+                  style: sfProDisplay600(20.sp, Colors.white),
+                ),
+                SizedBox(height: 6.h),
+                Text(
+                  'Please wait while we secure your session.',
+                  textAlign: TextAlign.center,
+                  style: sfProText400(
+                    13.sp,
+                    const Color.fromRGBO(235, 235, 245, 0.68),
+                  ),
+                ),
+                SizedBox(height: 14.h),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99.r),
+                  child: LinearProgressIndicator(
+                    minHeight: 4.h,
+                    color: accent,
+                    backgroundColor: const Color.fromRGBO(255, 255, 255, 0.14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

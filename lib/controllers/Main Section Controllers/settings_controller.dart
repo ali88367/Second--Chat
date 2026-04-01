@@ -242,10 +242,16 @@ class SettingsController extends GetxController {
     }
 
     if (target == null) return;
-    final prev = target.value;
     target.value = value;
-    final ok = await _patchSettings(_buildFullSettingsPatch());
-    if (!ok) target.value = prev;
+    final patch = _buildTogglePatch(key, value);
+    final ok = await _patchSettings(patch);
+    if (ok) {
+      _applyToggleToPayload(key, value);
+    } else {
+      print(
+        'SETTINGS TOGGLE PATCH FAILED (keeping local state): key=$key value=$value',
+      );
+    }
   }
 
   Future<void> updateFontSize(String value) async {
@@ -618,6 +624,151 @@ class SettingsController extends GetxController {
     settingsMap['other'] = otherMap;
 
     return {'settings': settingsMap};
+  }
+
+  Map<String, dynamic> _buildTogglePatch(String key, bool value) {
+    switch (key) {
+      case 'notifications':
+        return {
+          'settings': {
+            'notifications': {'enabled': value},
+          },
+        };
+      case 'ledNotifications':
+        return {
+          'settings': {
+            'notifications': {'ledNotifications': value},
+          },
+        };
+      case 'viewerCount':
+        return {
+          'settings': {
+            'chat': {'viewerCount': value},
+          },
+        };
+      case 'hideViewerNames':
+        return {
+          'settings': {
+            'chat': {'hideViewerNames': value},
+          },
+        };
+      case 'showSubscribersOnly':
+        return {
+          'settings': {
+            'chat': {'showSubscribersOnly': value},
+          },
+        };
+      case 'showVipsOnly':
+        return {
+          'settings': {
+            'chat': {'showVipModsOnly': value},
+          },
+        };
+      case 'multiChatMergedMode':
+        return {
+          'settings': {
+            'chat': {'multiChatMergedMode': value},
+          },
+        };
+      case 'lowPowerMode':
+        return {
+          'settings': {
+            'other': {'lowPowerMode': value},
+          },
+        };
+      case 'timeZoneDetection':
+        return {
+          'settings': {
+            'language': {'timeZoneDetection': value},
+          },
+        };
+      case 'multiScreenPreview':
+        return {
+          'settings': {
+            'other': {'multiScreenPreview': value},
+          },
+        };
+      case 'animations':
+        return {
+          'settings': {
+            'other': {'animations': value},
+          },
+        };
+      case 'fullActivityFilters':
+        return {
+          'settings': {
+            'other': {'fullActivityFilters': value},
+          },
+        };
+      case 'ttsAdvancedSettings':
+        return {
+          'settings': {
+            'other': {'ttsAdvancedSettings': value},
+          },
+        };
+      default:
+        return _buildFullSettingsPatch();
+    }
+  }
+
+  void _applyToggleToPayload(String key, bool value) {
+    final currentPayload = settingsPayload.value;
+    if (currentPayload == null) return;
+
+    final payload = Map<String, dynamic>.from(currentPayload);
+    final settingsMap = _copyMap(payload['settings']);
+
+    Map<String, dynamic> mergeSection(String sectionKey, String fieldKey) {
+      final section = _copyMap(settingsMap[sectionKey]);
+      section[fieldKey] = value;
+      settingsMap[sectionKey] = section;
+      return settingsMap;
+    }
+
+    switch (key) {
+      case 'notifications':
+        mergeSection('notifications', 'enabled');
+        break;
+      case 'ledNotifications':
+        mergeSection('notifications', 'ledNotifications');
+        break;
+      case 'viewerCount':
+        mergeSection('chat', 'viewerCount');
+        break;
+      case 'hideViewerNames':
+        mergeSection('chat', 'hideViewerNames');
+        break;
+      case 'showSubscribersOnly':
+        mergeSection('chat', 'showSubscribersOnly');
+        break;
+      case 'showVipsOnly':
+        mergeSection('chat', 'showVipModsOnly');
+        break;
+      case 'multiChatMergedMode':
+        mergeSection('chat', 'multiChatMergedMode');
+        break;
+      case 'lowPowerMode':
+        mergeSection('other', 'lowPowerMode');
+        break;
+      case 'timeZoneDetection':
+        mergeSection('language', 'timeZoneDetection');
+        break;
+      case 'multiScreenPreview':
+        mergeSection('other', 'multiScreenPreview');
+        break;
+      case 'animations':
+        mergeSection('other', 'animations');
+        break;
+      case 'fullActivityFilters':
+        mergeSection('other', 'fullActivityFilters');
+        break;
+      case 'ttsAdvancedSettings':
+        mergeSection('other', 'ttsAdvancedSettings');
+        break;
+    }
+
+    payload['settings'] = settingsMap;
+    settingsPayload.value = payload;
   }
 
   Map<String, dynamic> _copyMap(dynamic value) {

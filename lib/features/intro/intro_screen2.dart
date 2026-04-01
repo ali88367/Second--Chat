@@ -306,13 +306,18 @@ class _IntroScreen2State extends State<IntroScreen2> {
                                   ),
                                 ),
                                 if (isLoading)
-                                  SizedBox(
-                                    width: 20.w,
-                                    height: 20.w,
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                                  Positioned(
+                                    right: 16.w,
+                                    top: (50.h - 16.h) / 2,
+                                    child: SizedBox(
+                                      width: 16.w,
+                                      height: 16.w,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     ),
                                   ),

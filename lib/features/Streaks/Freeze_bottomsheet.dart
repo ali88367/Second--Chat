@@ -10,7 +10,12 @@ import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Last_streak.dart';
 
 class StreakFreezePreviewBottomSheet extends StatefulWidget {
-  const StreakFreezePreviewBottomSheet({super.key});
+  const StreakFreezePreviewBottomSheet({
+    super.key,
+    this.fetchOnInit = true,
+  });
+
+  final bool fetchOnInit;
 
   @override
   State<StreakFreezePreviewBottomSheet> createState() =>
@@ -61,8 +66,10 @@ class _StreakFreezePreviewBottomSheetState
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _streakCtrl.fetchCurrentStreak(silent: true);
-    _streakCtrl.fetchHistory(silent: true);
+    if (widget.fetchOnInit) {
+      _streakCtrl.fetchCurrentStreak(silent: true);
+      _streakCtrl.fetchHistory(silent: true);
+    }
   }
 
   @override

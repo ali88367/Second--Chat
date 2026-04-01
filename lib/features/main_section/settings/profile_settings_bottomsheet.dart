@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:second_chat/api/auth/oauth_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
+import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/localization/l10n.dart';
@@ -61,6 +63,8 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
       unawaited(
         Get.find<StreamStreaksController>().fetchCurrentStreak(silent: true),
       );
+      unawaited(Get.find<PlatformConnectController>().refreshConnections());
+      unawaited(Get.find<SettingsController>().loadSettings(force: true));
     });
   }
 
@@ -69,10 +73,16 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
     final auth = Get.find<AuthController>();
     final settings = Get.find<SettingsController>();
     final streakCtrl = Get.find<StreamStreaksController>();
+    final platformCtrl = Get.find<PlatformConnectController>();
 
     return Obx(() {
       streakCtrl.isLoading.value;
       streakCtrl.current.value;
+      final connectedByPlatform = <String, bool>{
+        'twitch': platformCtrl.isConnected[OAuthProvider.twitch] ?? false,
+        'kick': platformCtrl.isConnected[OAuthProvider.kick] ?? false,
+        'youtube': platformCtrl.isConnected[OAuthProvider.youtube] ?? false,
+      };
       final me = auth.me.value;
       final username = _pickString(me, const ['username', 'userName']);
       final email = _pickString(me, const ['email']);
@@ -91,12 +101,38 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
           : (planFromSettings.isEmpty ? context.l10n.free : planFromSettings);
 
       final platformsRaw = settings.settingsPayload.value?['connectPlatforms'];
-      final List<Map<String, dynamic>> platformRows = [];
+      final rowsByPlatform = <String, Map<String, dynamic>>{};
       if (platformsRaw is List) {
         for (final e in platformsRaw) {
           if (e is Map) {
-            platformRows.add(Map<String, dynamic>.from(e));
+            final row = Map<String, dynamic>.from(e);
+            final key = _normalizePlatformKey(
+              (row['platform'] ?? row['platformName'] ?? '').toString(),
+            );
+            if (key.isNotEmpty) {
+              rowsByPlatform[key] = row;
+            }
           }
+        }
+      }
+      final List<Map<String, dynamic>> platformRows = [];
+      for (final key in const ['twitch', 'kick', 'youtube']) {
+        if (connectedByPlatform[key] != true) continue;
+        final row = Map<String, dynamic>.from(rowsByPlatform[key] ?? const {});
+        row['platform'] = (row['platform'] ?? key).toString();
+        row['connected'] = true;
+        platformRows.add(row);
+      }
+      for (final entry in rowsByPlatform.entries) {
+        if (connectedByPlatform.containsKey(entry.key)) continue;
+        final row = Map<String, dynamic>.from(entry.value);
+        final connected =
+            row['connected'] == true ||
+            row['is_active'] == true ||
+            row['isActive'] == true ||
+            row['isConnected'] == true;
+        if (connected) {
+          platformRows.add(row);
         }
       }
 
@@ -438,6 +474,14 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
   String _titleCase(String s) {
     if (s.isEmpty) return s;
     return s[0].toUpperCase() + s.substring(1).toLowerCase();
+  }
+
+  String _normalizePlatformKey(String raw) {
+    final value = raw.trim().toLowerCase();
+    if (value.contains('youtube') || value.contains('google')) return 'youtube';
+    if (value.contains('twitch')) return 'twitch';
+    if (value.contains('kick')) return 'kick';
+    return value;
   }
 }
 

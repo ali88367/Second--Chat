@@ -8,7 +8,12 @@ import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Freeze_bottomsheet.dart';
 
 class StreakFreezeSingleRowPreviewBottomSheet extends StatefulWidget {
-  const StreakFreezeSingleRowPreviewBottomSheet({super.key});
+  const StreakFreezeSingleRowPreviewBottomSheet({
+    super.key,
+    this.fetchOnInit = true,
+  });
+
+  final bool fetchOnInit;
 
   @override
   State<StreakFreezeSingleRowPreviewBottomSheet> createState() =>
@@ -59,7 +64,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       end: -8.h,
     ).animate(CurvedAnimation(parent: _fireController, curve: Curves.bounceIn));
 
-    _streakCtrl.fetchCurrentStreak(silent: true);
+    if (widget.fetchOnInit) {
+      _streakCtrl.fetchCurrentStreak(silent: true);
+    }
   }
 
   @override
