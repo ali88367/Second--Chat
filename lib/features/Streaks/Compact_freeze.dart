@@ -242,7 +242,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   Widget build(BuildContext context) {
     return Obx(() {
       final streak = _streakCtrl.streak;
+      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
       final longestStreak = streak?.longestStreak ?? 0;
+      final currentStreakCount = streak?.currentStreak ?? 0;
       final rowData = _streakCtrl.buildCurrentWeekRow();
       final isLoading = _streakCtrl.isLoading.value;
 
@@ -424,9 +426,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                 SizedBox(height: 10.h),
 
                 Text(
-                  streak == null
+                  !hasCreatedStreak
                       ? context.l10n.dayStreak
-                      : '${streak.currentStreak} ${context.l10n.dayStreak}',
+                      : '$currentStreakCount ${context.l10n.dayStreak}',
                   style: sfProDisplay600(34.sp, Colors.white),
                 ),
                 if (isLoading) ...[
@@ -451,7 +453,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap:
-                      streak == null
+                      !hasCreatedStreak
                           ? null
                           : () {
                             Get.bottomSheet(

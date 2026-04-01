@@ -15,6 +15,7 @@ import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
 import '../Streaks/Compact_freeze.dart';
 import '../Streaks/Freeze_bottomsheet.dart';
+import '../Streaks/Streaksbottomsheet.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
@@ -123,9 +124,31 @@ class _LivestreamingState extends State<Livestreaming> {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
 
-      final cached = _streakCtrl.streak;
-      if (cached?.isInDanger == true) {
-        Get.bottomSheet(
+      final streak = await _streakCtrl.fetchCurrentStreak(
+        force: true,
+        silent: false,
+      );
+      if (!mounted) return;
+
+      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+      if (!hasCreatedStreak) {
+        await Get.bottomSheet(
+          const StreamStreakSetupBottomSheet(),
+          isDismissible: true,
+          isScrollControlled: true,
+          enableDrag: true,
+          backgroundColor: Colors.transparent,
+          enterBottomSheetDuration: const Duration(milliseconds: 300),
+          exitBottomSheetDuration: const Duration(milliseconds: 250),
+        );
+        if (mounted) {
+          await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+        }
+        return;
+      }
+
+      if (streak?.isInDanger == true) {
+        await Get.bottomSheet(
           const StreakFreezePreviewBottomSheet(),
           isDismissible: true,
           isScrollControlled: true,
@@ -135,7 +158,7 @@ class _LivestreamingState extends State<Livestreaming> {
           exitBottomSheetDuration: const Duration(milliseconds: 250),
         );
       } else {
-        Get.bottomSheet(
+        await Get.bottomSheet(
           const StreakFreezeSingleRowPreviewBottomSheet(),
           isDismissible: true,
           isScrollControlled: true,

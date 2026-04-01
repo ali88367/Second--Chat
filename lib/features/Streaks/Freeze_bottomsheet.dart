@@ -141,7 +141,7 @@ class _StreakFreezePreviewBottomSheetState
   Future<void> _toggleSelectedDay(int dayIndex, CellType cell) async {
     if (_isUpdating) return;
     final streak = _streakCtrl.streak;
-    if (streak == null) return;
+    if (streak == null || !streak.hasCreatedStreak) return;
 
     const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     if (dayIndex < 0 || dayIndex >= ordered.length) return;
@@ -276,6 +276,8 @@ class _StreakFreezePreviewBottomSheetState
   Widget build(BuildContext context) {
     return Obx(() {
       final streak = _streakCtrl.streak;
+      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+      final currentStreakCount = streak?.currentStreak ?? 0;
       final titleText = (streak?.isInDanger ?? false)
           ? context.l10n.streakInDangerHitFreezeButton
           : context.l10n.youVeNeverBeenHotterKeepStreakBurning;
@@ -420,10 +422,10 @@ class _StreakFreezePreviewBottomSheetState
                         textAlign: TextAlign.center,
                         style: sfProDisplay600(22.sp, Colors.white),
                       ),
-                      if (streak != null) ...[
+                      if (hasCreatedStreak) ...[
                         SizedBox(height: 4.h),
                         Text(
-                          '${streak.currentStreak} ${context.l10n.dayStreak}',
+                          '$currentStreakCount ${context.l10n.dayStreak}',
                           textAlign: TextAlign.center,
                           style: sfProDisplay400(
                             15.sp,

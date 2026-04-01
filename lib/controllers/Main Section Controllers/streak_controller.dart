@@ -58,6 +58,12 @@ class StreakData {
     return false;
   }
 
+  bool get hasCreatedStreak {
+    return currentStreak > 0 ||
+        completedDates.isNotEmpty ||
+        lastCompletedDate != null;
+  }
+
   int get remainingFreezes =>
       (freezeAllowancePerMonth - freezeUsedThisMonth)
           .clamp(0, freezeAllowancePerMonth)
@@ -358,7 +364,7 @@ class StreamStreaksController extends GetxController {
           selectedDaysCount == selectedTimesPerWeek.value);
 
   StreakData? get streak => current.value;
-  bool get hasStreak => current.value != null;
+  bool get hasStreak => current.value?.hasCreatedStreak ?? false;
   bool get supportsDayEditing => false;
 
   List<String> selectedDaysPayload() {
@@ -421,6 +427,14 @@ class StreamStreaksController extends GetxController {
 
       _logStreakResponse('GET /api/v1/streaks/overview', res.data);
       final snapshot = StreakData.fromPayload(res.data);
+      if (kDebugMode) {
+        debugPrint(
+          'STREAK CREATED CHECK: ${snapshot.hasCreatedStreak} '
+          '(currentStreak=${snapshot.currentStreak}, '
+          'historyCount=${snapshot.completedDates.length}, '
+          'lastCheckInDate=${snapshot.lastCompletedDate?.toIso8601String() ?? 'null'})',
+        );
+      }
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
       return current.value;
@@ -848,9 +862,12 @@ class StreamStreaksController extends GetxController {
   void _logStreakResponse(String label, dynamic data) {
     if (!kDebugMode) return;
     final str = _stringifyResponse(data);
-    const maxLen = 2000;
-    final snippet = str.length > maxLen ? '${str.substring(0, maxLen)}...' : str;
-    debugPrint('STREAK API RESPONSE $label: $snippet');
+    debugPrint('STREAK API RESPONSE $label:');
+    const chunkSize = 800;
+    for (int i = 0; i < str.length; i += chunkSize) {
+      final end = (i + chunkSize) < str.length ? (i + chunkSize) : str.length;
+      debugPrint(str.substring(i, end));
+    }
   }
 }
 
@@ -1110,10 +1127,47 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
       weeklyGoal['weekDays'] ??
       weeklyGoal['week_days'];
   var weekGrid = const <CellType>[];
-  final completedDates = <DateTime>[];
-  final frozenDates = <DateTime>[];
+  final completedDates = List<DateTime>.from(
+    _asDateList(
+      streakMap['history'] ??
+          streakMap['historyDates'] ??
+          streakMap['history_dates'] ??
+          streakMap['completedDates'] ??
+          streakMap['completed_dates'] ??
+          data['history'] ??
+          data['historyDates'] ??
+          data['history_dates'] ??
+          data['completedDates'] ??
+          data['completed_dates'],
+    ),
+  );
+  final frozenDates = List<DateTime>.from(
+    _asDateList(
+      streakMap['frozenDates'] ??
+          streakMap['freezeDates'] ??
+          streakMap['frozen_dates'] ??
+          streakMap['freeze_days'] ??
+          data['frozenDates'] ??
+          data['freezeDates'] ??
+          data['frozen_dates'] ??
+          data['freeze_days'],
+    ),
+  );
   DateTime? weekStartDate;
-  DateTime? lastCompletedDate;
+  DateTime? lastCompletedDate = _parseDate(
+    streakMap['lastCheckInDate'] ??
+        streakMap['last_check_in_date'] ??
+        streakMap['lastCheckInAt'] ??
+        streakMap['lastCompletedDate'] ??
+        streakMap['last_completed_date'] ??
+        streakMap['lastCompletedAt'] ??
+        data['lastCheckInDate'] ??
+        data['last_check_in_date'] ??
+        data['lastCheckInAt'] ??
+        data['lastCompletedDate'] ??
+        data['last_completed_date'] ??
+        data['lastCompletedAt'],
+  );
   if (weekList is List) {
     final row = List<CellType>.filled(7, CellType.cross);
     for (var i = 0; i < weekList.length && i < 7; i++) {
@@ -1128,14 +1182,22 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
       if (date != null) {
         weekStartDate ??= _startOfWeek(date);
         if (completed) {
-          completedDates.add(date);
+          if (!completedDates.any(
+            (d) => _isSameDay(_stripTime(d), _stripTime(date)),
+          )) {
+            completedDates.add(date);
+          }
           if (lastCompletedDate == null ||
-              lastCompletedDate!.isBefore(date)) {
+              lastCompletedDate.isBefore(date)) {
             lastCompletedDate = date;
           }
         }
         if (frozen) {
-          frozenDates.add(date);
+          if (!frozenDates.any(
+            (d) => _isSameDay(_stripTime(d), _stripTime(date)),
+          )) {
+            frozenDates.add(date);
+          }
         }
       }
     }
@@ -1145,6 +1207,13 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
   weekStartDate ??= _parseDate(
     weeklyGoal['weekStart'] ?? weeklyGoal['week_start'],
   );
+  final lastCheckIn = lastCompletedDate;
+  if (lastCheckIn != null &&
+      !completedDates.any(
+        (d) => _isSameDay(_stripTime(d), _stripTime(lastCheckIn)),
+      )) {
+    completedDates.add(lastCheckIn);
+  }
 
   final freezeAllowancePerMonth = _asInt(
     freezeMap['allowancePerMonth'] ??

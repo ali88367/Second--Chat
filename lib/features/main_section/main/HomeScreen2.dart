@@ -60,7 +60,8 @@ class _HomeScreen2State extends State<HomeScreen2> {
       );
       if (!mounted) return;
 
-      if (streak == null) {
+      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+      if (!hasCreatedStreak) {
         await Get.bottomSheet(
           const StreamStreakSetupBottomSheet(),
           isDismissible: true,
@@ -76,7 +77,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
         return;
       }
 
-      if (streak.isInDanger) {
+      if (streak?.isInDanger == true) {
         await Get.bottomSheet(
           const StreakFreezePreviewBottomSheet(),
           isDismissible: true,
@@ -440,7 +441,6 @@ class GettingStartedCard extends StatefulWidget {
 class _GettingStartedCardState extends State<GettingStartedCard> {
   bool _streamServiceAdded = false;
   bool _settingsOpened = false;
-  bool _streaksCustomized = false;
   bool _streakLoading = false;
   late final SettingsController _settingsCtrl;
   late final StreamStreaksController _streakCtrl;
@@ -460,23 +460,15 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     if (_streakLoading) return;
     setState(() => _streakLoading = true);
     try {
-      final streak = await _streakCtrl.fetchCurrentStreak(
+      await _streakCtrl.fetchCurrentStreak(
         force: true,
         silent: true,
       );
-      _setStreakExists(streak != null);
     } finally {
       if (mounted) {
         setState(() => _streakLoading = false);
       }
     }
-  }
-
-  void _setStreakExists(bool exists) {
-    if (!mounted) return;
-    setState(() {
-      _streaksCustomized = exists;
-    });
   }
 
   Future<void> _openStreakOverview() async {
@@ -486,7 +478,8 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
       silent: false,
     );
     if (!mounted) return;
-    if (streak == null) {
+    final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
+    if (!hasCreatedStreak) {
       await Get.bottomSheet(
         const StreamStreakSetupBottomSheet(),
         isDismissible: true,
@@ -502,7 +495,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
       return;
     }
 
-    if (streak.isInDanger) {
+    if (streak?.isInDanger == true) {
       await Get.bottomSheet(
         const StreakFreezePreviewBottomSheet(),
         isDismissible: true,
@@ -529,8 +522,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
   Widget build(BuildContext context) {
     return Obx(() {
       final notificationsEnabled = _settingsCtrl.notifications.value;
-      final hasStreak = _streakCtrl.hasStreak;
-      final streaksCustomized = hasStreak || _streaksCustomized;
+      final streaksCustomized = _streakCtrl.hasStreak;
       final completedCount = (notificationsEnabled ? 1 : 0) +
           (_streamServiceAdded ? 1 : 0) +
           (_settingsOpened ? 1 : 0) +
