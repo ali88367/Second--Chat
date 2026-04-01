@@ -85,6 +85,8 @@ class PlatformTokenProvider {
 
   Future<Map<String, dynamic>?> _readPlatformTokenMap(String platform) async {
     try {
+      final key = platform.toLowerCase().trim();
+      if (key.isEmpty) return null;
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(platformTokensKey);
       if (raw == null || raw.trim().isEmpty) return null;
@@ -93,7 +95,7 @@ class PlatformTokenProvider {
       if (decoded is! Map) return null;
 
       final map = decoded.cast<String, dynamic>();
-      final entry = map[platform];
+      final entry = map[key];
       if (entry is Map) {
         return entry.cast<String, dynamic>();
       }
@@ -103,4 +105,3 @@ class PlatformTokenProvider {
     }
   }
 }
-

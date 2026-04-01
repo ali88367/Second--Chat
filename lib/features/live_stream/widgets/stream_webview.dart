@@ -8,10 +8,16 @@ import 'package:second_chat/core/localization/l10n.dart';
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
 class StreamWebView extends StatefulWidget {
-  const StreamWebView({super.key, required this.url, required this.height});
+  const StreamWebView({
+    super.key,
+    required this.url,
+    required this.height,
+    this.muted = false,
+  });
 
   final String url;
   final double height;
+  final bool muted;
 
   @override
   State<StreamWebView> createState() => _StreamWebViewState();
@@ -79,6 +85,9 @@ class _StreamWebViewState extends State<StreamWebView> {
           if (_isAllowedMainFrameNavigation(url)) return;
           _restoreInitialUrl();
         },
+        onPageFinished: (_) {
+          _applyMuteState();
+        },
         onNavigationRequest: (req) {
           final allowed = _isAllowedMainFrameNavigation(req.url);
           if (!allowed) _restoreInitialUrl();
@@ -88,7 +97,34 @@ class _StreamWebViewState extends State<StreamWebView> {
     );
     if (trimmed.isNotEmpty) {
       _controller.loadRequest(Uri.parse(trimmed));
+      _applyMuteState();
     }
+  }
+
+  Future<void> _applyMuteState() async {
+    try {
+      final mutedValue = widget.muted ? 'true' : 'false';
+      await _controller.runJavaScript('''
+(() => {
+  const muted = $mutedValue;
+  const media = Array.from(document.querySelectorAll('video,audio'));
+  for (const el of media) {
+    try {
+      el.muted = muted;
+      el.volume = muted ? 0 : 1;
+    } catch (_) {}
+  }
+  const cmd = muted ? 'mute' : 'unMute';
+  const payload = JSON.stringify({ event: 'command', func: cmd, args: '' });
+  const frames = Array.from(document.querySelectorAll('iframe'));
+  for (const frame of frames) {
+    try {
+      frame.contentWindow.postMessage(payload, '*');
+    } catch (_) {}
+  }
+})();
+''');
+    } catch (_) {}
   }
 
   bool _isAllowedMainFrameNavigation(String rawUrl) {
@@ -125,6 +161,10 @@ class _StreamWebViewState extends State<StreamWebView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
       _setInitial(_sanitizeUrl(widget.url));
+      return;
+    }
+    if (oldWidget.muted != widget.muted) {
+      _applyMuteState();
     }
   }
 

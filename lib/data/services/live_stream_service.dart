@@ -44,6 +44,10 @@ class LiveStreamService {
   Timer? _heartbeatTimer;
   DateTime _lastStartEmit = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastStopEmit = DateTime.fromMillisecondsSinceEpoch(0);
+  String? _connectedBaseUrl;
+  String? _connectedPath;
+  String? _connectedAccessToken;
+  String? _connectedLabel;
 
   // Prevent duplicate messages (bounded memory).
   final Map<String, DateTime> _seen = <String, DateTime>{};
@@ -139,19 +143,32 @@ class LiveStreamService {
     required String accessToken,
     required String label,
   }) async {
+    final normalizedBase = baseUrl.trim();
+    final normalizedPath = path.trim();
+    final normalizedToken = accessToken.trim();
+    final normalizedLabel = label.trim().isEmpty ? 'live' : label.trim();
+
+    if (_socket?.connected == true &&
+        _connectedBaseUrl == normalizedBase &&
+        _connectedPath == normalizedPath &&
+        _connectedAccessToken == normalizedToken &&
+        _connectedLabel == normalizedLabel) {
+      return;
+    }
+
     _manuallyDisconnected = false;
-    _label = label.trim().isEmpty ? 'live' : label.trim();
+    _label = normalizedLabel;
     _connectSeq++;
 
     await disconnect();
 
     final socket = io.io(
-      baseUrl,
+      normalizedBase,
       io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
-          .setPath(path)
+          .setPath(normalizedPath)
           // Backend supports handshake auth token.
-          .setAuth({'token': accessToken})
+          .setAuth({'token': normalizedToken})
           .enableForceNew()
           .disableAutoConnect()
           .enableReconnection()
@@ -164,6 +181,10 @@ class LiveStreamService {
     _socket = socket;
 
     socket.on('connect', (_) {
+      _connectedBaseUrl = normalizedBase;
+      _connectedPath = normalizedPath;
+      _connectedAccessToken = normalizedToken;
+      _connectedLabel = normalizedLabel;
       onSocketConnected?.call();
       _emitStart();
       _startHeartbeat();
@@ -300,6 +321,10 @@ class LiveStreamService {
       } catch (_) {}
     }
     _socket = null;
+    _connectedBaseUrl = null;
+    _connectedPath = null;
+    _connectedAccessToken = null;
+    _connectedLabel = null;
   }
 
   // ---- Socket emits / keep-alive ----

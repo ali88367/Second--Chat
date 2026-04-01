@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -33,16 +31,12 @@ class _LivestreamingState extends State<Livestreaming> {
   final ValueNotifier<String?> _selectedPlatform = ValueNotifier<String?>(null);
   final ValueNotifier<bool> _showActivity = ValueNotifier<bool>(false);
   final ValueNotifier<bool> _titleSelected = ValueNotifier<bool>(false);
-  final GlobalKey _streamWebViewKey = GlobalKey(
-    debugLabel: 'Livestreaming.streamWebView',
-  );
 
   final ValueNotifier<String> _topBarImage = ValueNotifier<String>(
     'assets/images/topbarshade.png',
   );
 
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
-  Timer? _chatFilterRefreshDebounce;
   bool _streakCompletionChecked = false;
   bool _streakSheetOpening = false;
 
@@ -72,18 +66,15 @@ class _LivestreamingState extends State<Livestreaming> {
     _settingsCtrl = Get.find<SettingsController>();
     _streakCtrl = Get.find<StreamStreaksController>();
     _chatFilter.addListener(_updateImageBasedOnFilter);
-    _chatFilter.addListener(_refreshStreamingForChatFilter);
+    _chatFilter.addListener(_syncSelectedPlatformFromFilter);
     _maybeCompleteStreakForToday();
   }
 
-  void _refreshStreamingForChatFilter() {
-    // Any platform change (chips, swipe, popup) should trigger the same refresh logic.
-    _chatFilterRefreshDebounce?.cancel();
-    _chatFilterRefreshDebounce = Timer(const Duration(milliseconds: 250), () {
-      final chatCtrl = Get.find<ChatController>();
-      final selected = _chatFilter.value ?? 'twitch';
-      chatCtrl.refreshOverviewForPlatform(selected);
-    });
+  void _syncSelectedPlatformFromFilter() {
+    final chatCtrl = Get.find<ChatController>();
+    final selected = _chatFilter.value ?? 'twitch';
+    if (chatCtrl.platform.value.toLowerCase().trim() == selected) return;
+    chatCtrl.selectPlatformInstant(selected);
   }
 
   void _updateImageBasedOnFilter() {
@@ -139,9 +130,7 @@ class _LivestreamingState extends State<Livestreaming> {
   @override
   void dispose() {
     _chatFilter.removeListener(_updateImageBasedOnFilter);
-    _chatFilter.removeListener(_refreshStreamingForChatFilter);
-    _chatFilterRefreshDebounce?.cancel();
-    _chatFilterRefreshDebounce = null;
+    _chatFilter.removeListener(_syncSelectedPlatformFromFilter);
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
     _showActivity.dispose();
@@ -158,10 +147,6 @@ class _LivestreamingState extends State<Livestreaming> {
     } else {
       _chatFilter.value = platformKey;
     }
-    // Instant: clear old stream + switch selected platform immediately.
-    final chatCtrl = Get.find<ChatController>();
-    final selected = _chatFilter.value ?? 'twitch';
-    chatCtrl.selectPlatformInstant(selected);
   }
 
   void _handlePlatformSwipe(bool swipeRight) {
@@ -176,9 +161,6 @@ class _LivestreamingState extends State<Livestreaming> {
           (currentIndex - 1 + platforms.length) % platforms.length;
       _chatFilter.value = platforms[prevIndex];
     }
-    final chatCtrl = Get.find<ChatController>();
-    final selected = _chatFilter.value ?? 'twitch';
-    chatCtrl.selectPlatformInstant(selected);
   }
 
   void _log(String message) {
@@ -300,11 +282,8 @@ class _LivestreamingState extends State<Livestreaming> {
 
   Widget _buildInteractiveCounterRow() {
     return Obx(() {
-      if (!_settingsCtrl.viewerCount.value) {
-        return const SizedBox.shrink();
-      }
-
       final chatCtrl = Get.find<ChatController>();
+      final showViewerCounts = _settingsCtrl.viewerCount.value;
       final twitchViews = chatCtrl.platformViewerCounts['twitch'];
       final kickViews = chatCtrl.platformViewerCounts['kick'];
       final youtubeViews = chatCtrl.platformViewerCounts['youtube'];
@@ -325,7 +304,9 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('twitch');
                 return counterPill(
                   asset: 'assets/images/twitch.png',
-                  count: _formatViewerCount(twitchViews),
+                  count: showViewerCounts
+                      ? _formatViewerCount(twitchViews)
+                      : '-',
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -338,7 +319,9 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('kick');
                 return counterPill(
                   asset: 'assets/images/kick.png',
-                  count: _formatViewerCount(kickViews),
+                  count: showViewerCounts
+                      ? _formatViewerCount(kickViews)
+                      : '-',
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -351,7 +334,9 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('youtube');
                 return counterPill(
                   asset: 'assets/images/youtube.png',
-                  count: _formatViewerCount(youtubeViews),
+                  count: showViewerCounts
+                      ? _formatViewerCount(youtubeViews)
+                      : '-',
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -863,21 +848,36 @@ class _LivestreamingState extends State<Livestreaming> {
                                                 Get.find<SettingsController>();
 
                                             Widget buildSingle() {
-                                              final url =
-                                                  chatCtrl.watchUrl.value ?? '';
-                                              // If selected platform is offline, force placeholder.
-                                              final selected =
-                                                  _chatFilter.value ?? 'twitch';
-                                              final isLive =
-                                                  chatCtrl.isPlatformLive(
-                                                    selected,
-                                                  );
-                                              final resolvedUrl =
-                                                  isLive ? url : '';
-                                              return StreamWebView(
-                                                key: _streamWebViewKey,
-                                                url: resolvedUrl,
-                                                height: streamPreviewHeight,
+                                              const singlePlatforms = <String>[
+                                                'twitch',
+                                                'kick',
+                                                'youtube',
+                                              ];
+                                              final selected = chatCtrl.platform.value
+                                                  .toLowerCase()
+                                                  .trim();
+
+                                              return Stack(
+                                                fit: StackFit.expand,
+                                                children: [
+                                                  for (final p in singlePlatforms)
+                                                    Offstage(
+                                                      offstage: p != selected,
+                                                      child: IgnorePointer(
+                                                        ignoring: p != selected,
+                                                        child: StreamWebView(
+                                                          key: ValueKey(
+                                                            'stream_single_$p',
+                                                          ),
+                                                          url: chatCtrl.isPlatformLive(p)
+                                                              ? (chatCtrl.urlForPlatform(p) ?? '')
+                                                              : '',
+                                                          height: streamPreviewHeight,
+                                                          muted: p != selected,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
                                               );
                                             }
 
@@ -912,6 +912,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                     key: ValueKey('stream_$platform'),
                                                     url: url,
                                                     height: height,
+                                                    muted: false,
                                                   ),
                                                 );
                                               }
