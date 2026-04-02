@@ -53,6 +53,19 @@ class LiveStreamService {
   final Map<String, DateTime> _seen = <String, DateTime>{};
   static const int _seenMax = 600;
   static const Duration _seenTtl = Duration(minutes: 10);
+  static const Set<String> _typedActivitySocketEvents = <String>{
+    'activity:join',
+    'activity:follow',
+    'activity:superchat',
+    'activity:subscription',
+    'activity:gifted_sub',
+    'activity:resub',
+    'activity:raid',
+    'activity:bits',
+    'activity:like',
+    'activity:gift',
+    'activity:share',
+  };
 
   // ---- Callbacks (wired by controller) ----
   void Function()? onSocketConnected;
@@ -214,6 +227,7 @@ class LiveStreamService {
     });
 
     socket.on('activity:sync', (d) {
+      _logSocketEventPayload('activity:sync', d);
       final m = _asMap(d);
       if (m == null) return;
       final events = m['events'];
@@ -227,8 +241,23 @@ class LiveStreamService {
     });
 
     socket.on('activity:event', (d) {
-      final m = _asMap(d);
-      if (m != null) onActivityEvent?.call(m);
+      _handleActivitySocketEvent('activity:event', d);
+    });
+
+    for (final eventName in _typedActivitySocketEvents) {
+      socket.on(eventName, (d) {
+        _handleActivitySocketEvent(eventName, d);
+      });
+    }
+
+    // Some backends emit typed activity channels (activity:join, activity:follow, ...).
+    // Handle all activity:* names using the same payload shape.
+    socket.onAny((eventName, data) {
+      final name = eventName.toLowerCase().trim();
+      if (!name.startsWith('activity:')) return;
+      if (name == 'activity:sync' || name == 'activity:event') return;
+      if (_typedActivitySocketEvents.contains(name)) return;
+      _handleActivitySocketEvent(name, data);
     });
 
     void applyStreamPayload(JsonMap m, void Function(JsonMap payload)? cb) {
@@ -281,6 +310,7 @@ class LiveStreamService {
     });
 
     socket.on('chat:message', (payload) {
+      _logSocketEventPayload('chat:message', payload);
       final msg = _parseChatMessage(payload);
       if (msg == null) return;
       if (_dedupe(msg)) return;
@@ -288,6 +318,7 @@ class LiveStreamService {
     });
 
     socket.on('led:notification', (d) {
+      _logSocketEventPayload('led:notification', d);
       final m = _asMap(d);
       if (m != null) onLedNotification?.call(m);
     });
@@ -533,6 +564,57 @@ class LiveStreamService {
   void logDebug(String event, Object? payload) {
     if (!kDebugMode) return;
     debugPrint('[LiveStreamService] $_label#$_connectSeq $event ${payload ?? ''}');
+  }
+
+  void _handleActivitySocketEvent(String socketEventName, dynamic payload) {
+    _logSocketEventPayload(socketEventName, payload);
+    if (kDebugMode) {
+      debugPrint('[ACTIVITY_EVENT][$socketEventName][SOCKET_RAW] $payload');
+    }
+
+    final m = _asMap(payload);
+    if (m == null) return;
+
+    // Keep one normalized shape even when backend event channel is activity:<type>.
+    final existingType = m['type']?.toString().trim();
+    if (existingType == null || existingType.isEmpty) {
+      final inferredType = _typeFromActivityEventName(socketEventName);
+      if (inferredType != null) m['type'] = inferredType;
+    }
+    m['socketEvent'] = socketEventName;
+
+    if (kDebugMode) {
+      debugPrint('[ACTIVITY_EVENT][$socketEventName][SOCKET_PARSED] ${jsonEncode(m)}');
+    }
+    onActivityEvent?.call(m);
+  }
+
+  String? _typeFromActivityEventName(String socketEventName) {
+    final name = socketEventName.toLowerCase().trim();
+    if (!name.startsWith('activity:')) return null;
+    final type = name.substring('activity:'.length).trim();
+    if (type.isEmpty || type == 'event' || type == 'sync') return null;
+    return type;
+  }
+
+  void _logSocketEventPayload(String eventName, dynamic payload) {
+    if (!kDebugMode) return;
+    String text;
+    try {
+      if (payload is String) {
+        text = payload;
+      } else {
+        text = jsonEncode(payload);
+      }
+    } catch (_) {
+      text = payload.toString();
+    }
+    debugPrint('[SOCKET] $_label#$_connectSeq $eventName');
+    const chunk = 700;
+    for (int i = 0; i < text.length; i += chunk) {
+      final end = (i + chunk) < text.length ? (i + chunk) : text.length;
+      debugPrint(text.substring(i, end));
+    }
   }
 }
 

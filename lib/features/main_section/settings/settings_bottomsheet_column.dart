@@ -399,8 +399,12 @@ class SettingsBottomsheetColumn extends StatelessWidget {
 
                       Container(
                         decoration: BoxDecoration(
-                          color: onBottomSheetGrey,
-                          borderRadius: BorderRadius.circular(16.r),
+                          color: sectionTitle == "LOGOUT"
+                              ? Colors.transparent
+                              : onBottomSheetGrey,
+                          borderRadius: BorderRadius.circular(
+                            sectionTitle == "LOGOUT" ? 0.r : 16.r,
+                          ),
                         ),
                         child: Column(
                           children:
@@ -541,6 +545,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
     final bool isSwitch = tile["isSwitch"] ?? false;
     final bool isForward = tile["isForward"] ?? false;
     final bool isLocked = tile["isLocked"] ?? false;
+    final bool isLogoutAction = tile["isLogoutAction"] == true;
     final String? switchKey = tile["switchKey"];
     final String? openAsBottomSheet = tile["openAsBottomSheet"];
     final String? customForwardIcon = tile["customForwardIcon"];
@@ -704,21 +709,26 @@ class SettingsBottomsheetColumn extends StatelessWidget {
 
         return Container(
           height: 56.h,
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          padding: EdgeInsets.symmetric(horizontal: isLogoutAction ? 0.w : 16.w),
           decoration: BoxDecoration(
-            color:
-                isActuallyLocked ? const Color.fromRGBO(20, 18, 18, 1) : null,
-            border:
-                index > 0
-                    ? Border(
-                      top: BorderSide(
-                        width: 0.5.w,
-                        color: const Color.fromRGBO(120, 120, 128, 0.36),
-                      ),
-                    )
+            color: isLogoutAction
+                ? const Color(0xFF5C0606)
+                : isActuallyLocked
+                    ? const Color.fromRGBO(20, 18, 18, 1)
                     : null,
+            borderRadius: isLogoutAction ? BorderRadius.circular(999.r) : null,
+            border: (!isLogoutAction && index > 0)
+                ? Border(
+                    top: BorderSide(
+                      width: 0.5.w,
+                      color: const Color.fromRGBO(120, 120, 128, 0.36),
+                    ),
+                  )
+                : null,
           ),
           child: InkWell(
+            borderRadius:
+                isLogoutAction ? BorderRadius.circular(999.r) : null,
             onTap: () {
               if (tile["isLogoutAction"] == true) {
                 _runLogoutFlow(context);
@@ -849,74 +859,105 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                 Get.toNamed(tile["nextPage"]);
               }
             },
-            child: Row(
-              children: [
-                Obx(() {
-                  final iconColor = getBaseColor().withOpacity(opacity);
-                  if ((tile["prefixFlutterIcon"] as IconData?) != null) {
-                    return Icon(
-                      (tile["prefixFlutterIcon"] as IconData?)!,
-                      size: 24.sp,
-                      color: iconColor,
-                    );
-                  }
-                  return Image.asset(
-                    tile["prefixImageAsset"],
-                    width: 24.w,
-                    height: 24.h,
-                    color: iconColor,
-                  );
-                }),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Text(
-                    _tileTitle(context, tile["title"]),
-                    style: sfProText400(
-                      16.sp,
-                      Colors.white.withOpacity(opacity),
+            child: isLogoutAction
+                ? Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    child: Row(
+                      children: [
+                        Image.asset("assets/images/logouticon.png", width: 24.w, height: 24.h),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: Text(
+                            'Log Out',
+                            style: sfProText400(17.sp, Colors.white),
+                          ),
+                        ),
+                        Container(
+                          width: 23.w,
+                          height: 23.w,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.22),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16.sp,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (tile["suffixText"] != null)
-                      Padding(
-                        padding: EdgeInsets.only(right: 8.w),
-                        child: _buildSuffixText(tile, controller, opacity),
-                      ),
-                    if (shouldShowSwitch)
-                      _buildSwitch(
-                        switchValue!,
-                        getBaseColor,
-                        controller,
-                        switchKey,
-                      ),
-                    if ((isForward || openAsBottomSheet != null) &&
-                        !isActuallyLocked)
-                      Padding(
-                        padding: EdgeInsets.only(left: 4.w),
-                        child: GestureDetector(
-                          key: iconKey,
-                          onTap:
-                              customForwardIcon == "assets/images/changer.png"
-                                  ? showGlassSelector
-                                  : null,
-                          child: Image.asset(
-                            customForwardIcon ?? forward_arrow_icon,
-                            height: customForwardIcon != null ? 12.h : 28.h,
+                  )
+                : Row(
+                    children: [
+                      Obx(() {
+                        final iconColor = getBaseColor().withOpacity(opacity);
+                        if ((tile["prefixFlutterIcon"] as IconData?) != null) {
+                          return Icon(
+                            (tile["prefixFlutterIcon"] as IconData?)!,
+                            size: 24.sp,
+                            color: iconColor,
+                          );
+                        }
+                        return Image.asset(
+                          tile["prefixImageAsset"],
+                          width: 24.w,
+                          height: 24.h,
+                          color: iconColor,
+                        );
+                      }),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Text(
+                          _tileTitle(context, tile["title"]),
+                          style: sfProText400(
+                            16.sp,
+                            Colors.white.withOpacity(opacity),
                           ),
                         ),
                       ),
-                    if (isActuallyLocked)
-                      Padding(
-                        padding: EdgeInsets.only(left: 8.w),
-                        child: Image.asset(key_icon_2, height: 28.h),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (tile["suffixText"] != null)
+                            Padding(
+                              padding: EdgeInsets.only(right: 8.w),
+                              child: _buildSuffixText(tile, controller, opacity),
+                            ),
+                          if (shouldShowSwitch)
+                            _buildSwitch(
+                              switchValue!,
+                              getBaseColor,
+                              controller,
+                              switchKey,
+                            ),
+                          if ((isForward || openAsBottomSheet != null) &&
+                              !isActuallyLocked)
+                            Padding(
+                              padding: EdgeInsets.only(left: 4.w),
+                              child: GestureDetector(
+                                key: iconKey,
+                                onTap:
+                                    customForwardIcon ==
+                                            "assets/images/changer.png"
+                                        ? showGlassSelector
+                                        : null,
+                                child: Image.asset(
+                                  customForwardIcon ?? forward_arrow_icon,
+                                  height:
+                                      customForwardIcon != null ? 12.h : 28.h,
+                                ),
+                              ),
+                            ),
+                          if (isActuallyLocked)
+                            Padding(
+                              padding: EdgeInsets.only(left: 8.w),
+                              child: Image.asset(key_icon_2, height: 28.h),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
-              ],
-            ),
+                    ],
+                  ),
           ),
         );
       },

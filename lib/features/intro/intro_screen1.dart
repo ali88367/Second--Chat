@@ -5,7 +5,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/constants/app_images/app_images.dart';
 import '../../core/localization/l10n.dart';
-import 'intro_screen2.dart';
+import 'login_screen.dart';
 
 class IntroScreen1 extends StatefulWidget {
   const IntroScreen1({super.key, this.initialController});
@@ -145,7 +145,7 @@ class _IntroScreen1State extends State<IntroScreen1> {
               child: GestureDetector(
                 onTap: () {
                   Get.to(
-                        () => const IntroScreen2(),
+                        () => const LoginScreen(),
                     transition: Transition.cupertino,
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.fastOutSlowIn,

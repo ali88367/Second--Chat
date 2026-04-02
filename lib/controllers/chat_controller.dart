@@ -652,6 +652,12 @@ class ChatController extends GetxController {
   }
 
   static bool _isActivityPayload(Map<String, dynamic> payload) {
+    final socketEvent = payload['socketEvent']?.toString().toLowerCase().trim();
+    if (socketEvent != null &&
+        socketEvent.startsWith('activity:') &&
+        socketEvent != 'activity:sync') {
+      return true;
+    }
     return _isActivityType(payload['type']?.toString());
   }
 
@@ -707,14 +713,8 @@ class ChatController extends GetxController {
     final selectedPlatform = _normalizePlatformKey(platform.value);
     final eventPlatform = _normalizePlatformKey(event['platform']?.toString());
 
-    if (selectedPlatform.isNotEmpty &&
-        eventPlatform.isNotEmpty &&
-        selectedPlatform != eventPlatform) {
-      return;
-    }
-
     final glowPlatform =
-        selectedPlatform.isNotEmpty ? selectedPlatform : eventPlatform;
+        eventPlatform.isNotEmpty ? eventPlatform : selectedPlatform;
     if (glowPlatform.isEmpty) return;
 
     final dedupeKey = _edgeGlowDedupeKeyForActivity(
@@ -723,10 +723,16 @@ class ChatController extends GetxController {
     );
     if (_seenEdgeGlowRecently(dedupeKey)) return;
 
+    if (kDebugMode) {
+      debugPrint('[ACTIVITY_EVENT][EDGE_GLOW_TRIGGER] platform=$glowPlatform event=$event');
+    }
     _edgeGlow.triggerForPlatform(glowPlatform);
   }
 
   void _handleIncomingActivityEvent(Map<String, dynamic> event) {
+    if (kDebugMode) {
+      debugPrint('[ACTIVITY_EVENT][CHAT_CONTROLLER] $event');
+    }
     if (!_isActivityPayload(event)) return;
     activityEvents.add(event);
     _maybeTriggerEdgeGlowForActivity(event);
