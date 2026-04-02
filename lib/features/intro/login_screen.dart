@@ -3,8 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:second_chat/api/auth/oauth_provider.dart';
-import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/constants.dart';
 import 'package:second_chat/core/localization/l10n.dart';
@@ -44,19 +42,13 @@ class _LoginScreenState extends State<LoginScreen> {
     precacheImage(const AssetImage('assets/images/bunny.png'), context);
   }
 
-  Future<void> _connectGoogleAndContinue() async {
-    final ctrl = Get.find<PlatformConnectController>();
-    if (ctrl.connectingProvider.value != null) return;
-    final ok = await ctrl.connect(OAuthProvider.youtube);
-    if (!mounted) return;
-    if (ok) {
-      Get.to(
-        () => const IntroScreen2(),
-        transition: Transition.cupertino,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.fastOutSlowIn,
-      );
-    }
+  void _connectGoogleAndContinue() {
+    Get.to(
+      () => const IntroScreen2(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   void _showAppleComingSoon() {
@@ -81,7 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final connectCtrl = Get.find<PlatformConnectController>();
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
@@ -264,20 +255,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _showAppleComingSoon,
                       ),
                       SizedBox(height: 10.h),
-                      Obx(() {
-                        final isLoading =
-                            connectCtrl.connectingProvider.value ==
-                            OAuthProvider.youtube;
-                        return _LoginActionButton(
-                          label: 'Sign in with Google',
-                          backgroundColor: Colors.white,
-                          textColor: const Color(0xFF1E1D20),
-                          leading:Image.asset('assets/images/googleicon.png',height: 22.h,width: 22.w,),
-                          isLoading: isLoading,
-                          loadingColor: const Color(0xFF1E1D20),
-                          onPressed: _connectGoogleAndContinue,
-                        );
-                      }),
+                      _LoginActionButton(
+                        label: 'Sign in with Google',
+                        backgroundColor: Colors.white,
+                        textColor: const Color(0xFF1E1D20),
+                        leading: Image.asset(
+                          'assets/images/googleicon.png',
+                          height: 22.h,
+                          width: 22.w,
+                        ),
+                        onPressed: _connectGoogleAndContinue,
+                      ),
                     ],
                   ),
                 ),
@@ -297,8 +285,6 @@ class _LoginActionButton extends StatelessWidget {
     required this.textColor,
     required this.leading,
     required this.onPressed,
-    this.isLoading = false,
-    this.loadingColor = Colors.white,
   });
 
   final String label;
@@ -306,13 +292,11 @@ class _LoginActionButton extends StatelessWidget {
   final Color textColor;
   final Widget leading;
   final VoidCallback onPressed;
-  final bool isLoading;
-  final Color loadingColor;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: isLoading ? null : onPressed,
+      onTap: onPressed,
       child: Container(
         width: double.infinity,
         height: 56.h,
@@ -327,41 +311,8 @@ class _LoginActionButton extends StatelessWidget {
             leading,
             SizedBox(width: 8.w),
             Text(label, style: sfProText600(17.sp, textColor)),
-            if (isLoading) ...[
-              SizedBox(width: 10.w),
-              SizedBox(
-                width: 16.w,
-                height: 16.w,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(loadingColor),
-                ),
-              ),
-            ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _GoogleGIcon extends StatelessWidget {
-  const _GoogleGIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (rect) => const LinearGradient(
-        colors: [
-          Color(0xFF4285F4),
-          Color(0xFFEA4335),
-          Color(0xFFFBBC05),
-          Color(0xFF34A853),
-        ],
-      ).createShader(rect),
-      child: Text(
-        'G',
-        style: sfProText600(18.sp, Colors.white),
       ),
     );
   }
