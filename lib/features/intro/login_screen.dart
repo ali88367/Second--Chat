@@ -9,7 +9,7 @@ import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'intro_screen2.dart';
+import '../../controllers/auth_controller.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,6 +20,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   late _LanguageItem selectedLanguage = _languages[0];
+  bool _googleBusy = false;
 
   final List<_LanguageItem> _languages = [
     _LanguageItem('en', 'Eng', 'https://flagcdn.com/w160/us.png'),
@@ -42,13 +43,34 @@ class _LoginScreenState extends State<LoginScreen> {
     precacheImage(const AssetImage('assets/images/bunny.png'), context);
   }
 
-  void _connectGoogleAndContinue() {
-    Get.to(
-      () => const IntroScreen2(),
-      transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.fastOutSlowIn,
-    );
+  Future<void> _onGoogleSignIn() async {
+    if (_googleBusy) return;
+    setState(() => _googleBusy = true);
+    try {
+      final auth = Get.find<AuthController>();
+      await auth.loginWithGoogle();
+      if (!mounted) return;
+      if (Navigator.of(context).canPop()) {
+        Get.offAllNamed('/');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      final auth = Get.find<AuthController>();
+      final msg = auth.lastError.value;
+      if (msg != null && msg.isNotEmpty) {
+        Get.snackbar(
+          'Sign in',
+          msg,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFF2C2C2E),
+          colorText: Colors.white,
+          margin: EdgeInsets.all(12.w),
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _googleBusy = false);
+    }
   }
 
   void _showAppleComingSoon() {
@@ -264,7 +286,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 22.h,
                           width: 22.w,
                         ),
-                        onPressed: _connectGoogleAndContinue,
+                        isLoading: _googleBusy,
+                        onPressed: () {
+                          _onGoogleSignIn();
+                        },
                       ),
                     ],
                   ),
@@ -285,6 +310,7 @@ class _LoginActionButton extends StatelessWidget {
     required this.textColor,
     required this.leading,
     required this.onPressed,
+    this.isLoading = false,
   });
 
   final String label;
@@ -292,11 +318,12 @@ class _LoginActionButton extends StatelessWidget {
   final Color textColor;
   final Widget leading;
   final VoidCallback onPressed;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: isLoading ? null : onPressed,
       child: Container(
         width: double.infinity,
         height: 56.h,
@@ -308,7 +335,17 @@ class _LoginActionButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            leading,
+            if (isLoading)
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: textColor.withValues(alpha: 0.7),
+                ),
+              )
+            else
+              leading,
             SizedBox(width: 8.w),
             Text(label, style: sfProText600(17.sp, textColor)),
           ],

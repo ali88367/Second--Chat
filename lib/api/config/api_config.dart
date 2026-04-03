@@ -25,4 +25,20 @@ class ApiConfig {
     if (override.trim().isNotEmpty) return override.trim();
     return 'secondchat://auth/callback';
   }
+
+  /// OAuth 2.0 **Web** client id (Google Cloud Console). **Required on Android** for Google Sign-In.
+  ///
+  /// Order: `--dart-define=GOOGLE_SERVER_CLIENT_ID=...` / `dart_defines.json`, else [AppConstants.googleServerClientId].
+  static String get googleServerClientId {
+    const v = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID', defaultValue: '');
+    if (v.trim().isNotEmpty) return v.trim();
+    return AppConstants.googleServerClientId.trim();
+  }
+
+  /// iOS OAuth client id (`*.apps.googleusercontent.com`) if not using GoogleService-Info.plist.
+  static String get googleIosClientId {
+    const v = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID', defaultValue: '');
+    if (v.trim().isNotEmpty) return v.trim();
+    return AppConstants.googleIosClientId.trim();
+  }
 }

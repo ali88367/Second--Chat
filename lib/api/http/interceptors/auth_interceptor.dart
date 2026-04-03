@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import '../../auth/auth_api.dart';
+import '../../auth/jwt_utils.dart';
 import '../../auth/models/session_tokens.dart';
 import '../../storage/token_store.dart';
 
@@ -55,7 +56,14 @@ class AuthInterceptor extends Interceptor {
         _refreshInFlight = null;
       });
 
-      final newTokens = await _refreshInFlight!;
+      var newTokens = await _refreshInFlight!;
+      if (newTokens.accessTokenExpiresAt == null &&
+          newTokens.accessToken.isNotEmpty) {
+        final exp = parseJwtAccessTokenExpiryUtc(newTokens.accessToken);
+        if (exp != null) {
+          newTokens = newTokens.copyWith(accessTokenExpiresAt: exp);
+        }
+      }
       await _tokenStore.write(newTokens);
 
       final requestOptions = err.requestOptions;

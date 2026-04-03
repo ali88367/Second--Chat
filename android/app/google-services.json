@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "209792077701",
+    "project_id": "second-chat-5eef5",
+    "storage_bucket": "second-chat-5eef5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209792077701:android:5974687606d6a4b7c7beec",
+        "android_client_info": {
+          "package_name": "com.example.second_chat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "209792077701-v5sfu36ukds68ct74iu882odlc0q67m1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.second_chat",
+            "certificate_hash": "de251c7d8482e5762e8596f70eae5fc1446529cb"
+          }
+        },
+        {
+          "client_id": "209792077701-eftgsqfh9deks7hmo697d1dkp41a6umd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqqT1qiRlpbqoucgnjJNoP5fZlyBVt-xc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "209792077701-eftgsqfh9deks7hmo697d1dkp41a6umd.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "209792077701-fql181lav8fpsj99njarbrhd27mue2qj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.secondChat.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -61,6 +61,13 @@ class _IntroScreen2State extends State<IntroScreen2> {
     final ok = await ctrl.connect(provider);
     if (!mounted) return;
     if (ok) {
+      final prefs = await SharedPreferences.getInstance();
+      final introDone =
+          prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
+      if (introDone) {
+        Get.back();
+        return;
+      }
       Get.to(
         () => NotficationScreens(),
         transition: Transition.cupertino,

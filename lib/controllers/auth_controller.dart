@@ -6,16 +6,21 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/app_api.dart';
 import '../api/auth/auth_api.dart';
+import '../api/auth/google_sign_in_service.dart';
+import '../api/auth/jwt_utils.dart';
+import '../api/auth/models/google_sign_in_credentials.dart';
 import '../api/auth/models/session_tokens.dart';
 import '../api/auth/oauth_api.dart';
 import '../api/auth/oauth_flow.dart';
 import '../api/auth/oauth_provider.dart';
 import '../api/http/api_json.dart';
 import '../core/constants/app_colors/app_colors.dart';
+import '../core/constants/constants.dart';
 import '../core/localization/get_l10n.dart';
 
 class AuthController extends GetxController with WidgetsBindingObserver {
@@ -52,8 +57,24 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     if (hasSession) {
       await refreshMe(silent: true);
     }
+    await _migrateIntroOnboardingFlagIfNeeded();
 
     isReady.value = true;
+  }
+
+  /// Sessions created before intro onboarding existed: skip the notification → intro flow.
+  Future<void> _migrateIntroOnboardingFlagIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey(AppConstants.keyIntroOnboardingComplete)) return;
+    final tokens = await _api.tokenStore.read();
+    if (tokens != null) {
+      await prefs.setBool(AppConstants.keyIntroOnboardingComplete, true);
+    }
+  }
+
+  Future<void> _markIntroOnboardingPendingAfterLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keyIntroOnboardingComplete, false);
   }
 
   static const Duration _tokenExpiryLeeway = Duration(seconds: 30);
@@ -65,47 +86,39 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     return expiresAt.toUtc().isBefore(now.add(_tokenExpiryLeeway));
   }
 
-  Future<void> _persistSessionTokensToPrefs(SessionTokens tokens) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPrefsAccessToken, tokens.accessToken);
-    await prefs.setString(_kPrefsRefreshToken, tokens.refreshToken);
-  }
-
-  Future<void> _clearSessionTokensFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kPrefsAccessToken);
-    await prefs.remove(_kPrefsRefreshToken);
-  }
-
   Future<bool> ensureValidSession({bool refreshIfExpired = true}) async {
     final tokens = await _api.tokenStore.read();
     if (tokens == null) {
       isAuthenticated.value = false;
       me.value = null;
-      await _clearSessionTokensFromPrefs();
+      await _api.tokenStore.clear();
       return false;
     }
 
     if (_isTokenExpired(tokens)) {
       if (!refreshIfExpired) {
         await _api.tokenStore.clear();
-        await _clearSessionTokensFromPrefs();
         isAuthenticated.value = false;
         me.value = null;
         return false;
       }
 
       try {
-        final refreshed = await authApi.refresh(tokens.refreshToken);
+        var refreshed = await authApi.refresh(tokens.refreshToken);
+        if (refreshed.accessTokenExpiresAt == null &&
+            refreshed.accessToken.isNotEmpty) {
+          final exp = parseJwtAccessTokenExpiryUtc(refreshed.accessToken);
+          if (exp != null) {
+            refreshed = refreshed.copyWith(accessTokenExpiresAt: exp);
+          }
+        }
         await _api.tokenStore.write(refreshed);
-        await _persistSessionTokensToPrefs(refreshed);
         isAuthenticated.value = true;
         return true;
       } on DioException catch (e) {
         final status = e.response?.statusCode;
         if (status == 401 || status == 403) {
           await _api.tokenStore.clear();
-          await _clearSessionTokensFromPrefs();
           isAuthenticated.value = false;
           me.value = null;
           return false;
@@ -116,7 +129,6 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       } catch (e) {
         if (kDebugMode) debugPrint('API ERROR(refresh): $e');
         await _api.tokenStore.clear();
-        await _clearSessionTokensFromPrefs();
         isAuthenticated.value = false;
         me.value = null;
         return false;
@@ -137,10 +149,49 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       if (kDebugMode) debugPrint('API ERROR(me): $e');
       if (e is DioException && e.response?.statusCode == 401) {
         await _api.tokenStore.clear();
-        await _clearSessionTokensFromPrefs();
         isAuthenticated.value = false;
         me.value = null;
       }
+    }
+  }
+
+  /// Runs the Google sign-in UI and returns id token, access token (if granted), and Google user id.
+  Future<GoogleSignInCredentials> fetchGoogleAccountCredentials() {
+    return GoogleSignInService.instance.signInAndFetchCredentials();
+  }
+
+  /// Google Sign-In, then POST tokens to [AuthApi.loginWithGoogle] and persist the app session.
+  Future<void> loginWithGoogle() async {
+    try {
+      final creds = await fetchGoogleAccountCredentials();
+      var tokens = await authApi.loginWithGoogle(
+        idToken: creds.idToken,
+        accessToken: creds.accessToken,
+      );
+      if (tokens.accessTokenExpiresAt == null &&
+          tokens.accessToken.isNotEmpty) {
+        final exp = parseJwtAccessTokenExpiryUtc(tokens.accessToken);
+        if (exp != null) {
+          tokens = tokens.copyWith(accessTokenExpiresAt: exp);
+        }
+      }
+      await _api.tokenStore.write(tokens);
+      await _markIntroOnboardingPendingAfterLogin();
+      isAuthenticated.value = true;
+      lastError.value = null;
+      await refreshMe(silent: true);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        lastError.value = null;
+        return;
+      }
+      lastError.value = 'Google sign-in failed: ${e.description ?? e.code.name}';
+      if (kDebugMode) debugPrint('Google sign-in: $e');
+      rethrow;
+    } catch (e) {
+      lastError.value = 'Google sign-in failed: $e';
+      if (kDebugMode) debugPrint('Google sign-in: $e');
+      rethrow;
     }
   }
 
@@ -149,9 +200,16 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     required String password,
   }) async {
     try {
-      final tokens = await authApi.login(email: email, password: password);
+      var tokens = await authApi.login(email: email, password: password);
+      if (tokens.accessTokenExpiresAt == null &&
+          tokens.accessToken.isNotEmpty) {
+        final exp = parseJwtAccessTokenExpiryUtc(tokens.accessToken);
+        if (exp != null) {
+          tokens = tokens.copyWith(accessTokenExpiresAt: exp);
+        }
+      }
       await _api.tokenStore.write(tokens);
-      await _persistSessionTokensToPrefs(tokens);
+      await _markIntroOnboardingPendingAfterLogin();
       isAuthenticated.value = true;
       lastError.value = null;
       await refreshMe(silent: true);
@@ -187,6 +245,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     isAuthenticated.value = false;
     me.value = null;
     lastError.value = null;
+    await GoogleSignInService.instance.signOut();
   }
 
   Future<bool> connectProvider(
@@ -251,10 +310,13 @@ class AuthController extends GetxController with WidgetsBindingObserver {
           parsed.accessToken!.isNotEmpty &&
           parsed.refreshToken != null &&
           parsed.refreshToken!.isNotEmpty) {
+        final at = parsed.accessToken!;
+        final rt = parsed.refreshToken!;
         await _api.tokenStore.write(
           SessionTokens(
-            accessToken: parsed.accessToken!,
-            refreshToken: parsed.refreshToken!,
+            accessToken: at,
+            refreshToken: rt,
+            accessTokenExpiresAt: parseJwtAccessTokenExpiryUtc(at),
           ),
         );
         isAuthenticated.value = true;
@@ -405,7 +467,11 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     if (accessToken == null || accessToken.isEmpty) return null;
     if (refreshToken == null || refreshToken.isEmpty) return null;
 
-    return SessionTokens(accessToken: accessToken, refreshToken: refreshToken);
+    return SessionTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      accessTokenExpiresAt: parseJwtAccessTokenExpiryUtc(accessToken),
+    );
   }
 
   @override

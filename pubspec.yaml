@@ -57,6 +57,8 @@ dependencies:
   socket_io_client:
   webview_flutter:
   permission_handler:
+  google_sign_in: ^7.2.0
+  firebase_core: ^4.6.0
 
 dev_dependencies:
   flutter_test:

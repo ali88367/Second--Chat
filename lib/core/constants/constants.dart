@@ -12,6 +12,14 @@ class AppConstants {
   // API Constants
   // Backend base URL (overridable at build/run time via `--dart-define=API_BASE_URL=...`).
   static const String baseUrl = 'https://cafe7bygasco.com';
+
+  /// Google Cloud → APIs & Services → Credentials → **OAuth 2.0 Client ID** of type **Web application**.
+  /// Paste the full id (ends with `.apps.googleusercontent.com`). Android **requires** this.
+  /// Override per build with `--dart-define=GOOGLE_SERVER_CLIENT_ID=...` or `dart_defines.json`.
+  static const String googleServerClientId = '688446882450-32ad24bgrb04bjd4sfpijrce67o68i38.apps.googleusercontent.com';
+
+  /// iOS-only OAuth client ID if you do not use `--dart-define=GOOGLE_IOS_CLIENT_ID`.
+  static const String googleIosClientId = '';
   static const int connectionTimeout = 30000; // milliseconds
   static const int receiveTimeout = 30000; // milliseconds
 
@@ -23,6 +31,9 @@ class AppConstants {
   static const String keyThemeMode = 'theme_mode';
   static const String keyLanguage = 'language';
   static const String keyFontSize = 'font_size';
+
+  /// After login, user sees [NotficationScreens] → intro 3–5 until home; then set `true`.
+  static const String keyIntroOnboardingComplete = 'second_chat.intro_onboarding_complete';
 
   // Animation Durations
   static const Duration animationDurationShort = Duration(milliseconds: 200);

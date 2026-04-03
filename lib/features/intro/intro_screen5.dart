@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 
 import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
+import '../../core/constants/constants.dart';
 import '../../core/localization/get_l10n.dart';
 import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
@@ -890,8 +892,10 @@ class IntroScreen5Controller extends GetxController {
   }
 
   Future<String?> _readAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('second_chat.access_token')?.trim();
+    final auth = Get.find<AuthController>();
+    await auth.ensureValidSession(refreshIfExpired: true);
+    final tokens = await auth.api.tokenStore.read();
+    final token = tokens?.accessToken.trim();
     if (token == null || token.isEmpty) return null;
     return token;
   }
@@ -974,7 +978,7 @@ class IntroScreen5Controller extends GetxController {
           data['data'] is Map &&
           data['data']['status']?.toString() == 'active';
       if (isActive) {
-        _goToHome();
+        await _goToHome();
       } else {
         final l10n = getAppL10n();
         Get.snackbar(
@@ -1009,12 +1013,16 @@ class IntroScreen5Controller extends GetxController {
     }
   }
 
-  void skipTrial() {
+  Future<void> skipTrial() async {
     if (isLoading.value) return;
-    _goToHome();
+    await _goToHome();
   }
 
-  void _goToHome() {
+  Future<void> _goToHome() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(AppConstants.keyIntroOnboardingComplete, true);
+    } catch (_) {}
     Get.offAll(
       () => const HomeScreen2(),
       transition: Transition.cupertino,

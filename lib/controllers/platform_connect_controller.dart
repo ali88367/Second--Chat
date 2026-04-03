@@ -7,6 +7,8 @@ import 'package:get/get.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/auth/jwt_utils.dart';
+import '../api/auth/models/session_tokens.dart';
 import '../api/config/api_config.dart';
 import '../api/auth/oauth_provider.dart';
 import 'auth_controller.dart';
@@ -18,8 +20,6 @@ class PlatformConnectController extends GetxController {
   final AuthController _auth;
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSub;
-  static const _kPrefsAccessToken = 'second_chat.access_token';
-  static const _kPrefsRefreshToken = 'second_chat.refresh_token';
   static const _kPrefsPlatformTokens = 'second_chat.platform_tokens';
 
   final RxBool isLoading = false.obs;
@@ -120,9 +120,16 @@ class PlatformConnectController extends GetxController {
       debugPrint('CONNECT TOKENS [$source] refreshToken=$refreshToken');
     }
 
+    final exp = parseJwtAccessTokenExpiryUtc(accessToken);
+    await _auth.api.tokenStore.write(
+      SessionTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        accessTokenExpiresAt: exp,
+      ),
+    );
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPrefsAccessToken, accessToken);
-    await prefs.setString(_kPrefsRefreshToken, refreshToken);
 
     final provider = _inferProvider(params);
     if (provider == null) {
@@ -350,8 +357,9 @@ class PlatformConnectController extends GetxController {
   }
 
   Future<String?> _readAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_kPrefsAccessToken)?.trim();
+    await _auth.ensureValidSession(refreshIfExpired: true);
+    final tokens = await _auth.api.tokenStore.read();
+    final token = tokens?.accessToken.trim();
     if (token == null || token.isEmpty) return null;
     return token;
   }

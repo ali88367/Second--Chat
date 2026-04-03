@@ -1,12 +1,28 @@
 import 'package:dio/dio.dart';
 
 import '../http/api_json.dart';
+import 'jwt_utils.dart';
 import 'models/session_tokens.dart';
 
 class AuthApi {
   AuthApi(this._dio);
 
   final Dio _dio;
+
+  Future<SessionTokens> loginWithGoogle({
+    required String idToken,
+    String? accessToken,
+  }) async {
+    final data = <String, dynamic>{'idToken': idToken};
+    if (accessToken != null && accessToken.isNotEmpty) {
+      data['accessToken'] = accessToken;
+    }
+    final res = await _dio.post<dynamic>(
+      '/api/v1/auth/google/mobile',
+      data: data,
+    );
+    return _parseTokens(res.data);
+  }
 
   Future<SessionTokens> login({
     required String email,
@@ -64,6 +80,16 @@ class AuthApi {
     dynamic json, {
     String? fallbackRefreshToken,
   }) {
+    if (json is Map) {
+      final m = Map<String, dynamic>.from(json);
+      if (m['success'] == false) {
+        final msg = m['message']?.toString().trim();
+        throw StateError(
+          (msg != null && msg.isNotEmpty) ? msg : 'Authentication failed',
+        );
+      }
+    }
+
     final accessToken = extractString(json, const [
       'accessToken',
       'access_token',
@@ -89,11 +115,15 @@ class AuthApi {
     DateTime? expiresAt;
     final expiresInRaw = extractJson(json, const ['expiresIn', 'expires_in']);
     if (expiresInRaw is num) {
-      expiresAt = DateTime.now().toUtc().add(Duration(seconds: expiresInRaw.toInt()));
+      expiresAt = DateTime.now().toUtc().add(
+        Duration(seconds: expiresInRaw.toInt()),
+      );
     }
 
     final expiresAtRaw = extractString(json, const ['expiresAt', 'expires_at']);
     expiresAt ??= expiresAtRaw == null ? null : DateTime.tryParse(expiresAtRaw);
+
+    expiresAt ??= parseJwtAccessTokenExpiryUtc(accessToken);
 
     return SessionTokens(
       accessToken: accessToken,

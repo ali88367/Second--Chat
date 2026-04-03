@@ -6,7 +6,9 @@ import FlutterMacOS
 import Foundation
 
 import app_links
+import firebase_core
 import flutter_secure_storage_darwin
+import google_sign_in_ios
 import ios_color_picker
 import path_provider_foundation
 import shared_preferences_foundation
@@ -16,7 +18,9 @@ import webview_flutter_wkwebview
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   AppLinksMacosPlugin.register(with: registry.registrar(forPlugin: "AppLinksMacosPlugin"))
+  FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))
   FlutterSecureStorageDarwinPlugin.register(with: registry.registrar(forPlugin: "FlutterSecureStorageDarwinPlugin"))
+  FLTGoogleSignInPlugin.register(with: registry.registrar(forPlugin: "FLTGoogleSignInPlugin"))
   IosColorPickerPlugin.register(with: registry.registrar(forPlugin: "IosColorPickerPlugin"))
   PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
