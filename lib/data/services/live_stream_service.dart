@@ -583,6 +583,25 @@ class LiveStreamService {
     }
     m['socketEvent'] = socketEventName;
 
+    final normalizedType = (m['type'] ?? '').toString().toLowerCase().trim();
+    if (normalizedType == 'follow' && kDebugMode) {
+      final platform = (m['platform'] ?? '').toString();
+      final metadata = m['metadata'];
+      String follower = '';
+      if (metadata is Map) {
+        follower = (metadata['user_name'] ??
+                metadata['username'] ??
+                metadata['user_login'] ??
+                metadata['displayName'] ??
+                '')
+            .toString()
+            .trim();
+      }
+      debugPrint(
+        '[FOLLOW_EVENT][RECEIVED] socket=$socketEventName platform=$platform follower=$follower payload=${jsonEncode(m)}',
+      );
+    }
+
     if (kDebugMode) {
       debugPrint('[ACTIVITY_EVENT][$socketEventName][SOCKET_PARSED] ${jsonEncode(m)}');
     }
