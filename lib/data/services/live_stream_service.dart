@@ -87,6 +87,18 @@ class LiveStreamService {
 
   bool get isSocketConnected => _socket?.connected == true;
 
+  String _normalizePlatform(String? raw) {
+    final v = (raw ?? '').toLowerCase().trim();
+    if (v.isEmpty) return '';
+    if (v.contains('twitch')) return 'twitch';
+    if (v.contains('kick')) return 'kick';
+    if (v.contains('youtube') || v == 'yt' || v.contains('google')) {
+      return 'youtube';
+    }
+    if (v.contains('tiktok')) return 'tiktok';
+    return v;
+  }
+
   Future<StreamingOverview?> fetchOverview({
     required String platform,
     required String accessToken,
@@ -262,7 +274,7 @@ class LiveStreamService {
 
     void applyStreamPayload(JsonMap m, void Function(JsonMap payload)? cb) {
       cb?.call(m);
-      final platform = (m['platform'] ?? '').toString().toLowerCase();
+      final platform = _normalizePlatform((m['platform'] ?? '').toString());
       if (platform.isNotEmpty) {
         final liveRaw = m['live'];
         if (liveRaw is bool) onLiveUpdate?.call(platform, liveRaw);
@@ -301,7 +313,7 @@ class LiveStreamService {
 
     socket.on('viewer_count:update', (payload) {
       final m = _asMap(payload);
-      final platform = (m?['platform'] ?? '').toString().toLowerCase();
+      final platform = _normalizePlatform((m?['platform'] ?? '').toString());
       final vc = _parseViewerCount(payload);
       if (platform.isNotEmpty && vc != null) {
         onViewerCountUpdate?.call(platform, vc);
@@ -440,9 +452,14 @@ class LiveStreamService {
       }
       if (map == null) return null;
 
-      final platform =
-          (map['platform'] ?? map['source'] ?? 'twitch').toString().trim().toLowerCase();
       final metadata = map['metadata'];
+      final platform = _normalizePlatform(
+        (map['platform'] ??
+                map['source'] ??
+                (metadata is Map ? metadata['platform'] : null) ??
+                'twitch')
+            .toString(),
+      );
       final metaUser = metadata is Map
           ? (metadata['user'] ??
                   metadata['username'] ??

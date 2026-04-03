@@ -9,6 +9,7 @@ Widget serviceRow({
   required String asset,
   required String title,
   required String subtitle,
+  Color? iconColor,
   VoidCallback? onTap,
 }) {
   final row = Container(
@@ -20,7 +21,12 @@ Widget serviceRow({
     child: Row(
       children: [
         Center(
-          child: Image.asset(asset, width: 23.w, height: 23.h),
+          child: Image.asset(
+            asset,
+            color: iconColor,
+            width: 23.w,
+            height: 23.h,
+          ),
         ),
         SizedBox(width: 12.w),
         Column(

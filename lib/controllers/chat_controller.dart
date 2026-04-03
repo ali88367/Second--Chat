@@ -73,6 +73,19 @@ class ChatController extends GetxController {
   String? _socketConnectedPlatform;
   String? _socketConnectedToken;
 
+  String _normalizedApiPlatform(String? raw, {String fallback = ''}) {
+    final key = _normalizePlatformKey(raw);
+    switch (key) {
+      case 'twitch':
+      case 'kick':
+      case 'youtube':
+      case 'tiktok':
+        return key;
+      default:
+        return fallback;
+    }
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -134,7 +147,7 @@ class ChatController extends GetxController {
       }
       _lastSocketConnectAttempt = now;
 
-      final selected = platform.value.toLowerCase().trim();
+      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       final token =
           await _live.ensureFreshPlatformAccessToken(platform: selected) ??
           await _tokenProvider.getAccessToken(selected);
@@ -152,7 +165,7 @@ class ChatController extends GetxController {
 
       if (!hasSocketFields) {
         // Refresh only the selected platform overview; it also updates socketUrl/path.
-        await refreshOverviewForPlatform(platform.value);
+        await refreshOverviewForPlatform(selected);
         socketUrl = _socketBaseUrl;
         socketPath = _socketPath;
       }
@@ -193,26 +206,27 @@ class ChatController extends GetxController {
 
   Future<void> _bootstrap() async {
     try {
+      var selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       // 1) App start: hit overview for each connected platform (tokens in SharedPrefs).
       final connectedPlatforms = await _tokenProvider.getConnectedPlatforms();
       if (connectedPlatforms.isNotEmpty) {
         // Keep default selection as-is unless it's not connected.
-        final selected = platform.value.toLowerCase();
         if (!connectedPlatforms.contains(selected)) {
           platform.value = connectedPlatforms.first;
+          selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
         }
         await refreshOverviewsForPlatforms(connectedPlatforms);
       }
 
       // Keep a main access token for socket auth (typically app JWT).
-      _accessToken = await _tokenProvider.getAccessToken(platform.value);
+      _accessToken = await _tokenProvider.getAccessToken(selected);
       if (_accessToken == null || _accessToken!.isEmpty) return;
 
-      await _swapToPlatformAndRefresh(platform.value, forceHistory: true);
+      await _swapToPlatformAndRefresh(selected, forceHistory: true);
 
       // Ensure we have socketUrl/path even if connectedPlatforms was empty.
       if (overview.value == null) {
-        await refreshOverviewForPlatform(platform.value);
+        await refreshOverviewForPlatform(selected);
       }
 
       final socketUrl = _socketBaseUrl;
@@ -225,9 +239,9 @@ class ChatController extends GetxController {
           baseUrl: socketUrl.trim(),
           path: socketPath.trim(),
           accessToken: _accessToken!,
-          label: platform.value.toLowerCase(),
+          label: selected,
         );
-        _socketConnectedPlatform = platform.value.toLowerCase().trim();
+        _socketConnectedPlatform = selected;
         _socketConnectedToken = _accessToken;
       }
 
@@ -446,17 +460,21 @@ class ChatController extends GetxController {
   }
 
   bool isPlatformLive(String p) {
-    return platformLive[p.toLowerCase()] == true;
+    final key = _normalizedApiPlatform(p);
+    if (key.isEmpty) return false;
+    return platformLive[key] == true;
   }
 
   String? urlForPlatform(String p) {
-    return platformEmbedUrls[p.toLowerCase()];
+    final key = _normalizedApiPlatform(p);
+    if (key.isEmpty) return null;
+    return platformEmbedUrls[key];
   }
 
   Future<void> sendMessage(String text) async {
     final msg = text.trim();
     if (msg.isEmpty) return;
-    final p = platform.value.toLowerCase().trim();
+    final p = _normalizedApiPlatform(platform.value, fallback: 'twitch');
     final token =
         await _live.ensureFreshPlatformAccessToken(platform: p) ??
         await _tokenProvider.getAccessToken(p);
@@ -520,7 +538,8 @@ class ChatController extends GetxController {
   }
 
   void _removeMessageById(String platformKey, String id) {
-    final p = platformKey.toLowerCase().trim();
+    final p = _normalizePlatformKey(platformKey);
+    if (p.isEmpty) return;
     final list = List<ChatMessage>.from(platformMessages[p] ?? []);
     final before = list.length;
     list.removeWhere((m) => m.id == id);
@@ -530,17 +549,21 @@ class ChatController extends GetxController {
   }
 
   void _appendAndSortPlatformMessages(String p, ChatMessage m) {
-    final list = List<ChatMessage>.from(platformMessages[p] ?? []);
+    final key = _normalizePlatformKey(p);
+    if (key.isEmpty) return;
+    final list = List<ChatMessage>.from(platformMessages[key] ?? []);
     list.add(m);
     list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    platformMessages[p] = _collapseNearDuplicates(list);
-    _syncVisibleMessagesIfSelected(p);
+    platformMessages[key] = _collapseNearDuplicates(list);
+    _syncVisibleMessagesIfSelected(key);
     _bumpScroll();
   }
 
   void _syncVisibleMessagesIfSelected(String p) {
-    if (platform.value.toLowerCase() == p) {
-      messages.assignAll(platformMessages[p] ?? []);
+    final selected = _normalizePlatformKey(platform.value);
+    final key = _normalizePlatformKey(p);
+    if (selected.isNotEmpty && selected == key) {
+      messages.assignAll(platformMessages[key] ?? []);
     }
   }
 
@@ -619,7 +642,12 @@ class ChatController extends GetxController {
   }
 
   static bool _isNormalChatMessage(ChatMessage msg) {
-    return _chatMessagePayloadType(msg) == 'normal';
+    final t = _chatMessagePayloadType(msg);
+    return t == 'normal' ||
+        t == 'message' ||
+        t == 'chat' ||
+        t == 'chat_message' ||
+        t == 'chat:message';
   }
 
   static String _normalizePlatformKey(String? raw) {
@@ -776,7 +804,18 @@ class ChatController extends GetxController {
       return;
     }
 
-    final p = msg.platform.toLowerCase().trim();
+    final p = _normalizePlatformKey(msg.platform);
+    if (p.isEmpty) return;
+    final normalizedMsg = msg.platform == p
+        ? msg
+        : ChatMessage(
+            platform: p,
+            userName: msg.userName,
+            message: msg.message,
+            timestamp: msg.timestamp,
+            id: msg.id,
+            raw: msg.raw,
+          );
     _purgeStalePendingEchoes();
 
     final norm = msg.message.trim().toLowerCase();
@@ -788,7 +827,7 @@ class ChatController extends GetxController {
       final echo = _pendingLocalChatEchoes.removeAt(pendingIdx);
       var list = List<ChatMessage>.from(platformMessages[p] ?? []);
       list.removeWhere((m) => m.id == echo.localMessageId);
-      list.add(msg);
+      list.add(normalizedMsg);
       list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       list = _collapseNearDuplicates(list);
       platformMessages[p] = list;
@@ -798,11 +837,11 @@ class ChatController extends GetxController {
     }
 
     final existing = List<ChatMessage>.from(platformMessages[p] ?? []);
-    if (_shouldSuppressSocketNearDuplicate(existing, msg)) {
+    if (_shouldSuppressSocketNearDuplicate(existing, normalizedMsg)) {
       return;
     }
 
-    final merged = _mergeUniqueByDedupeKey(existing, <ChatMessage>[msg]);
+    final merged = _mergeUniqueByDedupeKey(existing, <ChatMessage>[normalizedMsg]);
     merged.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     platformMessages[p] = _collapseNearDuplicates(merged);
     _syncVisibleMessagesIfSelected(p);
@@ -813,7 +852,7 @@ class ChatController extends GetxController {
     String p, {
     bool forceHistory = false,
   }) async {
-    final key = p.toLowerCase().trim();
+    final key = _normalizePlatformKey(p);
     if (key.isEmpty) return;
 
     // 0) Instant player/chat switch: never keep previous platform stream visible.
@@ -847,7 +886,7 @@ class ChatController extends GetxController {
   }
 
   Future<void> _refreshHistoryForPlatform(String platformKey, {bool force = false}) async {
-    final key = platformKey.toLowerCase().trim();
+    final key = _normalizedApiPlatform(platformKey, fallback: 'twitch');
     if (key.isEmpty) return;
 
     if (_historyInFlight.contains(key)) return;
@@ -975,9 +1014,10 @@ class ChatController extends GetxController {
   void _wireServiceCallbacks() {
     _live.onSocketConnected = () {
       isConnected.value = true;
-      _socketConnectedPlatform = platform.value.toLowerCase().trim();
+      _socketConnectedPlatform =
+          _normalizedApiPlatform(platform.value, fallback: 'twitch');
       _socketConnectedToken = _accessToken;
-      final selected = platform.value.toLowerCase().trim();
+      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       if (selected.isNotEmpty) {
         unawaited(_refreshHistoryForPlatform(selected, force: true));
       }
@@ -1003,15 +1043,22 @@ class ChatController extends GetxController {
       }
     };
     _live.onViewerCountUpdate = (p, vc) {
-      platformViewerCounts[p] = vc;
+      final key = _normalizedApiPlatform(p);
+      if (key.isEmpty) return;
+      platformViewerCounts[key] = vc;
       platformViewerCounts.refresh();
-      if (p == platform.value.toLowerCase()) viewerCount.value = vc;
+      if (key ==
+          _normalizedApiPlatform(platform.value, fallback: 'twitch')) {
+        viewerCount.value = vc;
+      }
     };
     _live.onLiveUpdate = (p, live) {
-      platformLive[p] = live;
+      final key = _normalizedApiPlatform(p);
+      if (key.isEmpty) return;
+      platformLive[key] = live;
       platformLive.refresh();
-      final selected = platform.value.toLowerCase();
-      if (p != selected) return;
+      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      if (key != selected) return;
 
       if (!live) {
         isLive.value = false;
@@ -1027,10 +1074,12 @@ class ChatController extends GetxController {
       }
     };
     _live.onPlayerUrlUpdate = (p, url) {
-      platformEmbedUrls[p] = url;
+      final key = _normalizedApiPlatform(p);
+      if (key.isEmpty) return;
+      platformEmbedUrls[key] = url;
       platformEmbedUrls.refresh();
-      final selected = platform.value.toLowerCase();
-      if (p == selected && (url?.trim().isNotEmpty == true) && isPlatformLive(selected)) {
+      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      if (key == selected && (url?.trim().isNotEmpty == true) && isPlatformLive(selected)) {
         watchUrl.value = url;
         isLive.value = true;
       }
@@ -1060,7 +1109,7 @@ class ChatController extends GetxController {
       _maybeTriggerEdgeGlowForActivity(event);
     };
     void applyMeta(Map<String, dynamic> m) {
-      final p = (m['platform'] ?? '').toString().toLowerCase();
+      final p = _normalizedApiPlatform((m['platform'] ?? '').toString());
       if (p.isEmpty) return;
       Map<String, dynamic>? meta;
       final rawMeta = m['meta'];
@@ -1081,13 +1130,14 @@ class ChatController extends GetxController {
   /// Socket messages are still appended in realtime, but this ensures you don't
   /// miss messages after reconnect or backgrounding.
   Future<void> refreshChatHistory({String? forPlatform, bool force = true}) {
-    final key = (forPlatform ?? platform.value).toLowerCase().trim();
+    final key =
+        _normalizedApiPlatform(forPlatform ?? platform.value, fallback: 'twitch');
     return _refreshHistoryForPlatform(key, force: force);
   }
 
   /// Switch selected platform immediately using cached state while refresh runs.
   void selectPlatformInstant(String p) {
-    final key = p.toLowerCase().trim();
+    final key = _normalizedApiPlatform(p, fallback: 'twitch');
     if (key.isEmpty) return;
 
     final cachedLive = platformLive[key];

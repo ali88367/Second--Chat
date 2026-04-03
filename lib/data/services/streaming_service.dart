@@ -8,6 +8,18 @@ class StreamingService {
 
   final Dio _dio;
 
+  String _normalizePlatform(String? raw) {
+    final v = (raw ?? '').toLowerCase().trim();
+    if (v.isEmpty) return '';
+    if (v.contains('twitch')) return 'twitch';
+    if (v.contains('kick')) return 'kick';
+    if (v.contains('youtube') || v == 'yt' || v.contains('google')) {
+      return 'youtube';
+    }
+    if (v.contains('tiktok')) return 'tiktok';
+    return v;
+  }
+
   int? _extractInt(Map<String, dynamic> json, List<String> keys) {
     for (final key in keys) {
       final value = json[key];
@@ -25,6 +37,9 @@ class StreamingService {
     required String platform,
     required String accessToken,
   }) async {
+    final normalizedPlatform = _normalizePlatform(platform).isEmpty
+        ? platform.toLowerCase().trim()
+        : _normalizePlatform(platform);
     try {
       final res = await _dio.get<dynamic>(
         '/api/v1/streaming/overview',
@@ -33,11 +48,11 @@ class StreamingService {
             'Authorization': 'Bearer $accessToken',
           },
         ),
-        queryParameters: {'platform': platform},
+        queryParameters: {'platform': normalizedPlatform},
       );
 
       final json = res.data;
-      final parsed = _parseOverview(json, platform: platform);
+      final parsed = _parseOverview(json, platform: normalizedPlatform);
       if (parsed != null) return parsed;
 
       // Some deployments may not accept the `platform` query param.
@@ -49,7 +64,7 @@ class StreamingService {
           },
         ),
       );
-      return _parseOverview(res2.data, platform: platform);
+      return _parseOverview(res2.data, platform: normalizedPlatform);
     } catch (_) {
       return null;
     }
@@ -80,7 +95,8 @@ class StreamingService {
         final m = p.cast<String, dynamic>();
         final pNameRaw = (m['platform'] ?? m['name'] ?? '').toString().trim();
         if (pNameRaw.isEmpty) continue;
-        final pKey = pNameRaw.toLowerCase();
+        final pKey = _normalizePlatform(pNameRaw);
+        if (pKey.isEmpty) continue;
 
         final liveRaw = m['live'];
         final live = liveRaw is bool
@@ -115,12 +131,13 @@ class StreamingService {
         }
       }
 
-      final key = platform.toLowerCase();
+      final key = _normalizePlatform(platform);
       for (final p in platformsList) {
         if (p is! Map) continue;
         final m = p.cast<String, dynamic>();
-        final pName =
-            (m['platform'] ?? m['name'] ?? '').toString().toLowerCase();
+        final pName = _normalizePlatform(
+          (m['platform'] ?? m['name'] ?? '').toString(),
+        );
         if (pName != key) continue;
 
         final liveRaw = m['live'];
@@ -206,10 +223,10 @@ class StreamingService {
       viewerCount: viewerCount,
       viewerCountsByPlatform: viewerCount == null
           ? const {}
-          : {platform.toLowerCase(): viewerCount},
-      liveByPlatform: {platform.toLowerCase(): live},
+          : {_normalizePlatform(platform): viewerCount},
+      liveByPlatform: {_normalizePlatform(platform): live},
       embedUrlByPlatform: {
-        platform.toLowerCase(): (embedUrl != null && embedUrl.trim().isNotEmpty)
+        _normalizePlatform(platform): (embedUrl != null && embedUrl.trim().isNotEmpty)
             ? embedUrl
             : watchUrl
       },
