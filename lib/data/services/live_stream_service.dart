@@ -206,6 +206,10 @@ class LiveStreamService {
     _socket = socket;
 
     socket.on('connect', (_) {
+      _logSocketEventPayload('connect', {
+        'baseUrl': normalizedBase,
+        'path': normalizedPath,
+      });
       _connectedBaseUrl = normalizedBase;
       _connectedPath = normalizedPath;
       _connectedAccessToken = normalizedToken;
@@ -216,12 +220,14 @@ class LiveStreamService {
     });
 
     socket.on('disconnect', (reason) {
+      _logSocketEventPayload('disconnect', reason);
       onSocketDisconnected?.call(reason?.toString() ?? '');
       _stopHeartbeat();
       if (!_manuallyDisconnected) _scheduleReconnectGuard();
     });
 
     socket.on('connect_error', (e) {
+      _logSocketEventPayload('connect_error', e);
       final m = _asMap(e) ?? <String, dynamic>{'message': e.toString()};
       onSocketError?.call(m);
       if (!_manuallyDisconnected) _scheduleReconnectGuard();
@@ -239,7 +245,6 @@ class LiveStreamService {
     });
 
     socket.on('activity:sync', (d) {
-      _logSocketEventPayload('activity:sync', d);
       final m = _asMap(d);
       if (m == null) return;
       final events = m['events'];
@@ -265,7 +270,8 @@ class LiveStreamService {
     // Some backends emit typed activity channels (activity:join, activity:follow, ...).
     // Handle all activity:* names using the same payload shape.
     socket.onAny((eventName, data) {
-      final name = eventName.toLowerCase().trim();
+      final name = eventName.toString().toLowerCase().trim();
+      _logSocketEventPayload(name, data);
       if (!name.startsWith('activity:')) return;
       if (name == 'activity:sync' || name == 'activity:event') return;
       if (_typedActivitySocketEvents.contains(name)) return;
@@ -322,7 +328,6 @@ class LiveStreamService {
     });
 
     socket.on('chat:message', (payload) {
-      _logSocketEventPayload('chat:message', payload);
       final msg = _parseChatMessage(payload);
       if (msg == null) return;
       if (_dedupe(msg)) return;
@@ -330,7 +335,6 @@ class LiveStreamService {
     });
 
     socket.on('led:notification', (d) {
-      _logSocketEventPayload('led:notification', d);
       final m = _asMap(d);
       if (m != null) onLedNotification?.call(m);
     });
@@ -584,7 +588,6 @@ class LiveStreamService {
   }
 
   void _handleActivitySocketEvent(String socketEventName, dynamic payload) {
-    _logSocketEventPayload(socketEventName, payload);
     if (kDebugMode) {
       debugPrint('[ACTIVITY_EVENT][$socketEventName][SOCKET_RAW] $payload');
     }
