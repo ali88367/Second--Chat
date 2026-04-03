@@ -165,11 +165,7 @@ class PlatformConnectController extends GetxController {
   Future<void> refreshConnections() async {
     final token = await _readAccessToken();
     if (token == null) {
-      isConnected.assignAll({
-        OAuthProvider.twitch: false,
-        OAuthProvider.kick: false,
-        OAuthProvider.youtube: false,
-      });
+      isConnected.assignAll(_emptyConnectionMap());
       return;
     }
 
@@ -179,65 +175,7 @@ class PlatformConnectController extends GetxController {
       if (kDebugMode) {
         debugPrint('PLATFORMS raw count=${connections.length}');
       }
-      final map = <OAuthProvider, bool>{
-        OAuthProvider.twitch: false,
-        OAuthProvider.kick: false,
-        OAuthProvider.youtube: false,
-      };
-
-      for (final c in connections) {
-        final platformRaw = (c['platform'] ?? c['name'] ?? c['type'] ?? '')
-            .toString()
-            .toLowerCase();
-        // Treat "linked/authorized" separately from "enabled" or "currently connected/live".
-        final linkedRaw = c['isLinked'] ??
-            c['linked'] ??
-            c['authorized'] ??
-            c['isAuthorized'] ??
-            c['hasAuth'] ??
-            c['hasTokens'] ??
-            c['hasAccessToken'] ??
-            c['accessToken'] ??
-            c['refreshToken'] ??
-            (c['status']?.toString().toLowerCase() == 'linked') ??
-            (c['status']?.toString().toLowerCase() == 'authorized');
-
-        final connectedRaw =
-            c['isConnected'] ?? c['connected'] ?? c['isLive'] ?? c['live'];
-
-        bool asBool(dynamic v) {
-          if (v is bool) return v;
-          if (v is num) return v != 0;
-          if (v is String) {
-            final s = v.toLowerCase().trim();
-            return s == 'true' || s == '1' || s == 'yes' || s == 'connected';
-          }
-          // Non-empty token strings count as linked.
-          if (v != null && v is! bool && v is! num) {
-            final s = v.toString();
-            return s.isNotEmpty;
-          }
-          return false;
-        }
-
-        final linked = asBool(linkedRaw);
-        final connected = asBool(connectedRaw);
-        final finalConnected = linked || connected;
-
-        if (kDebugMode) {
-          debugPrint(
-            'PLATFORMS item platform=$platformRaw linkedRaw=$linkedRaw connectedRaw=$connectedRaw => linked=$linked connected=$connected final=$finalConnected',
-          );
-        }
-
-        if (platformRaw.contains('twitch')) {
-          map[OAuthProvider.twitch] = finalConnected;
-        }
-        if (platformRaw.contains('kick')) map[OAuthProvider.kick] = finalConnected;
-        if (platformRaw.contains('youtube') || platformRaw.contains('google')) {
-          map[OAuthProvider.youtube] = finalConnected;
-        }
-      }
+      final map = _buildConnectionMap(connections);
 
       isConnected.assignAll(map);
       // If backend doesn't reflect link state (or uses a different field), keep optimistic state.
@@ -250,6 +188,110 @@ class PlatformConnectController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Startup guard:
+  /// returns `true` only when at least one platform is connected.
+  /// If the platform-status API fails (network/backend error), returns `false`.
+  Future<bool> hasAnyConnectedPlatformForStartup() async {
+    final token = await _readAccessToken();
+    if (token == null) {
+      isConnected.assignAll(_emptyConnectionMap());
+      return false;
+    }
+
+    isLoading.value = true;
+    try {
+      final connections = await _fetchPlatformStatus(token);
+      final map = _buildConnectionMap(connections);
+      isConnected.assignAll(map);
+      for (final p in optimisticLinked) {
+        if (isConnected[p] != true) isConnected[p] = true;
+      }
+      return isConnected.values.any((v) => v);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PLATFORMS startup check error: $e');
+        if (e is DioException) {
+          debugPrint(
+            'PLATFORMS startup check error response: ${e.response?.data}',
+          );
+        }
+      }
+      isConnected.assignAll(_emptyConnectionMap());
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Map<OAuthProvider, bool> _emptyConnectionMap() {
+    return <OAuthProvider, bool>{
+      OAuthProvider.twitch: false,
+      OAuthProvider.kick: false,
+      OAuthProvider.youtube: false,
+    };
+  }
+
+  Map<OAuthProvider, bool> _buildConnectionMap(
+    List<Map<String, dynamic>> connections,
+  ) {
+    final map = _emptyConnectionMap();
+
+    for (final c in connections) {
+      final platformRaw =
+          (c['platform'] ?? c['name'] ?? c['type'] ?? '').toString().toLowerCase();
+      // Treat "linked/authorized" separately from "enabled" or "currently connected/live".
+      final linkedRaw = c['isLinked'] ??
+          c['linked'] ??
+          c['authorized'] ??
+          c['isAuthorized'] ??
+          c['hasAuth'] ??
+          c['hasTokens'] ??
+          c['hasAccessToken'] ??
+          c['accessToken'] ??
+          c['refreshToken'] ??
+          (c['status']?.toString().toLowerCase() == 'linked') ??
+          (c['status']?.toString().toLowerCase() == 'authorized');
+
+      final connectedRaw =
+          c['isConnected'] ?? c['connected'] ?? c['isLive'] ?? c['live'];
+
+      bool asBool(dynamic v) {
+        if (v is bool) return v;
+        if (v is num) return v != 0;
+        if (v is String) {
+          final s = v.toLowerCase().trim();
+          return s == 'true' || s == '1' || s == 'yes' || s == 'connected';
+        }
+        // Non-empty token strings count as linked.
+        if (v != null && v is! bool && v is! num) {
+          final s = v.toString();
+          return s.isNotEmpty;
+        }
+        return false;
+      }
+
+      final linked = asBool(linkedRaw);
+      final connected = asBool(connectedRaw);
+      final finalConnected = linked || connected;
+
+      if (kDebugMode) {
+        debugPrint(
+          'PLATFORMS item platform=$platformRaw linkedRaw=$linkedRaw connectedRaw=$connectedRaw => linked=$linked connected=$connected final=$finalConnected',
+        );
+      }
+
+      if (platformRaw.contains('twitch')) {
+        map[OAuthProvider.twitch] = finalConnected;
+      }
+      if (platformRaw.contains('kick')) map[OAuthProvider.kick] = finalConnected;
+      if (platformRaw.contains('youtube') || platformRaw.contains('google')) {
+        map[OAuthProvider.youtube] = finalConnected;
+      }
+    }
+
+    return map;
   }
 
   Future<List<Map<String, dynamic>>> _fetchPlatformStatus(String token) async {
@@ -296,6 +338,9 @@ class PlatformConnectController extends GetxController {
     return Dio(
       BaseOptions(
         baseUrl: ApiConfig.baseUrl,
+        connectTimeout: ApiConfig.connectTimeout,
+        receiveTimeout: ApiConfig.receiveTimeout,
+        sendTimeout: ApiConfig.receiveTimeout,
         headers: const {
           'Accept': 'application/json',
           'Content-Type': 'application/json',

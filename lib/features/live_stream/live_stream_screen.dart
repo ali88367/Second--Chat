@@ -196,15 +196,24 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   String _assetForPlatform(String platform) {
-    switch (platform.toLowerCase()) {
+    switch (_normalizeUiPlatform(platform)) {
       case 'kick':
         return 'assets/images/kick.png';
       case 'youtube':
-        return 'assets/images/youtube1.png';
+        return 'assets/images/youtube.png';
       case 'twitch':
       default:
-        return 'assets/images/twitch1.png';
+        return 'assets/images/twitch.png';
     }
+  }
+
+  String _normalizeUiPlatform(String? raw) {
+    final v = (raw ?? '').toLowerCase().trim();
+    if (v.contains('kick')) return 'kick';
+    if (v.contains('youtube') || v == 'yt' || v.contains('google')) {
+      return 'youtube';
+    }
+    return 'twitch';
   }
 
   String _formatTime(dynamic tsRaw) {
@@ -1043,15 +1052,10 @@ class _LivestreamingState extends State<Livestreaming> {
                                                         ) {
                                                           if (platform !=
                                                               null) {
-                                                            final asset =
-                                                                platform ==
-                                                                        'twitch'
-                                                                    ? 'assets/images/twitch1.png'
-                                                                    : platform ==
-                                                                        'kick'
-                                                                    ? 'assets/images/kick.png'
-                                                                    : 'assets/images/youtube1.png';
-
+                                                            final activePlatform =
+                                                                _normalizeUiPlatform(
+                                                                  platform,
+                                                                );
                                                             return SizedBox(
                                                               height:
                                                                   upperSectionHeight,
@@ -1122,15 +1126,25 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                   ),
                                                                                 ),
                                                                                 const Spacer(),
-                                                                                Center(
-                                                                                  child: Image.asset(
-                                                                                    asset,
-                                                                                    width:
-                                                                                        22.w,
-                                                                                    height:
-                                                                                        22.h,
-                                                                                  ),
-                                                                                ),
+                                                                                Obx(() {
+                                                                                  final iconAsset =
+                                                                                      _assetForPlatform(
+                                                                                        activePlatform,
+                                                                                      );
+                                                                                  final iconColor =
+                                                                                      _settingsCtrl
+                                                                                          .getPlatformColor(
+                                                                                            activePlatform,
+                                                                                          );
+                                                                                  return Center(
+                                                                                    child: Image.asset(
+                                                                                      iconAsset,
+                                                                                      color: iconColor,
+                                                                                      width: 22.w,
+                                                                                      height: 22.h,
+                                                                                    ),
+                                                                                  );
+                                                                                }),
                                                                                 const Spacer(),
                                                                                 SizedBox(
                                                                                   width:
@@ -1153,9 +1167,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                 ) {
                                                                               return Obx(() {
                                                                                 final metaKey =
-                                                                                    (chatFilter ?? platform ?? 'twitch')
+                                                                                    _normalizeUiPlatform(
+                                                                                      chatFilter ??
+                                                                                          activePlatform,
+                                                                                    )
                                                                                         .toString()
-                                                                                        .toLowerCase();
+                                                                                        .trim();
                                                                                 final titleLive =
                                                                                     (chatCtrl.streamTitleByPlatform[metaKey] ?? '')
                                                                                         .trim();
@@ -1227,19 +1244,35 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                           mainAxisSize:
                                                                               MainAxisSize.min,
                                                                           children: [
-                                                                            serviceRow(
-                                                                              asset:
-                                                                                  'assets/images/youtube1.png',
-                                                                              title:
-                                                                                  context.l10n.title,
-                                                                              subtitle:
-                                                                                  context.l10n.category,
-                                                                              onTap: () {
-                                                                                _selectedPlatform.value = 'youtube';
-                                                                                _titleSelected.value = true;
-                                                                                _showServiceCard.value = true;
-                                                                              },
-                                                                            ),
+                                                                            Obx(() {
+                                                                              final currentPlatform =
+                                                                                  _normalizeUiPlatform(
+                                                                                    _chatFilter
+                                                                                        .value ??
+                                                                                        chatCtrl
+                                                                                            .platform
+                                                                                            .value,
+                                                                                  );
+                                                                              return serviceRow(
+                                                                                asset: _assetForPlatform(
+                                                                                  currentPlatform,
+                                                                                ),
+                                                                                iconColor: _settingsCtrl
+                                                                                    .getPlatformColor(
+                                                                                      currentPlatform,
+                                                                                    ),
+                                                                                title:
+                                                                                    context.l10n.title,
+                                                                                subtitle:
+                                                                                    context.l10n.category,
+                                                                                onTap: () {
+                                                                                  _selectedPlatform.value =
+                                                                                      currentPlatform;
+                                                                                  _titleSelected.value = true;
+                                                                                  _showServiceCard.value = true;
+                                                                                },
+                                                                              );
+                                                                            }),
                                                                             SizedBox(
                                                                               height:
                                                                                   36.h,

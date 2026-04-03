@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'package:second_chat/l10n/app_localizations.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
+import 'package:second_chat/features/intro/intro_screen2.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/edge_glow_notification_controller.dart';
@@ -324,11 +325,48 @@ class _StartupGateState extends State<StartupGate> {
       }
 
       if (auth.isAuthenticated.value) {
-        return const HomeScreen2();
+        return const _PlatformStartupGate();
       }
 
       return IntroScreen1(initialController: widget.introVideoController);
     });
+  }
+}
+
+class _PlatformStartupGate extends StatefulWidget {
+  const _PlatformStartupGate();
+
+  @override
+  State<_PlatformStartupGate> createState() => _PlatformStartupGateState();
+}
+
+class _PlatformStartupGateState extends State<_PlatformStartupGate> {
+  late final Future<bool> _hasConnectedPlatformFuture = _runStartupCheck();
+
+  Future<bool> _runStartupCheck() async {
+    final platformCtrl = Get.find<PlatformConnectController>();
+    return platformCtrl.hasAnyConnectedPlatformForStartup();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _hasConnectedPlatformFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _SessionCheckLoader();
+        }
+
+        final hasConnectedPlatform = snapshot.data == true;
+        if (hasConnectedPlatform) {
+          return const HomeScreen2();
+        }
+
+        // If user has no linked platform OR platform-status API could not be fetched,
+        // send the user to Get Started onboarding.
+        return const IntroScreen2();
+      },
+    );
   }
 }
 
