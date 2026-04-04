@@ -8,6 +8,7 @@ import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/widgets/custom_switch.dart';
 
 import '../../3timewidget.dart';
+import '../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
 class StreamStreakSetupBottomSheet extends StatefulWidget {
@@ -28,6 +29,8 @@ class _StreamStreakSetupBottomSheetState
   bool _framesPreloaded = false;
   bool _isSubmitting = false;
   late final StreamStreaksController _streakCtrl;
+  late final SettingsController _settings;
+  Worker? _lowPowerWorker;
 
   static const int totalFrames = 90; // Frames from 0001 to 0119
 
@@ -35,23 +38,17 @@ class _StreamStreakSetupBottomSheetState
   void initState() {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
+    _settings = Get.find<SettingsController>();
     _streakCtrl.resetSelection();
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-
-    // Frame animation controller - loops continuously forward
-    _frameController = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        milliseconds: 3000,
-      ), // Adjust duration for animation speed
     );
 
-    // Start animation and ensure it loops continuously from start
-    // repeat() automatically handles looping, no need to call forward() separately
-    _frameController.repeat();
+    _frameController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    );
 
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOutSine),
@@ -60,6 +57,25 @@ class _StreamStreakSetupBottomSheetState
     _opacityAnimation = Tween<double>(begin: 0.15, end: 0.35).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOutSine),
     );
+
+    if (_settings.lowPowerMode.value) {
+      _glowController.value = 0.5;
+      _frameController.value = 0;
+    } else {
+      _glowController.repeat(reverse: true);
+      _frameController.repeat();
+    }
+
+    _lowPowerWorker = ever(_settings.lowPowerMode, (bool low) {
+      if (low) {
+        _glowController.stop();
+        _frameController.stop();
+      } else {
+        _glowController.repeat(reverse: true);
+        _frameController.repeat();
+      }
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -98,9 +114,61 @@ class _StreamStreakSetupBottomSheetState
 
   @override
   void dispose() {
+    _lowPowerWorker?.dispose();
     _glowController.dispose();
     _frameController.dispose();
     super.dispose();
+  }
+
+  Widget _lowPowerStreakGraphic(BuildContext context) {
+    const scale = 1.1;
+    const opacity = 0.25;
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 150.h,
+            height: 150.h,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0XFFFFE6A7).withOpacity(opacity),
+                  blurRadius: 50,
+                  spreadRadius: 20,
+                ),
+                BoxShadow(
+                  color: const Color(0XFFF2B269).withOpacity(opacity * 0.5),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+          ),
+        ),
+        Image.asset(
+          'assets/Fire3/frame_mq_0001.png',
+          height: 157.h,
+          width: 157.w,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          cacheWidth:
+              (177.w * MediaQuery.of(context).devicePixelRatio).round(),
+          cacheHeight:
+              (177.h * MediaQuery.of(context).devicePixelRatio).round(),
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 177.h,
+              width: 177.w,
+              color: Colors.transparent,
+            );
+          },
+        ),
+      ],
+    );
   }
 
   Future<bool> _createStreak(StreamStreaksController controller) async {
@@ -207,89 +275,92 @@ class _StreamStreakSetupBottomSheetState
                     // Main Graphic and Text Section
                     SizedBox(height: 10.h),
                     RepaintBoundary(
-                      child: AnimatedBuilder(
-                        animation: Listenable.merge([
-                          _glowController,
-                          _frameController,
-                        ]),
-                        builder: (context, child) {
-                          // Optimized frame calculation using round() for smoother transitions
-                          double animValue = _frameController.value.clamp(
-                            0.0,
-                            1.0,
-                          );
-                          // Use round() instead of floor() for smoother frame transitions
-                          int frame =
-                              ((animValue * totalFrames).round() % totalFrames);
-                          frame = (frame == 0 ? totalFrames : frame).clamp(
-                            1,
-                            totalFrames,
-                          );
-                          String frameNumber = frame.toString().padLeft(4, '0');
+                      child: _settings.lowPowerMode.value
+                          ? _lowPowerStreakGraphic(context)
+                          : AnimatedBuilder(
+                              animation: Listenable.merge([
+                                _glowController,
+                                _frameController,
+                              ]),
+                              builder: (context, child) {
+                                double animValue = _frameController.value.clamp(
+                                  0.0,
+                                  1.0,
+                                );
+                                int frame =
+                                    ((animValue * totalFrames).round() %
+                                        totalFrames);
+                                frame = (frame == 0 ? totalFrames : frame).clamp(
+                                  1,
+                                  totalFrames,
+                                );
+                                String frameNumber =
+                                    frame.toString().padLeft(4, '0');
 
-                          return Stack(
-                            alignment: Alignment.center,
-                            clipBehavior: Clip.none,
-                            children: [
-                              Transform.scale(
-                                scale: _scaleAnimation.value,
-                                child: Container(
-                                  width: 150.h,
-                                  height: 150.h,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(
-                                          0XFFFFE6A7,
-                                        ).withOpacity(_opacityAnimation.value),
-                                        blurRadius: 50,
-                                        spreadRadius: 20,
-                                      ),
-                                      BoxShadow(
-                                        color: const Color(
-                                          0XFFF2B269,
-                                        ).withOpacity(
-                                          _opacityAnimation.value * 0.5,
+                                return Stack(
+                                  alignment: Alignment.center,
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Transform.scale(
+                                      scale: _scaleAnimation.value,
+                                      child: Container(
+                                        width: 150.h,
+                                        height: 150.h,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0XFFFFE6A7,
+                                              ).withOpacity(
+                                                  _opacityAnimation.value),
+                                              blurRadius: 50,
+                                              spreadRadius: 20,
+                                            ),
+                                            BoxShadow(
+                                              color: const Color(
+                                                0XFFF2B269,
+                                              ).withOpacity(
+                                                _opacityAnimation.value * 0.5,
+                                              ),
+                                              blurRadius: 30,
+                                              spreadRadius: 5,
+                                            ),
+                                          ],
                                         ),
-                                        blurRadius: 30,
-                                        spreadRadius: 5,
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Image.asset(
-                                'assets/Fire3/frame_mq_$frameNumber.png',
-                                height: 157.h,
-                                width: 157.w,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                // Optimized cache dimensions for exact size
-                                cacheWidth:
-                                    (177.w *
-                                            MediaQuery.of(
-                                              context,
-                                            ).devicePixelRatio)
-                                        .round(),
-                                cacheHeight:
-                                    (177.h *
-                                            MediaQuery.of(
-                                              context,
-                                            ).devicePixelRatio)
-                                        .round(),
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 177.h,
-                                    width: 177.w,
-                                    color: Colors.transparent,
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                                    ),
+                                    Image.asset(
+                                      'assets/Fire3/frame_mq_$frameNumber.png',
+                                      height: 157.h,
+                                      width: 157.w,
+                                      fit: BoxFit.contain,
+                                      gaplessPlayback: true,
+                                      cacheWidth:
+                                          (177.w *
+                                                  MediaQuery.of(
+                                                    context,
+                                                  ).devicePixelRatio)
+                                              .round(),
+                                      cacheHeight:
+                                          (177.h *
+                                                  MediaQuery.of(
+                                                    context,
+                                                  ).devicePixelRatio)
+                                              .round(),
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          height: 177.h,
+                                          width: 177.w,
+                                          color: Colors.transparent,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                     ),
                     SizedBox(height: 3.h),
                     Text(

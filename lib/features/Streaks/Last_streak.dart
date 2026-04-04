@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
+import '../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 
 class StreakFreezeUseBottomSheet extends StatefulWidget {
@@ -24,6 +25,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
   bool _framesPreloaded = false;
   bool _isFreezing = false;
   late final StreamStreaksController _streakCtrl;
+  late final SettingsController _settings;
+  Worker? _lowPowerWorker;
 
   static const int days = 7;
   static const double horizontalPadding = 12;
@@ -34,21 +37,16 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
   void initState() {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
+    _settings = Get.find<SettingsController>();
     _freezeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2500),
-    )..repeat(reverse: true);
+    );
 
-    // Frame animation controller - loops continuously forward
-    // Optimized duration for smoother playback (32ms per frame for 95 frames ~ 3000ms)
     _frameController = AnimationController(
       vsync: this,
-      duration: const Duration(
-        milliseconds: 2500,
-      ), // Slightly faster for smoother feel
+      duration: const Duration(milliseconds: 2500),
     );
-    // repeat() automatically handles looping and starts the animation
-    _frameController.repeat();
 
     _glowAnimation = Tween<double>(begin: 0.15, end: 0.4).animate(
       CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutSine),
@@ -57,6 +55,25 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     _floatAnimation = Tween<double>(begin: 0, end: -10.h).animate(
       CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutQuad),
     );
+
+    if (_settings.lowPowerMode.value) {
+      _freezeController.value = 0.5;
+      _frameController.value = 0;
+    } else {
+      _freezeController.repeat(reverse: true);
+      _frameController.repeat();
+    }
+
+    _lowPowerWorker = ever(_settings.lowPowerMode, (bool low) {
+      if (low) {
+        _freezeController.stop();
+        _frameController.stop();
+      } else {
+        _freezeController.repeat(reverse: true);
+        _frameController.repeat();
+      }
+      if (mounted) setState(() {});
+    });
 
     _streakCtrl.fetchCurrentStreak(silent: true);
     _streakCtrl.fetchHistory(silent: true);
@@ -98,9 +115,62 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
 
   @override
   void dispose() {
+    _lowPowerWorker?.dispose();
     _freezeController.dispose();
     _frameController.dispose();
     super.dispose();
+  }
+
+  Widget _lowPowerFreezeUseGraphic(BuildContext context) {
+    const glow = 0.275;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 300.w,
+          height: 240.h,
+          decoration: BoxDecoration(
+            shape: BoxShape.rectangle,
+            borderRadius: BorderRadius.all(
+              Radius.elliptical(70.w, 110.h),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF7EDDE4).withOpacity(glow),
+                blurRadius: 180,
+                spreadRadius: 10,
+              ),
+            ],
+          ),
+        ),
+        Image.asset(
+          'assets/FrozenFire/frame_0001.png',
+          height: 250.h,
+          width: 250.w,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          cacheWidth:
+              (250.w * MediaQuery.of(context).devicePixelRatio).round(),
+          cacheHeight:
+              (250.h * MediaQuery.of(context).devicePixelRatio).round(),
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 250.h,
+              width: 250.w,
+              color: Colors.transparent,
+            );
+          },
+        ),
+        Positioned(
+          bottom: 0.h,
+          child: Image.asset(
+            'assets/images/Streak number.png',
+            width: 155.w,
+            height: 90.h,
+          ),
+        ),
+      ],
+    );
   }
 
   // NEW: Widget for the drag handle (bottom sheet bar)
@@ -274,95 +344,89 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           ),
                         ),
                         RepaintBoundary(
-                          child: AnimatedBuilder(
-                            animation: Listenable.merge([
-                              _freezeController,
-                              _frameController,
-                            ]),
-                            builder: (context, child) {
-                              // Optimized frame calculation using round() for smoother transitions
-                              double animValue = _frameController.value.clamp(
-                                0.0,
-                                1.0,
-                              );
-                              // Use round() instead of floor() for smoother frame transitions
-                              int frame =
-                                  ((animValue * totalFrames).round() %
-                                  totalFrames);
-                              frame = (frame == 0 ? totalFrames : frame).clamp(
-                                1,
-                                totalFrames,
-                              );
-                              String frameNumber = frame.toString().padLeft(
-                                4,
-                                '0',
-                              );
+                          child: _settings.lowPowerMode.value
+                              ? _lowPowerFreezeUseGraphic(context)
+                              : AnimatedBuilder(
+                                  animation: Listenable.merge([
+                                    _freezeController,
+                                    _frameController,
+                                  ]),
+                                  builder: (context, child) {
+                                    double animValue =
+                                        _frameController.value.clamp(0.0, 1.0);
+                                    int frame =
+                                        ((animValue * totalFrames).round() %
+                                            totalFrames);
+                                    frame =
+                                        (frame == 0 ? totalFrames : frame).clamp(
+                                      1,
+                                      totalFrames,
+                                    );
+                                    String frameNumber =
+                                        frame.toString().padLeft(4, '0');
 
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Container(
-                                    width: 300.w,
-                                    height: 240.h,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.rectangle,
-                                      borderRadius: BorderRadius.all(
-                                        Radius.elliptical(70.w, 110.h),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFF7EDDE4,
-                                          ).withOpacity(_glowAnimation.value),
-                                          blurRadius: 180,
-                                          spreadRadius: 10,
+                                    return Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        Container(
+                                          width: 300.w,
+                                          height: 240.h,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.rectangle,
+                                            borderRadius: BorderRadius.all(
+                                              Radius.elliptical(70.w, 110.h),
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0xFF7EDDE4,
+                                                ).withOpacity(
+                                                    _glowAnimation.value),
+                                                blurRadius: 180,
+                                                spreadRadius: 10,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Transform.translate(
+                                          offset:
+                                              Offset(0, _floatAnimation.value),
+                                          child: Image.asset(
+                                            'assets/FrozenFire/frame_$frameNumber.png',
+                                            height: 250.h,
+                                            width: 250.w,
+                                            fit: BoxFit.contain,
+                                            gaplessPlayback: true,
+                                            cacheWidth: (250.w *
+                                                    MediaQuery.of(context)
+                                                        .devicePixelRatio)
+                                                .round(),
+                                            cacheHeight: (250.h *
+                                                    MediaQuery.of(context)
+                                                        .devicePixelRatio)
+                                                .round(),
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Container(
+                                                height: 250.h,
+                                                width: 250.w,
+                                                color: Colors.transparent,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        Positioned(
+                                          bottom: 0.h,
+                                          child: Image.asset(
+                                            'assets/images/Streak number.png',
+                                            width: 155.w,
+                                            height: 90.h,
+                                          ),
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                  Transform.translate(
-                                    offset: Offset(0, _floatAnimation.value),
-                                    child: Image.asset(
-                                      'assets/FrozenFire/frame_$frameNumber.png',
-                                      height: 250.h,
-                                      width: 250.w,
-                                      fit: BoxFit.contain,
-                                      gaplessPlayback: true,
-                                      // Optimized cache dimensions for exact size
-                                      cacheWidth:
-                                          (250.w *
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).devicePixelRatio)
-                                              .round(),
-                                      cacheHeight:
-                                          (250.h *
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).devicePixelRatio)
-                                              .round(),
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              height: 250.h,
-                                              width: 250.w,
-                                              color: Colors.transparent,
-                                            );
-                                          },
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 0.h,
-                                    child: Image.asset(
-                                      'assets/images/Streak number.png',
-                                      width: 155.w,
-                                      height: 90.h,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
+                                    );
+                                  },
+                                ),
                         ),
                         Text(
                           context.l10n.freezeTagline,

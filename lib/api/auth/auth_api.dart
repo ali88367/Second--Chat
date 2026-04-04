@@ -9,14 +9,32 @@ class AuthApi {
 
   final Dio _dio;
 
+  /// POST body for `/api/v1/auth/google/mobile` must match the backend
+  /// (`oauth.controller.ts`): **`idToken`** = OpenID JWT only (`eyJ...`), optional
+  /// **`accessToken`** = Google OAuth access token (`ya29...`, not verified for login).
+  /// Do **not** send `token` / `credential` with the access token as the JWT field.
   Future<SessionTokens> loginWithGoogle({
     required String idToken,
     String? accessToken,
   }) async {
-    final data = <String, dynamic>{'idToken': idToken};
-    if (accessToken != null && accessToken.isNotEmpty) {
-      data['accessToken'] = accessToken;
+    final trimmedId = idToken.trim();
+    if (!trimmedId.startsWith('eyJ')) {
+      throw ArgumentError(
+        'idToken must be the Google ID token JWT (OpenID), typically starting with '
+        '"eyJ". Do not send the OAuth access token (ya29...) as idToken.',
+      );
     }
+
+    final trimmedAccess = accessToken?.trim();
+    final data = <String, dynamic>{
+      'idToken': trimmedId,
+      'accessToken':
+          (trimmedAccess != null && trimmedAccess.isNotEmpty)
+              ? trimmedAccess
+              : null,
+      'refreshToken': null,
+    };
+
     final res = await _dio.post<dynamic>(
       '/api/v1/auth/google/mobile',
       data: data,

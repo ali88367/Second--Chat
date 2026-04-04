@@ -425,16 +425,7 @@ class StreamStreaksController extends GetxController {
         ),
       );
 
-      _logStreakResponse('GET /api/v1/streaks/overview', res.data);
       final snapshot = StreakData.fromPayload(res.data);
-      if (kDebugMode) {
-        debugPrint(
-          'STREAK CREATED CHECK: ${snapshot.hasCreatedStreak} '
-          '(currentStreak=${snapshot.currentStreak}, '
-          'historyCount=${snapshot.completedDates.length}, '
-          'lastCheckInDate=${snapshot.lastCompletedDate?.toIso8601String() ?? 'null'})',
-        );
-      }
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
       return current.value;

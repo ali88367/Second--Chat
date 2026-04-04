@@ -13,6 +13,71 @@ import 'streaming_service.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
+const int _kInboundLogMaxChars = 12000;
+
+dynamic _jsonSafeForInboundLog(dynamic v) {
+  if (v == null || v is num || v is String || v is bool) return v;
+  if (v is DateTime) return v.toIso8601String();
+  if (v is Map) {
+    final out = <String, dynamic>{};
+    for (final e in v.entries) {
+      out[e.key.toString()] = _jsonSafeForInboundLog(e.value);
+    }
+    return out;
+  }
+  if (v is Iterable) {
+    return v.map(_jsonSafeForInboundLog).toList();
+  }
+  return v.toString();
+}
+
+String _payloadToInboundLogString(dynamic payload) {
+  try {
+    final s = jsonEncode(_jsonSafeForInboundLog(payload));
+    if (s.length > _kInboundLogMaxChars) {
+      return '${s.substring(0, _kInboundLogMaxChars)}…';
+    }
+    return s;
+  } catch (_) {
+    final s = payload.toString();
+    if (s.length > _kInboundLogMaxChars) {
+      return '${s.substring(0, _kInboundLogMaxChars)}…';
+    }
+    return s;
+  }
+}
+
+/// Socket.IO often passes a single-arg payload as a one-element [List].
+dynamic _unwrapSocketIoData(dynamic data) {
+  if (data is List && data.length == 1) return data.first;
+  return data;
+}
+
+bool _shouldRecordInboundSocketEvent(String eventName) {
+  final n = eventName.toLowerCase().trim();
+  if (n.startsWith('chat:')) return true;
+  if (n == 'socket:connect' ||
+      n == 'socket:disconnect' ||
+      n == 'socket:connect_error' ||
+      n == 'connected') {
+    return true;
+  }
+  if (n == 'socket:unhandled_event') return true;
+  return LiveStreamService.inboundLogNamedSocketEvents.contains(n);
+}
+
+/// Drop heavy `context` from [API_SOCKET_DETAILS.md] `chat:message` for log readability.
+dynamic _chatMessagePayloadForLog(dynamic payload) {
+  if (payload is! Map) return payload;
+  try {
+    final m = Map<String, dynamic>.from(payload.cast<String, dynamic>());
+    m.remove('context');
+    return m;
+  } catch (_) {
+    return payload;
+  }
+}
+
 /// Live stream orchestration service:
 /// - Fetches REST overview/history/send
 /// - Manages Socket.IO connection + events
@@ -47,7 +112,6 @@ class LiveStreamService {
   String? _connectedBaseUrl;
   String? _connectedPath;
   String? _connectedAccessToken;
-  String? _connectedLabel;
 
   // Prevent duplicate messages (bounded memory).
   final Map<String, DateTime> _seen = <String, DateTime>{};
@@ -85,7 +149,85 @@ class LiveStreamService {
   void Function(JsonMap payload)? onStreamSettingsApplied;
   void Function(JsonMap payload)? onSocketError;
 
+  /// Inbound events for the socket log UI ([SocketLogScreen]): activity + live chat.
+  void Function(String eventName, String payloadText)? onSocketInbound;
+
   bool get isSocketConnected => _socket?.connected == true;
+
+  /// Connection parameters for the Socket.IO session that receives **`chat:message`**
+  /// (and related §5 events), aligned with `API_SOCKET_DETAILS.md` §5 *Connection*.
+  ///
+  /// Does not include raw tokens — only a fingerprint of the handshake token.
+  Map<String, dynamic> get chatMessageSocketConnectionDetails {
+    final s = _socket;
+    String? ioId;
+    try {
+      ioId = (s as dynamic).id?.toString();
+    } catch (_) {
+      ioId = null;
+    }
+    const transports = 'websocket, polling';
+    return <String, dynamic>{
+      'api_doc_reference': 'API_SOCKET_DETAILS.md §5 WebSocket (Socket.IO)',
+      'inbound_chat_event': 'chat:message (§5.2)',
+      'url_source': 'GET /streaming/overview → chatSocketUrl',
+      'path_source': 'GET /streaming/overview → chatSocketPath',
+      'base_url': _connectedBaseUrl?.trim().isNotEmpty == true
+          ? _connectedBaseUrl!.trim()
+          : '(awaiting connect / overview)',
+      'socket_io_path': _connectedPath?.trim().isNotEmpty == true
+          ? _connectedPath!.trim()
+          : '(awaiting overview)',
+      'transports': transports,
+      'implements_transports_per_doc': true,
+      'handshake_auth': 'auth: { "token": "<accessToken>" }',
+      'handshake_header': 'Authorization: Bearer <accessToken>',
+      'implements_auth_per_doc': true,
+      'access_token_fingerprint': _tokenFingerprint(_connectedAccessToken),
+      'transport_connected': s?.connected == true,
+      'socket_io_session_id': ioId ?? '(after connect)',
+      'client_emits_after_connect': 'chat:start (§5.1), periodic keep-alive',
+      'listens_for_chat_message': true,
+    };
+  }
+
+  static String _tokenFingerprint(String? token) {
+    final t = token?.trim() ?? '';
+    if (t.isEmpty) return '(none)';
+    if (t.length <= 12) return 'len=${t.length}';
+    return '${t.substring(0, 6)}…${t.substring(t.length - 4)} (len=${t.length})';
+  }
+
+  static bool _shouldLogUnhandledSocketEvent(String name) {
+    final n = name.toLowerCase().trim();
+    if (n.isEmpty) return false;
+    if (n == 'ping' || n == 'pong') return false;
+    if (n.contains('reconnect')) return false;
+    if (n.startsWith('chat:')) return false;
+    if (n.startsWith('activity:')) return false;
+    if (n.startsWith('stream:')) return false;
+    if (n.startsWith('viewer_count')) return false;
+    if (n == 'connected' ||
+        n == 'settings:update' ||
+        n == 'led:notification' ||
+        n == 'error') {
+      return false;
+    }
+    return true;
+  }
+
+  /// Logged by name (plus every inbound `chat:*`, [connected], socket session lines).
+  static const Set<String> inboundLogNamedSocketEvents = <String>{
+    'activity:follow',
+    'activity:event',
+  };
+
+  void _recordInboundSocket(String eventName, dynamic payload) {
+    final cb = onSocketInbound;
+    if (cb == null) return;
+    if (!_shouldRecordInboundSocketEvent(eventName)) return;
+    cb(eventName, _payloadToInboundLogString(payload));
+  }
 
   String _normalizePlatform(String? raw) {
     final v = (raw ?? '').toLowerCase().trim();
@@ -106,17 +248,19 @@ class LiveStreamService {
     return _streaming.fetchOverview(platform: platform, accessToken: accessToken);
   }
 
-  Future<List<ChatMessage>> loadHistory({
+  Future<ChatHistoryLoadResult> loadHistory({
     required String platform,
     required String accessToken,
     int limit = 100,
     int offset = 0,
+    void Function(String eventName, String payloadText)? onLogLine,
   }) {
     return _chat.loadHistory(
       platform: platform,
       accessToken: accessToken,
       limit: limit,
       offset: offset,
+      onLogLine: onLogLine,
     );
   }
 
@@ -162,6 +306,15 @@ class LiveStreamService {
     return newTokens.accessToken.trim();
   }
 
+  /// Opens the Socket.IO connection used for **`chat:message`** and all other §5 events.
+  ///
+  /// Matches `API_SOCKET_DETAILS.md` §5 *Connection*:
+  /// - Engine transports: **`websocket`**, **`polling`** (`/socket.io` endpoint via [path]).
+  /// - Auth: **`socket.handshake.auth.token`** and **`Authorization: Bearer <accessToken>`**.
+  ///
+  /// [baseUrl] / [path] come from overview **`chatSocketUrl`** / **`chatSocketPath`**.
+  /// [accessToken] must be the **Second Chat backend** JWT (or platform token your API accepts),
+  /// not a Google `ya29…` OAuth access token.
   Future<void> connect({
     required String baseUrl,
     required String path,
@@ -173,11 +326,12 @@ class LiveStreamService {
     final normalizedToken = accessToken.trim();
     final normalizedLabel = label.trim().isEmpty ? 'live' : label.trim();
 
+    // Same room for this user: reconnecting only to change [label] drops `chat:message` briefly.
     if (_socket?.connected == true &&
         _connectedBaseUrl == normalizedBase &&
         _connectedPath == normalizedPath &&
-        _connectedAccessToken == normalizedToken &&
-        _connectedLabel == normalizedLabel) {
+        _connectedAccessToken == normalizedToken) {
+      _label = normalizedLabel;
       return;
     }
 
@@ -192,8 +346,11 @@ class LiveStreamService {
       io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .setPath(normalizedPath)
-          // Backend supports handshake auth token.
           .setAuth({'token': normalizedToken})
+          // Some deployments read Bearer during handshake (see API_SOCKET_DETAILS.md).
+          .setExtraHeaders(<String, String>{
+            'Authorization': 'Bearer $normalizedToken',
+          })
           .enableForceNew()
           .disableAutoConnect()
           .enableReconnection()
@@ -206,36 +363,44 @@ class LiveStreamService {
     _socket = socket;
 
     socket.on('connect', (_) {
-      _logSocketEventPayload('connect', {
-        'baseUrl': normalizedBase,
-        'path': normalizedPath,
-      });
       _connectedBaseUrl = normalizedBase;
       _connectedPath = normalizedPath;
       _connectedAccessToken = normalizedToken;
-      _connectedLabel = normalizedLabel;
+      _recordInboundSocket('socket:connect', {
+        'url': normalizedBase,
+        'path': normalizedPath,
+        'transports': ['websocket', 'polling'],
+        'auth':
+            'handshake auth.token + Authorization: Bearer <accessToken> (§5 Connection)',
+        'perApiDoc': 'GET /streaming/overview → chatSocketUrl + chatSocketPath',
+        'afterConnect': 'emit chat:start (starts session; server sends settings:update, activity:sync)',
+      });
       onSocketConnected?.call();
       _emitStart();
       _startHeartbeat();
     });
 
     socket.on('disconnect', (reason) {
-      _logSocketEventPayload('disconnect', reason);
+      _recordInboundSocket('socket:disconnect', {
+        'reason': reason?.toString() ?? '',
+      });
       onSocketDisconnected?.call(reason?.toString() ?? '');
       _stopHeartbeat();
       if (!_manuallyDisconnected) _scheduleReconnectGuard();
     });
 
     socket.on('connect_error', (e) {
-      _logSocketEventPayload('connect_error', e);
       final m = _asMap(e) ?? <String, dynamic>{'message': e.toString()};
+      _recordInboundSocket('socket:connect_error', m);
       onSocketError?.call(m);
       if (!_manuallyDisconnected) _scheduleReconnectGuard();
     });
 
     // Server -> client events per API_SOCKET_DETAILS.md
     socket.on('connected', (d) {
-      final m = _asMap(d);
+      final u = _unwrapSocketIoData(d);
+      _recordInboundSocket('connected', u);
+      final m = _asMap(u);
       if (m != null) onConnectedEvent?.call(m);
     });
 
@@ -254,15 +419,30 @@ class LiveStreamService {
         final em = _asMap(e);
         if (em != null) list.add(em);
       }
+      if (kDebugMode) {
+        try {
+          debugPrint(
+            '[ACTIVITY_SOCKET] activity:sync count=${list.length} payload=${jsonEncode(m)}',
+          );
+        } catch (_) {
+          debugPrint('[ACTIVITY_SOCKET] activity:sync count=${list.length} $m');
+        }
+      }
       onActivitySync?.call(list);
     });
 
+    // Server contract: event name is always `activity:event`; kind is only in JSON `type`
+    // (`join` | `follow`). See [_normalizeJoinFollowFromActivityEvent].
     socket.on('activity:event', (d) {
+      _recordInboundSocket('activity:event', d);
       _handleActivitySocketEvent('activity:event', d);
     });
 
     for (final eventName in _typedActivitySocketEvents) {
       socket.on(eventName, (d) {
+        if (eventName.toLowerCase().trim() == 'activity:follow') {
+          _recordInboundSocket('activity:follow', d);
+        }
         _handleActivitySocketEvent(eventName, d);
       });
     }
@@ -270,8 +450,22 @@ class LiveStreamService {
     // Some backends emit typed activity channels (activity:join, activity:follow, ...).
     // Handle all activity:* names using the same payload shape.
     socket.onAny((eventName, data) {
-      final name = eventName.toString().toLowerCase().trim();
-      _logSocketEventPayload(name, data);
+      final ev = eventName.toString();
+      final name = ev.toLowerCase().trim();
+      // Log every server `chat:*` event (trim chat:message per API_SOCKET_DETAILS.md).
+      if (name.startsWith('chat:')) {
+        var logPayload = _unwrapSocketIoData(data);
+        if (name == 'chat:message') {
+          logPayload = _chatMessagePayloadForLog(logPayload);
+        }
+        _recordInboundSocket(ev, logPayload);
+      } else if (_shouldLogUnhandledSocketEvent(name)) {
+        // Helps find alternate event names if the backend does not use `chat:message` for third-party lines.
+        _recordInboundSocket('socket:unhandled_event', <String, dynamic>{
+          'event': ev,
+          'payload_preview': _payloadToInboundLogString(_unwrapSocketIoData(data)),
+        });
+      }
       if (!name.startsWith('activity:')) return;
       if (name == 'activity:sync' || name == 'activity:event') return;
       if (_typedActivitySocketEvents.contains(name)) return;
@@ -324,13 +518,34 @@ class LiveStreamService {
       if (platform.isNotEmpty && vc != null) {
         onViewerCountUpdate?.call(platform, vc);
       }
-      _emitStart(); // keep session warm
+      // Heartbeat already emits `chat:start`; avoid extra emits every ~15s (reduces load + UI churn).
     });
 
     socket.on('chat:message', (payload) {
-      final msg = _parseChatMessage(payload);
-      if (msg == null) return;
-      if (_dedupe(msg)) return;
+      final p = _unwrapSocketIoData(payload);
+      final msg = _parseChatMessage(p);
+      if (msg == null) {
+        _recordInboundSocket('chat:message:parse_failed', <String, dynamic>{
+          'hint':
+              'Server sent chat:message but payload could not be mapped to ChatMessage (missing body or shape).',
+          'raw_preview': _payloadToInboundLogString(
+            p is Map ? _chatMessagePayloadForLog(p) : p,
+          ),
+        });
+        return;
+      }
+      if (_dedupe(msg)) {
+        if (kDebugMode) {
+          _recordInboundSocket('chat:message:dedupe_skipped', <String, dynamic>{
+            'dedupe_key': msg.dedupeKey,
+            'userName': msg.userName,
+            'message_preview': msg.message.length > 80
+                ? '${msg.message.substring(0, 80)}…'
+                : msg.message,
+          });
+        }
+        return;
+      }
       onChatMessage?.call(msg);
     });
 
@@ -371,7 +586,6 @@ class LiveStreamService {
     _connectedBaseUrl = null;
     _connectedPath = null;
     _connectedAccessToken = null;
-    _connectedLabel = null;
   }
 
   // ---- Socket emits / keep-alive ----
@@ -391,20 +605,11 @@ class LiveStreamService {
 
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    var ticks = 0;
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Align with server viewer polling (~15s) and avoid hammering `chat:start`.
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_manuallyDisconnected) return;
       if (_socket?.connected != true) return;
       _emitStart();
-      ticks++;
-      if (ticks >= 12) {
-        _heartbeatTimer?.cancel();
-        _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-          if (_manuallyDisconnected) return;
-          if (_socket?.connected != true) return;
-          _emitStart();
-        });
-      }
     });
   }
 
@@ -445,6 +650,69 @@ class LiveStreamService {
     }
   }
 
+  /// Merges optional nested `data` / `payload` maps so providers can wrap the row.
+  Map<String, dynamic> _flattenChatMessageMap(Map<String, dynamic> top) {
+    Map<String, dynamic>? layer(dynamic v) {
+      if (v is Map<String, dynamic>) return v;
+      if (v is Map) return v.cast<String, dynamic>();
+      return null;
+    }
+
+    final data = layer(top['data']);
+    final inner = layer(top['payload']);
+    var merged = top;
+    if (data != null) merged = {...data, ...merged};
+    if (inner != null) merged = {...inner, ...merged};
+    return merged;
+  }
+
+  /// Treats null and blank strings as missing so `username: ""` still falls back to metadata.
+  String? _nonEmptyString(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  String? _coalesceChatBody(Map<String, dynamic> map, dynamic metadata) {
+    dynamic pick(dynamic a, dynamic b) {
+      final s = a?.toString().trim() ?? '';
+      if (s.isNotEmpty) return a;
+      final t = b?.toString().trim() ?? '';
+      return t.isNotEmpty ? b : null;
+    }
+
+    var v = pick(
+      map['message'],
+      map['text'],
+    );
+    v ??= pick(map['body'], null);
+    if (v == null) {
+      final content = map['content'];
+      if (content is Map) {
+        final cm = content.cast<String, dynamic>();
+        v = pick(cm['text'], cm['message']);
+        v ??= pick(cm['body'], null);
+      } else {
+        v = pick(map['content'], null);
+      }
+    }
+    v ??= pick(map['msg'], null);
+    if (metadata is Map) {
+      final mm = metadata.cast<String, dynamic>();
+      v ??= pick(mm['message'], mm['text']);
+      v ??= pick(mm['body'], mm['content']);
+    }
+    if (v == null) {
+      final sn = map['snippet'];
+      if (sn is Map) {
+        final sm = sn.cast<String, dynamic>();
+        v = pick(sm['text'], sm['message']);
+      }
+    }
+    final out = v?.toString() ?? '';
+    return out.trim().isEmpty ? null : out;
+  }
+
   ChatMessage? _parseChatMessage(dynamic payload) {
     try {
       Map<String, dynamic>? map;
@@ -455,6 +723,7 @@ class LiveStreamService {
         if (decoded is Map) map = decoded.cast<String, dynamic>();
       }
       if (map == null) return null;
+      map = _flattenChatMessageMap(map);
 
       final metadata = map['metadata'];
       final platform = _normalizePlatform(
@@ -465,29 +734,28 @@ class LiveStreamService {
             .toString(),
       );
       final metaUser = metadata is Map
-          ? (metadata['user'] ??
-                  metadata['username'] ??
-                  metadata['sender_username'] ??
-                  metadata['senderUsername'] ??
-                  metadata['name'] ??
-                  metadata['displayName'])
-              ?.toString()
+          ? _nonEmptyString(metadata['user']) ??
+              _nonEmptyString(metadata['username']) ??
+              _nonEmptyString(metadata['sender_username']) ??
+              _nonEmptyString(metadata['senderUsername']) ??
+              _nonEmptyString(metadata['name']) ??
+              _nonEmptyString(metadata['displayName']) ??
+              _nonEmptyString(metadata['display_name']) ??
+              _nonEmptyString(metadata['login'])
           : null;
 
-      var user = (map['sender_username'] ??
-              map['senderUsername'] ??
-              map['username'] ??
-              map['user'] ??
-              map['name'] ??
-              map['displayName'] ??
-              metaUser ??
-              'Unknown')
-          .toString()
-          .trim();
-      if (user.isEmpty) user = (metaUser ?? 'Unknown').toString().trim();
+      var user = _nonEmptyString(map['sender_username']) ??
+          _nonEmptyString(map['senderUsername']) ??
+          _nonEmptyString(map['username']) ??
+          _nonEmptyString(map['user']) ??
+          _nonEmptyString(map['name']) ??
+          _nonEmptyString(map['displayName']) ??
+          _nonEmptyString(map['display_name']) ??
+          metaUser ??
+          'Unknown';
 
-      final message = (map['message'] ?? map['text'] ?? '').toString();
-      if (message.trim().isEmpty) return null;
+      final message = _coalesceChatBody(map, metadata);
+      if (message == null) return null;
 
       final id = (map['platform_message_id'] ??
               map['platformMessageId'] ??
@@ -587,43 +855,72 @@ class LiveStreamService {
     debugPrint('[LiveStreamService] $_label#$_connectSeq $event ${payload ?? ''}');
   }
 
+  /// Normalizes `type` for activity rows:
+  /// - **Primary contract**: socket **`activity:event`** with body **`type`: `join` | `follow`**
+  ///   (also accepts same values via `eventType` / `kind` if `type` is empty).
+  ///   The channel name does not imply a kind (see [_typeFromActivityEventName]).
+  /// - **Typed channels** (`activity:follow`, `activity:join`, …): if body omits `type`, it is
+  ///   inferred from the channel (`follow`, `join`, …).
+  void _coalesceActivityType(JsonMap m, String socketEventName) {
+    var t = m['type']?.toString().trim();
+    if (t == null || t.isEmpty) {
+      final et = m['eventType']?.toString().trim();
+      if (et != null && et.isNotEmpty) {
+        m['type'] = et;
+        t = et;
+      }
+    }
+    if (t == null || t.isEmpty) {
+      final k = m['kind']?.toString().trim();
+      if (k != null && k.isNotEmpty) {
+        m['type'] = k;
+        t = k;
+      }
+    }
+    if (t == null || t.isEmpty) {
+      final inferred = _typeFromActivityEventName(socketEventName);
+      if (inferred != null) m['type'] = inferred;
+    }
+  }
+
+  /// For **`activity:event`**, backend sends the kind only in **`type`** (`join` or `follow`).
+  /// Normalizes casing (`Follow` → `follow`) so [ChatController] and UI see stable values.
+  void _normalizeJoinFollowFromActivityEvent(JsonMap m) {
+    final raw = m['type']?.toString().trim().toLowerCase();
+    if (raw == 'join' || raw == 'follow') {
+      m['type'] = raw;
+      return;
+    }
+    if (kDebugMode && (raw == null || raw.isEmpty)) {
+      debugPrint(
+        '[ACTIVITY_SOCKET] activity:event missing `type` (expected join|follow): $m',
+      );
+    }
+  }
+
   void _handleActivitySocketEvent(String socketEventName, dynamic payload) {
-    if (kDebugMode) {
-      debugPrint('[ACTIVITY_EVENT][$socketEventName][SOCKET_RAW] $payload');
+    final m = _asMap(payload);
+    if (m == null) {
+      if (kDebugMode) {
+        debugPrint('[ACTIVITY_SOCKET] $socketEventName (unparsed) $payload');
+      }
+      return;
     }
 
-    final m = _asMap(payload);
-    if (m == null) return;
-
-    // Keep one normalized shape even when backend event channel is activity:<type>.
-    final existingType = m['type']?.toString().trim();
-    if (existingType == null || existingType.isEmpty) {
-      final inferredType = _typeFromActivityEventName(socketEventName);
-      if (inferredType != null) m['type'] = inferredType;
+    _coalesceActivityType(m, socketEventName);
+    if (socketEventName.toLowerCase().trim() == 'activity:event') {
+      _normalizeJoinFollowFromActivityEvent(m);
     }
     m['socketEvent'] = socketEventName;
 
-    final normalizedType = (m['type'] ?? '').toString().toLowerCase().trim();
-    if (normalizedType == 'follow' && kDebugMode) {
-      final platform = (m['platform'] ?? '').toString();
-      final metadata = m['metadata'];
-      String follower = '';
-      if (metadata is Map) {
-        follower = (metadata['user_name'] ??
-                metadata['username'] ??
-                metadata['user_login'] ??
-                metadata['displayName'] ??
-                '')
-            .toString()
-            .trim();
-      }
-      debugPrint(
-        '[FOLLOW_EVENT][RECEIVED] socket=$socketEventName platform=$platform follower=$follower payload=${jsonEncode(m)}',
-      );
-    }
-
     if (kDebugMode) {
-      debugPrint('[ACTIVITY_EVENT][$socketEventName][SOCKET_PARSED] ${jsonEncode(m)}');
+      try {
+        debugPrint(
+          '[ACTIVITY_SOCKET] $socketEventName ${jsonEncode(m)}',
+        );
+      } catch (_) {
+        debugPrint('[ACTIVITY_SOCKET] $socketEventName $m');
+      }
     }
     onActivityEvent?.call(m);
   }
@@ -636,24 +933,5 @@ class LiveStreamService {
     return type;
   }
 
-  void _logSocketEventPayload(String eventName, dynamic payload) {
-    if (!kDebugMode) return;
-    String text;
-    try {
-      if (payload is String) {
-        text = payload;
-      } else {
-        text = jsonEncode(payload);
-      }
-    } catch (_) {
-      text = payload.toString();
-    }
-    debugPrint('[SOCKET] $_label#$_connectSeq $eventName');
-    const chunk = 700;
-    for (int i = 0; i < text.length; i += chunk) {
-      final end = (i + chunk) < text.length ? (i + chunk) : text.length;
-      debugPrint(text.substring(i, end));
-    }
-  }
 }
 

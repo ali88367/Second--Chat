@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -50,9 +51,16 @@ class ChatController extends GetxController {
   bool _socketConnecting = false;
   DateTime _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastPlatformSocketSwitchAttempt = DateTime.fromMillisecondsSinceEpoch(0);
-  final Set<String> _historyInFlight = <String>{};
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
-  static const Duration _historyMinRefreshInterval = Duration(seconds: 0);
+  static const Duration _historyMinRefreshInterval = Duration(seconds: 25);
+
+  /// Merges overlapping refreshes for the same platform (avoids duplicate HTTP).
+  final Map<String, Future<void>> _overviewRefreshCoalesce =
+      <String, Future<void>>{};
+
+  /// One in-flight `GET /chat/history` per platform (callers await the same [Future]).
+  final Map<String, Future<void>> _historyRefreshCoalesce =
+      <String, Future<void>>{};
 
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
@@ -67,11 +75,73 @@ class ChatController extends GetxController {
 
   final RxInt scrollTick = 0.obs; // UI can observe this to auto-scroll.
 
-  String? _accessToken;
+  /// Auth for Socket.IO + `/api/v1/chat/*`: **backend** bearer (session JWT or platform token), never Google `ya29…`.
+  String? _socketAuthToken;
   String? _socketBaseUrl;
   String? _socketPath;
   String? _socketConnectedPlatform;
   String? _socketConnectedToken;
+
+  /// Newest-first lines: `time | event | payload` — socket session (`socket:connect`, `connected`),
+  /// `chat:*` / activity, and `api:chat/history` (REST `data` only on success/error body).
+  final RxList<String> socketInboundLog = <String>[].obs;
+  static const int _socketInboundLogMax = 600;
+
+  void clearSocketInboundLog() => socketInboundLog.clear();
+
+  /// §5 Socket.IO connection that carries **`chat:message`** (see `API_SOCKET_DETAILS.md`).
+  Map<String, dynamic> get chatMessageSocketConnectionDetails =>
+      _live.chatMessageSocketConnectionDetails;
+
+  /// Inserts one `CHAT_MESSAGE_SOCKET` line into [socketInboundLog] (JSON snapshot).
+  void appendChatMessageSocketConnectionToLog() {
+    final report = <String, dynamic>{
+      ..._live.chatMessageSocketConnectionDetails,
+      'app_rx_is_connected': isConnected.value,
+      'app_ui_selected_platform': platform.value,
+      'overview_chat_socket_url': _socketBaseUrl ?? '',
+      'overview_chat_socket_path': _socketPath ?? '',
+      'chat_auth_token_fingerprint': _maskToken(_socketAuthToken),
+    };
+    final ts = DateTime.now().toIso8601String();
+    final line = '$ts | CHAT_MESSAGE_SOCKET | ${jsonEncode(report)}';
+    socketInboundLog.insert(0, line);
+    while (socketInboundLog.length > _socketInboundLogMax) {
+      socketInboundLog.removeLast();
+    }
+  }
+
+  void _appendSocketInboundLog(String eventName, String payloadText) {
+    final ts = DateTime.now().toIso8601String();
+    final line = '$ts | $eventName | $payloadText';
+    socketInboundLog.insert(0, line);
+    while (socketInboundLog.length > _socketInboundLogMax) {
+      socketInboundLog.removeLast();
+    }
+  }
+
+  /// Backend session JWT + platform tokens for **`GET /streaming/overview`** only
+  /// (Second Chat REST; keep JWT-first so socket URL loads reliably).
+  Future<String?> _resolveStreamingRestToken(String platformKey) async {
+    try {
+      final session = await Get.find<AuthController>().api.tokenStore.read();
+      final appJwt = session?.accessToken.trim();
+      if (appJwt != null && appJwt.isNotEmpty) return appJwt;
+    } catch (_) {}
+    final p = platformKey.toLowerCase().trim();
+    if (p.isEmpty) return null;
+    return await _live.ensureFreshPlatformAccessToken(platform: p) ??
+        await _tokenProvider.getAccessToken(p);
+  }
+
+  /// **`/api/v1/chat/*`** and Socket.IO (§5): backend **`accessToken` (JWT)** per `API_SOCKET_DETAILS.md`.
+  ///
+  /// Google’s OAuth **access** token (`ya29…`) is for Google APIs only — the Second Chat server
+  /// validates **its own** JWT (from `/auth/login`, `/auth/google/token` with `idToken`, etc.).
+  /// Using the Google access token here causes `Invalid authentication token` on the socket.
+  Future<String?> _resolveChatAuthToken(String platformKey) async {
+    return _resolveStreamingRestToken(platformKey);
+  }
 
   String _normalizedApiPlatform(String? raw, {String fallback = ''}) {
     final key = _normalizePlatformKey(raw);
@@ -92,9 +162,10 @@ class ChatController extends GetxController {
     _wireServiceCallbacks();
     _bootstrap();
     ever<String>(platform, (p) {
-      unawaited(_swapToPlatformAndRefresh(p));
-      // Also refresh overview so the WebView/player URL switches instantly.
-      unawaited(refreshOverviewForPlatform(p));
+      final key = _normalizedApiPlatform(p, fallback: 'twitch');
+      // Instant UI from cache; do not fetch history here — [refreshOverviewForPlatform] does once.
+      unawaited(_swapToPlatformAndRefresh(key, fetchHistory: false));
+      unawaited(refreshOverviewForPlatform(key));
     });
 
     // If tokens/overview are not ready at first app launch, connect may skip.
@@ -148,11 +219,9 @@ class ChatController extends GetxController {
       _lastSocketConnectAttempt = now;
 
       final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
-      final token =
-          await _live.ensureFreshPlatformAccessToken(platform: selected) ??
-          await _tokenProvider.getAccessToken(selected);
+      final token = await _resolveChatAuthToken(selected);
       if (token == null || token.trim().isEmpty) return;
-      _accessToken = token.trim();
+      _socketAuthToken = token.trim();
 
       // Ensure we have socketUrl/socketPath in `overview`.
       var socketUrl = _socketBaseUrl;
@@ -179,18 +248,18 @@ class ChatController extends GetxController {
 
       if (isConnected.value == true &&
           _socketConnectedPlatform == selected &&
-          _socketConnectedToken == _accessToken) {
+          _socketConnectedToken == _socketAuthToken) {
         return;
       }
 
       await _live.connect(
         baseUrl: socketUrl.trim(),
         path: socketPath.trim(),
-        accessToken: _accessToken!,
+        accessToken: _socketAuthToken!,
         label: selected,
       );
       _socketConnectedPlatform = selected;
-      _socketConnectedToken = _accessToken;
+      _socketConnectedToken = _socketAuthToken;
 
       _wireObserversOnce();
     } catch (_) {
@@ -218,9 +287,9 @@ class ChatController extends GetxController {
         await refreshOverviewsForPlatforms(connectedPlatforms);
       }
 
-      // Keep a main access token for socket auth (typically app JWT).
-      _accessToken = await _tokenProvider.getAccessToken(selected);
-      if (_accessToken == null || _accessToken!.isEmpty) return;
+      // Socket + chat: Google OAuth access token when signed in with Google, else session JWT.
+      _socketAuthToken = await _resolveChatAuthToken(selected);
+      if (_socketAuthToken == null || _socketAuthToken!.isEmpty) return;
 
       await _swapToPlatformAndRefresh(selected, forceHistory: true);
 
@@ -238,11 +307,11 @@ class ChatController extends GetxController {
         await _live.connect(
           baseUrl: socketUrl.trim(),
           path: socketPath.trim(),
-          accessToken: _accessToken!,
+          accessToken: _socketAuthToken!,
           label: selected,
         );
         _socketConnectedPlatform = selected;
-        _socketConnectedToken = _accessToken;
+        _socketConnectedToken = _socketAuthToken;
       }
 
       _wireObserversOnce();
@@ -265,9 +334,7 @@ class ChatController extends GetxController {
 
       final results = <String, StreamingOverview>{};
       for (final p in normalized) {
-        final pToken =
-            await _live.ensureFreshPlatformAccessToken(platform: p) ??
-            await _tokenProvider.getAccessToken(p);
+        final pToken = await _resolveStreamingRestToken(p);
         final effectiveToken =
             (pToken != null && pToken.trim().isNotEmpty) ? pToken.trim() : null;
         if (kDebugMode) {
@@ -333,6 +400,7 @@ class ChatController extends GetxController {
       final currentUrl = mergedEmbed[current] ?? primary.watchUrl;
       watchUrl.value = currentUrl;
       isLive.value = mergedLive[current] ?? primary.live;
+      _logStreamSnapshot('rest:overview_multi');
     } catch (_) {}
   }
 
@@ -343,12 +411,80 @@ class ChatController extends GetxController {
     return '${t.substring(0, 6)}...${t.substring(t.length - 4)} (${t.length} chars)';
   }
 
-  Future<void> refreshOverviewForPlatform(String p) async {
+  /// Debug console: current stream state (REST + socket-derived maps).
+  void _logStreamSnapshot(String reason) {
+    if (!kDebugMode) return;
+    String su(String? u) {
+      final s = u?.trim() ?? '';
+      if (s.length <= 160) return s;
+      return '${s.substring(0, 157)}...';
+    }
+
+    debugPrint('======== SC_STREAM_DETAILS ($reason) ========');
+    debugPrint(
+      'selected=${platform.value} isLive=${isLive.value} '
+      'viewerCount=${viewerCount.value} socketConnected=${isConnected.value}',
+    );
+    debugPrint('watchUrl=${su(watchUrl.value)}');
+    final ov = overview.value;
+    if (ov != null) {
+      debugPrint(
+        'overview: platform=${ov.platform} live=${ov.live} '
+        'viewerCount=${ov.viewerCount} watchUrl=${su(ov.watchUrl)} '
+        'hasSocketUrl=${ov.chatSocketUrl != null && ov.chatSocketUrl!.trim().isNotEmpty}',
+      );
+    } else {
+      debugPrint('overview: (null)');
+    }
+    for (final key in const ['twitch', 'kick', 'youtube', 'tiktok']) {
+      final live = platformLive[key];
+      final vc = platformViewerCounts[key];
+      final embed = platformEmbedUrls[key];
+      final title = streamTitleByPlatform[key];
+      final cat = streamCategoryByPlatform[key];
+      final hasAny = live != null ||
+          vc != null ||
+          (embed != null && embed.trim().isNotEmpty) ||
+          (title != null && title.trim().isNotEmpty) ||
+          (cat != null && cat.trim().isNotEmpty);
+      if (!hasAny) continue;
+      debugPrint(
+        '  [$key] live=$live viewers=$vc title="${title ?? ''}" '
+        'category="${cat ?? ''}" embed=${su(embed)}',
+      );
+    }
+    debugPrint('================================================');
+  }
+
+  Future<void> refreshOverviewForPlatform(
+    String p, {
+    bool forceChatHistory = false,
+  }) {
+    final key = _normalizedApiPlatform(p, fallback: 'twitch');
+    if (!forceChatHistory) {
+      final pending = _overviewRefreshCoalesce[key];
+      if (pending != null) return pending;
+    }
+    final run = _refreshOverviewForPlatformBody(key, forceChatHistory: forceChatHistory);
+    if (!forceChatHistory) {
+      _overviewRefreshCoalesce[key] = run;
+      run.whenComplete(() {
+        if (_overviewRefreshCoalesce[key] == run) {
+          _overviewRefreshCoalesce.remove(key);
+        }
+      });
+    }
+    return run;
+  }
+
+  Future<void> _refreshOverviewForPlatformBody(
+    String p, {
+    bool forceChatHistory = false,
+  }) async {
     try {
-      final token = await _live.ensureFreshPlatformAccessToken(platform: p) ??
-          await _tokenProvider.getAccessToken(p);
+      final token = await _resolveStreamingRestToken(p);
       if (token == null || token.isEmpty) return;
-      _accessToken = token.trim();
+      // Do not overwrite [_socketAuthToken]: overview uses app/platform JWT; socket uses [_resolveChatAuthToken].
 
       // If multi-preview mode is enabled, refresh all platforms so the top streams stay "hot".
       if (_settings.multiScreenPreview.value == true) {
@@ -365,7 +501,7 @@ class ChatController extends GetxController {
         isLive.value = platformLive[key] ?? isLive.value;
         watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
         if (isLive.value == true) {
-          unawaited(_ensureChatForLivePlatform(key));
+          unawaited(_ensureChatForLivePlatform(key, forceHistory: forceChatHistory));
         } else {
           platformMessages[key] = const <ChatMessage>[];
           if (platform.value.toLowerCase().trim() == key) {
@@ -373,6 +509,7 @@ class ChatController extends GetxController {
             _bumpScroll();
           }
         }
+        _logStreamSnapshot('rest:overview_platform_multi_preview');
         return;
       }
 
@@ -406,7 +543,9 @@ class ChatController extends GetxController {
         platformEmbedUrls[p.toLowerCase()] = ov.watchUrl;
       }
       if (ov.live == true) {
-        unawaited(_ensureChatForLivePlatform(p.toLowerCase()));
+        unawaited(
+          _ensureChatForLivePlatform(p.toLowerCase(), forceHistory: forceChatHistory),
+        );
       } else {
         final key = p.toLowerCase().trim();
         platformMessages[key] = const <ChatMessage>[];
@@ -415,6 +554,7 @@ class ChatController extends GetxController {
           _bumpScroll();
         }
       }
+      _logStreamSnapshot('rest:overview_platform');
     } catch (_) {}
   }
 
@@ -429,13 +569,12 @@ class ChatController extends GetxController {
     }
     _lastPlatformSocketSwitchAttempt = now;
 
-    final token = await _live.ensureFreshPlatformAccessToken(platform: key) ??
-        await _tokenProvider.getAccessToken(key);
+    final token = await _resolveChatAuthToken(key);
     if (token == null || token.trim().isEmpty) return;
-    _accessToken = token.trim();
+    _socketAuthToken = token.trim();
     if (isConnected.value == true &&
         _socketConnectedPlatform == key &&
-        _socketConnectedToken == _accessToken) {
+        _socketConnectedToken == _socketAuthToken) {
       return;
     }
 
@@ -452,11 +591,11 @@ class ChatController extends GetxController {
     await _live.connect(
       baseUrl: socketUrl.trim(),
       path: socketPath.trim(),
-      accessToken: _accessToken!,
+      accessToken: _socketAuthToken!,
       label: key,
     );
     _socketConnectedPlatform = key;
-    _socketConnectedToken = _accessToken;
+    _socketConnectedToken = _socketAuthToken;
   }
 
   bool isPlatformLive(String p) {
@@ -471,15 +610,20 @@ class ChatController extends GetxController {
     return platformEmbedUrls[key];
   }
 
+  /// True only when the backend/socket said this platform is **not** live.
+  /// Missing map entry is treated as unknown (not offline) so embed URLs are not cleared during races.
+  bool isPlatformExplicitlyOffline(String p) {
+    final key = _normalizedApiPlatform(p, fallback: 'twitch');
+    return platformLive[key] == false;
+  }
+
   Future<void> sendMessage(String text) async {
     final msg = text.trim();
     if (msg.isEmpty) return;
     final p = _normalizedApiPlatform(platform.value, fallback: 'twitch');
-    final token =
-        await _live.ensureFreshPlatformAccessToken(platform: p) ??
-        await _tokenProvider.getAccessToken(p);
+    final token = await _resolveChatAuthToken(p);
     if (token == null || token.isEmpty) return;
-    _accessToken = token.trim();
+    _socketAuthToken = token.trim();
 
     _purgeStalePendingEchoes();
 
@@ -506,7 +650,7 @@ class ChatController extends GetxController {
     try {
       await _live.sendMessage(
         platform: p,
-        accessToken: _accessToken!,
+        accessToken: _socketAuthToken!,
         message: msg,
       );
     } catch (_) {
@@ -619,16 +763,19 @@ class ChatController extends GetxController {
       }
       final u1 = m.userName.trim().toLowerCase();
       final u2 = incoming.userName.trim().toLowerCase();
-      if (u1 == u2) {
-        if (m.id != null &&
-            incoming.id != null &&
-            m.id == incoming.id) {
-          return true;
-        }
-        if (m.id != incoming.id) return true;
+      // Different users may send the same text; never treat our optimistic row as blocking them.
+      if (u1 != u2) continue;
+
+      if (m.id != null &&
+          incoming.id != null &&
+          m.id == incoming.id) {
         return true;
       }
       if (_isLocalEchoId(m.id) || _isLocalEchoId(incoming.id)) {
+        return true;
+      }
+      final dt = (incTs.difference(m.timestamp.toUtc())).abs().inSeconds;
+      if (m.id == null && incoming.id == null && dt <= 3) {
         return true;
       }
     }
@@ -641,14 +788,29 @@ class ChatController extends GetxController {
     return t;
   }
 
+  /// Per [API_SOCKET_DETAILS.md] `chat:message`, only these belong in the activity rail, not main chat.
+  static bool _isSocketChatActivityOnlyType(String t) {
+    switch (t) {
+      case 'subscription':
+      case 'superchat':
+      case 'gifted_sub':
+      case 'raid':
+      case 'resub':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   static bool _isNormalChatMessage(ChatMessage msg) {
     final t = _chatMessagePayloadType(msg);
-    return t == 'normal' ||
-        t == 'message' ||
-        t == 'chat' ||
-        t == 'chat_message' ||
-        t == 'chat:message';
+    if (_isSocketChatActivityOnlyType(t)) return false;
+    return true;
   }
+
+  /// Same criteria as [_handleIncomingChatMessage] / history merge — use in UI so
+  /// lines are not dropped when the server uses alternate `type` strings.
+  static bool isMainChatFeedLine(ChatMessage msg) => _isNormalChatMessage(msg);
 
   static String _normalizePlatformKey(String? raw) {
     final value = (raw ?? '').toLowerCase().trim();
@@ -673,12 +835,18 @@ class ChatController extends GetxController {
         type == 'message' ||
         type == 'chat' ||
         type == 'chat_message' ||
-        type == 'chat:message') {
+        type == 'chat:message' ||
+        type == 'text' ||
+        type == 'viewer_message') {
       return false;
     }
     return true;
   }
 
+  /// True for any `activity:*` socket row except `activity:sync`, or for a non-chat `type`
+  /// (`follow`, `join`, `raid`, …). Covers **`activity:event`** payloads whose kind is in
+  /// `type` / `eventType` (normalized in [LiveStreamService._coalesceActivityType]) and typed
+  /// channels like `activity:follow` / `activity:join`.
   static bool _isActivityPayload(Map<String, dynamic> payload) {
     final socketEvent = payload['socketEvent']?.toString().toLowerCase().trim();
     if (socketEvent != null &&
@@ -757,6 +925,7 @@ class ChatController extends GetxController {
     _edgeGlow.triggerForPlatform(glowPlatform);
   }
 
+  /// Appends one realtime activity row (from `activity:event`, `activity:follow`, `activity:join`, …).
   void _handleIncomingActivityEvent(Map<String, dynamic> event) {
     if (kDebugMode) {
       debugPrint('[ACTIVITY_EVENT][CHAT_CONTROLLER] $event');
@@ -798,6 +967,8 @@ class ChatController extends GetxController {
     }
   }
 
+  /// Realtime `chat:message` → `platformMessages` → `messages` when that platform is selected;
+  /// `scrollTick` and `ever(messages)` drive auto-scroll in the live chat UI.
   void _handleIncomingChatMessage(ChatMessage msg) {
     if (!_isNormalChatMessage(msg)) {
       _appendActivityFromChatMessage(msg);
@@ -831,6 +1002,7 @@ class ChatController extends GetxController {
       list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       list = _collapseNearDuplicates(list);
       platformMessages[p] = list;
+      platformMessages.refresh();
       _syncVisibleMessagesIfSelected(p);
       _bumpScroll();
       return;
@@ -844,6 +1016,7 @@ class ChatController extends GetxController {
     final merged = _mergeUniqueByDedupeKey(existing, <ChatMessage>[normalizedMsg]);
     merged.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     platformMessages[p] = _collapseNearDuplicates(merged);
+    platformMessages.refresh();
     _syncVisibleMessagesIfSelected(p);
     _bumpScroll();
   }
@@ -851,6 +1024,7 @@ class ChatController extends GetxController {
   Future<void> _swapToPlatformAndRefresh(
     String p, {
     bool forceHistory = false,
+    bool fetchHistory = true,
   }) async {
     final key = _normalizePlatformKey(p);
     if (key.isEmpty) return;
@@ -881,15 +1055,97 @@ class ChatController extends GetxController {
       _bumpScroll();
     }
 
+    if (!fetchHistory) return;
+
     // 2) Fetch latest history for that platform (fast + safe).
     await _refreshHistoryForPlatform(key, force: forceHistory);
   }
 
-  Future<void> _refreshHistoryForPlatform(String platformKey, {bool force = false}) async {
-    final key = _normalizedApiPlatform(platformKey, fallback: 'twitch');
-    if (key.isEmpty) return;
+  static DateTime _activityEventTimeUtc(Map<String, dynamic> e) {
+    final t = e['timestamp'] ?? e['created_at'] ?? e['createdAt'];
+    if (t == null) return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    if (t is DateTime) return t.toUtc();
+    if (t is int) {
+      return t > 1000000000000
+          ? DateTime.fromMillisecondsSinceEpoch(t, isUtc: true)
+          : DateTime.fromMillisecondsSinceEpoch(t * 1000, isUtc: true);
+    }
+    return DateTime.tryParse(t.toString())?.toUtc() ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
 
-    if (_historyInFlight.contains(key)) return;
+  /// Merges `activities` from GET `/chat/history` into [activityEvents] (deduped by `id`).
+  void _mergeHistoryActivitiesFromApi(
+    List<Map<String, dynamic>> raw, {
+    required String platformKey,
+  }) {
+    if (raw.isEmpty) return;
+
+    final existingIds = <String>{
+      for (final e in activityEvents)
+        if (e['id'] != null) e['id'].toString().trim(),
+    }..removeWhere((s) => s.isEmpty);
+
+    final toAdd = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (!_isActivityPayload(item)) continue;
+
+      final eventPlatform = _normalizePlatformKey(item['platform']?.toString());
+      if (eventPlatform.isNotEmpty && eventPlatform != platformKey) continue;
+
+      final id = item['id']?.toString().trim() ?? '';
+      if (id.isNotEmpty && existingIds.contains(id)) continue;
+
+      final copy = Map<String, dynamic>.from(item);
+      final meta = copy['metadata'];
+      if (meta is Map) {
+        final mm = Map<String, dynamic>.from(meta.cast<String, dynamic>());
+        final login = (mm['user_login'] ??
+                mm['user_name'] ??
+                mm['username'] ??
+                mm['user'])
+            ?.toString()
+            .trim();
+        if (login != null && login.isNotEmpty) {
+          mm.putIfAbsent('user', () => login);
+          mm.putIfAbsent('username', () => login);
+        }
+        copy['metadata'] = mm;
+      }
+
+      if (id.isNotEmpty) existingIds.add(id);
+      toAdd.add(copy);
+    }
+
+    if (toAdd.isEmpty) return;
+
+    toAdd.sort(
+      (a, b) => _activityEventTimeUtc(a).compareTo(_activityEventTimeUtc(b)),
+    );
+    for (final m in toAdd) {
+      activityEvents.add(m);
+    }
+    activityEvents.refresh();
+  }
+
+  Future<void> _refreshHistoryForPlatform(String platformKey, {bool force = false}) {
+    final key = _normalizedApiPlatform(platformKey, fallback: 'twitch');
+    if (key.isEmpty) return Future.value();
+
+    final pending = _historyRefreshCoalesce[key];
+    if (pending != null) return pending;
+
+    final run = _refreshHistoryForPlatformImpl(key, force: force);
+    _historyRefreshCoalesce[key] = run;
+    run.whenComplete(() {
+      if (_historyRefreshCoalesce[key] == run) {
+        _historyRefreshCoalesce.remove(key);
+      }
+    });
+    return run;
+  }
+
+  Future<void> _refreshHistoryForPlatformImpl(String key, {bool force = false}) async {
     final now = DateTime.now().toUtc();
     final last = _historyLastFetchAt[key];
     if (!force &&
@@ -898,20 +1154,24 @@ class ChatController extends GetxController {
       return;
     }
 
-    final token =
-        await _live.ensureFreshPlatformAccessToken(platform: key) ??
-        await _tokenProvider.getAccessToken(key);
+    final token = await _resolveChatAuthToken(key);
     if (token == null || token.trim().isEmpty) return;
 
-    _historyInFlight.add(key);
     try {
-      final history = await _live.loadHistory(
+      final historyResult = await _live.loadHistory(
         platform: key,
         accessToken: token,
         limit: 100,
         offset: 0,
+        onLogLine: _appendSocketInboundLog,
       );
 
+      _mergeHistoryActivitiesFromApi(
+        historyResult.activities,
+        platformKey: key,
+      );
+
+      final history = historyResult.messages;
       if (history.isNotEmpty) {
         final normalOnly = <ChatMessage>[];
         for (final m in history) {
@@ -936,8 +1196,6 @@ class ChatController extends GetxController {
       _historyLastFetchAt[key] = now;
     } catch (_) {
       // silent
-    } finally {
-      _historyInFlight.remove(key);
     }
   }
 
@@ -960,7 +1218,10 @@ class ChatController extends GetxController {
     return out;
   }
 
-  Future<void> _ensureChatForLivePlatform(String p) async {
+  Future<void> _ensureChatForLivePlatform(
+    String p, {
+    bool forceHistory = false,
+  }) async {
     final key = p.toLowerCase();
     // 1) Socket ensure connect (no-op if already connected)
     if (isConnected.value != true) {
@@ -968,7 +1229,7 @@ class ChatController extends GetxController {
     }
 
     // 2) History refresh (per-platform list)
-    await _refreshHistoryForPlatform(key);
+    await _refreshHistoryForPlatform(key, force: forceHistory);
   }
 
   void _bumpScroll() {
@@ -978,10 +1239,11 @@ class ChatController extends GetxController {
 
   /// Disconnect realtime chat and clear lists after full logout.
   Future<void> resetForLogout() async {
+    _overviewRefreshCoalesce.clear();
+    _historyRefreshCoalesce.clear();
     _connectRetryTimer?.cancel();
     _connectRetryTimer = null;
     _pendingLocalChatEchoes.clear();
-    _historyInFlight.clear();
     _historyLastFetchAt.clear();
     _activityChatSourceDedupeIds.clear();
     _edgeGlowEventSeenAt.clear();
@@ -989,7 +1251,7 @@ class ChatController extends GetxController {
     try {
       await _live.disconnect();
     } catch (_) {}
-    _accessToken = null;
+    _socketAuthToken = null;
     _socketBaseUrl = null;
     _socketPath = null;
     _socketConnectedPlatform = null;
@@ -1008,18 +1270,21 @@ class ChatController extends GetxController {
     viewerCount.value = 0;
     isConnected.value = false;
     scrollTick.value = 0;
+    socketInboundLog.clear();
     _startConnectRetry();
   }
 
   void _wireServiceCallbacks() {
+    _live.onSocketInbound = _appendSocketInboundLog;
     _live.onSocketConnected = () {
       isConnected.value = true;
       _socketConnectedPlatform =
           _normalizedApiPlatform(platform.value, fallback: 'twitch');
-      _socketConnectedToken = _accessToken;
+      _socketConnectedToken = _socketAuthToken;
       final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       if (selected.isNotEmpty) {
-        unawaited(_refreshHistoryForPlatform(selected, force: true));
+        // Overview’s `_ensureChatForLivePlatform` usually loads history; avoid a second immediate GET.
+        unawaited(_refreshHistoryForPlatform(selected, force: false));
       }
     };
     _live.onSocketDisconnected = (_) {
@@ -1031,12 +1296,10 @@ class ChatController extends GetxController {
       final msg = (m['message'] ?? '').toString();
       if (msg.contains('Invalid authentication token') ||
           msg.contains('Authentication token required')) {
-        // Refresh platform token and retry connect quickly.
         final selected = platform.value.toLowerCase();
-        final fresh =
-            await _live.ensureFreshPlatformAccessToken(platform: selected);
+        final fresh = await _resolveChatAuthToken(selected);
         if (fresh != null && fresh.trim().isNotEmpty) {
-          _accessToken = fresh.trim();
+          _socketAuthToken = fresh.trim();
           await refreshOverviewForPlatform(selected);
           unawaited(_tryConnectIfPossible());
         }
@@ -1050,6 +1313,11 @@ class ChatController extends GetxController {
       if (key ==
           _normalizedApiPlatform(platform.value, fallback: 'twitch')) {
         viewerCount.value = vc;
+      }
+      if (kDebugMode) {
+        debugPrint(
+          '[SC_STREAM_DETAILS] viewer_count:update platform=$key count=$vc',
+        );
       }
     };
     _live.onLiveUpdate = (p, live) {
@@ -1072,6 +1340,7 @@ class ChatController extends GetxController {
         if (u != null && u.trim().isNotEmpty) watchUrl.value = u;
         unawaited(_ensureChatForLivePlatform(selected));
       }
+      _logStreamSnapshot('socket:live_state');
     };
     _live.onPlayerUrlUpdate = (p, url) {
       final key = _normalizedApiPlatform(p);
@@ -1083,6 +1352,7 @@ class ChatController extends GetxController {
         watchUrl.value = url;
         isLive.value = true;
       }
+      _logStreamSnapshot('socket:player_url');
     };
     _live.onActivitySync = (events) {
       if (events.isEmpty) return;
@@ -1120,6 +1390,7 @@ class ChatController extends GetxController {
       if (category != null && category.isNotEmpty) streamCategoryByPlatform[p] = category;
       streamTitleByPlatform.refresh();
       streamCategoryByPlatform.refresh();
+      _logStreamSnapshot('socket:stream_meta');
     }
     _live.onStreamStatus = applyMeta;
     _live.onStreamInfoUpdate = applyMeta;
@@ -1137,35 +1408,40 @@ class ChatController extends GetxController {
 
   /// Switch selected platform immediately using cached state while refresh runs.
   void selectPlatformInstant(String p) {
-    final key = _normalizedApiPlatform(p, fallback: 'twitch');
-    if (key.isEmpty) return;
+    try {
+      final key = _normalizedApiPlatform(p, fallback: 'twitch');
+      if (key.isEmpty) return;
 
-    final cachedLive = platformLive[key];
-    final cachedUrl = platformEmbedUrls[key];
-    if (cachedLive == true) {
-      isLive.value = true;
-      watchUrl.value = (cachedUrl != null && cachedUrl.trim().isNotEmpty)
-          ? cachedUrl
-          : '';
-    } else if (cachedLive == false) {
-      isLive.value = false;
-      watchUrl.value = '';
-    } else {
-      isLive.value = false;
-      watchUrl.value = (cachedUrl != null && cachedUrl.trim().isNotEmpty)
-          ? cachedUrl
-          : '';
-    }
+      final cachedLive = platformLive[key];
+      final cachedUrl = platformEmbedUrls[key];
+      if (cachedLive == true) {
+        isLive.value = true;
+        watchUrl.value = (cachedUrl != null && cachedUrl.trim().isNotEmpty)
+            ? cachedUrl
+            : '';
+      } else if (cachedLive == false) {
+        isLive.value = false;
+        watchUrl.value = '';
+      } else {
+        isLive.value = false;
+        watchUrl.value = (cachedUrl != null && cachedUrl.trim().isNotEmpty)
+            ? cachedUrl
+            : '';
+      }
 
-    messages.assignAll(platformMessages[key] ?? const <ChatMessage>[]);
-    _bumpScroll();
+      messages.assignAll(platformMessages[key] ?? const <ChatMessage>[]);
+      _bumpScroll();
 
-    if (platform.value.toLowerCase().trim() != key) {
-      platform.value = key;
-    } else {
-      // If selecting the same platform again, still force refresh so stream updates.
-      unawaited(_swapToPlatformAndRefresh(key, forceHistory: true));
-      unawaited(refreshOverviewForPlatform(key));
+      if (platform.value.toLowerCase().trim() != key) {
+        platform.value = key;
+      } else {
+        // One round-trip: overview (REST) + chat history; avoid duplicate swap/history work.
+        unawaited(refreshOverviewForPlatform(key, forceChatHistory: true));
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[ChatController] selectPlatformInstant failed: $e');
+      }
     }
   }
 
@@ -1174,7 +1450,7 @@ class ChatController extends GetxController {
     _connectRetryTimer?.cancel();
     _connectRetryTimer = null;
     _pendingLocalChatEchoes.clear();
-    _historyInFlight.clear();
+    _historyRefreshCoalesce.clear();
     _historyLastFetchAt.clear();
     _edgeGlowEventSeenAt.clear();
     _socketConnectedPlatform = null;

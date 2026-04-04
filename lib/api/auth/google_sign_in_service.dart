@@ -7,6 +7,8 @@ import 'models/google_sign_in_credentials.dart';
 /// Wraps [GoogleSignIn] (v7+) to obtain ID token, access token, and account id for a backend.
 ///
 /// Does **not** use Firebase Auth — tokens are for your own API.
+///
+/// Initialization uses only [ApiConfig.googleServerClientId] (Web OAuth client id) — no per-platform `clientId`.
 class GoogleSignInService {
   GoogleSignInService._();
   static final GoogleSignInService instance = GoogleSignInService._();
@@ -16,32 +18,17 @@ class GoogleSignInService {
   Future<void> ensureInitialized() async {
     if (_initialized) return;
 
-    final serverId = ApiConfig.googleServerClientId;
-    final iosClientId = ApiConfig.googleIosClientId;
-
-    String? clientId;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      if (iosClientId.isNotEmpty) {
-        clientId = iosClientId;
-      }
-    }
-
-    // Android: plugin requires a non-null serverClientId (Web OAuth client id).
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      if (serverId.isEmpty) {
-        throw StateError(
-          'Set your Google **Web** OAuth client ID:\n'
-          '• Edit `AppConstants.googleServerClientId` in '
-          'lib/core/constants/constants.dart, or\n'
-          '• Run with --dart-define=GOOGLE_SERVER_CLIENT_ID=xxx.apps.googleusercontent.com '
-          '(or --dart-define-from-file=dart_defines.json).',
-        );
-      }
+    final serverId = ApiConfig.googleServerClientId.trim();
+    if (serverId.isEmpty) {
+      throw StateError(
+        'Set `AppConstants.googleServerClientId` in lib/core/constants/constants.dart '
+        'to your Web OAuth client id (…apps.googleusercontent.com), or pass '
+        '--dart-define=GOOGLE_SERVER_CLIENT_ID=...',
+      );
     }
 
     await GoogleSignIn.instance.initialize(
-      clientId: clientId,
-      serverClientId: serverId.isEmpty ? null : serverId,
+      serverClientId: serverId,
     );
     _initialized = true;
   }
@@ -57,8 +44,8 @@ class GoogleSignInService {
     final idToken = account.authentication.idToken;
     if (idToken == null || idToken.isEmpty) {
       throw StateError(
-        'Missing Google ID token. Ensure `AppConstants.googleServerClientId` '
-        '(or GOOGLE_SERVER_CLIENT_ID) is your Web OAuth client id.',
+        'Missing Google ID token. Check `AppConstants.googleServerClientId` '
+        '(Web OAuth client from the same Firebase project as google-services.json).',
       );
     }
 
@@ -72,10 +59,12 @@ class GoogleSignInService {
           await account.authorizationClient.authorizationForScopes(scopes);
       authz ??= await account.authorizationClient.authorizeScopes(scopes);
       accessToken = authz.accessToken;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('GoogleSignIn: optional access token not obtained: $e');
-      }
+    } catch (_) {
+      // Optional; backend login uses idToken.
+    }
+
+    if (kDebugMode && accessToken != null) {
+      debugPrint('accessToken: $accessToken');
     }
 
     return GoogleSignInCredentials(

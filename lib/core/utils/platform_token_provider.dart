@@ -6,6 +6,31 @@ class PlatformTokenProvider {
   static const platformTokensKey = 'second_chat.platform_tokens';
   static const accessTokenKey = 'accessToken';
   static const refreshTokenKey = 'refreshToken';
+  static const googleOAuthAccessTokenKey = 'second_chat.google_oauth_access_token';
+
+  /// Google Sign-In OAuth **access** token (`ya29…`) after Google sign-in.
+  /// Second Chat REST/socket use the **backend session JWT**, not this Google access token.
+  Future<String?> getGoogleOAuthAccessToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final t = prefs.getString(googleOAuthAccessTokenKey)?.trim();
+      return (t == null || t.isEmpty) ? null : t;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setGoogleOAuthAccessToken(String? token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = token?.trim();
+      if (v == null || v.isEmpty) {
+        await prefs.remove(googleOAuthAccessTokenKey);
+      } else {
+        await prefs.setString(googleOAuthAccessTokenKey, v);
+      }
+    } catch (_) {}
+  }
 
   /// Returns platforms that have a non-empty accessToken in `second_chat.platform_tokens`.
   /// Example: ["twitch","kick","youtube"].

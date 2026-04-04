@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -5,33 +8,71 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 
+import 'stream_embed_url_utils.dart';
+
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
+///
+/// If [streamExpectedLive] is true (platform is live but embed URL not ready yet),
+/// shows an animated loading indicator instead of the delayed "no stream" message.
 class StreamWebView extends StatefulWidget {
   const StreamWebView({
     super.key,
     required this.url,
     required this.height,
     this.muted = false,
+    this.streamExpectedLive = false,
   });
 
   final String url;
   final double height;
   final bool muted;
+  final bool streamExpectedLive;
 
   @override
   State<StreamWebView> createState() => _StreamWebViewState();
 }
 
-class _StreamWebViewState extends State<StreamWebView> {
+class _StreamWebViewState extends State<StreamWebView>
+    with SingleTickerProviderStateMixin {
+  /// In-app idle document (avoids `about:blank` on Android, which can trigger
+  /// pigeon/WebViewClient races with resource error callbacks).
+  static const String _kIdleBase = 'https://secondchat.idle/stream-view/';
+  static const String _kIdleHtml =
+      '<!DOCTYPE html><html><head><meta charset="utf-8">'
+      '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      '</head><body style="margin:0;background:#000;height:100vh"></body></html>';
+
   late final WebViewController _controller;
   String? _initialUrl;
   Uri? _initialUri;
   bool _restoringInitial = false;
+  bool _delegateAttached = false;
+
+  /// Dedupes navigations: `''` = idle shell, else last sanitized embed URL.
+  String? _lastCommittedNavigation;
+
+  /// Same logical embed as [_lastCommittedNavigation] even if the raw string differs.
+  String _lastCanonicalEmbedId = '';
+
+  /// Avoids overlay flicker when [url] briefly toggles empty during socket/overview updates.
+  bool _showNoStreamOverlay = false;
+  bool _showLiveLoadingOverlay = false;
+  Timer? _noStreamOverlayTimer;
+  static const Duration _noStreamOverlayDelay = Duration(milliseconds: 480);
+
+  late final AnimationController _dotsController;
+
+  bool get _shellIsIdle =>
+      _initialUri != null && _initialUri!.host == 'secondchat.idle';
 
   @override
   void initState() {
     super.initState();
+    _dotsController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
     // Configure iOS autoplay/inline playback via WebKit params when available.
     // IMPORTANT: WKWebView params cause platform channel errors on Android, so
     // we only create them on iOS.
@@ -52,7 +93,71 @@ class _StreamWebViewState extends State<StreamWebView> {
 
     _controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
-    _setInitial(_sanitizeUrl(widget.url));
+    _ensureNavigationDelegate();
+    _loadUrlIntoController(widget.url);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncOverlays();
+    });
+  }
+
+  @override
+  void dispose() {
+    _noStreamOverlayTimer?.cancel();
+    _dotsController.dispose();
+    super.dispose();
+  }
+
+  void _setDotsAnimating(bool on) {
+    if (on) {
+      if (!_dotsController.isAnimating) {
+        _dotsController.repeat();
+      }
+    } else {
+      _dotsController.stop();
+    }
+  }
+
+  void _syncOverlays() {
+    final empty = widget.url.trim().isEmpty;
+    if (!empty) {
+      _noStreamOverlayTimer?.cancel();
+      _noStreamOverlayTimer = null;
+      _setDotsAnimating(false);
+      if (_showNoStreamOverlay || _showLiveLoadingOverlay) {
+        setState(() {
+          _showNoStreamOverlay = false;
+          _showLiveLoadingOverlay = false;
+        });
+      }
+      return;
+    }
+    if (widget.streamExpectedLive) {
+      _noStreamOverlayTimer?.cancel();
+      _noStreamOverlayTimer = null;
+      if (!_showLiveLoadingOverlay || _showNoStreamOverlay) {
+        setState(() {
+          _showNoStreamOverlay = false;
+          _showLiveLoadingOverlay = true;
+        });
+      }
+      _setDotsAnimating(true);
+      return;
+    }
+
+    _setDotsAnimating(false);
+    if (_showLiveLoadingOverlay) {
+      setState(() => _showLiveLoadingOverlay = false);
+    }
+    if (_showNoStreamOverlay) return;
+    _noStreamOverlayTimer?.cancel();
+    _noStreamOverlayTimer = Timer(_noStreamOverlayDelay, () {
+      _noStreamOverlayTimer = null;
+      if (!mounted) return;
+      if (widget.url.trim().isEmpty && !widget.streamExpectedLive) {
+        setState(() => _showNoStreamOverlay = true);
+      }
+    });
   }
 
   String _sanitizeUrl(String url) {
@@ -75,10 +180,9 @@ class _StreamWebViewState extends State<StreamWebView> {
     return trimmed;
   }
 
-  void _setInitial(String url) {
-    final trimmed = url.trim();
-    _initialUrl = trimmed.isEmpty ? null : trimmed;
-    _initialUri = trimmed.isEmpty ? null : Uri.tryParse(trimmed);
+  void _ensureNavigationDelegate() {
+    if (_delegateAttached) return;
+    _delegateAttached = true;
     _controller.setNavigationDelegate(
       NavigationDelegate(
         onPageStarted: (url) {
@@ -95,13 +199,53 @@ class _StreamWebViewState extends State<StreamWebView> {
         },
       ),
     );
-    if (trimmed.isNotEmpty) {
-      _controller.loadRequest(Uri.parse(trimmed));
+  }
+
+  void _logWebNavError(Object error, StackTrace stackTrace) {
+    if (kDebugMode) {
+      debugPrint('[StreamWebView] navigation failed: $error');
+    }
+  }
+
+  /// Keeps the native WebView alive: empty URL → local black HTML shell under overlay.
+  void _loadUrlIntoController(String raw) {
+    try {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) {
+        if (_lastCommittedNavigation == '') return;
+        _lastCommittedNavigation = '';
+        _lastCanonicalEmbedId = '';
+        _initialUrl = _kIdleBase;
+        _initialUri = Uri.parse(_kIdleBase);
+        _controller
+            .loadHtmlString(_kIdleHtml, baseUrl: _kIdleBase)
+            .catchError(_logWebNavError);
+        _applyMuteState();
+        return;
+      }
+      final sanitized = _sanitizeUrl(trimmed);
+      final nextId = canonicalStreamEmbedIdentity(sanitized);
+      if (nextId.isNotEmpty && nextId == _lastCanonicalEmbedId) {
+        _applyMuteState();
+        return;
+      }
+      _lastCommittedNavigation = sanitized;
+      _lastCanonicalEmbedId = nextId;
+      _initialUrl = sanitized;
+      _initialUri = Uri.tryParse(sanitized);
+      _controller
+          .loadRequest(Uri.parse(sanitized))
+          .catchError(_logWebNavError);
       _applyMuteState();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[StreamWebView] _loadUrlIntoController: $e');
+      }
     }
   }
 
   Future<void> _applyMuteState() async {
+    if (_shellIsIdle) return;
     try {
       final mutedValue = widget.muted ? 'true' : 'false';
       await _controller.runJavaScript('''
@@ -131,11 +275,17 @@ class _StreamWebViewState extends State<StreamWebView> {
     final init = _initialUrl;
     final initUri = _initialUri;
     if (init == null || init.isEmpty || initUri == null) return false;
-    if (rawUrl == init || rawUrl == 'about:blank') return true;
+    if (rawUrl == init) return true;
 
     final uri = Uri.tryParse(rawUrl);
     if (uri == null) return false;
     if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+
+    // First load from idle shell → real embed.
+    if (initUri.host == 'secondchat.idle' &&
+        (uri.scheme == 'http' || uri.scheme == 'https')) {
+      return true;
+    }
 
     final sameHost = uri.host.toLowerCase() == initUri.host.toLowerCase();
     if (!sameHost) return false;
@@ -151,17 +301,35 @@ class _StreamWebViewState extends State<StreamWebView> {
     final init = _initialUrl;
     if (init == null || init.isEmpty) return;
     _restoringInitial = true;
-    _controller.loadRequest(Uri.parse(init)).whenComplete(() {
+    void done() {
       _restoringInitial = false;
-    });
+    }
+
+    if (_shellIsIdle) {
+      _controller
+          .loadHtmlString(_kIdleHtml, baseUrl: _kIdleBase)
+          .catchError(_logWebNavError)
+          .whenComplete(done);
+      return;
+    }
+    _controller
+        .loadRequest(Uri.parse(init))
+        .catchError(_logWebNavError)
+        .whenComplete(done);
   }
 
   @override
   void didUpdateWidget(StreamWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
-      _setInitial(_sanitizeUrl(widget.url));
-      return;
+    final urlChanged =
+        !streamEmbedUrlsCanonicallyEqual(oldWidget.url, widget.url);
+    final liveFlagChanged =
+        oldWidget.streamExpectedLive != widget.streamExpectedLive;
+    if (urlChanged) {
+      _syncOverlays();
+      _loadUrlIntoController(widget.url);
+    } else if (liveFlagChanged) {
+      _syncOverlays();
     }
     if (oldWidget.muted != widget.muted) {
       _applyMuteState();
@@ -170,33 +338,67 @@ class _StreamWebViewState extends State<StreamWebView> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.url.trim().isEmpty) {
-      final l10n = context.l10n;
-      return SizedBox(
-        height: widget.height,
-        child: Container(
-          color: Colors.black,
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.videocam_off, color: Colors.white38, size:43.sp),
-              SizedBox(height: 7.h),
-              Center(
-                child: Text(
-                  l10n.noStreamAtTheMoment,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white54),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final l10n = context.l10n;
     return SizedBox(
       height: widget.height,
-      child: WebViewWidget(controller: _controller),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_showLiveLoadingOverlay)
+            ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _dotsController,
+                  builder: (context, _) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(3, (i) {
+                        final base =
+                            _dotsController.value * 2 * math.pi + i * 0.9;
+                        final opacity =
+                            0.35 + 0.65 * (0.5 + 0.5 * math.sin(base));
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 3.w),
+                          child: Opacity(
+                            opacity: opacity.clamp(0.2, 1.0),
+                            child: Text(
+                              '•',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 32.sp,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    );
+                  },
+                ),
+              ),
+            ),
+          if (_showNoStreamOverlay)
+            ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.videocam_off, color: Colors.white38, size: 43.sp),
+                    SizedBox(height: 7.h),
+                    Text(
+                      l10n.noStreamAtTheMoment,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white54),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

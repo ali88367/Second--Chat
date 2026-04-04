@@ -22,6 +22,7 @@ import '../api/http/api_json.dart';
 import '../core/constants/app_colors/app_colors.dart';
 import '../core/constants/constants.dart';
 import '../core/localization/get_l10n.dart';
+import '../core/utils/platform_token_provider.dart';
 
 class AuthController extends GetxController with WidgetsBindingObserver {
   AuthController({
@@ -160,26 +161,69 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     return GoogleSignInService.instance.signInAndFetchCredentials();
   }
 
+  /// Message when [loginWithGoogle] already obtained Google tokens but the backend rejected the request.
+  String _messageForGoogleLoginApiFailure(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final err = data['error'];
+        if (err is Map) {
+          final code = err['code']?.toString();
+          final raw = err['message']?.toString().trim();
+          if (code == 'INVALID_TOKEN') {
+            return 'Could not finish signing in with the server. '
+                'If this continues, the app may need an update or the server configuration must allow this Google project.';
+          }
+          if (raw != null && raw.isNotEmpty) {
+            return raw;
+          }
+        }
+        final top = data['message']?.toString().trim();
+        if (top != null && top.isNotEmpty) return top;
+      }
+      final status = e.response?.statusCode;
+      if (status != null) {
+        return 'Could not complete sign-in (server responded with $status). Please try again.';
+      }
+    }
+    return 'Could not complete sign-in. Please try again.';
+  }
+
   /// Google Sign-In, then POST tokens to [AuthApi.loginWithGoogle] and persist the app session.
   Future<void> loginWithGoogle() async {
     try {
       final creds = await fetchGoogleAccountCredentials();
-      var tokens = await authApi.loginWithGoogle(
-        idToken: creds.idToken,
-        accessToken: creds.accessToken,
-      );
-      if (tokens.accessTokenExpiresAt == null &&
-          tokens.accessToken.isNotEmpty) {
-        final exp = parseJwtAccessTokenExpiryUtc(tokens.accessToken);
-        if (exp != null) {
-          tokens = tokens.copyWith(accessTokenExpiresAt: exp);
+      try {
+        var tokens = await authApi.loginWithGoogle(
+          idToken: creds.idToken,
+          accessToken: creds.accessToken,
+        );
+        if (tokens.accessTokenExpiresAt == null &&
+            tokens.accessToken.isNotEmpty) {
+          final exp = parseJwtAccessTokenExpiryUtc(tokens.accessToken);
+          if (exp != null) {
+            tokens = tokens.copyWith(accessTokenExpiresAt: exp);
+          }
         }
+        await _api.tokenStore.write(tokens);
+        await PlatformTokenProvider().setGoogleOAuthAccessToken(
+          creds.accessToken,
+        );
+        await _markIntroOnboardingPendingAfterLogin();
+        isAuthenticated.value = true;
+        lastError.value = null;
+        await refreshMe(silent: true);
+      } on DioException catch (e) {
+        lastError.value = _messageForGoogleLoginApiFailure(e);
+        if (kDebugMode) {
+          debugPrint('loginWithGoogle: Google OK, backend error: $e');
+        }
+        rethrow;
+      } catch (e) {
+        lastError.value = 'Could not complete sign-in. Please try again.';
+        if (kDebugMode) debugPrint('loginWithGoogle: Google OK, unexpected: $e');
+        rethrow;
       }
-      await _api.tokenStore.write(tokens);
-      await _markIntroOnboardingPendingAfterLogin();
-      isAuthenticated.value = true;
-      lastError.value = null;
-      await refreshMe(silent: true);
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         lastError.value = null;
@@ -209,6 +253,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         }
       }
       await _api.tokenStore.write(tokens);
+      await PlatformTokenProvider().setGoogleOAuthAccessToken(null);
       await _markIntroOnboardingPendingAfterLogin();
       isAuthenticated.value = true;
       lastError.value = null;

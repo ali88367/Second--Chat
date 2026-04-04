@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 
 import '../../../../core/themes/textstyles.dart';
+import 'package:second_chat/core/utils/app_clock_format.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
@@ -17,7 +21,7 @@ import '../Streaks/Streaksbottomsheet.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
-import 'widgets/stream_webview.dart';
+import 'widgets/live_stream_embed_stack.dart';
 
 class Livestreaming extends StatefulWidget {
   const Livestreaming({super.key});
@@ -42,8 +46,10 @@ class _LivestreamingState extends State<Livestreaming> {
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
-  double? _bottomSectionHeightBeforeActivityMore;
-  bool _isActivitySeeMoreActive = false;
+  bool _activityPanelExpanded = false;
+  double _activityLayoutMin = 0;
+  double _activityLayoutMax = 0;
+  double? _bottomSectionHeightBeforeActivityExpand;
   bool _isInitialHeightSet = false;
   static const double _dragSensitivity = 1.8;
   static const double _minBottomSectionHeightFactor = 0.20;
@@ -67,7 +73,17 @@ class _LivestreamingState extends State<Livestreaming> {
     _streakCtrl = Get.find<StreamStreaksController>();
     _chatFilter.addListener(_updateImageBasedOnFilter);
     _chatFilter.addListener(_syncSelectedPlatformFromFilter);
+    _showActivity.addListener(_onShowActivityOpened);
     _maybeCompleteStreakForToday();
+  }
+
+  void _onShowActivityOpened() {
+    if (!_showActivity.value || !mounted) return;
+    setState(() {
+      _activityPanelExpanded = false;
+      _activityHeight = 0;
+      _bottomSectionHeightBeforeActivityExpand = null;
+    });
   }
 
   void _syncSelectedPlatformFromFilter() {
@@ -124,6 +140,9 @@ class _LivestreamingState extends State<Livestreaming> {
       );
     } finally {
       _streakSheetOpening = false;
+      if (mounted) {
+        unawaited(_streakCtrl.fetchCurrentStreak(force: true, silent: true));
+      }
     }
   }
 
@@ -131,6 +150,7 @@ class _LivestreamingState extends State<Livestreaming> {
   void dispose() {
     _chatFilter.removeListener(_updateImageBasedOnFilter);
     _chatFilter.removeListener(_syncSelectedPlatformFromFilter);
+    _showActivity.removeListener(_onShowActivityOpened);
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
     _showActivity.dispose();
@@ -141,7 +161,37 @@ class _LivestreamingState extends State<Livestreaming> {
     super.dispose();
   }
 
+  void _collapseActivityExpandedIfNeeded(BuildContext context) {
+    if (!_activityPanelExpanded) return;
+    final screenHeight = Get.height;
+    final minHeight = _bottomSectionMinHeight(screenHeight);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final maxBottom =
+        screenHeight -
+        _layoutTopPadding(context) -
+        16.h -
+        _minUpperSectionHeight -
+        12.h -
+        bottomInset;
+    final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
+    setState(() {
+      final restored =
+          (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
+              .clamp(minHeight, clampedMaxBottom)
+              .toDouble();
+      _bottomSectionHeight = restored;
+      _bottomSectionHeightBeforeActivityExpand = null;
+      if (_activityLayoutMin > 0) {
+        _activityHeight = _activityLayoutMin;
+      }
+      _activityPanelExpanded = false;
+    });
+  }
+
   void _handleFilterTap(String platformKey) {
+    if (mounted) {
+      _collapseActivityExpandedIfNeeded(context);
+    }
     if (_chatFilter.value == platformKey) {
       _chatFilter.value = null;
     } else {
@@ -150,6 +200,9 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   void _handlePlatformSwipe(bool swipeRight) {
+    if (mounted) {
+      _collapseActivityExpandedIfNeeded(context);
+    }
     const platforms = [null, 'twitch', 'kick', 'youtube'];
     final currentIndex = platforms.indexOf(_chatFilter.value);
 
@@ -216,19 +269,38 @@ class _LivestreamingState extends State<Livestreaming> {
     return 'twitch';
   }
 
-  String _formatTime(dynamic tsRaw) {
-    DateTime? ts;
-    if (tsRaw is String) ts = DateTime.tryParse(tsRaw);
-    if (tsRaw is int) {
-      ts = tsRaw > 1000000000000
-          ? DateTime.fromMillisecondsSinceEpoch(tsRaw, isUtc: true)
-          : DateTime.fromMillisecondsSinceEpoch(tsRaw * 1000, isUtc: true);
+  /// Primary line: `{username} joined|followed|unfollowed` when [type] matches; else fallback.
+  (String primary, String secondary) _activityRowLines({
+    required String user,
+    required String typeRaw,
+  }) {
+    final type = typeRaw.toLowerCase().trim();
+    final u = user.trim();
+    if (type == 'join' || type == 'viewer_join' || type == 'viewer join') {
+      return (u.isNotEmpty ? '$u joined' : 'Someone joined', '');
     }
-    ts ??= DateTime.now().toUtc();
-    final local = ts.toLocal();
-    final h = local.hour.toString().padLeft(2, '0');
-    final m = local.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    if (type == 'follow' || type == 'new_follower' || type == 'new follow') {
+      return (u.isNotEmpty ? '$u followed' : 'Someone followed', '');
+    }
+    if (type == 'unfollow' ||
+        type == 'unfollowed' ||
+        type == 'follow_off' ||
+        type == 'followoff') {
+      return (u.isNotEmpty ? '$u unfollowed' : 'Someone unfollowed', '');
+    }
+    final primary = u.isNotEmpty ? u : (typeRaw.isNotEmpty ? typeRaw : 'Activity');
+    final secondary =
+        u.isNotEmpty && typeRaw.isNotEmpty && typeRaw.toLowerCase() != u.toLowerCase()
+            ? typeRaw
+            : '';
+    return (primary, secondary);
+  }
+
+  String _formatActivityTime(dynamic tsRaw) {
+    return formatAppClockTimeFromRaw(
+      tsRaw,
+      clockFormat: _settingsCtrl.clockFormat.value,
+    );
   }
 
   double _bottomSectionMinHeight(double screenHeight) {
@@ -258,34 +330,40 @@ class _LivestreamingState extends State<Livestreaming> {
     return _mainContentTopOffset(context) + 5.h;
   }
 
-  void _toggleChatSheetForActivity(BuildContext context) {
+  void _toggleActivityPanelExpand(BuildContext context) {
     final screenHeight = Get.height;
     final minHeight = _bottomSectionMinHeight(screenHeight);
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
-    const double bottomGap = 16;
-    final maxHeight =
+    final maxBottom =
         screenHeight -
         _layoutTopPadding(context) -
-        bottomGap.h -
+        16.h -
         _minUpperSectionHeight -
         12.h -
         bottomInset;
-    final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
+    final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
 
     setState(() {
-      if (!_isActivitySeeMoreActive) {
-        _bottomSectionHeightBeforeActivityMore =
-            _bottomSectionHeight.clamp(minHeight, clampedMaxHeight).toDouble();
+      final nextExpanded = !_activityPanelExpanded;
+      if (nextExpanded) {
+        _bottomSectionHeightBeforeActivityExpand ??=
+            _bottomSectionHeight.clamp(minHeight, clampedMaxBottom).toDouble();
         _bottomSectionHeight = minHeight;
-        _isActivitySeeMoreActive = true;
+        if (_activityLayoutMax > 0) {
+          _activityHeight = _activityLayoutMax;
+        }
       } else {
-        final restoredHeight =
-            (_bottomSectionHeightBeforeActivityMore ?? clampedMaxHeight)
-                .clamp(minHeight, clampedMaxHeight)
+        final restored =
+            (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
+                .clamp(minHeight, clampedMaxBottom)
                 .toDouble();
-        _bottomSectionHeight = restoredHeight;
-        _isActivitySeeMoreActive = false;
+        _bottomSectionHeight = restored;
+        _bottomSectionHeightBeforeActivityExpand = null;
+        if (_activityLayoutMin > 0) {
+          _activityHeight = _activityLayoutMin;
+        }
       }
+      _activityPanelExpanded = nextExpanded;
     });
   }
 
@@ -367,14 +445,17 @@ class _LivestreamingState extends State<Livestreaming> {
     final double screenHeight = Get.height;
     final double minHeightFromScreen = screenHeight * _activityMinHeight;
     final double maxHeightFromScreen = screenHeight * _activityMaxHeight;
-    final double maxHeight =
+    final double slotCap =
         (availableHeight > 0 ? availableHeight : maxHeightFromScreen)
             .toDouble();
+    // Fill the upper stream slot when expanded (no artificial shrink).
+    final double maxHeight = math.max(minHeightFromScreen, slotCap);
     final double originalHeight =
         minHeightFromScreen.clamp(0, maxHeight).toDouble();
 
     if (_activityHeight == 0) {
-      _activityHeight = maxHeight;
+      _activityHeight =
+          _activityPanelExpanded ? maxHeight : originalHeight;
     }
 
     final double clampedHeight = _activityHeight.clamp(
@@ -384,21 +465,54 @@ class _LivestreamingState extends State<Livestreaming> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final effectiveMax =
+        final parentMax =
             constraints.maxHeight.isFinite && constraints.maxHeight > 0
-                ? constraints.maxHeight.clamp(0, maxHeight).toDouble()
-                : maxHeight;
+                ? constraints.maxHeight
+                : slotCap;
+        final effectiveMax =
+            math.min(parentMax, maxHeight).clamp(0.0, double.infinity).toDouble();
         final effectiveMin = originalHeight.clamp(0, effectiveMax).toDouble();
-        // Keep activity filling the free space above the bottom sheet by default.
-        final height =
-            (_isDraggingActivity ? clampedHeight : effectiveMax)
-                .clamp(effectiveMin, effectiveMax)
-                .toDouble();
+        _activityLayoutMin = effectiveMin;
+        _activityLayoutMax = effectiveMax;
+
+        final double height;
+        if (_isDraggingActivity) {
+          height = clampedHeight.clamp(effectiveMin, effectiveMax).toDouble();
+        } else if (_activityPanelExpanded) {
+          height = effectiveMax;
+        } else {
+          height = _activityHeight.clamp(effectiveMin, effectiveMax).toDouble();
+        }
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onVerticalDragStart: (_) {
             setState(() {
               _isDraggingActivity = true;
+              final wasExpanded = _activityPanelExpanded;
+              final startH = wasExpanded
+                  ? effectiveMax
+                  : _activityHeight.clamp(effectiveMin, effectiveMax);
+              if (wasExpanded) {
+                final sh = Get.height;
+                final minBs = _bottomSectionMinHeight(sh);
+                final inset = MediaQuery.of(context).viewPadding.bottom;
+                final maxBs =
+                    sh -
+                    _layoutTopPadding(context) -
+                    16.h -
+                    _minUpperSectionHeight -
+                    12.h -
+                    inset;
+                final cap = maxBs > minBs ? maxBs : minBs;
+                final restored =
+                    (_bottomSectionHeightBeforeActivityExpand ?? cap)
+                        .clamp(minBs, cap)
+                        .toDouble();
+                _bottomSectionHeight = restored;
+                _bottomSectionHeightBeforeActivityExpand = null;
+              }
+              _activityHeight = startH;
+              _activityPanelExpanded = false;
             });
           },
           onVerticalDragUpdate: (details) {
@@ -461,8 +575,8 @@ class _LivestreamingState extends State<Livestreaming> {
                         padding: EdgeInsets.only(
                           left: 12.w,
                           right: 12.w,
-                          top: 34.h,
-                          bottom: 42.h,
+                          top: 22.h,
+                          bottom: 28.h,
                         ),
                         physics:
                             _isDraggingActivity
@@ -470,6 +584,10 @@ class _LivestreamingState extends State<Livestreaming> {
                                 : const BouncingScrollPhysics(),
                         child: Obx(() {
                           final chatCtrl = Get.find<ChatController>();
+                          chatCtrl.platform.value;
+                          _settingsCtrl.clockFormat.value;
+                          final selected =
+                              _normalizeUiPlatform(chatCtrl.platform.value);
                           // Prefer controller activity list (wired to sockets).
                           // Chat "normal" lines stay in chat; activity = everything else.
                           final events = chatCtrl.activityEvents
@@ -479,6 +597,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                     .trim()
                                     .toLowerCase();
                                 return t != 'normal';
+                              })
+                              .where((e) {
+                                final raw =
+                                    (e['platform'] ?? '').toString().trim();
+                                if (raw.isEmpty) return true;
+                                return _normalizeUiPlatform(raw) == selected;
                               })
                               .toList(growable: false);
                           if (events.isEmpty) {
@@ -498,43 +622,59 @@ class _LivestreamingState extends State<Livestreaming> {
                           }
                           // Render newest first.
                           final list = events.reversed.toList(growable: false);
-                          return Column(
-                            children: [
-                              for (var i = 0; i < list.length; i++) ...[
-                                Builder(
-                                  builder: (ctx) {
-                                    final e = list[i];
-                                    final platform =
-                                        (e['platform'] ?? '').toString();
-                                    final meta = e['metadata'];
-                                    final metaMap = meta is Map
-                                        ? meta.cast<String, dynamic>()
-                                        : const <String, dynamic>{};
-                                    final user = (metaMap['user'] ??
-                                            metaMap['username'] ??
-                                            metaMap['name'] ??
-                                            e['username'] ??
-                                            '')
-                                        .toString()
-                                        .trim();
-                                    final type =
-                                        (e['type'] ?? e['eventType'] ?? '')
-                                            .toString()
-                                            .trim();
-                                    final time = _formatTime(
-                                      e['timestamp'] ?? e['created_at'],
-                                    );
-                                    return activityRow(
-                                      _assetForPlatform(platform),
-                                      user.isNotEmpty ? user : type,
-                                      time,
-                                      user.isNotEmpty ? type : '',
-                                    );
-                                  },
-                                ),
-                                if (i != list.length - 1) SizedBox(height: 12.h),
+                          return RepaintBoundary(
+                            child: Column(
+                              key: ValueKey<String>('activity_$selected'),
+                              children: [
+                                for (var i = 0; i < list.length; i++) ...[
+                                  Builder(
+                                    builder: (ctx) {
+                                      final e = list[i];
+                                      final platform =
+                                          (e['platform'] ?? '').toString();
+                                      final meta = e['metadata'];
+                                      final metaMap = meta is Map
+                                          ? meta.cast<String, dynamic>()
+                                          : const <String, dynamic>{};
+                                      final user = (metaMap['user'] ??
+                                              metaMap['username'] ??
+                                              metaMap['user_name'] ??
+                                              metaMap['user_login'] ??
+                                              metaMap['name'] ??
+                                              e['username'] ??
+                                              '')
+                                          .toString()
+                                          .trim();
+                                      final type =
+                                          (e['type'] ?? e['eventType'] ?? '')
+                                              .toString()
+                                              .trim();
+                                      final time = _formatActivityTime(
+                                        e['timestamp'] ?? e['created_at'],
+                                      );
+                                      final lines = _activityRowLines(
+                                        user: user,
+                                        typeRaw: type,
+                                      );
+                                      final pKey = _normalizeUiPlatform(
+                                        platform.isNotEmpty
+                                            ? platform
+                                            : selected,
+                                      );
+                                      return activityRow(
+                                        _assetForPlatform(pKey),
+                                        pKey,
+                                        lines.$1,
+                                        time,
+                                        lines.$2,
+                                      );
+                                    },
+                                  ),
+                                  if (i != list.length - 1)
+                                    SizedBox(height: 12.h),
+                                ],
                               ],
-                            ],
+                            ),
                           );
                         }),
                       ),
@@ -545,7 +685,7 @@ class _LivestreamingState extends State<Livestreaming> {
                   right: 12.w,
                   bottom: 10.h,
                   child: GestureDetector(
-                    onTap: () => _toggleChatSheetForActivity(context),
+                    onTap: () => _toggleActivityPanelExpand(context),
                     child: Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 10.w,
@@ -557,7 +697,7 @@ class _LivestreamingState extends State<Livestreaming> {
                         border: Border.all(color: Colors.white12, width: 1.w),
                       ),
                       child: Text(
-                        _isActivitySeeMoreActive
+                        _activityPanelExpanded
                             ? context.l10n.seeLess
                             : context.l10n.seeMore,
                         style: sfProText400(11.sp, Colors.white),
@@ -685,7 +825,27 @@ class _LivestreamingState extends State<Livestreaming> {
                       ),
                       Row(
                         children: [
-                          SizedBox(width: 6.w),
+                          // SizedBox(width: 6.w),
+                          // GestureDetector(
+                          //   onTap: () {
+                          //     Get.to(() => const SocketLogScreen());
+                          //   },
+                          //   child: Container(
+                          //     width: 36.w,
+                          //     height: 36.w,
+                          //     alignment: Alignment.center,
+                          //     decoration: BoxDecoration(
+                          //       color: const Color(0xFF2C2C2E),
+                          //       borderRadius: BorderRadius.circular(10.r),
+                          //     ),
+                          //     child: Icon(
+                          //       Icons.terminal_rounded,
+                          //       size: 20.sp,
+                          //       color: Colors.white70,
+                          //     ),
+                          //   ),
+                          // ),
+                          // SizedBox(width: 6.w),
                           GestureDetector(
                             onTap: () {
                               Get.bottomSheet(
@@ -833,152 +993,36 @@ class _LivestreamingState extends State<Livestreaming> {
                                 return ValueListenableBuilder<bool>(
                                   valueListenable: _showActivity,
                                   builder: (context, showActivity, _) {
-                                    final streamContent = SingleChildScrollView(
-                                      physics:
-                                          _isDraggingActivity
-                                              ? const NeverScrollableScrollPhysics()
-                                              : const ClampingScrollPhysics(),
-                                      padding: EdgeInsets.only(
-                                        bottom:
-                                            MediaQuery.of(
-                                              context,
-                                            ).viewPadding.bottom,
-                                      ),
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          minHeight: upperSectionHeight,
-                                        ),
-                                        child: ValueListenableBuilder<bool>(
-                                          valueListenable: _showServiceCard,
-                                          builder: (context, showCard, child) {
+                                    return SizedBox(
+                                      height: upperSectionHeight,
+                                      width: double.infinity,
+                                      child: Stack(
+                                        clipBehavior: Clip.hardEdge,
+                                        children: [
+                                          IgnorePointer(
+                                            ignoring: showActivity,
+                                            child: SingleChildScrollView(
+                                              physics:
+                                                  _isDraggingActivity
+                                                      ? const NeverScrollableScrollPhysics()
+                                                      : const ClampingScrollPhysics(),
+                                              padding: EdgeInsets.only(
+                                                bottom:
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).viewPadding.bottom,
+                                              ),
+                                              child: ConstrainedBox(
+                                                constraints: BoxConstraints(
+                                                  minHeight: upperSectionHeight,
+                                                ),
+                                                child: ValueListenableBuilder<bool>(
+                                                  valueListenable: _showServiceCard,
+                                                  builder: (context, showCard, child) {
                                             final chatCtrl =
                                                 Get.find<ChatController>();
                                             final settingsCtrl =
                                                 Get.find<SettingsController>();
-
-                                            Widget buildSingle() {
-                                              const singlePlatforms = <String>[
-                                                'twitch',
-                                                'kick',
-                                                'youtube',
-                                              ];
-                                              final selected = chatCtrl.platform.value
-                                                  .toLowerCase()
-                                                  .trim();
-
-                                              return Stack(
-                                                fit: StackFit.expand,
-                                                children: [
-                                                  for (final p in singlePlatforms)
-                                                    Offstage(
-                                                      offstage: p != selected,
-                                                      child: IgnorePointer(
-                                                        ignoring: p != selected,
-                                                        child: StreamWebView(
-                                                          key: ValueKey(
-                                                            'stream_single_$p',
-                                                          ),
-                                                          url: chatCtrl.isPlatformLive(p)
-                                                              ? (chatCtrl.urlForPlatform(p) ?? '')
-                                                              : '',
-                                                          height: streamPreviewHeight,
-                                                          muted: p != selected,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              );
-                                            }
-
-                                            Widget buildMulti() {
-                                              // Segmented layout: max 3 streams.
-                                              const allPlatforms = [
-                                                'twitch',
-                                                'kick',
-                                                'youtube',
-                                              ];
-                                              final platforms = allPlatforms;
-
-                                              final tileGap = 8.w;
-                                              const topFlex = 56;
-                                              const bottomFlex = 44;
-
-                                              Widget tile({
-                                                required String platform,
-                                                required BorderRadius radius,
-                                                required double height,
-                                              }) {
-                                                final url = chatCtrl
-                                                        .isPlatformLive(platform)
-                                                    ? (chatCtrl.urlForPlatform(
-                                                          platform,
-                                                        ) ??
-                                                        '')
-                                                    : '';
-                                                return ClipRRect(
-                                                  borderRadius: radius,
-                                                  child: StreamWebView(
-                                                    key: ValueKey('stream_$platform'),
-                                                    url: url,
-                                                    height: height,
-                                                    muted: false,
-                                                  ),
-                                                );
-                                              }
-
-                                              // Three streams: top row 2 tiles (only one outer top corner each),
-                                              // bottom tile spans full width (only bottom corners).
-                                              return Column(
-                                                children: [
-                                                  Expanded(
-                                                    flex: topFlex,
-                                                    child: Row(
-                                                      children: [
-                                                        Expanded(
-                                                          child: tile(
-                                                            platform: platforms[0],
-                                                            radius: BorderRadius.only(
-                                                              topLeft:
-                                                                  Radius.circular(
-                                                                    16.r,
-                                                                  ),
-                                                            ),
-                                                            height: streamPreviewHeight,
-                                                          ),
-                                                        ),
-                                                        SizedBox(width: tileGap),
-                                                        Expanded(
-                                                          child: tile(
-                                                            platform: platforms[1],
-                                                            radius: BorderRadius.only(
-                                                              topRight:
-                                                                  Radius.circular(
-                                                                    16.r,
-                                                                  ),
-                                                            ),
-                                                            height: streamPreviewHeight,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: tileGap),
-                                                  Expanded(
-                                                    flex: bottomFlex,
-                                                    child: tile(
-                                                      platform: platforms[2],
-                                                      radius: BorderRadius.only(
-                                                        bottomLeft:
-                                                            Radius.circular(16.r),
-                                                        bottomRight:
-                                                            Radius.circular(16.r),
-                                                      ),
-                                                      height: streamPreviewHeight,
-                                                    ),
-                                                  ),
-                                                ],
-                                              );
-                                            }
 
                                             final webView = SizedBox(
                                               height: streamPreviewHeight,
@@ -1012,75 +1056,74 @@ class _LivestreamingState extends State<Livestreaming> {
                                                         multi ? 8.w : 0,
                                                       ),
                                                       child: multi
-                                                          ? buildMulti()
-                                                          : buildSingle(),
+                                                          ? LiveStreamMultiEmbedGrid(
+                                                              streamPreviewHeight:
+                                                                  streamPreviewHeight,
+                                                            )
+                                                          : LiveStreamSingleEmbedStack(
+                                                              streamPreviewHeight:
+                                                                  streamPreviewHeight,
+                                                            ),
                                                     ),
                                                   ),
                                                 );
                                               }),
                                             );
 
-                                            if (!showCard) {
-                                              return webView;
-                                            }
-
-                                            return Stack(
-                                              children: [
-                                                // Keep the WebView alive to avoid platform-view recreation issues.
-                                                Offstage(
-                                                  offstage: true,
-                                                  child: webView,
-                                                ),
-                                                ValueListenableBuilder<bool>(
-                                                  valueListenable:
-                                                      _titleSelected,
-                                                  builder: (
-                                                    context,
-                                                    titleSelected,
-                                                    _,
-                                                  ) {
-                                                    if (titleSelected) {
-                                                      return ValueListenableBuilder<
-                                                        String?
-                                                      >(
+                                            return SizedBox(
+                                              height: streamPreviewHeight,
+                                              child: Stack(
+                                                fit: StackFit.expand,
+                                                clipBehavior: Clip.hardEdge,
+                                                children: [
+                                                  Offstage(
+                                                    offstage: showCard,
+                                                    child: webView,
+                                                  ),
+                                                  if (showCard)
+                                                    Positioned.fill(
+                                                      child: ValueListenableBuilder<bool>(
                                                         valueListenable:
-                                                            _selectedPlatform,
+                                                            _titleSelected,
                                                         builder: (
                                                           context,
-                                                          platform,
+                                                          titleSelected,
                                                           _,
                                                         ) {
-                                                          if (platform !=
-                                                              null) {
-                                                            final activePlatform =
-                                                                _normalizeUiPlatform(
-                                                                  platform,
-                                                                );
-                                                            return SizedBox(
-                                                              height:
-                                                                  upperSectionHeight,
-                                                              child: Column(
-                                                                children: [
-                                                                  Expanded(
-                                                                    child: Container(
-                                                                      width:
-                                                                          double
-                                                                              .infinity,
-                                                                      padding: EdgeInsets.symmetric(
-                                                                        horizontal:
-                                                                            12.w,
-                                                                        vertical:
-                                                                            12.h,
-                                                                      ),
-                                                                      decoration: BoxDecoration(
-                                                                        color:
-                                                                            black,
-                                                                        borderRadius:
-                                                                            BorderRadius.circular(
+                                                          if (titleSelected) {
+                                                            return ValueListenableBuilder<
+                                                              String?
+                                                            >(
+                                                              valueListenable:
+                                                                  _selectedPlatform,
+                                                              builder: (
+                                                                context,
+                                                                platform,
+                                                                _,
+                                                              ) {
+                                                                if (platform !=
+                                                                    null) {
+                                                                  final activePlatform =
+                                                                      _normalizeUiPlatform(
+                                                                        platform,
+                                                                      );
+                                                                  return Column(
+                                                                    children: [
+                                                                      Expanded(
+                                                                        child: Container(
+                                                                          width: double.infinity,
+                                                                          padding: EdgeInsets.symmetric(
+                                                                            horizontal: 12.w,
+                                                                            vertical: 12.h,
+                                                                          ),
+                                                                          decoration: BoxDecoration(
+                                                                            color: black,
+                                                                            borderRadius:
+                                                                                BorderRadius.circular(
                                                                               20.r,
                                                                             ),
-                                                                      ),
-                                                                      child: Column(
+                                                                          ),
+                                                                          child: Column(
                                                                         children: [
                                                                           Padding(
                                                                             padding: EdgeInsets.symmetric(
@@ -1091,6 +1134,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                               children: [
                                                                                 GestureDetector(
                                                                                   onTap: () {
+                                                                                    _collapseActivityExpandedIfNeeded(context);
                                                                                     _selectedPlatform.value = null;
                                                                                     _showServiceCard.value = false;
                                                                                     _titleSelected.value = false;
@@ -1126,25 +1170,54 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                   ),
                                                                                 ),
                                                                                 const Spacer(),
-                                                                                Obx(() {
-                                                                                  final iconAsset =
-                                                                                      _assetForPlatform(
-                                                                                        activePlatform,
+                                                                                ValueListenableBuilder<String?>(
+                                                                                  valueListenable: _chatFilter,
+                                                                                  builder: (
+                                                                                    context,
+                                                                                    chatFilterSnap,
+                                                                                    _,
+                                                                                  ) {
+                                                                                    return Obx(() {
+                                                                                      final liveP =
+                                                                                          chatCtrl
+                                                                                              .platform
+                                                                                              .value
+                                                                                              .toString()
+                                                                                              .trim();
+                                                                                      final raw =
+                                                                                          (chatFilterSnap !=
+                                                                                                      null &&
+                                                                                                  chatFilterSnap
+                                                                                                      .trim()
+                                                                                                      .isNotEmpty)
+                                                                                              ? chatFilterSnap
+                                                                                              : (liveP.isNotEmpty
+                                                                                                    ? liveP
+                                                                                                    : activePlatform);
+                                                                                      final displayKey =
+                                                                                          _normalizeUiPlatform(
+                                                                                        raw,
                                                                                       );
-                                                                                  final iconColor =
-                                                                                      _settingsCtrl
-                                                                                          .getPlatformColor(
-                                                                                            activePlatform,
-                                                                                          );
-                                                                                  return Center(
-                                                                                    child: Image.asset(
-                                                                                      iconAsset,
-                                                                                      color: iconColor,
-                                                                                      width: 22.w,
-                                                                                      height: 22.h,
-                                                                                    ),
-                                                                                  );
-                                                                                }),
+                                                                                      final iconAsset =
+                                                                                          _assetForPlatform(
+                                                                                        displayKey,
+                                                                                      );
+                                                                                      final iconColor =
+                                                                                          _settingsCtrl
+                                                                                              .getPlatformColor(
+                                                                                        displayKey,
+                                                                                      );
+                                                                                      return Center(
+                                                                                        child: Image.asset(
+                                                                                          iconAsset,
+                                                                                          color: iconColor,
+                                                                                          width: 22.w,
+                                                                                          height: 22.h,
+                                                                                        ),
+                                                                                      );
+                                                                                    });
+                                                                                  },
+                                                                                ),
                                                                                 const Spacer(),
                                                                                 SizedBox(
                                                                                   width:
@@ -1209,124 +1282,76 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                     ),
                                                                   ),
                                                                 ],
-                                                              ),
-                                                            );
+                                                              );
                                                           }
 
-                                                          return SizedBox(
-                                                            height:
-                                                                upperSectionHeight,
-                                                            child: Column(
+                                                          return Column(
                                                               children: [
                                                                 Expanded(
-                                                                  child: Stack(
-                                                                    alignment:
-                                                                        Alignment
-                                                                            .center,
-                                                                    children: [
-                                                                      Container(
-                                                                        width:
-                                                                            double.infinity,
-                                                                        padding: EdgeInsets.symmetric(
-                                                                          horizontal:
-                                                                              14.w,
-                                                                          vertical:
-                                                                              14.h,
-                                                                        ),
-                                                                        decoration: BoxDecoration(
-                                                                          color:
-                                                                              black,
-                                                                          borderRadius: BorderRadius.circular(
-                                                                            20.r,
-                                                                          ),
-                                                                        ),
-                                                                        child: Column(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.min,
-                                                                          children: [
-                                                                            Obx(() {
-                                                                              final currentPlatform =
-                                                                                  _normalizeUiPlatform(
-                                                                                    _chatFilter
-                                                                                        .value ??
-                                                                                        chatCtrl
-                                                                                            .platform
-                                                                                            .value,
-                                                                                  );
-                                                                              return serviceRow(
-                                                                                asset: _assetForPlatform(
-                                                                                  currentPlatform,
-                                                                                ),
-                                                                                iconColor: _settingsCtrl
-                                                                                    .getPlatformColor(
-                                                                                      currentPlatform,
-                                                                                    ),
-                                                                                title:
-                                                                                    context.l10n.title,
-                                                                                subtitle:
-                                                                                    context.l10n.category,
-                                                                                onTap: () {
-                                                                                  _selectedPlatform.value =
-                                                                                      currentPlatform;
-                                                                                  _titleSelected.value = true;
-                                                                                  _showServiceCard.value = true;
-                                                                                },
-                                                                              );
-                                                                            }),
-                                                                            SizedBox(
-                                                                              height:
-                                                                                  36.h,
-                                                                            ),
-                                                                          ],
+                                                                  child: Center(
+                                                                    child: Container(
+                                                                      width:
+                                                                          double.infinity,
+                                                                      padding: EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            14.w,
+                                                                        vertical:
+                                                                            14.h,
+                                                                      ),
+                                                                      decoration: BoxDecoration(
+                                                                        color:
+                                                                            black,
+                                                                        borderRadius: BorderRadius.circular(
+                                                                          20.r,
                                                                         ),
                                                                       ),
-                                                                      Positioned(
-                                                                        bottom:
-                                                                            6.h,
-                                                                        child: Container(
-                                                                          padding: EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                20.w,
-                                                                            vertical:
-                                                                                8.h,
-                                                                          ),
-                                                                          decoration: BoxDecoration(
-                                                                            color: const Color.fromRGBO(
-                                                                              20,
-                                                                              18,
-                                                                              20,
-                                                                              1,
-                                                                            ),
-                                                                            borderRadius: BorderRadius.circular(
-                                                                              20.r,
-                                                                            ),
-                                                                            border: Border.all(
-                                                                              color:
-                                                                                  Colors.white10,
-                                                                              width:
-                                                                                  1.w,
-                                                                            ),
-                                                                          ),
-                                                                          child: Text(
-                                                                            context.l10n.updateAll,
-                                                                            style: sfProText400(
-                                                                              14.sp,
-                                                                              const Color.fromRGBO(
-                                                                                238,
-                                                                                218,
-                                                                                172,
-                                                                                1,
+                                                                      child: Column(
+                                                                        mainAxisSize:
+                                                                            MainAxisSize.min,
+                                                                        mainAxisAlignment:
+                                                                            MainAxisAlignment.center,
+                                                                        children: [
+                                                                          Obx(() {
+                                                                            final currentPlatform =
+                                                                                _normalizeUiPlatform(
+                                                                                  _chatFilter
+                                                                                      .value ??
+                                                                                      chatCtrl
+                                                                                          .platform
+                                                                                          .value,
+                                                                                );
+                                                                            return serviceRow(
+                                                                              asset: _assetForPlatform(
+                                                                                currentPlatform,
                                                                               ),
-                                                                            ),
+                                                                              iconColor: _settingsCtrl
+                                                                                  .getPlatformColor(
+                                                                                    currentPlatform,
+                                                                                  ),
+                                                                              title:
+                                                                                  context.l10n.title,
+                                                                              subtitle:
+                                                                                  context.l10n.category,
+                                                                              onTap: () {
+                                                                                _collapseActivityExpandedIfNeeded(context);
+                                                                                _selectedPlatform.value =
+                                                                                    currentPlatform;
+                                                                                _titleSelected.value = true;
+                                                                                _showServiceCard.value = true;
+                                                                              },
+                                                                            );
+                                                                          }),
+                                                                          SizedBox(
+                                                                            height:
+                                                                                36.h,
                                                                           ),
-                                                                        ),
+                                                                        ],
                                                                       ),
-                                                                    ],
+                                                                    ),
                                                                   ),
                                                                 ),
                                                               ],
-                                                            ),
-                                                          );
+                                                            );
                                                         },
                                                       );
                                                     }
@@ -1334,30 +1359,25 @@ class _LivestreamingState extends State<Livestreaming> {
                                                     return const SizedBox.shrink();
                                                   },
                                                 ),
-                                              ],
-                                            );
-                                          },
-                                        ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                                          if (showActivity)
+                                            Positioned.fill(
+                                              child: _buildResizableActivityContainer(
+                                                context,
+                                                upperSectionHeight,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     );
-
-                                    if (showActivity) {
-                                      return Stack(
-                                        children: [
-                                          // Keep stream (WebView) alive under Activity to avoid platform-view recreation issues.
-                                          Offstage(
-                                            offstage: true,
-                                            child: streamContent,
-                                          ),
-                                          _buildResizableActivityContainer(
-                                            context,
-                                            upperSectionHeight,
-                                          ),
-                                        ],
-                                      );
-                                    }
-
-                                    return streamContent;
                                   },
                                 );
                               },
@@ -1404,6 +1424,8 @@ class _LivestreamingState extends State<Livestreaming> {
                 titleSelected: _titleSelected,
                 chatFilter: _chatFilter,
                 onPlatformSwipe: _handlePlatformSwipe,
+                onOverlayViewChange:
+                    () => _collapseActivityExpandedIfNeeded(context),
               ),
             ),
           ],
@@ -1442,6 +1464,8 @@ class _LivestreamingState extends State<Livestreaming> {
               selectedPlatform: _selectedPlatform,
               titleSelected: _titleSelected,
               chatFilter: _chatFilter,
+              onOverlayViewChange:
+                  () => _collapseActivityExpandedIfNeeded(context),
               onResize: (delta) {
                 final adjustedDelta = delta * _dragSensitivity;
                 setState(() {

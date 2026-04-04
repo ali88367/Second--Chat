@@ -13,10 +13,16 @@ class AppConstants {
   // Backend base URL (overridable at build/run time via `--dart-define=API_BASE_URL=...`).
   static const String baseUrl = 'https://cafe7bygasco.com';
 
-  /// Google Cloud → APIs & Services → Credentials → **OAuth 2.0 Client ID** of type **Web application**.
-  /// Paste the full id (ends with `.apps.googleusercontent.com`). Android **requires** this.
+  /// **Web application** OAuth client ID — must be from the **same** Firebase/Google project as
+  /// `android/app/google-services.json` (see `oauth_client` with `client_type` 3 there).
+  /// A client ID from a different project (different numeric prefix) breaks Android Google Sign-In.
+  ///
+  /// The ID token’s JWT `aud` must also be listed as an allowed audience on your **backend**
+  /// (`INVALID_TOKEN` / “jwt audience invalid” means the server expects different client IDs than
+  /// this one — fix the server config, or align Firebase with the backend’s Google Cloud project).
   /// Override per build with `--dart-define=GOOGLE_SERVER_CLIENT_ID=...` or `dart_defines.json`.
-  static const String googleServerClientId = '688446882450-32ad24bgrb04bjd4sfpijrce67o68i38.apps.googleusercontent.com';
+  static const String googleServerClientId =
+      '209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com';
 
   /// iOS-only OAuth client ID if you do not use `--dart-define=GOOGLE_IOS_CLIENT_ID`.
   static const String googleIosClientId = '';

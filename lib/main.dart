@@ -15,6 +15,8 @@ import 'package:second_chat/features/intro/login_screen.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/core/utils/platform_token_provider.dart';
+import 'package:second_chat/data/services/live_stream_service.dart';
 import 'package:second_chat/controllers/edge_glow_notification_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
@@ -62,7 +64,15 @@ void main() {
     Get.put(EdgeGlowNotificationController(), permanent: true);
     Get.put(StreamStreaksController());
     Get.put(AuthController(), permanent: true);
-    Get.put(ChatController(), permanent: true);
+    Get.put(
+      ChatController(
+        liveStreamService: LiveStreamService(
+          api: Get.find<AuthController>().api,
+          tokenProvider: PlatformTokenProvider(),
+        ),
+      ),
+      permanent: true,
+    );
     Get.put(PlatformConnectController(), permanent: true);
 
     // Load persisted locale (if any) before building the app.

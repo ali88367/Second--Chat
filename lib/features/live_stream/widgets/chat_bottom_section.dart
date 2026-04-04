@@ -9,8 +9,6 @@ import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/core/localization/l10n.dart';
-import 'package:second_chat/data/models/chat_message.dart';
-
 import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
 import '../../../core/helper/emote_parser.dart';
@@ -27,6 +25,8 @@ class ChatBottomSection extends StatefulWidget {
   final Function(double delta)? onResize;
   final VoidCallback? onResizeEnd;
   final Function(bool swipeRight)? onPlatformSwipe;
+  /// Called before Title/Activity pills change the overlay; parent can collapse expanded activity.
+  final VoidCallback? onOverlayViewChange;
 
   const ChatBottomSection({
     super.key,
@@ -38,6 +38,7 @@ class ChatBottomSection extends StatefulWidget {
     this.onResize,
     this.onResizeEnd,
     this.onPlatformSwipe,
+    this.onOverlayViewChange,
   });
 
   @override
@@ -313,12 +314,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
-  bool _isNormalChatLine(ChatMessage m) {
-    final t = m.raw?['type']?.toString().trim().toLowerCase();
-    if (t == null || t.isEmpty) return true;
-    return t == 'normal';
-  }
-
   List<Map<String, dynamic>> _commentsWithNamePrivacy(bool hideNames) {
     if (!hideNames) return List<Map<String, dynamic>>.from(_comments);
     return _comments
@@ -339,11 +334,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     if (merged) {
       final rows = <Map<String, dynamic>>[];
       for (final entry in _chatCtrl.platformMessages.entries) {
-        for (final m in entry.value.where(_isNormalChatLine)) {
+        for (final m in entry.value.where(ChatController.isMainChatFeedLine)) {
           rows.add({
             'platform': _getPlatformAsset(m.platform),
             'name': hideNames ? '' : m.userName,
             'message': m.message,
+            'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
             '_ts': m.timestamp,
           });
         }
@@ -362,7 +358,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       }
     } else {
       final normalMessages =
-          _chatCtrl.messages.where(_isNormalChatLine).toList(growable: false);
+          _chatCtrl.messages
+              .where(ChatController.isMainChatFeedLine)
+              .toList(growable: false);
       source =
           normalMessages.isNotEmpty
               ? normalMessages
@@ -371,6 +369,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                       'platform': _getPlatformAsset(m.platform),
                       'name': hideNames ? '' : m.userName,
                       'message': m.message,
+                      'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
                     },
                   )
                   .toList(growable: false)
@@ -741,11 +740,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     String message,
     Color nameColor, {
     Key? key,
+    List<Map<String, Object>>? embeddedEmotes,
   }) {
-    // Parse message for emotes
+    final emb = embeddedEmotes;
     final List<InlineSpan> messageSpans =
-        _emoteParser?.parse(message) ??
-        [TextSpan(text: message, style: sfProText400(12.sp, Colors.white))];
+        emb != null &&
+                emb.isNotEmpty &&
+                _emoteParser != null
+            ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
+            : _emoteParser?.parse(message) ??
+                [TextSpan(text: message, style: sfProText400(12.sp, Colors.white))];
 
     return TweenAnimationBuilder<double>(
       key: key,
@@ -900,6 +904,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                         builder: (context, val, _) {
                           return GestureDetector(
                             onTap: () {
+                              widget.onOverlayViewChange?.call();
                               final newVal = !val;
                               widget.titleSelected.value = newVal;
                               if (newVal) {
@@ -924,6 +929,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                         builder: (context, active, _) {
                           return GestureDetector(
                             onTap: () {
+                              widget.onOverlayViewChange?.call();
                               final newVal = !active;
                               widget.showActivity.value = newVal;
                               if (newVal) {
@@ -1011,6 +1017,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   item['name'],
                                   item['message'],
                                   nameColor,
+                                  embeddedEmotes:
+                                      item['embeddedEmotes']
+                                          as List<Map<String, Object>>?,
                                   key: ValueKey(
                                     'expanded_${item['name']}_${index}_${item['message']}',
                                   ),
@@ -1174,6 +1183,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                     builder: (context, val, _) {
                       return GestureDetector(
                         onTap: () {
+                          widget.onOverlayViewChange?.call();
                           final newVal = !val;
                           widget.titleSelected.value = newVal;
                           if (newVal) {
@@ -1196,6 +1206,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                     builder: (context, active, _) {
                       return GestureDetector(
                         onTap: () {
+                          widget.onOverlayViewChange?.call();
                           final newVal = !active;
                           widget.showActivity.value = newVal;
                           if (newVal) {
@@ -1290,6 +1301,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   item['name'],
                                   item['message'],
                                   nameColor,
+                                  embeddedEmotes:
+                                      item['embeddedEmotes']
+                                          as List<Map<String, Object>>?,
                                   key: ValueKey(
                                     'main_${item['name']}_${index}_${item['message']}',
                                   ),

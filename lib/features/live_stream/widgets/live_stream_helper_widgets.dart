@@ -141,46 +141,43 @@ Widget panelRow(String text, {bool showChevron = false, VoidCallback? onTap}) {
   return container;
 }
 
-Widget activityRow(String asset, String name, String time, String message) {
-  // Get platform color dynamically
+/// [normalizedPlatformKey] is `twitch` | `kick` | `youtube` (same as viewer-count pills).
+Widget activityRow(
+  String asset,
+  String normalizedPlatformKey,
+  String name,
+  String time,
+  String message,
+) {
   SettingsController? controller;
   try {
     controller = Get.find<SettingsController>();
-  } catch (e) {
-    // Controller not found, use defaults
-  }
+  } catch (_) {}
 
   return Obx(() {
-    Color nameColor;
+    final key = normalizedPlatformKey.toLowerCase().trim();
+    final Color nameColor;
     if (controller != null) {
-      if (asset.contains('kick')) {
-        nameColor = controller.getPlatformColor('kick');
-      } else if (asset.contains('twitch')) {
-        nameColor = controller.getPlatformColor('twitch');
-      } else if (asset.contains('youtube')) {
-        nameColor = controller.getPlatformColor('youtube');
-      } else {
-        nameColor = Colors.white;
-      }
+      nameColor = controller.getPlatformColor(key);
+    } else if (key == 'kick') {
+      nameColor = const Color.fromRGBO(83, 252, 24, 1);
+    } else if (key == 'youtube') {
+      nameColor = const Color.fromRGBO(221, 44, 40, 1);
     } else {
-      // Fallback to defaults if controller not available
-      if (asset.contains('kick')) {
-        nameColor = const Color.fromRGBO(83, 252, 24, 1);
-      } else if (asset.contains('twitch')) {
-        nameColor = const Color.fromRGBO(185, 80, 239, 1);
-      } else if (asset.contains('youtube')) {
-        nameColor = const Color.fromRGBO(221, 44, 40, 1);
-      } else {
-        nameColor = Colors.white;
-      }
+      nameColor = const Color.fromRGBO(185, 80, 239, 1);
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Image.asset(asset, width: 16.w, height: 16.h),
+            Image.asset(
+              asset,
+              color: nameColor,
+              width: 16.w,
+              height: 16.h,
+            ),
             SizedBox(width: 8.w),
             Text(name, style: sfProText600(14.sp, nameColor)),
             Spacer(),
