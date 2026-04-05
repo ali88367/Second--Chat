@@ -9,10 +9,12 @@ class StreamingOverview {
     Map<String, int>? viewerCountsByPlatform,
     Map<String, bool>? liveByPlatform,
     Map<String, String?>? embedUrlByPlatform,
+    Map<String, String?>? usernamesByPlatform,
     this.raw,
   })  : viewerCountsByPlatform = viewerCountsByPlatform ?? const {},
         liveByPlatform = liveByPlatform ?? const {},
-        embedUrlByPlatform = embedUrlByPlatform ?? const {};
+        embedUrlByPlatform = embedUrlByPlatform ?? const {},
+        usernamesByPlatform = usernamesByPlatform ?? const {};
 
   final String platform; // "twitch"
   final bool live;
@@ -24,5 +26,7 @@ class StreamingOverview {
   final Map<String, bool> liveByPlatform;
   /// Per-platform preferred playback URL (embedUrl if present, else watchUrl).
   final Map<String, String?> embedUrlByPlatform;
+  /// Linked account login per platform from overview `platforms[]` (chat display).
+  final Map<String, String?> usernamesByPlatform;
   final Map<String, dynamic>? raw;
 }

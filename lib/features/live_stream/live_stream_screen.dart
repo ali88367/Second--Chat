@@ -488,36 +488,192 @@ class _LivestreamingState extends State<Livestreaming> {
         } else {
           height = _activityHeight.clamp(effectiveMin, effectiveMax).toDouble();
         }
+        final activityPanel = AnimatedContainer(
+          duration: Duration(milliseconds: _isDraggingActivity ? 0 : 250),
+          curve: Curves.easeOut,
+          height: height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color.fromRGBO(22, 21, 24, 1),
+            borderRadius: BorderRadius.circular(20.r),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 10.h,
+                left: 12.w,
+                child: Text(
+                  context.l10n.activity,
+                  style: sfProText600(13.sp, Colors.white),
+                ),
+              ),
+              // ─── Scrollable activity rows ───────────────────────
+              Positioned.fill(
+                child: ScrollbarTheme(
+                  data: ScrollbarThemeData(
+                    thumbColor: MaterialStateProperty.all(
+                      Colors.grey.shade500,
+                    ),
+                  ),
+                  child: Scrollbar(
+                    controller: _activityScrollController,
+                    thumbVisibility: true,
+                    thickness: 3.w,
+                    radius: Radius.circular(8.r),
+                    scrollbarOrientation: ScrollbarOrientation.right,
+                    child: SingleChildScrollView(
+                      controller: _activityScrollController,
+                      padding: EdgeInsets.only(
+                        left: 12.w,
+                        right: 12.w,
+                        top: 22.h,
+                        bottom: 28.h,
+                      ),
+                      physics:
+                          _isDraggingActivity
+                              ? const NeverScrollableScrollPhysics()
+                              : const BouncingScrollPhysics(),
+                      child: Obx(() {
+                        final chatCtrl = Get.find<ChatController>();
+                        chatCtrl.platform.value;
+                        _settingsCtrl.clockFormat.value;
+                        final selected =
+                            _normalizeUiPlatform(chatCtrl.platform.value);
+                        // Prefer controller activity list (wired to sockets).
+                        // Chat "normal" lines stay in chat; activity = everything else.
+                        final events = chatCtrl.activityEvents
+                            .where((e) {
+                              final t = (e['type'] ?? e['eventType'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .toLowerCase();
+                              return t != 'normal';
+                            })
+                            .where((e) {
+                              final raw =
+                                  (e['platform'] ?? '').toString().trim();
+                              if (raw.isEmpty) return true;
+                              return _normalizeUiPlatform(raw) == selected;
+                            })
+                            .toList(growable: false);
+                        if (events.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 24.h),
+                              child: Text(
+                                context.l10n.noActivityYet,
+                                textAlign: TextAlign.center,
+                                style: sfProText400(
+                                  13.sp,
+                                  Colors.white54,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        // Render newest first.
+                        final list = events.reversed.toList(growable: false);
+                        return RepaintBoundary(
+                          child: Column(
+                            key: ValueKey<String>('activity_$selected'),
+                            children: [
+                              for (var i = 0; i < list.length; i++) ...[
+                                Builder(
+                                  builder: (ctx) {
+                                    final e = list[i];
+                                    final platform =
+                                        (e['platform'] ?? '').toString();
+                                    final meta = e['metadata'];
+                                    final metaMap = meta is Map
+                                        ? meta.cast<String, dynamic>()
+                                        : const <String, dynamic>{};
+                                    final user = (metaMap['user'] ??
+                                            metaMap['username'] ??
+                                            metaMap['user_name'] ??
+                                            metaMap['user_login'] ??
+                                            metaMap['name'] ??
+                                            e['username'] ??
+                                            '')
+                                        .toString()
+                                        .trim();
+                                    final type =
+                                        (e['type'] ?? e['eventType'] ?? '')
+                                            .toString()
+                                            .trim();
+                                    final time = _formatActivityTime(
+                                      e['timestamp'] ?? e['created_at'],
+                                    );
+                                    final lines = _activityRowLines(
+                                      user: user,
+                                      typeRaw: type,
+                                    );
+                                    final pKey = _normalizeUiPlatform(
+                                      platform.isNotEmpty
+                                          ? platform
+                                          : selected,
+                                    );
+                                    return activityRow(
+                                      _assetForPlatform(pKey),
+                                      pKey,
+                                      lines.$1,
+                                      time,
+                                      lines.$2,
+                                    );
+                                  },
+                                ),
+                                if (i != list.length - 1)
+                                  SizedBox(height: 12.h),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12.w,
+                bottom: 10.h,
+                child: GestureDetector(
+                  onTap: () => _toggleActivityPanelExpand(context),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.w,
+                      vertical: 5.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(38, 37, 41, 1),
+                      borderRadius: BorderRadius.circular(14.r),
+                      border: Border.all(color: Colors.white12, width: 1.w),
+                    ),
+                    child: Text(
+                      _activityPanelExpanded
+                          ? context.l10n.seeLess
+                          : context.l10n.seeMore,
+                      style: sfProText400(11.sp, Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        // Expanded: no parent vertical-drag — avoids collapsing when scrolling /
+        // tapping the list. Collapse only via See less (or filter / other controls).
+        if (_activityPanelExpanded) {
+          return activityPanel;
+        }
+
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onVerticalDragStart: (_) {
             setState(() {
               _isDraggingActivity = true;
-              final wasExpanded = _activityPanelExpanded;
-              final startH = wasExpanded
-                  ? effectiveMax
-                  : _activityHeight.clamp(effectiveMin, effectiveMax);
-              if (wasExpanded) {
-                final sh = Get.height;
-                final minBs = _bottomSectionMinHeight(sh);
-                final inset = MediaQuery.of(context).viewPadding.bottom;
-                final maxBs =
-                    sh -
-                    _layoutTopPadding(context) -
-                    16.h -
-                    _minUpperSectionHeight -
-                    12.h -
-                    inset;
-                final cap = maxBs > minBs ? maxBs : minBs;
-                final restored =
-                    (_bottomSectionHeightBeforeActivityExpand ?? cap)
-                        .clamp(minBs, cap)
-                        .toDouble();
-                _bottomSectionHeight = restored;
-                _bottomSectionHeightBeforeActivityExpand = null;
-              }
+              final startH =
+                  _activityHeight.clamp(effectiveMin, effectiveMax);
               _activityHeight = startH;
-              _activityPanelExpanded = false;
             });
           },
           onVerticalDragUpdate: (details) {
@@ -542,177 +698,7 @@ class _LivestreamingState extends State<Livestreaming> {
               _isDraggingActivity = false;
             });
           },
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: _isDraggingActivity ? 0 : 250),
-            curve: Curves.easeOut,
-            height: height,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color.fromRGBO(22, 21, 24, 1),
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 10.h,
-                  left: 12.w,
-                  child: Text(
-                    context.l10n.activity,
-                    style: sfProText600(13.sp, Colors.white),
-                  ),
-                ),
-                // ─── Scrollable activity rows ───────────────────────
-                Positioned.fill(
-                  child: ScrollbarTheme(
-                    data: ScrollbarThemeData(
-                      thumbColor: MaterialStateProperty.all(
-                        Colors.grey.shade500,
-                      ),
-                    ),
-                    child: Scrollbar(
-                      controller: _activityScrollController,
-                      thumbVisibility: true,
-                      thickness: 3.w,
-                      radius: Radius.circular(8.r),
-                      scrollbarOrientation: ScrollbarOrientation.right,
-                      child: SingleChildScrollView(
-                        controller: _activityScrollController,
-                        padding: EdgeInsets.only(
-                          left: 12.w,
-                          right: 12.w,
-                          top: 22.h,
-                          bottom: 28.h,
-                        ),
-                        physics:
-                            _isDraggingActivity
-                                ? const NeverScrollableScrollPhysics()
-                                : const BouncingScrollPhysics(),
-                        child: Obx(() {
-                          final chatCtrl = Get.find<ChatController>();
-                          chatCtrl.platform.value;
-                          _settingsCtrl.clockFormat.value;
-                          final selected =
-                              _normalizeUiPlatform(chatCtrl.platform.value);
-                          // Prefer controller activity list (wired to sockets).
-                          // Chat "normal" lines stay in chat; activity = everything else.
-                          final events = chatCtrl.activityEvents
-                              .where((e) {
-                                final t = (e['type'] ?? e['eventType'] ?? '')
-                                    .toString()
-                                    .trim()
-                                    .toLowerCase();
-                                return t != 'normal';
-                              })
-                              .where((e) {
-                                final raw =
-                                    (e['platform'] ?? '').toString().trim();
-                                if (raw.isEmpty) return true;
-                                return _normalizeUiPlatform(raw) == selected;
-                              })
-                              .toList(growable: false);
-                          if (events.isEmpty) {
-                            return Center(
-                              child: Padding(
-                                padding: EdgeInsets.only(top: 24.h),
-                                child: Text(
-                                  context.l10n.noActivityYet,
-                                  textAlign: TextAlign.center,
-                                  style: sfProText400(
-                                    13.sp,
-                                    Colors.white54,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          // Render newest first.
-                          final list = events.reversed.toList(growable: false);
-                          return RepaintBoundary(
-                            child: Column(
-                              key: ValueKey<String>('activity_$selected'),
-                              children: [
-                                for (var i = 0; i < list.length; i++) ...[
-                                  Builder(
-                                    builder: (ctx) {
-                                      final e = list[i];
-                                      final platform =
-                                          (e['platform'] ?? '').toString();
-                                      final meta = e['metadata'];
-                                      final metaMap = meta is Map
-                                          ? meta.cast<String, dynamic>()
-                                          : const <String, dynamic>{};
-                                      final user = (metaMap['user'] ??
-                                              metaMap['username'] ??
-                                              metaMap['user_name'] ??
-                                              metaMap['user_login'] ??
-                                              metaMap['name'] ??
-                                              e['username'] ??
-                                              '')
-                                          .toString()
-                                          .trim();
-                                      final type =
-                                          (e['type'] ?? e['eventType'] ?? '')
-                                              .toString()
-                                              .trim();
-                                      final time = _formatActivityTime(
-                                        e['timestamp'] ?? e['created_at'],
-                                      );
-                                      final lines = _activityRowLines(
-                                        user: user,
-                                        typeRaw: type,
-                                      );
-                                      final pKey = _normalizeUiPlatform(
-                                        platform.isNotEmpty
-                                            ? platform
-                                            : selected,
-                                      );
-                                      return activityRow(
-                                        _assetForPlatform(pKey),
-                                        pKey,
-                                        lines.$1,
-                                        time,
-                                        lines.$2,
-                                      );
-                                    },
-                                  ),
-                                  if (i != list.length - 1)
-                                    SizedBox(height: 12.h),
-                                ],
-                              ],
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 12.w,
-                  bottom: 10.h,
-                  child: GestureDetector(
-                    onTap: () => _toggleActivityPanelExpand(context),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10.w,
-                        vertical: 5.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(38, 37, 41, 1),
-                        borderRadius: BorderRadius.circular(14.r),
-                        border: Border.all(color: Colors.white12, width: 1.w),
-                      ),
-                      child: Text(
-                        _activityPanelExpanded
-                            ? context.l10n.seeLess
-                            : context.l10n.seeMore,
-                        style: sfProText400(11.sp, Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: activityPanel,
         );
       },
     );

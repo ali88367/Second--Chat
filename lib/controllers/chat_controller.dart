@@ -35,6 +35,8 @@ class ChatController extends GetxController {
   final RxMap<String, int> platformViewerCounts = <String, int>{}.obs;
   final RxMap<String, bool> platformLive = <String, bool>{}.obs;
   final RxMap<String, String?> platformEmbedUrls = <String, String?>{}.obs;
+  /// Linked channel login from streaming overview `platforms[]` (optimistic send label).
+  final RxMap<String, String> platformChatUsernames = <String, String>{}.obs;
   final RxMap<String, String?> streamTitleByPlatform = <String, String?>{}.obs;
   final RxMap<String, String?> streamCategoryByPlatform =
       <String, String?>{}.obs;
@@ -382,6 +384,7 @@ class ChatController extends GetxController {
       final mergedViewer = <String, int>{};
       final mergedLive = <String, bool>{};
       final mergedEmbed = <String, String?>{};
+      final mergedUsernames = <String, String?>{};
       String? socketUrl;
       String? socketPath;
 
@@ -393,6 +396,10 @@ class ChatController extends GetxController {
         mergedEmbed.addAll(ov.embedUrlByPlatform);
         // also ensure the requested platform has a url if backend didn't provide platforms list
         mergedEmbed[ov.platform.toLowerCase()] ??= ov.watchUrl;
+        for (final e in ov.usernamesByPlatform.entries) {
+          final v = e.value?.trim() ?? '';
+          if (v.isNotEmpty) mergedUsernames[e.key] = v;
+        }
       }
 
       _socketBaseUrl = socketUrl ?? _socketBaseUrl;
@@ -411,12 +418,20 @@ class ChatController extends GetxController {
         viewerCountsByPlatform: mergedViewer,
         liveByPlatform: mergedLive,
         embedUrlByPlatform: mergedEmbed,
+        usernamesByPlatform: mergedUsernames,
         raw: primary.raw,
       );
 
       if (mergedViewer.isNotEmpty) platformViewerCounts.assignAll(mergedViewer);
       if (mergedLive.isNotEmpty) platformLive.assignAll(mergedLive);
       if (mergedEmbed.isNotEmpty) platformEmbedUrls.assignAll(mergedEmbed);
+      if (mergedUsernames.isNotEmpty) {
+        for (final e in mergedUsernames.entries) {
+          final v = e.value?.trim() ?? '';
+          if (v.isNotEmpty) platformChatUsernames[e.key] = v;
+        }
+        platformChatUsernames.refresh();
+      }
 
       // Update currently selected stream URL.
       final currentUrl = mergedEmbed[current] ?? primary.watchUrl;
@@ -541,6 +556,11 @@ class ChatController extends GetxController {
       );
       if (ov == null) return;
       overview.value = ov;
+      for (final e in ov.usernamesByPlatform.entries) {
+        final v = e.value?.trim() ?? '';
+        if (v.isNotEmpty) platformChatUsernames[e.key] = v;
+      }
+      platformChatUsernames.refresh();
       _socketBaseUrl = ov.chatSocketUrl ?? _socketBaseUrl;
       _socketPath = ov.chatSocketPath ?? _socketPath;
       // selected platform state
@@ -684,6 +704,11 @@ class ChatController extends GetxController {
   }
 
   String _outgoingChatDisplayName() {
+    final p = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+    final fromOverview = platformChatUsernames[p];
+    if (fromOverview != null && fromOverview.trim().isNotEmpty) {
+      return fromOverview.trim();
+    }
     try {
       final me = Get.find<AuthController>().me.value;
       final u = me?['username']?.toString().trim();
@@ -1284,6 +1309,7 @@ class ChatController extends GetxController {
     platformViewerCounts.clear();
     platformLive.clear();
     platformEmbedUrls.clear();
+    platformChatUsernames.clear();
     streamTitleByPlatform.clear();
     streamCategoryByPlatform.clear();
     overview.value = null;

@@ -20,6 +20,35 @@ class StreamingService {
     return v;
   }
 
+  /// Login/username for chat display from one `platforms[]` entry.
+  String? _platformUsernameFromOverviewEntry(Map<String, dynamic> m) {
+    var s = extractString(m, const [
+      'username',
+      'user_login',
+      'userLogin',
+      'user_name',
+      'userName',
+      'login',
+      'display_name',
+      'displayName',
+    ]);
+    if (s != null && s.trim().isNotEmpty) return s.trim();
+    final si = m['streamInfo'];
+    if (si is Map) {
+      final sm = si.cast<String, dynamic>();
+      s = extractString(sm, const [
+        'user_login',
+        'user_name',
+        'userLogin',
+        'username',
+        'display_name',
+        'displayName',
+      ]);
+      if (s != null && s.trim().isNotEmpty) return s.trim();
+    }
+    return null;
+  }
+
   int? _extractInt(Map<String, dynamic> json, List<String> keys) {
     for (final key in keys) {
       final value = json[key];
@@ -90,6 +119,7 @@ class StreamingService {
       final viewerCountsByPlatform = <String, int>{};
       final liveByPlatform = <String, bool>{};
       final embedUrlByPlatform = <String, String?>{};
+      final usernamesByPlatform = <String, String?>{};
       for (final p in platformsList) {
         if (p is! Map) continue;
         final m = p.cast<String, dynamic>();
@@ -97,6 +127,11 @@ class StreamingService {
         if (pNameRaw.isEmpty) continue;
         final pKey = _normalizePlatform(pNameRaw);
         if (pKey.isEmpty) continue;
+
+        final uname = _platformUsernameFromOverviewEntry(m);
+        if (uname != null && uname.isNotEmpty) {
+          usernamesByPlatform[pKey] = uname;
+        }
 
         final liveRaw = m['live'];
         final live = liveRaw is bool
@@ -181,6 +216,7 @@ class StreamingService {
           viewerCountsByPlatform: viewerCountsByPlatform,
           liveByPlatform: liveByPlatform,
           embedUrlByPlatform: embedUrlByPlatform,
+          usernamesByPlatform: usernamesByPlatform,
           raw: map,
         );
       }
@@ -212,6 +248,11 @@ class StreamingService {
       'viewCount',
       'view_count',
     ]);
+    final pNorm = _normalizePlatform(platform);
+    final legacyUser = _platformUsernameFromOverviewEntry(map);
+    final usernamesLegacy = (legacyUser != null && legacyUser.isNotEmpty)
+        ? <String, String?>{pNorm: legacyUser}
+        : const <String, String?>{};
     return StreamingOverview(
       platform: platform,
       live: live,
@@ -223,13 +264,14 @@ class StreamingService {
       viewerCount: viewerCount,
       viewerCountsByPlatform: viewerCount == null
           ? const {}
-          : {_normalizePlatform(platform): viewerCount},
-      liveByPlatform: {_normalizePlatform(platform): live},
+          : {pNorm: viewerCount},
+      liveByPlatform: {pNorm: live},
       embedUrlByPlatform: {
-        _normalizePlatform(platform): (embedUrl != null && embedUrl.trim().isNotEmpty)
+        pNorm: (embedUrl != null && embedUrl.trim().isNotEmpty)
             ? embedUrl
             : watchUrl
       },
+      usernamesByPlatform: usernamesLegacy,
       raw: map,
     );
   }
