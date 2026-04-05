@@ -34,16 +34,16 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
     final chatCtrl = Get.find<ChatController>();
     return Obx(() {
       final fresh = chatCtrl.urlForPlatform(widget.platformKey)?.trim() ?? '';
-      final hardOff = chatCtrl.isPlatformExplicitlyOffline(widget.platformKey);
       final liveExpected = chatCtrl.isPlatformLive(widget.platformKey);
 
-      if (fresh.isNotEmpty) {
+      if (!liveExpected) {
+        // Never keep or render stale embeds while platform is offline.
+        _latchedEmbedUrl = '';
+      } else if (fresh.isNotEmpty) {
         if (_latchedEmbedUrl.isEmpty ||
             !streamEmbedUrlsCanonicallyEqual(fresh, _latchedEmbedUrl)) {
           _latchedEmbedUrl = fresh;
         }
-      } else if (hardOff) {
-        _latchedEmbedUrl = '';
       }
 
       return RepaintBoundary(

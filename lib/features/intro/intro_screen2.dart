@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,7 +66,12 @@ class _IntroScreen2State extends State<IntroScreen2> {
       final introDone =
           prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
       if (introDone) {
-        Get.back();
+        Get.offAll(
+          () => const HomeScreen2(),
+          transition: Transition.cupertino,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.fastOutSlowIn,
+        );
         return;
       }
       Get.to(

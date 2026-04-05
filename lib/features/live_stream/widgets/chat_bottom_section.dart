@@ -314,6 +314,55 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
+  String? _normalizeUiPlatformOrNull(String? raw) {
+    final v = (raw ?? '').toLowerCase().trim();
+    if (v.isEmpty) return null;
+    if (v.contains('kick')) return 'kick';
+    if (v.contains('youtube') || v == 'yt' || v.contains('google')) {
+      return 'youtube';
+    }
+    if (v.contains('twitch')) return 'twitch';
+    return null;
+  }
+
+  String _effectiveSelectedPlatform(String? filter) {
+    final fromFilter = _normalizeUiPlatformOrNull(filter);
+    if (fromFilter != null) return fromFilter;
+
+    final fromController = _normalizeUiPlatformOrNull(_chatCtrl.platform.value);
+    if (fromController != null) return fromController;
+
+    final fromSelected = _normalizeUiPlatformOrNull(widget.selectedPlatform.value);
+    if (fromSelected != null) return fromSelected;
+
+    return 'twitch';
+  }
+
+  String _platformLabel(String platform) {
+    switch (platform) {
+      case 'kick':
+        return 'Kick';
+      case 'youtube':
+        return 'YouTube';
+      case 'twitch':
+      default:
+        return 'Twitch';
+    }
+  }
+
+  Color _platformLabelColor(String platform) {
+    if (platform == 'twitch') {
+      return _settingsController.twitchColor.value ?? twitchPurple;
+    }
+    if (platform == 'kick') {
+      return _settingsController.kickColor.value ?? kickGreen;
+    }
+    if (platform == 'youtube') {
+      return _settingsController.youtubeColor.value ?? youtubeRed;
+    }
+    return Colors.white;
+  }
+
   List<Map<String, dynamic>> _commentsWithNamePrivacy(bool hideNames) {
     if (!hideNames) return List<Map<String, dynamic>>.from(_comments);
     return _comments
@@ -411,13 +460,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Keep existing platform selection behavior.
-    String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
-      currentPlatform = widget.selectedPlatform.value!;
-    }
+    final currentPlatform = _effectiveSelectedPlatform(widget.chatFilter.value);
     _chatCtrl.platform.value = currentPlatform;
+
+    // Do not send while stream is offline; just clear the input.
+    if (!_chatCtrl.isPlatformLive(currentPlatform)) {
+      _messageController.clear();
+      _focusNode.requestFocus();
+      return;
+    }
+
     _chatCtrl.sendMessage(text);
 
     _messageController.clear();
@@ -443,11 +495,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   /// Send emote directly to chat (not to text field)
   void _sendEmoteDirectly(String emoteName) {
-    String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
-      currentPlatform = widget.selectedPlatform.value!;
-    }
+    final currentPlatform = _effectiveSelectedPlatform(widget.chatFilter.value);
     _chatCtrl.platform.value = currentPlatform;
     _chatCtrl.sendMessage(emoteName);
 
@@ -605,6 +653,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
                       // Update the ValueNotifier's value
                       widget.chatFilter.value = filterValue;
+                      if (widget.selectedPlatform.value != null) {
+                        final effective = _effectiveSelectedPlatform(filterValue);
+                        if (_normalizeUiPlatformOrNull(widget.selectedPlatform.value) !=
+                            effective) {
+                          widget.selectedPlatform.value = effective;
+                        }
+                      }
 
                       // Update filter controller if needed
                       filterController.setFilter(selected);
@@ -646,56 +701,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,
       builder: (context, filter, _) {
-        // If no filter is selected, show "All" without color
-        if (filter == null) {
-          return GestureDetector(
-            onTap: () {
-              if (isExpanded) {
-                FocusScope.of(context).unfocus();
-                Future.delayed(const Duration(milliseconds: 300), () {
-                  if (context.mounted) {
-                    _showGlassmorphicPopupMenu(context, filter, setSheetState);
-                  }
-                });
-              } else {
-                _showGlassmorphicPopupMenu(context, filter, null);
-              }
-            },
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4.h),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    context.l10n.all,
-                    style: TextStyle(color: Colors.white, fontSize: 16.sp),
-                  ),
-                  Icon(
-                    Icons.unfold_more,
-                    color: Colors.white.withOpacity(0.6),
-                    size: 16.sp,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        // When filter is selected, use Obx to track platform color changes
         return Obx(() {
-          String label = "${filter[0].toUpperCase()}${filter.substring(1)}";
-          Color labelColor;
-
-          // Directly access observables for GetX to track them
-          if (filter == 'twitch') {
-            labelColor = _settingsController.twitchColor.value ?? twitchPurple;
-          } else if (filter == 'kick') {
-            labelColor = _settingsController.kickColor.value ?? kickGreen;
-          } else if (filter == 'youtube') {
-            labelColor = _settingsController.youtubeColor.value ?? youtubeRed;
-          } else {
-            labelColor = Colors.white;
-          }
+          final selectedPlatform = _effectiveSelectedPlatform(filter);
+          final label = _platformLabel(selectedPlatform);
+          final labelColor = _platformLabelColor(selectedPlatform);
 
           return GestureDetector(
             onTap: () {

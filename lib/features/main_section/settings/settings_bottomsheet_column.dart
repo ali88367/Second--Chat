@@ -8,7 +8,7 @@ import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_co
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/core/localization/l10n.dart';
-import 'package:second_chat/features/intro/intro_screen2.dart';
+import 'package:second_chat/features/intro/login_screen.dart';
 import 'package:second_chat/features/main_section/settings/Led_settings.dart';
 import 'package:second_chat/features/main_section/settings/profile_settings_bottomsheet.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
@@ -297,7 +297,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       }
     }
 
-    Get.offAll(() => const IntroScreen2());
+    Get.offAll(() => const LoginScreen());
   }
 
   @override

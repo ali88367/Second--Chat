@@ -12,6 +12,7 @@ import 'package:second_chat/l10n/app_localizations.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/features/intro/login_screen.dart';
+import 'package:second_chat/features/intro/intro_screen2.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
@@ -354,7 +355,7 @@ class _StartupGateState extends State<StartupGate> {
   }
 }
 
-/// After login, route by intro onboarding (notification → intro 3–5 → home), not by linked platforms.
+/// After login, route by linked platform first, then intro onboarding, then home.
 class _PostAuthStartupGate extends StatefulWidget {
   const _PostAuthStartupGate();
 
@@ -363,23 +364,44 @@ class _PostAuthStartupGate extends StatefulWidget {
 }
 
 class _PostAuthStartupGateState extends State<_PostAuthStartupGate> {
-  late final Future<bool> _introOnboardingCompleteFuture = _readIntroOnboardingComplete();
+  late final Future<Map<String, bool>> _routeStateFuture = _readRouteState();
 
-  Future<bool> _readIntroOnboardingComplete() async {
+  Future<Map<String, bool>> _readRouteState() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
+    final introDone =
+        prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
+    bool hasLinkedPlatform = false;
+    try {
+      hasLinkedPlatform = await Get.find<PlatformConnectController>()
+          .hasAnyConnectedPlatformForStartup();
+    } catch (_) {
+      hasLinkedPlatform = false;
+    }
+    return <String, bool>{
+      'introDone': introDone,
+      'hasLinkedPlatform': hasLinkedPlatform,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _introOnboardingCompleteFuture,
+    return FutureBuilder<Map<String, bool>>(
+      future: _routeStateFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const _SessionCheckLoader();
         }
 
-        final introDone = snapshot.data == true;
+        final state = snapshot.data;
+        if (state == null) {
+          return const _SessionCheckLoader();
+        }
+
+        final hasLinkedPlatform = state['hasLinkedPlatform'] == true;
+        final introDone = state['introDone'] == true;
+        if (!hasLinkedPlatform) {
+          return const IntroScreen2();
+        }
         if (introDone) {
           return const HomeScreen2();
         }

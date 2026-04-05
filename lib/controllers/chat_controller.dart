@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 
 import 'auth_controller.dart';
 import 'edge_glow_notification_controller.dart';
+import 'platform_connect_controller.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
@@ -206,6 +207,42 @@ class ChatController extends GetxController {
     kick();
   }
 
+  List<String> _connectedPlatformsFromStatusCache() {
+    try {
+      final status = Get.find<PlatformConnectController>();
+      return status.isConnected.entries
+          .where((e) => e.value == true)
+          .map((e) => _normalizedApiPlatform(e.key.name))
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  Future<List<String>> _connectedPlatformsForBootstrap() async {
+    final fromStored = (await _tokenProvider.getConnectedPlatforms())
+        .map((e) => _normalizedApiPlatform(e))
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final merged = <String>{...fromStored, ..._connectedPlatformsFromStatusCache()};
+    return merged.toList(growable: false);
+  }
+
+  Future<bool> _hasAnyConnectedPlatformForStreaming() async {
+    final connected = await _connectedPlatformsForBootstrap();
+    return connected.isNotEmpty;
+  }
+
+  Future<String> _preferredConnectedPlatform({String fallback = 'twitch'}) async {
+    final current = _normalizedApiPlatform(platform.value, fallback: fallback);
+    final connected = await _connectedPlatformsForBootstrap();
+    if (connected.contains(current)) return current;
+    if (connected.isNotEmpty) return connected.first;
+    return current;
+  }
+
   void _startConnectRetry() {
     _connectRetryTimer?.cancel();
     _connectRetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
@@ -242,7 +279,11 @@ class ChatController extends GetxController {
       }
       _lastSocketConnectAttempt = now;
 
-      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      if (!await _hasAnyConnectedPlatformForStreaming()) return;
+      final selected = await _preferredConnectedPlatform(fallback: 'twitch');
+      if (_normalizedApiPlatform(platform.value, fallback: 'twitch') != selected) {
+        platform.value = selected;
+      }
       final token = await _resolveChatAuthToken(selected);
       if (token == null || token.trim().isEmpty) return;
       _socketAuthToken = token.trim();
@@ -299,9 +340,13 @@ class ChatController extends GetxController {
 
   Future<void> _bootstrapBody() async {
     try {
-      var selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      if (!await _hasAnyConnectedPlatformForStreaming()) return;
+      var selected = await _preferredConnectedPlatform(fallback: 'twitch');
+      if (_normalizedApiPlatform(platform.value, fallback: 'twitch') != selected) {
+        platform.value = selected;
+      }
       // 1) App start: hit overview for each connected platform (tokens in SharedPrefs).
-      final connectedPlatforms = await _tokenProvider.getConnectedPlatforms();
+      final connectedPlatforms = await _connectedPlatformsForBootstrap();
       if (connectedPlatforms.isNotEmpty) {
         // Keep default selection as-is unless it's not connected.
         if (!connectedPlatforms.contains(selected)) {

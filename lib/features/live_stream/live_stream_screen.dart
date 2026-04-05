@@ -93,7 +93,23 @@ class _LivestreamingState extends State<Livestreaming> {
 
   void _syncSelectedPlatformFromFilter() {
     final chatCtrl = Get.find<ChatController>();
-    final selected = _chatFilter.value ?? 'twitch';
+    final selected = _chatFilter.value?.toLowerCase().trim();
+    // "All" view should not force-switch the active stream platform.
+    if (selected == null || selected.isEmpty) {
+      if (_selectedPlatform.value != null) {
+        final current = _normalizeUiPlatform(chatCtrl.platform.value);
+        if (_normalizeUiPlatform(_selectedPlatform.value) != current) {
+          _selectedPlatform.value = current;
+        }
+      }
+      return;
+    }
+
+    if (_selectedPlatform.value != null &&
+        _normalizeUiPlatform(_selectedPlatform.value) != selected) {
+      _selectedPlatform.value = selected;
+    }
+
     if (chatCtrl.platform.value.toLowerCase().trim() == selected) return;
     chatCtrl.selectPlatformInstant(selected);
   }
@@ -197,10 +213,11 @@ class _LivestreamingState extends State<Livestreaming> {
     if (mounted) {
       _collapseActivityExpandedIfNeeded(context);
     }
-    if (_chatFilter.value == platformKey) {
-      _chatFilter.value = null;
-    } else {
-      _chatFilter.value = platformKey;
+    final next = _normalizeUiPlatform(platformKey);
+    _chatFilter.value = next;
+    if (_selectedPlatform.value != null &&
+        _normalizeUiPlatform(_selectedPlatform.value) != next) {
+      _selectedPlatform.value = next;
     }
   }
 
@@ -208,16 +225,21 @@ class _LivestreamingState extends State<Livestreaming> {
     if (mounted) {
       _collapseActivityExpandedIfNeeded(context);
     }
-    const platforms = [null, 'twitch', 'kick', 'youtube'];
-    final currentIndex = platforms.indexOf(_chatFilter.value);
-
-    if (swipeRight) {
-      final nextIndex = (currentIndex + 1) % platforms.length;
-      _chatFilter.value = platforms[nextIndex];
-    } else {
-      final prevIndex =
-          (currentIndex - 1 + platforms.length) % platforms.length;
-      _chatFilter.value = platforms[prevIndex];
+    const platforms = <String>['twitch', 'kick', 'youtube'];
+    final currentRaw =
+        (_chatFilter.value ?? Get.find<ChatController>().platform.value)
+            .toString();
+    final current = _normalizeUiPlatform(currentRaw);
+    final currentIndex = platforms.indexOf(current);
+    final safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    final nextIndex = swipeRight
+        ? (safeIndex + 1) % platforms.length
+        : (safeIndex - 1 + platforms.length) % platforms.length;
+    final next = platforms[nextIndex];
+    _chatFilter.value = next;
+    if (_selectedPlatform.value != null &&
+        _normalizeUiPlatform(_selectedPlatform.value) != next) {
+      _selectedPlatform.value = next;
     }
   }
 

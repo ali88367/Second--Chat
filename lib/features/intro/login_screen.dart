@@ -50,9 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final auth = Get.find<AuthController>();
       await auth.loginWithGoogle();
       if (!mounted) return;
-      if (Navigator.of(context).canPop()) {
-        Get.offAllNamed('/');
-      }
+      Get.offAllNamed('/');
     } catch (_) {
       if (!mounted) return;
       final auth = Get.find<AuthController>();
