@@ -517,6 +517,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'You haven\'t started the stream yet, but in the meantime you can';
 
   @override
+  String get homeStreamLiveMessage =>
+      'You\'re live! Open the stream to chat and view activity.';
+
+  @override
   String get startFreeTrial => 'Start Free Trial';
 
   @override

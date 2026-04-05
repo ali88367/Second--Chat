@@ -64,6 +64,10 @@ class StreakData {
         lastCompletedDate != null;
   }
 
+  /// Longest streak for compact headers; uses [currentStreak] if it exceeds [longestStreak].
+  int get headerStreakTotal =>
+      longestStreak >= currentStreak ? longestStreak : currentStreak;
+
   int get remainingFreezes =>
       (freezeAllowancePerMonth - freezeUsedThisMonth)
           .clamp(0, freezeAllowancePerMonth)

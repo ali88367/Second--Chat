@@ -13,6 +13,7 @@ import 'package:second_chat/core/utils/app_clock_format.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
+import '../../core/widgets/stream_header_buttons.dart';
 import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
 import '../Streaks/Compact_freeze.dart';
@@ -75,6 +76,10 @@ class _LivestreamingState extends State<Livestreaming> {
     _chatFilter.addListener(_syncSelectedPlatformFromFilter);
     _showActivity.addListener(_onShowActivityOpened);
     _maybeCompleteStreakForToday();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(Get.find<ChatController>().ensureStreamRealtimeBootstrap());
+    });
   }
 
   void _onShowActivityOpened() {
@@ -815,14 +820,18 @@ class _LivestreamingState extends State<Livestreaming> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      GestureDetector(
-                        onTap: _openStreakSheet,
-                        child: buildImageButton(
-                          'assets/images/streak_icon.png',
-                          width: 72.w,
-                          height: 36.w,
-                        ),
-                      ),
+                      Obx(() {
+                        final streakTotal =
+                            _streakCtrl.current.value?.headerStreakTotal ?? 0;
+                        return StreakButton(
+                          count: streakTotal,
+                          onTap: _openStreakSheet,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 4.h,
+                          ),
+                        );
+                      }),
                       Row(
                         children: [
                           // SizedBox(width: 6.w),

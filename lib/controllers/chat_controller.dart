@@ -49,6 +49,7 @@ class ChatController extends GetxController {
   Timer? _connectRetryTimer;
   bool _realtimeObserversWired = false;
   bool _socketConnecting = false;
+  Future<void>? _bootstrapInFlight;
   DateTime _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastPlatformSocketSwitchAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
@@ -160,7 +161,7 @@ class ChatController extends GetxController {
   void onInit() {
     super.onInit();
     _wireServiceCallbacks();
-    _bootstrap();
+    _scheduleBootstrapAfterAuth();
     ever<String>(platform, (p) {
       final key = _normalizedApiPlatform(p, fallback: 'twitch');
       // Instant UI from cache; do not fetch history here — [refreshOverviewForPlatform] does once.
@@ -180,6 +181,27 @@ class ChatController extends GetxController {
         );
       }
     });
+  }
+
+  /// Same work as opening the live stream screen: multi-platform overview + socket.
+  /// Safe to call from home after login; concurrent calls share one in-flight run.
+  Future<void> ensureStreamRealtimeBootstrap() {
+    _bootstrapInFlight ??= _bootstrapBody().whenComplete(() {
+      _bootstrapInFlight = null;
+    });
+    return _bootstrapInFlight!;
+  }
+
+  void _scheduleBootstrapAfterAuth() {
+    final auth = Get.find<AuthController>();
+    void kick() {
+      if (!auth.isReady.value || !auth.isAuthenticated.value) return;
+      unawaited(ensureStreamRealtimeBootstrap());
+    }
+
+    ever<bool>(auth.isReady, (_) => kick());
+    ever<bool>(auth.isAuthenticated, (_) => kick());
+    kick();
   }
 
   void _startConnectRetry() {
@@ -273,7 +295,7 @@ class ChatController extends GetxController {
     // Wiring is callback-based inside LiveStreamService.
   }
 
-  Future<void> _bootstrap() async {
+  Future<void> _bootstrapBody() async {
     try {
       var selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       // 1) App start: hit overview for each connected platform (tokens in SharedPrefs).

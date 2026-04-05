@@ -1084,6 +1084,12 @@ abstract class AppLocalizations {
   /// **'You haven\'t started the stream yet, but in the meantime you can'**
   String get homeStreamNotStartedMessage;
 
+  /// No description provided for @homeStreamLiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re live! Open the stream to chat and view activity.'**
+  String get homeStreamLiveMessage;
+
   /// No description provided for @startFreeTrial.
   ///
   /// In en, this message translates to:

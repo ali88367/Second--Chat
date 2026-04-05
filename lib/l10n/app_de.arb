@@ -177,6 +177,7 @@
   "freezesPerMonthLabel": "Freezes pro Monat",
   "oneMonthFreePremium": "1 Monat Premium gratis",
   "homeStreamNotStartedMessage": "Du hast den\\nStream noch nicht gestartet,\\naber in der Zwischenzeit kannst du",
+  "homeStreamLiveMessage": "Du bist live! Öffne den Stream für Chat und Aktivität.",
   "startFreeTrial": "Kostenlose Testphase starten",
   "unlockTheFullExperienceWith": "Schalte das volle Erlebnis frei mit {premium}",
   "@unlockTheFullExperienceWith": {

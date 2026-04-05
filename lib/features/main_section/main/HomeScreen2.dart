@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
+import 'package:second_chat/core/widgets/stream_header_buttons.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
@@ -39,6 +43,10 @@ class _HomeScreen2State extends State<HomeScreen2> {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
     _loadStreakOnLaunch();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(Get.find<ChatController>().ensureStreamRealtimeBootstrap());
+    });
   }
 
   Future<void> _loadStreakOnLaunch() async {
@@ -289,14 +297,22 @@ class _HomeScreen2State extends State<HomeScreen2> {
                       ),
                     ),
                     SizedBox(height: 24.h),
-                    Text(
-                      context.l10n.homeStreamNotStartedMessage,
-                      textAlign: TextAlign.center,
-                      style: sfProDisplay400(
-                        28.sp,
-                        Color.fromRGBO(255, 255, 255, 0.4),
-                      ),
-                    ),
+                    Obx(() {
+                      final chatCtrl = Get.find<ChatController>();
+                      final streamOnline = chatCtrl.isConnected.value &&
+                          chatCtrl.platformLive.values
+                              .any((v) => v == true);
+                      return Text(
+                        streamOnline
+                            ? context.l10n.homeStreamLiveMessage
+                            : context.l10n.homeStreamNotStartedMessage,
+                        textAlign: TextAlign.center,
+                        style: sfProDisplay400(
+                          28.sp,
+                          Color.fromRGBO(255, 255, 255, 0.4),
+                        ),
+                      );
+                    }),
                     SizedBox(height: 350.h),
                   ],
                 ),
@@ -323,34 +339,50 @@ class _HomeScreen2State extends State<HomeScreen2> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Offline Button
-                  GestureDetector(
-                    onTap: () {
-                      Get.to(
-                        () => Livestreaming(),
-                        transition: Transition.cupertino,
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.fastOutSlowIn,
-                      );
-                    },
-                    child: _buildImageButton(
-                      'assets/images/offline.png',
-                      width: 119.w,
-                      height: 36.h,
-                    ),
-                  ),
+                  Obx(() {
+                    final chatCtrl = Get.find<ChatController>();
+                    final socketConnected = chatCtrl.isConnected.value;
+                    final anyLive = chatCtrl.platformLive.values.any((v) => v == true);
+                    final streamOnline = socketConnected && anyLive;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                      
+                        StreamStatusButton(
+                          isOnline: streamOnline,
+                          onTap: () {
+                            Get.to(
+                              () => Livestreaming(),
+                              transition: Transition.cupertino,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.fastOutSlowIn,
+                            );
+                          },
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 4.h,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
 
                   // Right Buttons
+
+                Obx(() {
+                    final streakTotal =
+                        _streakCtrl.current.value?.headerStreakTotal ?? 0;
+                    return 
                   Row(
                     children: [
-                      InkWell(
-                        onTap: _openStreakSheet,
-                        child: _buildImageButton(
-                          'assets/images/streak_icon.png',
-                          width: 72.w,
-                          height: 36.w,
+                      StreakButton(
+                          count: streakTotal,
+                          onTap: _openStreakSheet,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 4.h,
+                          ),
                         ),
-                      ),
                       SizedBox(width: 6.w),
                       InkWell(
                         onTap: () {
@@ -416,7 +448,8 @@ class _HomeScreen2State extends State<HomeScreen2> {
                         ),
                       ),
                     ],
-                  ),
+                  );
+                  }),
                 ],
               ),
             ),

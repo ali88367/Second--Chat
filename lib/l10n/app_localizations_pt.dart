@@ -524,6 +524,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Você ainda não começou a\\ntransmissão, mas enquanto\\nisso você pode';
 
   @override
+  String get homeStreamLiveMessage =>
+      'Você está ao vivo! Abra a transmissão para conversar e ver a atividade.';
+
+  @override
   String get startFreeTrial => 'Iniciar avaliação gratuita';
 
   @override

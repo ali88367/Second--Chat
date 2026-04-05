@@ -516,6 +516,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'لم تبدأ\\nالبث بعد، لكن في\\nهذه الأثناء يمكنك';
 
   @override
+  String get homeStreamLiveMessage =>
+      'أنت على البث المباشر! افتح الشاشة للدردشة ومتابعة النشاط.';
+
+  @override
   String get startFreeTrial => 'ابدأ النسخة التجريبية المجانية';
 
   @override

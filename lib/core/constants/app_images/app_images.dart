@@ -1,8 +1,10 @@
 final key_icon = "assets/icons/key_icon.png";
 final key_icon_2 = "assets/icons/key_icon_2.png";
 final gift_icon = "assets/icons/gift_icon.png";
-final bolt_icon = "assets/icons/bolt_icon.png";
-final gradient_fire_icon = "assets/icons/gradient_fire_icon.png";
+const bolt_icon = "assets/icons/bolt_icon.png";
+const gradient_fire_icon = "assets/icons/gradient_fire_icon.png";
+/// Same asset as [gradient_fire_icon]; use in streak / flame UI.
+const gradient_flame_icon = gradient_fire_icon;
 final cyan_fire_icon = "assets/icons/cyan_fire_icon.png";
 final loader_icon = "assets/icons/loader_icon.png";
 final bell_icon = "assets/icons/bell_icon.png";

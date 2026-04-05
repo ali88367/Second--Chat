@@ -526,6 +526,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Du hast den\\nStream noch nicht gestartet,\\naber in der Zwischenzeit kannst du';
 
   @override
+  String get homeStreamLiveMessage =>
+      'Du bist live! Öffne den Stream für Chat und Aktivität.';
+
+  @override
   String get startFreeTrial => 'Kostenlose Testphase starten';
 
   @override
