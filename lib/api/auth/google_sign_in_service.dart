@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../core/utils/platform_token_provider.dart';
 import '../config/api_config.dart';
 import 'models/google_sign_in_credentials.dart';
 
@@ -8,12 +9,22 @@ import 'models/google_sign_in_credentials.dart';
 ///
 /// Does **not** use Firebase Auth — tokens are for your own API.
 ///
+/// **Google account UI** runs only from [signInAndFetchCredentials] (login screen). The OAuth
+/// access token is persisted via [PlatformTokenProvider.setGoogleOAuthAccessToken]; session
+/// checks must **not** call the Google SDK again (avoids repeated account prompts).
+///
 /// Initialization uses only [ApiConfig.googleServerClientId] (Web OAuth client id) — no per-platform `clientId`.
 class GoogleSignInService {
   GoogleSignInService._();
   static final GoogleSignInService instance = GoogleSignInService._();
 
   bool _initialized = false;
+
+  /// OAuth scopes for profile/email access token (must match [signInAndFetchCredentials]).
+  static const List<String> oauthScopes = <String>[
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+  ];
 
   Future<void> ensureInitialized() async {
     if (_initialized) return;
@@ -33,7 +44,13 @@ class GoogleSignInService {
     _initialized = true;
   }
 
+  /// Token saved at Google login — **no** Google SDK calls (safe during session checks).
+  Future<String?> readStoredGoogleAccessToken() async {
+    return PlatformTokenProvider().getGoogleOAuthAccessToken();
+  }
+
   /// Interactive Google sign-in; returns credentials including [GoogleSignInCredentials.idToken].
+  /// Persists OAuth access token to SharedPreferences via [loginWithGoogle] in [AuthController].
   Future<GoogleSignInCredentials> signInAndFetchCredentials() async {
     await ensureInitialized();
 
@@ -51,13 +68,9 @@ class GoogleSignInService {
 
     String? accessToken;
     try {
-      const scopes = <String>[
-        'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ];
       GoogleSignInClientAuthorization? authz =
-          await account.authorizationClient.authorizationForScopes(scopes);
-      authz ??= await account.authorizationClient.authorizeScopes(scopes);
+          await account.authorizationClient.authorizationForScopes(oauthScopes);
+      authz ??= await account.authorizationClient.authorizeScopes(oauthScopes);
       accessToken = authz.accessToken;
     } catch (_) {
       // Optional; backend login uses idToken.

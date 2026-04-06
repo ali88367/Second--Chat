@@ -23,6 +23,7 @@ import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
 import 'widgets/live_stream_embed_stack.dart';
+import 'socket_log_screen.dart';
 
 class Livestreaming extends StatefulWidget {
   const Livestreaming({super.key});
@@ -93,23 +94,7 @@ class _LivestreamingState extends State<Livestreaming> {
 
   void _syncSelectedPlatformFromFilter() {
     final chatCtrl = Get.find<ChatController>();
-    final selected = _chatFilter.value?.toLowerCase().trim();
-    // "All" view should not force-switch the active stream platform.
-    if (selected == null || selected.isEmpty) {
-      if (_selectedPlatform.value != null) {
-        final current = _normalizeUiPlatform(chatCtrl.platform.value);
-        if (_normalizeUiPlatform(_selectedPlatform.value) != current) {
-          _selectedPlatform.value = current;
-        }
-      }
-      return;
-    }
-
-    if (_selectedPlatform.value != null &&
-        _normalizeUiPlatform(_selectedPlatform.value) != selected) {
-      _selectedPlatform.value = selected;
-    }
-
+    final selected = _chatFilter.value ?? 'twitch';
     if (chatCtrl.platform.value.toLowerCase().trim() == selected) return;
     chatCtrl.selectPlatformInstant(selected);
   }
@@ -189,17 +174,17 @@ class _LivestreamingState extends State<Livestreaming> {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final maxBottom =
         screenHeight -
-        _layoutTopPadding(context) -
-        16.h -
-        _minUpperSectionHeight -
-        12.h -
-        bottomInset;
+            _layoutTopPadding(context) -
+            16.h -
+            _minUpperSectionHeight -
+            12.h -
+            bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
     setState(() {
       final restored =
-          (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
-              .clamp(minHeight, clampedMaxBottom)
-              .toDouble();
+      (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
+          .clamp(minHeight, clampedMaxBottom)
+          .toDouble();
       _bottomSectionHeight = restored;
       _bottomSectionHeightBeforeActivityExpand = null;
       if (_activityLayoutMin > 0) {
@@ -213,11 +198,10 @@ class _LivestreamingState extends State<Livestreaming> {
     if (mounted) {
       _collapseActivityExpandedIfNeeded(context);
     }
-    final next = _normalizeUiPlatform(platformKey);
-    _chatFilter.value = next;
-    if (_selectedPlatform.value != null &&
-        _normalizeUiPlatform(_selectedPlatform.value) != next) {
-      _selectedPlatform.value = next;
+    if (_chatFilter.value == platformKey) {
+      _chatFilter.value = null;
+    } else {
+      _chatFilter.value = platformKey;
     }
   }
 
@@ -225,21 +209,16 @@ class _LivestreamingState extends State<Livestreaming> {
     if (mounted) {
       _collapseActivityExpandedIfNeeded(context);
     }
-    const platforms = <String>['twitch', 'kick', 'youtube'];
-    final currentRaw =
-        (_chatFilter.value ?? Get.find<ChatController>().platform.value)
-            .toString();
-    final current = _normalizeUiPlatform(currentRaw);
-    final currentIndex = platforms.indexOf(current);
-    final safeIndex = currentIndex >= 0 ? currentIndex : 0;
-    final nextIndex = swipeRight
-        ? (safeIndex + 1) % platforms.length
-        : (safeIndex - 1 + platforms.length) % platforms.length;
-    final next = platforms[nextIndex];
-    _chatFilter.value = next;
-    if (_selectedPlatform.value != null &&
-        _normalizeUiPlatform(_selectedPlatform.value) != next) {
-      _selectedPlatform.value = next;
+    const platforms = [null, 'twitch', 'kick', 'youtube'];
+    final currentIndex = platforms.indexOf(_chatFilter.value);
+
+    if (swipeRight) {
+      final nextIndex = (currentIndex + 1) % platforms.length;
+      _chatFilter.value = platforms[nextIndex];
+    } else {
+      final prevIndex =
+          (currentIndex - 1 + platforms.length) % platforms.length;
+      _chatFilter.value = platforms[prevIndex];
     }
   }
 
@@ -317,9 +296,9 @@ class _LivestreamingState extends State<Livestreaming> {
     }
     final primary = u.isNotEmpty ? u : (typeRaw.isNotEmpty ? typeRaw : 'Activity');
     final secondary =
-        u.isNotEmpty && typeRaw.isNotEmpty && typeRaw.toLowerCase() != u.toLowerCase()
-            ? typeRaw
-            : '';
+    u.isNotEmpty && typeRaw.isNotEmpty && typeRaw.toLowerCase() != u.toLowerCase()
+        ? typeRaw
+        : '';
     return (primary, secondary);
   }
 
@@ -336,8 +315,8 @@ class _LivestreamingState extends State<Livestreaming> {
     // Keep collapsed size large enough for fixed header UI + counter row.
     final minByContent =
         (12.h + 59.4.h + 12.h) + // counter row wrapper in parent
-        (10.h + 8.h + 4.h + 8.h + 16.h + 36.h + 16.h) + // chat header chrome
-        8.h; // small safety buffer to avoid edge overflow on some devices
+            (10.h + 8.h + 4.h + 8.h + 16.h + 36.h + 16.h) + // chat header chrome
+            8.h; // small safety buffer to avoid edge overflow on some devices
 
     return minByFactor > minByContent ? minByFactor : minByContent;
   }
@@ -346,9 +325,9 @@ class _LivestreamingState extends State<Livestreaming> {
     final safeTop = MediaQuery.of(context).viewPadding.top;
     final dynamicOffset =
         safeTop +
-        28.h + // top padding used by top icon row
-        36.w + // icon row visual height
-        12.h; // spacing below row
+            28.h + // top padding used by top icon row
+            36.w + // icon row visual height
+            12.h; // spacing below row
     final legacyOffset = 117.h;
     return dynamicOffset > legacyOffset ? dynamicOffset : legacyOffset;
   }
@@ -363,11 +342,11 @@ class _LivestreamingState extends State<Livestreaming> {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final maxBottom =
         screenHeight -
-        _layoutTopPadding(context) -
-        16.h -
-        _minUpperSectionHeight -
-        12.h -
-        bottomInset;
+            _layoutTopPadding(context) -
+            16.h -
+            _minUpperSectionHeight -
+            12.h -
+            bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
 
     setState(() {
@@ -381,9 +360,9 @@ class _LivestreamingState extends State<Livestreaming> {
         }
       } else {
         final restored =
-            (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
-                .clamp(minHeight, clampedMaxBottom)
-                .toDouble();
+        (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
+            .clamp(minHeight, clampedMaxBottom)
+            .toDouble();
         _bottomSectionHeight = restored;
         _bottomSectionHeightBeforeActivityExpand = null;
         if (_activityLayoutMin > 0) {
@@ -466,23 +445,23 @@ class _LivestreamingState extends State<Livestreaming> {
   static const double _activityDragSensitivity = 1.5;
 
   Widget _buildResizableActivityContainer(
-    BuildContext context,
-    double availableHeight,
-  ) {
+      BuildContext context,
+      double availableHeight,
+      ) {
     final double screenHeight = Get.height;
     final double minHeightFromScreen = screenHeight * _activityMinHeight;
     final double maxHeightFromScreen = screenHeight * _activityMaxHeight;
     final double slotCap =
-        (availableHeight > 0 ? availableHeight : maxHeightFromScreen)
-            .toDouble();
+    (availableHeight > 0 ? availableHeight : maxHeightFromScreen)
+        .toDouble();
     // Fill the upper stream slot when expanded (no artificial shrink).
     final double maxHeight = math.max(minHeightFromScreen, slotCap);
     final double originalHeight =
-        minHeightFromScreen.clamp(0, maxHeight).toDouble();
+    minHeightFromScreen.clamp(0, maxHeight).toDouble();
 
     if (_activityHeight == 0) {
       _activityHeight =
-          _activityPanelExpanded ? maxHeight : originalHeight;
+      _activityPanelExpanded ? maxHeight : originalHeight;
     }
 
     final double clampedHeight = _activityHeight.clamp(
@@ -493,11 +472,11 @@ class _LivestreamingState extends State<Livestreaming> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final parentMax =
-            constraints.maxHeight.isFinite && constraints.maxHeight > 0
-                ? constraints.maxHeight
-                : slotCap;
+        constraints.maxHeight.isFinite && constraints.maxHeight > 0
+            ? constraints.maxHeight
+            : slotCap;
         final effectiveMax =
-            math.min(parentMax, maxHeight).clamp(0.0, double.infinity).toDouble();
+        math.min(parentMax, maxHeight).clamp(0.0, double.infinity).toDouble();
         final effectiveMin = originalHeight.clamp(0, effectiveMax).toDouble();
         _activityLayoutMin = effectiveMin;
         _activityLayoutMax = effectiveMax;
@@ -552,31 +531,31 @@ class _LivestreamingState extends State<Livestreaming> {
                         bottom: 28.h,
                       ),
                       physics:
-                          _isDraggingActivity
-                              ? const NeverScrollableScrollPhysics()
-                              : const BouncingScrollPhysics(),
+                      _isDraggingActivity
+                          ? const NeverScrollableScrollPhysics()
+                          : const BouncingScrollPhysics(),
                       child: Obx(() {
                         final chatCtrl = Get.find<ChatController>();
                         chatCtrl.platform.value;
                         _settingsCtrl.clockFormat.value;
                         final selected =
-                            _normalizeUiPlatform(chatCtrl.platform.value);
+                        _normalizeUiPlatform(chatCtrl.platform.value);
                         // Prefer controller activity list (wired to sockets).
                         // Chat "normal" lines stay in chat; activity = everything else.
                         final events = chatCtrl.activityEvents
                             .where((e) {
-                              final t = (e['type'] ?? e['eventType'] ?? '')
-                                  .toString()
-                                  .trim()
-                                  .toLowerCase();
-                              return t != 'normal';
-                            })
+                          final t = (e['type'] ?? e['eventType'] ?? '')
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+                          return t != 'normal';
+                        })
                             .where((e) {
-                              final raw =
-                                  (e['platform'] ?? '').toString().trim();
-                              if (raw.isEmpty) return true;
-                              return _normalizeUiPlatform(raw) == selected;
-                            })
+                          final raw =
+                          (e['platform'] ?? '').toString().trim();
+                          if (raw.isEmpty) return true;
+                          return _normalizeUiPlatform(raw) == selected;
+                        })
                             .toList(growable: false);
                         if (events.isEmpty) {
                           return Center(
@@ -604,24 +583,24 @@ class _LivestreamingState extends State<Livestreaming> {
                                   builder: (ctx) {
                                     final e = list[i];
                                     final platform =
-                                        (e['platform'] ?? '').toString();
+                                    (e['platform'] ?? '').toString();
                                     final meta = e['metadata'];
                                     final metaMap = meta is Map
                                         ? meta.cast<String, dynamic>()
                                         : const <String, dynamic>{};
                                     final user = (metaMap['user'] ??
-                                            metaMap['username'] ??
-                                            metaMap['user_name'] ??
-                                            metaMap['user_login'] ??
-                                            metaMap['name'] ??
-                                            e['username'] ??
-                                            '')
+                                        metaMap['username'] ??
+                                        metaMap['user_name'] ??
+                                        metaMap['user_login'] ??
+                                        metaMap['name'] ??
+                                        e['username'] ??
+                                        '')
                                         .toString()
                                         .trim();
                                     final type =
-                                        (e['type'] ?? e['eventType'] ?? '')
-                                            .toString()
-                                            .trim();
+                                    (e['type'] ?? e['eventType'] ?? '')
+                                        .toString()
+                                        .trim();
                                     final time = _formatActivityTime(
                                       e['timestamp'] ?? e['created_at'],
                                     );
@@ -694,7 +673,7 @@ class _LivestreamingState extends State<Livestreaming> {
             setState(() {
               _isDraggingActivity = true;
               final startH =
-                  _activityHeight.clamp(effectiveMin, effectiveMax);
+              _activityHeight.clamp(effectiveMin, effectiveMax);
               _activityHeight = startH;
             });
           },
@@ -765,14 +744,14 @@ class _LivestreamingState extends State<Livestreaming> {
                             if (filter == 'twitch') {
                               filterColor =
                                   _settingsCtrl.twitchColor.value ??
-                                  twitchPurple;
+                                      twitchPurple;
                             } else if (filter == 'kick') {
                               filterColor =
                                   _settingsCtrl.kickColor.value ?? kickGreen;
                             } else if (filter == 'youtube') {
                               filterColor =
                                   _settingsCtrl.youtubeColor.value ??
-                                  youtubeRed;
+                                      youtubeRed;
                             } else {
                               filterColor = Colors.transparent;
                             }
@@ -842,27 +821,26 @@ class _LivestreamingState extends State<Livestreaming> {
                       }),
                       Row(
                         children: [
-                          // SizedBox(width: 6.w),
-                          // GestureDetector(
-                          //   onTap: () {
-                          //     Get.to(() => const SocketLogScreen());
-                          //   },
-                          //   child: Container(
-                          //     width: 36.w,
-                          //     height: 36.w,
-                          //     alignment: Alignment.center,
-                          //     decoration: BoxDecoration(
-                          //       color: const Color(0xFF2C2C2E),
-                          //       borderRadius: BorderRadius.circular(10.r),
-                          //     ),
-                          //     child: Icon(
-                          //       Icons.terminal_rounded,
-                          //       size: 20.sp,
-                          //       color: Colors.white70,
-                          //     ),
-                          //   ),
-                          // ),
-                          // SizedBox(width: 6.w),
+                          GestureDetector(
+                            onTap: () {
+                              Get.to(() => const SocketLogScreen());
+                            },
+                            child: Container(
+                              width: 36.w,
+                              height: 36.w,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2C2C2E),
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
+                              child: Icon(
+                                Icons.terminal_rounded,
+                                size: 20.sp,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 6.w),
                           GestureDetector(
                             onTap: () {
                               Get.bottomSheet(
@@ -951,32 +929,32 @@ class _LivestreamingState extends State<Livestreaming> {
                             final spacing = 12.h;
                             final bottomPadding =
                                 16.h +
-                                MediaQuery.of(context).viewPadding.bottom;
+                                    MediaQuery.of(context).viewPadding.bottom;
                             final minHeight = _bottomSectionMinHeight(
                               screenHeight,
                             );
                             final maxHeight =
                                 screenHeight -
-                                topPadding -
-                                spacing -
-                                _minUpperSectionHeight -
-                                bottomPadding;
+                                    topPadding -
+                                    spacing -
+                                    _minUpperSectionHeight -
+                                    bottomPadding;
                             final safeMaxHeight =
-                                maxHeight > minHeight ? maxHeight : minHeight;
+                            maxHeight > minHeight ? maxHeight : minHeight;
                             final upperSectionHeight = 236.h + spacing;
                             final counterRowHeight = 59.4.h + 24.h;
                             final availableHeight =
                                 screenHeight - topPadding - bottomPadding;
                             final calculatedHeight =
                                 availableHeight -
-                                upperSectionHeight -
-                                spacing -
-                                counterRowHeight;
+                                    upperSectionHeight -
+                                    spacing -
+                                    counterRowHeight;
                             final initialBottomHeight = calculatedHeight * 1.4;
                             final legacyInitialHeight =
-                                initialBottomHeight > 200.h
-                                    ? initialBottomHeight
-                                    : 200.h;
+                            initialBottomHeight > 200.h
+                                ? initialBottomHeight
+                                : 200.h;
                             setState(() {
                               _bottomSectionHeight =
                                   legacyInitialHeight
@@ -1000,12 +978,12 @@ class _LivestreamingState extends State<Livestreaming> {
                             child: LayoutBuilder(
                               builder: (context, upperConstraints) {
                                 final upperSectionHeight =
-                                    upperConstraints.maxHeight.isFinite &&
-                                            upperConstraints.maxHeight > 0
-                                        ? upperConstraints.maxHeight
-                                        : 226.h;
+                                upperConstraints.maxHeight.isFinite &&
+                                    upperConstraints.maxHeight > 0
+                                    ? upperConstraints.maxHeight
+                                    : 226.h;
                                 final streamPreviewHeight =
-                                    upperSectionHeight.toDouble();
+                                upperSectionHeight.toDouble();
 
                                 return ValueListenableBuilder<bool>(
                                   valueListenable: _showActivity,
@@ -1020,14 +998,14 @@ class _LivestreamingState extends State<Livestreaming> {
                                             ignoring: showActivity,
                                             child: SingleChildScrollView(
                                               physics:
-                                                  _isDraggingActivity
-                                                      ? const NeverScrollableScrollPhysics()
-                                                      : const ClampingScrollPhysics(),
+                                              _isDraggingActivity
+                                                  ? const NeverScrollableScrollPhysics()
+                                                  : const ClampingScrollPhysics(),
                                               padding: EdgeInsets.only(
                                                 bottom:
-                                                    MediaQuery.of(
-                                                      context,
-                                                    ).viewPadding.bottom,
+                                                MediaQuery.of(
+                                                  context,
+                                                ).viewPadding.bottom,
                                               ),
                                               child: ConstrainedBox(
                                                 constraints: BoxConstraints(
@@ -1036,355 +1014,365 @@ class _LivestreamingState extends State<Livestreaming> {
                                                 child: ValueListenableBuilder<bool>(
                                                   valueListenable: _showServiceCard,
                                                   builder: (context, showCard, child) {
-                                            final chatCtrl =
-                                                Get.find<ChatController>();
-                                            final settingsCtrl =
-                                                Get.find<SettingsController>();
+                                                    final chatCtrl =
+                                                    Get.find<ChatController>();
+                                                    final settingsCtrl =
+                                                    Get.find<SettingsController>();
 
-                                            final webView = SizedBox(
-                                              height: streamPreviewHeight,
-                                              child: Obx(() {
-                                                final multi =
-                                                    settingsCtrl
-                                                        .multiScreenPreview
-                                                        .value ==
-                                                    true;
-                                                return Container(
-                                                  width:
-                                                      MediaQuery.of(
-                                                        context,
-                                                      ).size.width,
-                                                  margin: EdgeInsets.symmetric(
-                                                    horizontal: 5.w,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          24.r,
-                                                        ),
-                                                  ),
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          24.r,
-                                                        ),
-                                                    child: Padding(
-                                                      padding: EdgeInsets.all(
-                                                        multi ? 8.w : 0,
-                                                      ),
-                                                      child: multi
-                                                          ? LiveStreamMultiEmbedGrid(
-                                                              streamPreviewHeight:
-                                                                  streamPreviewHeight,
-                                                            )
-                                                          : LiveStreamSingleEmbedStack(
-                                                              streamPreviewHeight:
-                                                                  streamPreviewHeight,
+                                                    final webView = SizedBox(
+                                                      height: streamPreviewHeight,
+                                                      child: Obx(() {
+                                                        final multi =
+                                                            settingsCtrl
+                                                                .multiScreenPreview
+                                                                .value ==
+                                                                true;
+                                                        return Container(
+                                                          width:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.width,
+                                                          margin: EdgeInsets.symmetric(
+                                                            horizontal: 5.w,
+                                                          ),
+                                                          decoration: BoxDecoration(
+                                                            borderRadius:
+                                                            BorderRadius.circular(
+                                                              24.r,
                                                             ),
-                                                    ),
-                                                  ),
-                                                );
-                                              }),
-                                            );
+                                                          ),
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                            BorderRadius.circular(
+                                                              24.r,
+                                                            ),
+                                                            child: Padding(
+                                                              padding: EdgeInsets.all(
+                                                                multi ? 8.w : 0,
+                                                              ),
+                                                              child: multi
+                                                                  ? LiveStreamMultiEmbedGrid(
+                                                                streamPreviewHeight:
+                                                                streamPreviewHeight,
+                                                              )
+                                                                  : LiveStreamSingleEmbedStack(
+                                                                streamPreviewHeight:
+                                                                streamPreviewHeight,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }),
+                                                    );
 
-                                            return SizedBox(
-                                              height: streamPreviewHeight,
-                                              child: Stack(
-                                                fit: StackFit.expand,
-                                                clipBehavior: Clip.hardEdge,
-                                                children: [
-                                                  Offstage(
-                                                    offstage: showCard,
-                                                    child: webView,
-                                                  ),
-                                                  if (showCard)
-                                                    Positioned.fill(
-                                                      child: ValueListenableBuilder<bool>(
-                                                        valueListenable:
-                                                            _titleSelected,
-                                                        builder: (
-                                                          context,
-                                                          titleSelected,
-                                                          _,
-                                                        ) {
-                                                          if (titleSelected) {
-                                                            return ValueListenableBuilder<
-                                                              String?
-                                                            >(
-                                                              valueListenable:
-                                                                  _selectedPlatform,
-                                                              builder: (
-                                                                context,
-                                                                platform,
-                                                                _,
-                                                              ) {
-                                                                if (platform !=
-                                                                    null) {
-                                                                  final activePlatform =
-                                                                      _normalizeUiPlatform(
-                                                                        platform,
-                                                                      );
-                                                                  return Column(
-                                                                    children: [
-                                                                      Expanded(
-                                                                        child: Container(
-                                                                          width: double.infinity,
-                                                                          padding: EdgeInsets.symmetric(
-                                                                            horizontal: 12.w,
-                                                                            vertical: 12.h,
-                                                                          ),
-                                                                          decoration: BoxDecoration(
-                                                                            color: black,
-                                                                            borderRadius:
-                                                                                BorderRadius.circular(
-                                                                              20.r,
-                                                                            ),
-                                                                          ),
-                                                                          child: Column(
-                                                                        children: [
-                                                                          Padding(
-                                                                            padding: EdgeInsets.symmetric(
-                                                                              horizontal:
-                                                                                  8.w,
-                                                                            ),
-                                                                            child: Row(
-                                                                              children: [
-                                                                                GestureDetector(
-                                                                                  onTap: () {
-                                                                                    _collapseActivityExpandedIfNeeded(context);
-                                                                                    _selectedPlatform.value = null;
-                                                                                    _showServiceCard.value = false;
-                                                                                    _titleSelected.value = false;
-                                                                                    _showActivity.value = false;
-                                                                                    _activityHeight =
-                                                                                        0;
-                                                                                    _isDraggingActivity =
-                                                                                        false;
-                                                                                  },
-                                                                                  child: Container(
-                                                                                    padding: EdgeInsets.all(
-                                                                                      8.w,
-                                                                                    ),
-                                                                                    decoration: BoxDecoration(
-                                                                                      color:
-                                                                                          Colors.grey.shade900,
-                                                                                      shape:
-                                                                                          BoxShape.circle,
-                                                                                    ),
-                                                                                    child: Transform.translate(
-                                                                                      offset: const Offset(
-                                                                                        2,
-                                                                                        0,
-                                                                                      ),
-                                                                                      child: Icon(
-                                                                                        Icons.arrow_back_ios,
-                                                                                        color:
-                                                                                            Colors.white,
-                                                                                        size:
-                                                                                            16.sp,
-                                                                                      ),
+                                                    return SizedBox(
+                                                      height: streamPreviewHeight,
+                                                      child: Stack(
+                                                        fit: StackFit.expand,
+                                                        clipBehavior: Clip.hardEdge,
+                                                        children: [
+                                                          Offstage(
+                                                            offstage: showCard,
+                                                            child: webView,
+                                                          ),
+                                                          if (showCard)
+                                                            Positioned.fill(
+                                                              child: ValueListenableBuilder<bool>(
+                                                                valueListenable:
+                                                                _titleSelected,
+                                                                builder: (
+                                                                    context,
+                                                                    titleSelected,
+                                                                    _,
+                                                                    ) {
+                                                                  if (titleSelected) {
+                                                                    return ValueListenableBuilder<
+                                                                        String?
+                                                                    >(
+                                                                      valueListenable:
+                                                                      _selectedPlatform,
+                                                                      builder: (
+                                                                          context,
+                                                                          platform,
+                                                                          _,
+                                                                          ) {
+                                                                        if (platform !=
+                                                                            null) {
+                                                                          final activePlatform =
+                                                                          _normalizeUiPlatform(
+                                                                            platform,
+                                                                          );
+                                                                          return Column(
+                                                                            children: [
+                                                                              Expanded(
+                                                                                child: Container(
+                                                                                  width: double.infinity,
+                                                                                  padding: EdgeInsets.symmetric(
+                                                                                    horizontal: 12.w,
+                                                                                    vertical: 12.h,
+                                                                                  ),
+                                                                                  decoration: BoxDecoration(
+                                                                                    color: black,
+                                                                                    borderRadius:
+                                                                                    BorderRadius.circular(
+                                                                                      20.r,
                                                                                     ),
                                                                                   ),
-                                                                                ),
-                                                                                const Spacer(),
-                                                                                ValueListenableBuilder<String?>(
-                                                                                  valueListenable: _chatFilter,
-                                                                                  builder: (
-                                                                                    context,
-                                                                                    chatFilterSnap,
-                                                                                    _,
-                                                                                  ) {
-                                                                                    return Obx(() {
-                                                                                      final liveP =
-                                                                                          chatCtrl
-                                                                                              .platform
-                                                                                              .value
-                                                                                              .toString()
-                                                                                              .trim();
-                                                                                      final raw =
-                                                                                          (chatFilterSnap !=
-                                                                                                      null &&
-                                                                                                  chatFilterSnap
-                                                                                                      .trim()
-                                                                                                      .isNotEmpty)
-                                                                                              ? chatFilterSnap
-                                                                                              : (liveP.isNotEmpty
-                                                                                                    ? liveP
-                                                                                                    : activePlatform);
-                                                                                      final displayKey =
-                                                                                          _normalizeUiPlatform(
-                                                                                        raw,
-                                                                                      );
-                                                                                      final iconAsset =
-                                                                                          _assetForPlatform(
-                                                                                        displayKey,
-                                                                                      );
-                                                                                      final iconColor =
-                                                                                          _settingsCtrl
-                                                                                              .getPlatformColor(
-                                                                                        displayKey,
-                                                                                      );
-                                                                                      return Center(
-                                                                                        child: Image.asset(
-                                                                                          iconAsset,
-                                                                                          color: iconColor,
-                                                                                          width: 22.w,
-                                                                                          height: 22.h,
+                                                                                  child: Column(
+                                                                                    children: [
+                                                                                      Padding(
+                                                                                        padding: EdgeInsets.symmetric(
+                                                                                          horizontal:
+                                                                                          8.w,
                                                                                         ),
-                                                                                      );
-                                                                                    });
-                                                                                  },
-                                                                                ),
-                                                                                const Spacer(),
-                                                                                SizedBox(
-                                                                                  width:
-                                                                                      40.w,
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                          ),
-                                                                          SizedBox(
-                                                                            height:
-                                                                                16.h,
-                                                                          ),
-                                                                          ValueListenableBuilder<String?>(
-                                                                            valueListenable: _chatFilter,
-                                                                            builder:
-                                                                                (
-                                                                                  context,
-                                                                                  chatFilter,
-                                                                                  _,
-                                                                                ) {
-                                                                              return Obx(() {
-                                                                                final metaKey =
-                                                                                    _normalizeUiPlatform(
-                                                                                      chatFilter ??
-                                                                                          activePlatform,
-                                                                                    )
-                                                                                        .toString()
-                                                                                        .trim();
-                                                                                final titleLive =
-                                                                                    (chatCtrl.streamTitleByPlatform[metaKey] ?? '')
-                                                                                        .trim();
-                                                                                final categoryLive =
-                                                                                    (chatCtrl.streamCategoryByPlatform[metaKey] ?? '')
-                                                                                        .trim();
-                                                                                final titlePanel =
-                                                                                    titleLive.isNotEmpty
-                                                                                        ? titleLive
-                                                                                        : context.l10n.streamMetaEmpty;
-                                                                                final categoryPanel =
-                                                                                    categoryLive.isNotEmpty
-                                                                                        ? categoryLive
-                                                                                        : context.l10n.streamMetaEmpty;
-                                                                                return Column(
-                                                                                  mainAxisSize:
-                                                                                      MainAxisSize.min,
-                                                                                  children: [
-                                                                                    panelRow(titlePanel),
-                                                                                    SizedBox(height: 12.h),
-                                                                                    // Category row: no chevron / picker (disabled).
-                                                                                    panelRow(
-                                                                                      categoryPanel,
-                                                                                      showChevron: false,
-                                                                                      onTap: null,
-                                                                                    ),
-                                                                                  ],
-                                                                                );
-                                                                              });
-                                                                            },
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              );
-                                                          }
-
-                                                          return Column(
-                                                              children: [
-                                                                Expanded(
-                                                                  child: Center(
-                                                                    child: Container(
-                                                                      width:
-                                                                          double.infinity,
-                                                                      padding: EdgeInsets.symmetric(
-                                                                        horizontal:
-                                                                            14.w,
-                                                                        vertical:
-                                                                            14.h,
-                                                                      ),
-                                                                      decoration: BoxDecoration(
-                                                                        color:
-                                                                            black,
-                                                                        borderRadius: BorderRadius.circular(
-                                                                          20.r,
-                                                                        ),
-                                                                      ),
-                                                                      child: Column(
-                                                                        mainAxisSize:
-                                                                            MainAxisSize.min,
-                                                                        mainAxisAlignment:
-                                                                            MainAxisAlignment.center,
-                                                                        children: [
-                                                                          Obx(() {
-                                                                            final currentPlatform =
-                                                                                _normalizeUiPlatform(
-                                                                                  _chatFilter
-                                                                                      .value ??
-                                                                                      chatCtrl
-                                                                                          .platform
-                                                                                          .value,
-                                                                                );
-                                                                            return serviceRow(
-                                                                              asset: _assetForPlatform(
-                                                                                currentPlatform,
-                                                                              ),
-                                                                              iconColor: _settingsCtrl
-                                                                                  .getPlatformColor(
-                                                                                    currentPlatform,
+                                                                                        child: Row(
+                                                                                          children: [
+                                                                                            GestureDetector(
+                                                                                              onTap: () {
+                                                                                                _collapseActivityExpandedIfNeeded(context);
+                                                                                                _selectedPlatform.value = null;
+                                                                                                _showServiceCard.value = false;
+                                                                                                _titleSelected.value = false;
+                                                                                                _showActivity.value = false;
+                                                                                                _activityHeight =
+                                                                                                0;
+                                                                                                _isDraggingActivity =
+                                                                                                false;
+                                                                                              },
+                                                                                              child: Container(
+                                                                                                padding: EdgeInsets.all(
+                                                                                                  8.w,
+                                                                                                ),
+                                                                                                decoration: BoxDecoration(
+                                                                                                  color:
+                                                                                                  Colors.grey.shade900,
+                                                                                                  shape:
+                                                                                                  BoxShape.circle,
+                                                                                                ),
+                                                                                                child: Transform.translate(
+                                                                                                  offset: const Offset(
+                                                                                                    2,
+                                                                                                    0,
+                                                                                                  ),
+                                                                                                  child: Icon(
+                                                                                                    Icons.arrow_back_ios,
+                                                                                                    color:
+                                                                                                    Colors.white,
+                                                                                                    size:
+                                                                                                    16.sp,
+                                                                                                  ),
+                                                                                                ),
+                                                                                              ),
+                                                                                            ),
+                                                                                            const Spacer(),
+                                                                                            ValueListenableBuilder<String?>(
+                                                                                              valueListenable: _chatFilter,
+                                                                                              builder: (
+                                                                                                  context,
+                                                                                                  chatFilterSnap,
+                                                                                                  _,
+                                                                                                  ) {
+                                                                                                return Obx(() {
+                                                                                                  chatCtrl.platform.value;
+                                                                                                  final cfs =
+                                                                                                      chatFilterSnap
+                                                                                                          ?.trim();
+                                                                                                  final raw =
+                                                                                                      (cfs !=
+                                                                                                              null &&
+                                                                                                          cfs
+                                                                                                              .isNotEmpty)
+                                                                                                          ? cfs
+                                                                                                          : chatCtrl
+                                                                                                              .platform
+                                                                                                              .value
+                                                                                                              .toString()
+                                                                                                              .trim();
+                                                                                                  final displayKey =
+                                                                                                      _normalizeUiPlatform(
+                                                                                                    raw.isNotEmpty
+                                                                                                        ? raw
+                                                                                                        : activePlatform,
+                                                                                                  );
+                                                                                                  final iconAsset =
+                                                                                                  _assetForPlatform(
+                                                                                                    displayKey,
+                                                                                                  );
+                                                                                                  final iconColor =
+                                                                                                  _settingsCtrl
+                                                                                                      .getPlatformColor(
+                                                                                                    displayKey,
+                                                                                                  );
+                                                                                                  return Center(
+                                                                                                    child: Image.asset(
+                                                                                                      iconAsset,
+                                                                                                      color: iconColor,
+                                                                                                      width: 22.w,
+                                                                                                      height: 22.h,
+                                                                                                    ),
+                                                                                                  );
+                                                                                                });
+                                                                                              },
+                                                                                            ),
+                                                                                            const Spacer(),
+                                                                                            SizedBox(
+                                                                                              width:
+                                                                                              40.w,
+                                                                                            ),
+                                                                                          ],
+                                                                                        ),
+                                                                                      ),
+                                                                                      SizedBox(
+                                                                                        height:
+                                                                                        16.h,
+                                                                                      ),
+                                                                                      ValueListenableBuilder<String?>(
+                                                                                        valueListenable: _chatFilter,
+                                                                                        builder:
+                                                                                            (
+                                                                                            context,
+                                                                                            chatFilter,
+                                                                                            _,
+                                                                                            ) {
+                                                                                          return Obx(() {
+                                                                                            chatCtrl.platform.value;
+                                                                                            final cf =
+                                                                                                chatFilter?.trim();
+                                                                                            final metaKey =
+                                                                                                _normalizeUiPlatform(
+                                                                                              (cf != null &&
+                                                                                                      cf.isNotEmpty)
+                                                                                                  ? cf
+                                                                                                  : chatCtrl
+                                                                                                      .platform
+                                                                                                      .value
+                                                                                                      .toString()
+                                                                                                      .trim(),
+                                                                                            )
+                                                                                                .toString()
+                                                                                                .trim();
+                                                                                            final titleLive =
+                                                                                            (chatCtrl.streamTitleByPlatform[metaKey] ?? '')
+                                                                                                .trim();
+                                                                                            final categoryLive =
+                                                                                            (chatCtrl.streamCategoryByPlatform[metaKey] ?? '')
+                                                                                                .trim();
+                                                                                            final titlePanel =
+                                                                                            titleLive.isNotEmpty
+                                                                                                ? titleLive
+                                                                                                : context.l10n.streamMetaEmpty;
+                                                                                            final categoryPanel =
+                                                                                            categoryLive.isNotEmpty
+                                                                                                ? categoryLive
+                                                                                                : context.l10n.streamMetaEmpty;
+                                                                                            return Column(
+                                                                                              mainAxisSize:
+                                                                                              MainAxisSize.min,
+                                                                                              children: [
+                                                                                                panelRow(titlePanel),
+                                                                                                SizedBox(height: 12.h),
+                                                                                                // Category row: no chevron / picker (disabled).
+                                                                                                panelRow(
+                                                                                                  categoryPanel,
+                                                                                                  showChevron: false,
+                                                                                                  onTap: null,
+                                                                                                ),
+                                                                                              ],
+                                                                                            );
+                                                                                          });
+                                                                                        },
+                                                                                      ),
+                                                                                    ],
                                                                                   ),
-                                                                              title:
-                                                                                  context.l10n.title,
-                                                                              subtitle:
-                                                                                  context.l10n.category,
-                                                                              onTap: () {
-                                                                                _collapseActivityExpandedIfNeeded(context);
-                                                                                _selectedPlatform.value =
-                                                                                    currentPlatform;
-                                                                                _titleSelected.value = true;
-                                                                                _showServiceCard.value = true;
-                                                                              },
-                                                                            );
-                                                                          }),
-                                                                          SizedBox(
-                                                                            height:
-                                                                                36.h,
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            );
-                                                        },
-                                                      );
-                                                    }
+                                                                                ),
+                                                                              ),
+                                                                            ],
+                                                                          );
+                                                                        }
 
-                                                    return const SizedBox.shrink();
+                                                                        return Column(
+                                                                          children: [
+                                                                            Expanded(
+                                                                              child: Center(
+                                                                                child: Container(
+                                                                                  width:
+                                                                                  double.infinity,
+                                                                                  padding: EdgeInsets.symmetric(
+                                                                                    horizontal:
+                                                                                    14.w,
+                                                                                    vertical:
+                                                                                    14.h,
+                                                                                  ),
+                                                                                  decoration: BoxDecoration(
+                                                                                    color:
+                                                                                    black,
+                                                                                    borderRadius: BorderRadius.circular(
+                                                                                      20.r,
+                                                                                    ),
+                                                                                  ),
+                                                                                  child: Column(
+                                                                                    mainAxisSize:
+                                                                                    MainAxisSize.min,
+                                                                                    mainAxisAlignment:
+                                                                                    MainAxisAlignment.center,
+                                                                                    children: [
+                                                                                      Obx(() {
+                                                                                        final currentPlatform =
+                                                                                        _normalizeUiPlatform(
+                                                                                          _chatFilter
+                                                                                              .value ??
+                                                                                              chatCtrl
+                                                                                                  .platform
+                                                                                                  .value,
+                                                                                        );
+                                                                                        return serviceRow(
+                                                                                          asset: _assetForPlatform(
+                                                                                            currentPlatform,
+                                                                                          ),
+                                                                                          iconColor: _settingsCtrl
+                                                                                              .getPlatformColor(
+                                                                                            currentPlatform,
+                                                                                          ),
+                                                                                          title:
+                                                                                          context.l10n.title,
+                                                                                          subtitle:
+                                                                                          context.l10n.category,
+                                                                                          onTap: () {
+                                                                                            _collapseActivityExpandedIfNeeded(context);
+                                                                                            _selectedPlatform.value =
+                                                                                                currentPlatform;
+                                                                                            _titleSelected.value = true;
+                                                                                            _showServiceCard.value = true;
+                                                                                          },
+                                                                                        );
+                                                                                      }),
+                                                                                      SizedBox(
+                                                                                        height:
+                                                                                        36.h,
+                                                                                      ),
+                                                                                    ],
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                            ),
+                                                                          ],
+                                                                        );
+                                                                      },
+                                                                    );
+                                                                  }
+
+                                                                  return const SizedBox.shrink();
+                                                                },
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    );
                                                   },
                                                 ),
                                               ),
-                                            ],
+                                            ),
                                           ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
                                           if (showActivity)
                                             Positioned.fill(
                                               child: _buildResizableActivityContainer(
@@ -1416,9 +1404,9 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   Widget _buildResizableBottomSection(
-    BuildContext context,
-    BoxConstraints constraints,
-  ) {
+      BuildContext context,
+      BoxConstraints constraints,
+      ) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
     _logValueChange('layout.bottomInset', bottomInset);
@@ -1455,15 +1443,15 @@ class _LivestreamingState extends State<Livestreaming> {
     final minHeight = _bottomSectionMinHeight(screenHeight);
     final maxHeight =
         screenHeight -
-        _layoutTopPadding(context) -
-        _minUpperSectionHeight -
-        bottomGap.h -
-        12.h -
-        bottomInset;
+            _layoutTopPadding(context) -
+            _minUpperSectionHeight -
+            bottomGap.h -
+            12.h -
+            bottomInset;
     final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
 
     final currentHeight =
-        _bottomSectionHeight.clamp(minHeight, clampedMaxHeight).toDouble();
+    _bottomSectionHeight.clamp(minHeight, clampedMaxHeight).toDouble();
     _logValueChange('layout.currentHeight', currentHeight);
 
     return SizedBox(

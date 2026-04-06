@@ -8,8 +8,8 @@ class PlatformTokenProvider {
   static const refreshTokenKey = 'refreshToken';
   static const googleOAuthAccessTokenKey = 'second_chat.google_oauth_access_token';
 
-  /// Google Sign-In OAuth **access** token (`ya29…`) after Google sign-in.
-  /// Second Chat REST/socket use the **backend session JWT**, not this Google access token.
+  /// Google Sign-In OAuth **access** token (`ya29…`) set once after login via [AuthController.loginWithGoogle].
+  /// Session checks do not re-prompt Google; read with [GoogleSignInService.readStoredGoogleAccessToken].
   Future<String?> getGoogleOAuthAccessToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();

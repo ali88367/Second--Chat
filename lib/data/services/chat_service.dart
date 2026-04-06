@@ -203,13 +203,21 @@ class ChatService {
         final metadata = m['metadata'];
         final user = _historyNonEmpty(m['sender_username']) ??
             _historyNonEmpty(m['senderUsername']) ??
-            _historyNonEmpty(m['user']) ??
+            _historyNonEmpty(m['login']) ??
+            _historyNonEmpty(m['user_login']) ??
+            _historyNonEmpty(m['userLogin']) ??
             _historyNonEmpty(m['username']) ??
+            _historyNonEmpty(m['user']) ??
             _historyNonEmpty(m['name']) ??
             (metadata is Map
-                ? (_historyNonEmpty(metadata['user']) ??
+                ? (_historyNonEmpty(metadata['login']) ??
+                    _historyNonEmpty(metadata['user_login']) ??
+                    _historyNonEmpty(metadata['userLogin']) ??
+                    _historyNonEmpty(metadata['sender_username']) ??
                     _historyNonEmpty(metadata['username']) ??
-                    _historyNonEmpty(metadata['login']))
+                    _historyNonEmpty(metadata['user']) ??
+                    _historyNonEmpty(metadata['display_name']) ??
+                    _historyNonEmpty(metadata['displayName']))
                 : null) ??
             'Unknown';
         var text = (m['message'] ?? m['text'] ?? m['body'] ?? m['content'] ?? '')

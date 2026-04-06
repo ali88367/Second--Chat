@@ -33,23 +33,27 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
   Widget build(BuildContext context) {
     final chatCtrl = Get.find<ChatController>();
     return Obx(() {
-      final fresh = chatCtrl.urlForPlatform(widget.platformKey)?.trim() ?? '';
       final liveExpected = chatCtrl.isPlatformLive(widget.platformKey);
+      final fresh = chatCtrl.urlForPlatform(widget.platformKey)?.trim() ?? '';
+      final hardOff = chatCtrl.isPlatformExplicitlyOffline(widget.platformKey);
 
       if (!liveExpected) {
-        // Never keep or render stale embeds while platform is offline.
         _latchedEmbedUrl = '';
       } else if (fresh.isNotEmpty) {
         if (_latchedEmbedUrl.isEmpty ||
             !streamEmbedUrlsCanonicallyEqual(fresh, _latchedEmbedUrl)) {
           _latchedEmbedUrl = fresh;
         }
+      } else if (hardOff) {
+        _latchedEmbedUrl = '';
       }
 
+      // Always keep WebView mounted: no embed URL when offline; idle shell only.
+      final webUrl = liveExpected ? _latchedEmbedUrl : '';
       return RepaintBoundary(
         child: StreamWebView(
           key: widget.streamViewKey,
-          url: _latchedEmbedUrl,
+          url: webUrl,
           height: widget.height,
           muted: widget.muted,
           streamExpectedLive: liveExpected,

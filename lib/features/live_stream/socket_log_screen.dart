@@ -4,8 +4,22 @@ import 'package:get/get.dart';
 
 import '../../controllers/chat_controller.dart';
 
-/// Full-screen live debug log with search (fed by [ChatController.socketInboundLog]):
-/// socket connect + `connected`, `chat:*`, activity, and chat history (`api:chat/history` logs API `data` only).
+/// Parses `timestamp | event | payload…` (payload may contain ` | `).
+String? _parseSocketLogEventName(String line) {
+  final first = line.indexOf(' | ');
+  if (first == -1) return null;
+  final second = line.indexOf(' | ', first + 1);
+  if (second == -1) return null;
+  return line.substring(first + 3, second).trim();
+}
+
+bool _isChatMessageLog(String line) {
+  final ev = _parseSocketLogEventName(line);
+  return ev == 'chat:message';
+}
+
+/// Live debug log: **chat:message socket** connection status at top; list shows only
+/// inbound `chat:message` lines ([ChatController.socketInboundLog]).
 class SocketLogScreen extends StatefulWidget {
   const SocketLogScreen({super.key});
 
@@ -70,7 +84,7 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1C1C1E),
         foregroundColor: Colors.white,
-        title: Text('Socket log', style: TextStyle(fontSize: 17.sp)),
+        title: Text('Chat & activity log', style: TextStyle(fontSize: 17.sp)),
         actions: [
           TextButton(
             onPressed: () {
@@ -158,7 +172,10 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
                         '${d['access_token_fingerprint']}',
                       ),
                       _socketDetailRow('Base URL', '${d['base_url']}'),
-                      _socketDetailRow('Socket.IO path', '${d['socket_io_path']}'),
+                      _socketDetailRow(
+                        'Socket.IO path',
+                        '${d['socket_io_path']}',
+                      ),
                       _socketDetailRow(
                         'Transport',
                         connected ? 'connected' : 'disconnected',
@@ -210,8 +227,7 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
               onChanged: (v) => _searchRx.value = v,
               style: TextStyle(color: Colors.white, fontSize: 14.sp),
               decoration: InputDecoration(
-                hintText:
-                    'Search (CHAT_MESSAGE_SOCKET, chat:message, activity:event…)…',
+                hintText: 'Search chat:message & activity:event…',
                 hintStyle: TextStyle(color: Colors.white38, fontSize: 13.sp),
                 filled: true,
                 fillColor: const Color(0xFF2C2C2E),
@@ -234,10 +250,12 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
           Expanded(
             child: Obx(() {
               final q = _searchRx.value.trim().toLowerCase();
-              final all = chat.socketInboundLog;
+              final base = chat.socketInboundLog
+                  .where(_isChatMessageLog)
+                  .toList(growable: false);
               final filtered = q.isEmpty
-                  ? all.toList(growable: false)
-                  : all
+                  ? base
+                  : base
                       .where((e) => e.toLowerCase().contains(q))
                       .toList(growable: false);
 
@@ -245,7 +263,7 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
                 return Center(
                   child: Text(
                     q.isEmpty
-                        ? 'No log lines yet. Open live chat; history logs on refresh.'
+                        ? 'No chat:message lines yet.'
                         : 'No matches.',
                     style: TextStyle(color: Colors.white54, fontSize: 14.sp),
                   ),

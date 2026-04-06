@@ -87,6 +87,25 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     return expiresAt.toUtc().isBefore(now.add(_tokenExpiryLeeway));
   }
 
+  /// True when the access token expires within [within] (proactive refresh).
+  bool _isTokenExpiredWithin(SessionTokens tokens, Duration within) {
+    final expiresAt = tokens.accessTokenExpiresAt;
+    if (expiresAt == null) return false;
+    final now = DateTime.now().toUtc();
+    return expiresAt.toUtc().isBefore(now.add(within));
+  }
+
+  Future<void> _persistRefreshedSession(SessionTokens refreshed) async {
+    var r = refreshed;
+    if (r.accessTokenExpiresAt == null && r.accessToken.isNotEmpty) {
+      final exp = parseJwtAccessTokenExpiryUtc(r.accessToken);
+      if (exp != null) {
+        r = r.copyWith(accessTokenExpiresAt: exp);
+      }
+    }
+    await _api.tokenStore.write(r);
+  }
+
   Future<bool> ensureValidSession({bool refreshIfExpired = true}) async {
     final tokens = await _api.tokenStore.read();
     if (tokens == null) {
@@ -105,15 +124,8 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       }
 
       try {
-        var refreshed = await authApi.refresh(tokens.refreshToken);
-        if (refreshed.accessTokenExpiresAt == null &&
-            refreshed.accessToken.isNotEmpty) {
-          final exp = parseJwtAccessTokenExpiryUtc(refreshed.accessToken);
-          if (exp != null) {
-            refreshed = refreshed.copyWith(accessTokenExpiresAt: exp);
-          }
-        }
-        await _api.tokenStore.write(refreshed);
+        final refreshed = await authApi.refresh(tokens.refreshToken);
+        await _persistRefreshedSession(refreshed);
         isAuthenticated.value = true;
         return true;
       } on DioException catch (e) {
@@ -133,6 +145,18 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         isAuthenticated.value = false;
         me.value = null;
         return false;
+      }
+    }
+
+    // Still valid: optionally refresh early so the next API call uses a fresh JWT.
+    if (refreshIfExpired &&
+        tokens.refreshToken.isNotEmpty &&
+        _isTokenExpiredWithin(tokens, const Duration(minutes: 5))) {
+      try {
+        final refreshed = await authApi.refresh(tokens.refreshToken);
+        await _persistRefreshedSession(refreshed);
+      } catch (_) {
+        // Keep existing tokens; [AuthInterceptor] will retry refresh on 401.
       }
     }
 

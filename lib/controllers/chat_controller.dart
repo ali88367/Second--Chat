@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 
 import 'auth_controller.dart';
 import 'edge_glow_notification_controller.dart';
-import 'platform_connect_controller.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
@@ -18,14 +17,14 @@ class ChatController extends GetxController {
     PlatformTokenProvider? tokenProvider,
     LiveStreamService? liveStreamService,
   }) : _tokenProvider = tokenProvider ?? PlatformTokenProvider(),
-       _live =
-           liveStreamService ??
-           LiveStreamService(tokenProvider: tokenProvider ?? PlatformTokenProvider());
+        _live =
+            liveStreamService ??
+                LiveStreamService(tokenProvider: tokenProvider ?? PlatformTokenProvider());
 
   final PlatformTokenProvider _tokenProvider;
   final SettingsController _settings = Get.find<SettingsController>();
   final EdgeGlowNotificationController _edgeGlow =
-      Get.find<EdgeGlowNotificationController>();
+  Get.find<EdgeGlowNotificationController>();
   final LiveStreamService _live;
 
   final RxString platform = 'twitch'.obs;
@@ -60,11 +59,11 @@ class ChatController extends GetxController {
 
   /// Merges overlapping refreshes for the same platform (avoids duplicate HTTP).
   final Map<String, Future<void>> _overviewRefreshCoalesce =
-      <String, Future<void>>{};
+  <String, Future<void>>{};
 
   /// One in-flight `GET /chat/history` per platform (callers await the same [Future]).
   final Map<String, Future<void>> _historyRefreshCoalesce =
-      <String, Future<void>>{};
+  <String, Future<void>>{};
 
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
@@ -124,8 +123,8 @@ class ChatController extends GetxController {
     }
   }
 
-  /// Backend session JWT + platform tokens for **`GET /streaming/overview`** only
-  /// (Second Chat REST; keep JWT-first so socket URL loads reliably).
+  /// Backend session JWT (same as [AuthInterceptor]) + platform tokens for overview/socket.
+  /// Google Sign-In supplies an **id token** once to `/auth/google`; the server returns this JWT.
   Future<String?> _resolveStreamingRestToken(String platformKey) async {
     try {
       final session = await Get.find<AuthController>().api.tokenStore.read();
@@ -138,11 +137,7 @@ class ChatController extends GetxController {
         await _tokenProvider.getAccessToken(p);
   }
 
-  /// **`/api/v1/chat/*`** and Socket.IO (§5): backend **`accessToken` (JWT)** per `API_SOCKET_DETAILS.md`.
-  ///
-  /// Google’s OAuth **access** token (`ya29…`) is for Google APIs only — the Second Chat server
-  /// validates **its own** JWT (from `/auth/login`, `/auth/google/token` with `idToken`, etc.).
-  /// Using the Google access token here causes `Invalid authentication token` on the socket.
+  /// REST + Socket.IO: **backend session JWT** (not Google `ya29…` — server `authenticate` expects JWT).
   Future<String?> _resolveChatAuthToken(String platformKey) async {
     return _resolveStreamingRestToken(platformKey);
   }
@@ -207,42 +202,6 @@ class ChatController extends GetxController {
     kick();
   }
 
-  List<String> _connectedPlatformsFromStatusCache() {
-    try {
-      final status = Get.find<PlatformConnectController>();
-      return status.isConnected.entries
-          .where((e) => e.value == true)
-          .map((e) => _normalizedApiPlatform(e.key.name))
-          .where((e) => e.isNotEmpty)
-          .toSet()
-          .toList(growable: false);
-    } catch (_) {
-      return const <String>[];
-    }
-  }
-
-  Future<List<String>> _connectedPlatformsForBootstrap() async {
-    final fromStored = (await _tokenProvider.getConnectedPlatforms())
-        .map((e) => _normalizedApiPlatform(e))
-        .where((e) => e.isNotEmpty)
-        .toSet();
-    final merged = <String>{...fromStored, ..._connectedPlatformsFromStatusCache()};
-    return merged.toList(growable: false);
-  }
-
-  Future<bool> _hasAnyConnectedPlatformForStreaming() async {
-    final connected = await _connectedPlatformsForBootstrap();
-    return connected.isNotEmpty;
-  }
-
-  Future<String> _preferredConnectedPlatform({String fallback = 'twitch'}) async {
-    final current = _normalizedApiPlatform(platform.value, fallback: fallback);
-    final connected = await _connectedPlatformsForBootstrap();
-    if (connected.contains(current)) return current;
-    if (connected.isNotEmpty) return connected.first;
-    return current;
-  }
-
   void _startConnectRetry() {
     _connectRetryTimer?.cancel();
     _connectRetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
@@ -279,11 +238,7 @@ class ChatController extends GetxController {
       }
       _lastSocketConnectAttempt = now;
 
-      if (!await _hasAnyConnectedPlatformForStreaming()) return;
-      final selected = await _preferredConnectedPlatform(fallback: 'twitch');
-      if (_normalizedApiPlatform(platform.value, fallback: 'twitch') != selected) {
-        platform.value = selected;
-      }
+      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       final token = await _resolveChatAuthToken(selected);
       if (token == null || token.trim().isEmpty) return;
       _socketAuthToken = token.trim();
@@ -340,13 +295,13 @@ class ChatController extends GetxController {
 
   Future<void> _bootstrapBody() async {
     try {
-      if (!await _hasAnyConnectedPlatformForStreaming()) return;
-      var selected = await _preferredConnectedPlatform(fallback: 'twitch');
-      if (_normalizedApiPlatform(platform.value, fallback: 'twitch') != selected) {
-        platform.value = selected;
-      }
+      final auth = Get.find<AuthController>();
+      await auth.ensureValidSession(refreshIfExpired: true);
+      if (!auth.isAuthenticated.value) return;
+
+      var selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       // 1) App start: hit overview for each connected platform (tokens in SharedPrefs).
-      final connectedPlatforms = await _connectedPlatformsForBootstrap();
+      final connectedPlatforms = await _tokenProvider.getConnectedPlatforms();
       if (connectedPlatforms.isNotEmpty) {
         // Keep default selection as-is unless it's not connected.
         if (!connectedPlatforms.contains(selected)) {
@@ -356,7 +311,7 @@ class ChatController extends GetxController {
         await refreshOverviewsForPlatforms(connectedPlatforms);
       }
 
-      // Socket + chat: Google OAuth access token when signed in with Google, else session JWT.
+      // Socket + chat: backend session JWT (same as REST [AuthInterceptor]).
       _socketAuthToken = await _resolveChatAuthToken(selected);
       if (_socketAuthToken == null || _socketAuthToken!.isEmpty) return;
 
@@ -405,11 +360,11 @@ class ChatController extends GetxController {
       for (final p in normalized) {
         final pToken = await _resolveStreamingRestToken(p);
         final effectiveToken =
-            (pToken != null && pToken.trim().isNotEmpty) ? pToken.trim() : null;
+        (pToken != null && pToken.trim().isNotEmpty) ? pToken.trim() : null;
         if (kDebugMode) {
           debugPrint(
             '[ChatController] overview token platform=$p present=${pToken != null && pToken.trim().isNotEmpty} '
-            'token=${_maskToken(effectiveToken)}',
+                'token=${_maskToken(effectiveToken)}',
           );
         }
         if (effectiveToken == null || effectiveToken.isEmpty) continue;
@@ -505,15 +460,15 @@ class ChatController extends GetxController {
     debugPrint('======== SC_STREAM_DETAILS ($reason) ========');
     debugPrint(
       'selected=${platform.value} isLive=${isLive.value} '
-      'viewerCount=${viewerCount.value} socketConnected=${isConnected.value}',
+          'viewerCount=${viewerCount.value} socketConnected=${isConnected.value}',
     );
     debugPrint('watchUrl=${su(watchUrl.value)}');
     final ov = overview.value;
     if (ov != null) {
       debugPrint(
         'overview: platform=${ov.platform} live=${ov.live} '
-        'viewerCount=${ov.viewerCount} watchUrl=${su(ov.watchUrl)} '
-        'hasSocketUrl=${ov.chatSocketUrl != null && ov.chatSocketUrl!.trim().isNotEmpty}',
+            'viewerCount=${ov.viewerCount} watchUrl=${su(ov.watchUrl)} '
+            'hasSocketUrl=${ov.chatSocketUrl != null && ov.chatSocketUrl!.trim().isNotEmpty}',
       );
     } else {
       debugPrint('overview: (null)');
@@ -532,16 +487,16 @@ class ChatController extends GetxController {
       if (!hasAny) continue;
       debugPrint(
         '  [$key] live=$live viewers=$vc title="${title ?? ''}" '
-        'category="${cat ?? ''}" embed=${su(embed)}',
+            'category="${cat ?? ''}" embed=${su(embed)}',
       );
     }
     debugPrint('================================================');
   }
 
   Future<void> refreshOverviewForPlatform(
-    String p, {
-    bool forceChatHistory = false,
-  }) {
+      String p, {
+        bool forceChatHistory = false,
+      }) {
     final key = _normalizedApiPlatform(p, fallback: 'twitch');
     if (!forceChatHistory) {
       final pending = _overviewRefreshCoalesce[key];
@@ -560,13 +515,13 @@ class ChatController extends GetxController {
   }
 
   Future<void> _refreshOverviewForPlatformBody(
-    String p, {
-    bool forceChatHistory = false,
-  }) async {
+      String p, {
+        bool forceChatHistory = false,
+      }) async {
     try {
       final token = await _resolveStreamingRestToken(p);
       if (token == null || token.isEmpty) return;
-      // Do not overwrite [_socketAuthToken]: overview uses app/platform JWT; socket uses [_resolveChatAuthToken].
+      // Do not overwrite [_socketAuthToken]: overview + socket use [_resolveStreamingRestToken].
 
       // If multi-preview mode is enabled, refresh all platforms so the top streams stay "hot".
       if (_settings.multiScreenPreview.value == true) {
@@ -762,6 +717,38 @@ class ChatController extends GetxController {
     return 'You';
   }
 
+  /// Socket payloads sometimes use display/login variants; overview [platformChatUsernames] is canonical.
+  /// Prefix match only when length gap is small (avoids `cat` vs `catherine`).
+  static bool _isSameUsernameVariant(String fromSocket, String fromOverview) {
+    final a = fromSocket.trim().toLowerCase();
+    final b = fromOverview.trim().toLowerCase();
+    if (a.isEmpty || b.isEmpty) return false;
+    if (a == b) return true;
+    if (a.startsWith(b) || b.startsWith(a)) {
+      return (a.length - b.length).abs() <= 6;
+    }
+    return false;
+  }
+
+  /// When the sender matches the linked channel login from overview, show that exact name.
+  ChatMessage _chatMessageWithOverviewUsername(ChatMessage msg, String platformKey) {
+    final key = _normalizePlatformKey(platformKey);
+    if (key.isEmpty) return msg;
+    final linked = platformChatUsernames[key];
+    if (linked == null || linked.trim().isEmpty) return msg;
+    final canonical = linked.trim();
+    if (!_isSameUsernameVariant(msg.userName, canonical)) return msg;
+    if (msg.userName == canonical) return msg;
+    return ChatMessage(
+      platform: msg.platform,
+      userName: canonical,
+      message: msg.message,
+      timestamp: msg.timestamp,
+      id: msg.id,
+      raw: msg.raw,
+    );
+  }
+
   void _purgeStalePendingEchoes() {
     final now = DateTime.now().toUtc();
     _pendingLocalChatEchoes.removeWhere((e) {
@@ -840,9 +827,9 @@ class ChatController extends GetxController {
   }
 
   bool _shouldSuppressSocketNearDuplicate(
-    List<ChatMessage> existing,
-    ChatMessage incoming,
-  ) {
+      List<ChatMessage> existing,
+      ChatMessage incoming,
+      ) {
     final incTs = incoming.timestamp.toUtc();
     for (final m in existing.reversed.take(30)) {
       if (m.platform.toLowerCase().trim() !=
@@ -950,19 +937,19 @@ class ChatController extends GetxController {
   }
 
   String _edgeGlowDedupeKeyForActivity(
-    Map<String, dynamic> event, {
-    required String platformKey,
-  }) {
+      Map<String, dynamic> event, {
+        required String platformKey,
+      }) {
     final id = event['id']?.toString().trim();
     final metadata = event['metadata'];
     String messageId = '';
     if (metadata is Map) {
       messageId = (metadata['messageId'] ??
-                  metadata['message_id'] ??
-                  metadata['id'] ??
-                  '')
-              .toString()
-              .trim();
+          metadata['message_id'] ??
+          metadata['id'] ??
+          '')
+          .toString()
+          .trim();
     }
     final type = _normalizeActivityType(event['type']?.toString());
     final ts = (event['timestamp'] ?? event['created_at'] ?? '')
@@ -978,7 +965,7 @@ class ChatController extends GetxController {
   bool _seenEdgeGlowRecently(String key) {
     final now = DateTime.now().toUtc();
     _edgeGlowEventSeenAt.removeWhere(
-      (_, ts) => now.difference(ts) > const Duration(seconds: 12),
+          (_, ts) => now.difference(ts) > const Duration(seconds: 12),
     );
     if (_edgeGlowEventSeenAt.containsKey(key)) return true;
     _edgeGlowEventSeenAt[key] = now;
@@ -1002,7 +989,7 @@ class ChatController extends GetxController {
     final eventPlatform = _normalizePlatformKey(event['platform']?.toString());
 
     final glowPlatform =
-        eventPlatform.isNotEmpty ? eventPlatform : selectedPlatform;
+    eventPlatform.isNotEmpty ? eventPlatform : selectedPlatform;
     if (glowPlatform.isEmpty) return;
 
     final dedupeKey = _edgeGlowDedupeKeyForActivity(
@@ -1028,9 +1015,9 @@ class ChatController extends GetxController {
   }
 
   void _appendActivityFromChatMessage(
-    ChatMessage msg, {
-    bool triggerEdgeGlow = true,
-  }) {
+      ChatMessage msg, {
+        bool triggerEdgeGlow = true,
+      }) {
     final id = msg.id?.trim();
     final dedupe = id != null && id.isNotEmpty
         ? 'id:$id'
@@ -1069,7 +1056,7 @@ class ChatController extends GetxController {
 
     final p = _normalizePlatformKey(msg.platform);
     if (p.isEmpty) return;
-    final normalizedMsg = msg.platform == p
+    var normalizedMsg = msg.platform == p
         ? msg
         : ChatMessage(
             platform: p,
@@ -1079,11 +1066,12 @@ class ChatController extends GetxController {
             id: msg.id,
             raw: msg.raw,
           );
+    normalizedMsg = _chatMessageWithOverviewUsername(normalizedMsg, p);
     _purgeStalePendingEchoes();
 
     final norm = msg.message.trim().toLowerCase();
     final pendingIdx = _pendingLocalChatEchoes.indexWhere(
-      (e) => e.platform == p && e.normalizedText == norm,
+          (e) => e.platform == p && e.normalizedText == norm,
     );
 
     if (pendingIdx != -1) {
@@ -1114,10 +1102,10 @@ class ChatController extends GetxController {
   }
 
   Future<void> _swapToPlatformAndRefresh(
-    String p, {
-    bool forceHistory = false,
-    bool fetchHistory = true,
-  }) async {
+      String p, {
+        bool forceHistory = false,
+        bool fetchHistory = true,
+      }) async {
     final key = _normalizePlatformKey(p);
     if (key.isEmpty) return;
 
@@ -1168,9 +1156,9 @@ class ChatController extends GetxController {
 
   /// Merges `activities` from GET `/chat/history` into [activityEvents] (deduped by `id`).
   void _mergeHistoryActivitiesFromApi(
-    List<Map<String, dynamic>> raw, {
-    required String platformKey,
-  }) {
+      List<Map<String, dynamic>> raw, {
+        required String platformKey,
+      }) {
     if (raw.isEmpty) return;
 
     final existingIds = <String>{
@@ -1193,9 +1181,9 @@ class ChatController extends GetxController {
       if (meta is Map) {
         final mm = Map<String, dynamic>.from(meta.cast<String, dynamic>());
         final login = (mm['user_login'] ??
-                mm['user_name'] ??
-                mm['username'] ??
-                mm['user'])
+            mm['user_name'] ??
+            mm['username'] ??
+            mm['user'])
             ?.toString()
             .trim();
         if (login != null && login.isNotEmpty) {
@@ -1212,7 +1200,7 @@ class ChatController extends GetxController {
     if (toAdd.isEmpty) return;
 
     toAdd.sort(
-      (a, b) => _activityEventTimeUtc(a).compareTo(_activityEventTimeUtc(b)),
+          (a, b) => _activityEventTimeUtc(a).compareTo(_activityEventTimeUtc(b)),
     );
     for (final m in toAdd) {
       activityEvents.add(m);
@@ -1268,7 +1256,8 @@ class ChatController extends GetxController {
         final normalOnly = <ChatMessage>[];
         for (final m in history) {
           if (_isNormalChatMessage(m)) {
-            normalOnly.add(m);
+            final pk = _normalizePlatformKey(m.platform);
+            normalOnly.add(_chatMessageWithOverviewUsername(m, pk));
           } else {
             _appendActivityFromChatMessage(m, triggerEdgeGlow: false);
           }
@@ -1292,9 +1281,9 @@ class ChatController extends GetxController {
   }
 
   List<ChatMessage> _mergeUniqueByDedupeKey(
-    List<ChatMessage> a,
-    List<ChatMessage> b,
-  ) {
+      List<ChatMessage> a,
+      List<ChatMessage> b,
+      ) {
     final out = <ChatMessage>[];
     final seen = <String>{};
     void addAll(List<ChatMessage> list) {
@@ -1311,9 +1300,9 @@ class ChatController extends GetxController {
   }
 
   Future<void> _ensureChatForLivePlatform(
-    String p, {
-    bool forceHistory = false,
-  }) async {
+      String p, {
+        bool forceHistory = false,
+      }) async {
     final key = p.toLowerCase();
     // 1) Socket ensure connect (no-op if already connected)
     if (isConnected.value != true) {
@@ -1464,10 +1453,10 @@ class ChatController extends GetxController {
       event['platform'] = (event['platform'] ?? platform.value).toString();
       event['type'] =
           (event['type'] ??
-                  event['eventType'] ??
-                  event['kind'] ??
-                  event['event'] ??
-                  'notification')
+              event['eventType'] ??
+              event['kind'] ??
+              event['event'] ??
+              'notification')
               .toString();
       _maybeTriggerEdgeGlowForActivity(event);
     };
@@ -1495,7 +1484,7 @@ class ChatController extends GetxController {
   /// miss messages after reconnect or backgrounding.
   Future<void> refreshChatHistory({String? forPlatform, bool force = true}) {
     final key =
-        _normalizedApiPlatform(forPlatform ?? platform.value, fallback: 'twitch');
+    _normalizedApiPlatform(forPlatform ?? platform.value, fallback: 'twitch');
     return _refreshHistoryForPlatform(key, force: force);
   }
 

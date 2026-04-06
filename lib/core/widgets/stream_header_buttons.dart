@@ -3,7 +3,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 
-/// Blur + gradient border; sizes to [padding] + [child] (no fixed width/height).
+/// Blur + simple solid border; sizes to [padding] + [child] (no fixed width/height).
 class _GlassHeaderChip extends StatelessWidget {
   const _GlassHeaderChip({
     required this.padding,
@@ -15,41 +15,24 @@ class _GlassHeaderChip extends StatelessWidget {
 
   static const double _borderRadius = 22;
   static const double _blur = 12;
-
-  static final LinearGradient _borderGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Colors.white.withOpacity(0.18),
-      Colors.white.withOpacity(0.09),
-    ],
-  );
+  static const Color _fillColor = Color(0xFF141414);
+  static const Color _borderColor = Color(0xFF4A4A4A);
 
   @override
   Widget build(BuildContext context) {
     const r = _borderRadius;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(r + 1),
-        gradient: _borderGradient,
-      ),
-      padding: const EdgeInsets.all(1),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(r),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: _blur, sigmaY: _blur * 2),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(r),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.black, Colors.black],
-              ),
-            ),
-            child: child,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(r),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: _blur, sigmaY: _blur * 2),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: _fillColor,
+            borderRadius: BorderRadius.circular(r),
+            border: Border.all(color: _borderColor, width: 1),
           ),
+          child: child,
         ),
       ),
     );

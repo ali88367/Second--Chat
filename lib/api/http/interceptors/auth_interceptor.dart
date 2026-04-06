@@ -23,6 +23,8 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    // Second Chat `authenticate` middleware expects the **backend session JWT** from
+    // `/auth/login` or `/auth/google` — not the Google OAuth access token (`ya29…`).
     final tokens = await _tokenStore.read();
     if (tokens != null && tokens.accessToken.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer ${tokens.accessToken}';
@@ -68,7 +70,8 @@ class AuthInterceptor extends Interceptor {
 
       final requestOptions = err.requestOptions;
       requestOptions.extra['__retry'] = true;
-      requestOptions.headers['Authorization'] = 'Bearer ${newTokens.accessToken}';
+      requestOptions.headers['Authorization'] =
+          'Bearer ${newTokens.accessToken}';
 
       final response = await _dio.fetch<dynamic>(requestOptions);
       handler.resolve(response);

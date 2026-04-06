@@ -209,7 +209,56 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     });
 
     _focusNode.addListener(_onFocusChanged);
+    widget.chatFilter.addListener(_syncFilterLabelFromChatFilter);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncFilterLabelFromChatFilter();
+    });
     _log('initState completed');
+  }
+
+  /// Keeps [FilterController] label aligned with swipe / viewer-count changes.
+  void _syncFilterLabelFromChatFilter() {
+    final raw = widget.chatFilter.value?.trim();
+    final String label;
+    if (raw == null || raw.isEmpty) {
+      label = 'All';
+    } else {
+      final k = raw.toLowerCase();
+      if (k == 'twitch') {
+        label = 'Twitch';
+      } else if (k == 'kick') {
+        label = 'Kick';
+      } else if (k == 'youtube') {
+        label = 'YouTube';
+      } else {
+        label = raw.length == 1
+            ? raw.toUpperCase()
+            : '${raw[0].toUpperCase()}${raw.substring(1).toLowerCase()}';
+      }
+    }
+    if (filterController.currentFilter.value != label) {
+      filterController.currentFilter.value = label;
+    }
+    _expandedSheetStateSetter?.call(() {});
+    if (mounted) setState(() {});
+  }
+
+  String _apiPlatformForSend(String raw) {
+    final k = raw.toLowerCase().trim();
+    if (k.contains('kick')) return 'kick';
+    if (k.contains('youtube') || k == 'yt' || k.contains('google')) {
+      return 'youtube';
+    }
+    return 'twitch';
+  }
+
+  /// When [platformLive] has an entry for this platform and it is not live.
+  bool _streamOffForSendTarget(String currentPlatform) {
+    final key = _apiPlatformForSend(currentPlatform);
+    final map = _chatCtrl.platformLive;
+    if (map.isEmpty) return false;
+    if (!map.containsKey(key)) return false;
+    return map[key] != true;
   }
 
   /// Update the emote parser when emotes change
@@ -225,6 +274,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   @override
   void dispose() {
+    widget.chatFilter.removeListener(_syncFilterLabelFromChatFilter);
     _focusNode.removeListener(_onFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
     _scrollWorker?.dispose();
@@ -253,8 +303,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     final inset = MediaQuery.maybeOf(context)?.viewInsets.bottom ?? 0.0;
     _log(
       'focus changed: hasFocus=${_focusNode.hasFocus}, '
-      'hasPrimaryFocus=${_focusNode.hasPrimaryFocus}, '
-      'keyboardInset.mediaQuery=$inset, keyboardInset.metrics=$_keyboardInset',
+          'hasPrimaryFocus=${_focusNode.hasPrimaryFocus}, '
+          'keyboardInset.mediaQuery=$inset, keyboardInset.metrics=$_keyboardInset',
     );
   }
 
@@ -314,61 +364,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
-  String? _normalizeUiPlatformOrNull(String? raw) {
-    final v = (raw ?? '').toLowerCase().trim();
-    if (v.isEmpty) return null;
-    if (v.contains('kick')) return 'kick';
-    if (v.contains('youtube') || v == 'yt' || v.contains('google')) {
-      return 'youtube';
-    }
-    if (v.contains('twitch')) return 'twitch';
-    return null;
-  }
-
-  String _effectiveSelectedPlatform(String? filter) {
-    final fromFilter = _normalizeUiPlatformOrNull(filter);
-    if (fromFilter != null) return fromFilter;
-
-    final fromController = _normalizeUiPlatformOrNull(_chatCtrl.platform.value);
-    if (fromController != null) return fromController;
-
-    final fromSelected = _normalizeUiPlatformOrNull(widget.selectedPlatform.value);
-    if (fromSelected != null) return fromSelected;
-
-    return 'twitch';
-  }
-
-  String _platformLabel(String platform) {
-    switch (platform) {
-      case 'kick':
-        return 'Kick';
-      case 'youtube':
-        return 'YouTube';
-      case 'twitch':
-      default:
-        return 'Twitch';
-    }
-  }
-
-  Color _platformLabelColor(String platform) {
-    if (platform == 'twitch') {
-      return _settingsController.twitchColor.value ?? twitchPurple;
-    }
-    if (platform == 'kick') {
-      return _settingsController.kickColor.value ?? kickGreen;
-    }
-    if (platform == 'youtube') {
-      return _settingsController.youtubeColor.value ?? youtubeRed;
-    }
-    return Colors.white;
-  }
-
   List<Map<String, dynamic>> _commentsWithNamePrivacy(bool hideNames) {
     if (!hideNames) return List<Map<String, dynamic>>.from(_comments);
     return _comments
         .map(
           (e) => Map<String, dynamic>.from(e)..['name'] = '',
-        )
+    )
         .toList(growable: false);
   }
 
@@ -395,7 +396,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       }
       if (rows.isNotEmpty) {
         rows.sort(
-          (a, b) =>
+              (a, b) =>
               (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime),
         );
         for (final r in rows) {
@@ -407,22 +408,22 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       }
     } else {
       final normalMessages =
-          _chatCtrl.messages
-              .where(ChatController.isMainChatFeedLine)
-              .toList(growable: false);
+      _chatCtrl.messages
+          .where(ChatController.isMainChatFeedLine)
+          .toList(growable: false);
       source =
-          normalMessages.isNotEmpty
-              ? normalMessages
-                  .map<Map<String, dynamic>>(
-                    (m) => {
-                      'platform': _getPlatformAsset(m.platform),
-                      'name': hideNames ? '' : m.userName,
-                      'message': m.message,
-                      'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
-                    },
-                  )
-                  .toList(growable: false)
-              : _commentsWithNamePrivacy(hideNames);
+      normalMessages.isNotEmpty
+          ? normalMessages
+          .map<Map<String, dynamic>>(
+            (m) => {
+          'platform': _getPlatformAsset(m.platform),
+          'name': hideNames ? '' : m.userName,
+          'message': m.message,
+          'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
+        },
+      )
+          .toList(growable: false)
+          : _commentsWithNamePrivacy(hideNames);
     }
 
     // If no streams are live, hide chat entirely.
@@ -460,16 +461,17 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    final currentPlatform = _effectiveSelectedPlatform(widget.chatFilter.value);
-    _chatCtrl.platform.value = currentPlatform;
-
-    // Do not send while stream is offline; just clear the input.
-    if (!_chatCtrl.isPlatformLive(currentPlatform)) {
+    // Keep existing platform selection behavior.
+    String currentPlatform = widget.chatFilter.value ?? 'twitch';
+    if (widget.chatFilter.value == null &&
+        widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!;
+    }
+    if (_streamOffForSendTarget(currentPlatform)) {
       _messageController.clear();
-      _focusNode.requestFocus();
       return;
     }
-
+    _chatCtrl.platform.value = currentPlatform;
     _chatCtrl.sendMessage(text);
 
     _messageController.clear();
@@ -495,7 +497,14 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   /// Send emote directly to chat (not to text field)
   void _sendEmoteDirectly(String emoteName) {
-    final currentPlatform = _effectiveSelectedPlatform(widget.chatFilter.value);
+    String currentPlatform = widget.chatFilter.value ?? 'twitch';
+    if (widget.chatFilter.value == null &&
+        widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!;
+    }
+    if (_streamOffForSendTarget(currentPlatform)) {
+      return;
+    }
     _chatCtrl.platform.value = currentPlatform;
     _chatCtrl.sendMessage(emoteName);
 
@@ -596,12 +605,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   }
 
   void _showGlassmorphicPopupMenu(
-    BuildContext context,
-    String? currentFilter,
-    StateSetter? setSheetState,
-  ) {
+      BuildContext context,
+      String? currentFilter,
+      StateSetter? setSheetState,
+      ) {
     final RenderBox? overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    Overlay.of(context).context.findRenderObject() as RenderBox?;
     final RenderBox? button = context.findRenderObject() as RenderBox?;
 
     if (button == null || overlay == null) return;
@@ -621,7 +630,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             Positioned(
               bottom: overlay.size.height - buttonPosition.dy - 25.h,
               right:
-                  overlay.size.width -
+              overlay.size.width -
                   (buttonPosition.dx + buttonSize.width) -
                   28.w,
               child: Material(
@@ -653,13 +662,6 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
                       // Update the ValueNotifier's value
                       widget.chatFilter.value = filterValue;
-                      if (widget.selectedPlatform.value != null) {
-                        final effective = _effectiveSelectedPlatform(filterValue);
-                        if (_normalizeUiPlatformOrNull(widget.selectedPlatform.value) !=
-                            effective) {
-                          widget.selectedPlatform.value = effective;
-                        }
-                      }
 
                       // Update filter controller if needed
                       filterController.setFilter(selected);
@@ -701,10 +703,56 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,
       builder: (context, filter, _) {
+        // If no filter is selected, show "All" without color
+        if (filter == null) {
+          return GestureDetector(
+            onTap: () {
+              if (isExpanded) {
+                FocusScope.of(context).unfocus();
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (context.mounted) {
+                    _showGlassmorphicPopupMenu(context, filter, setSheetState);
+                  }
+                });
+              } else {
+                _showGlassmorphicPopupMenu(context, filter, null);
+              }
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4.h),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.l10n.all,
+                    style: TextStyle(color: Colors.white, fontSize: 16.sp),
+                  ),
+                  Icon(
+                    Icons.unfold_more,
+                    color: Colors.white.withOpacity(0.6),
+                    size: 16.sp,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // When filter is selected, use Obx to track platform color changes
         return Obx(() {
-          final selectedPlatform = _effectiveSelectedPlatform(filter);
-          final label = _platformLabel(selectedPlatform);
-          final labelColor = _platformLabelColor(selectedPlatform);
+          String label = "${filter[0].toUpperCase()}${filter.substring(1)}";
+          Color labelColor;
+
+          // Directly access observables for GetX to track them
+          if (filter == 'twitch') {
+            labelColor = _settingsController.twitchColor.value ?? twitchPurple;
+          } else if (filter == 'kick') {
+            labelColor = _settingsController.kickColor.value ?? kickGreen;
+          } else if (filter == 'youtube') {
+            labelColor = _settingsController.youtubeColor.value ?? youtubeRed;
+          } else {
+            labelColor = Colors.white;
+          }
 
           return GestureDetector(
             onTap: () {
@@ -744,21 +792,21 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   /// Build chat message with emote parsing
   Widget _chatItem(
-    String platform,
-    String name,
-    String message,
-    Color nameColor, {
-    Key? key,
-    List<Map<String, Object>>? embeddedEmotes,
-  }) {
+      String platform,
+      String name,
+      String message,
+      Color nameColor, {
+        Key? key,
+        List<Map<String, Object>>? embeddedEmotes,
+      }) {
     final emb = embeddedEmotes;
     final List<InlineSpan> messageSpans =
-        emb != null &&
-                emb.isNotEmpty &&
-                _emoteParser != null
-            ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
-            : _emoteParser?.parse(message) ??
-                [TextSpan(text: message, style: sfProText400(12.sp, Colors.white))];
+    emb != null &&
+        emb.isNotEmpty &&
+        _emoteParser != null
+        ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
+        : _emoteParser?.parse(message) ??
+        [TextSpan(text: message, style: sfProText400(12.sp, Colors.white))];
 
     return TweenAnimationBuilder<double>(
       key: key,
@@ -869,9 +917,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   /// Builds the expanded chat content (shared between normal and emoji-trigger open)
   Widget _buildExpandedChatContent(
-    BuildContext context,
-    StateSetter setSheetState,
-  ) {
+      BuildContext context,
+      StateSetter setSheetState,
+      ) {
     final keyboardInset = math.max(
       MediaQuery.of(context).viewInsets.bottom,
       _keyboardInset,
@@ -981,23 +1029,23 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                 Expanded(
                   child: GestureDetector(
                     onHorizontalDragEnd:
-                        widget.onPlatformSwipe != null
-                            ? (details) {
-                              // Determine swipe direction based on velocity
-                              const swipeThreshold =
-                                  100.0; // Minimum velocity to trigger swipe
-                              if (details.primaryVelocity != null) {
-                                if (details.primaryVelocity! > swipeThreshold) {
-                                  // Swipe right
-                                  widget.onPlatformSwipe!(true);
-                                } else if (details.primaryVelocity! <
-                                    -swipeThreshold) {
-                                  // Swipe left
-                                  widget.onPlatformSwipe!(false);
-                                }
-                              }
-                            }
-                            : null,
+                    widget.onPlatformSwipe != null
+                        ? (details) {
+                      // Determine swipe direction based on velocity
+                      const swipeThreshold =
+                      100.0; // Minimum velocity to trigger swipe
+                      if (details.primaryVelocity != null) {
+                        if (details.primaryVelocity! > swipeThreshold) {
+                          // Swipe right
+                          widget.onPlatformSwipe!(true);
+                        } else if (details.primaryVelocity! <
+                            -swipeThreshold) {
+                          // Swipe left
+                          widget.onPlatformSwipe!(false);
+                        }
+                      }
+                    }
+                        : null,
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16.w),
                       child: ValueListenableBuilder<String?>(
@@ -1019,16 +1067,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 final item = filteredList[index];
                                 final nameHash = item['name'].hashCode;
                                 final nameColor =
-                                    nameColors[nameHash.abs() %
-                                        nameColors.length];
+                                nameColors[nameHash.abs() %
+                                    nameColors.length];
                                 return _chatItem(
                                   item['platform'],
                                   item['name'],
                                   item['message'],
                                   nameColor,
                                   embeddedEmotes:
-                                      item['embeddedEmotes']
-                                          as List<Map<String, Object>>?,
+                                  item['embeddedEmotes']
+                                  as List<Map<String, Object>>?,
                                   key: ValueKey(
                                     'expanded_${item['name']}_${index}_${item['message']}',
                                   ),
@@ -1157,17 +1205,17 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onVerticalDragUpdate:
-                  widget.onResize != null
-                      ? (details) {
-                        widget.onResize!(details.delta.dy);
-                      }
-                      : null,
+              widget.onResize != null
+                  ? (details) {
+                widget.onResize!(details.delta.dy);
+              }
+                  : null,
               onVerticalDragEnd:
-                  widget.onResizeEnd != null
-                      ? (_) {
-                        widget.onResizeEnd!();
-                      }
-                      : null,
+              widget.onResizeEnd != null
+                  ? (_) {
+                widget.onResizeEnd!();
+              }
+                  : null,
               child: Container(
                 padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
                 child: Center(
@@ -1252,23 +1300,23 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             Expanded(
               child: GestureDetector(
                 onHorizontalDragEnd:
-                    widget.onPlatformSwipe != null
-                        ? (details) {
-                          // Determine swipe direction based on velocity
-                          const swipeThreshold =
-                              100.0; // Minimum velocity to trigger swipe
-                          if (details.primaryVelocity != null) {
-                            if (details.primaryVelocity! > swipeThreshold) {
-                              // Swipe right
-                              widget.onPlatformSwipe!(true);
-                            } else if (details.primaryVelocity! <
-                                -swipeThreshold) {
-                              // Swipe left
-                              widget.onPlatformSwipe!(false);
-                            }
-                          }
-                        }
-                        : null,
+                widget.onPlatformSwipe != null
+                    ? (details) {
+                  // Determine swipe direction based on velocity
+                  const swipeThreshold =
+                  100.0; // Minimum velocity to trigger swipe
+                  if (details.primaryVelocity != null) {
+                    if (details.primaryVelocity! > swipeThreshold) {
+                      // Swipe right
+                      widget.onPlatformSwipe!(true);
+                    } else if (details.primaryVelocity! <
+                        -swipeThreshold) {
+                      // Swipe left
+                      widget.onPlatformSwipe!(false);
+                    }
+                  }
+                }
+                    : null,
                 child: Stack(
                   children: [
                     ValueListenableBuilder<String?>(
@@ -1303,16 +1351,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 final item = filteredList[index];
                                 final nameHash = item['name'].hashCode;
                                 final nameColor =
-                                    nameColors[nameHash.abs() %
-                                        nameColors.length];
+                                nameColors[nameHash.abs() %
+                                    nameColors.length];
                                 return _chatItem(
                                   item['platform'],
                                   item['name'],
                                   item['message'],
                                   nameColor,
                                   embeddedEmotes:
-                                      item['embeddedEmotes']
-                                          as List<Map<String, Object>>?,
+                                  item['embeddedEmotes']
+                                  as List<Map<String, Object>>?,
                                   key: ValueKey(
                                     'main_${item['name']}_${index}_${item['message']}',
                                   ),
@@ -1494,50 +1542,50 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                       duration: const Duration(milliseconds: 200),
                       height: showSearch ? 50.h : 0,
                       child:
-                          showSearch
-                              ? Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                  12.w,
-                                  8.h,
-                                  12.w,
-                                  4.h,
-                                ),
-                                child: TextField(
-                                  controller: _searchController,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14.sp,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: context.l10n.searchEmotes,
-                                    hintStyle: TextStyle(
-                                      color: Colors.white38,
-                                      fontSize: 14.sp,
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.search,
-                                      color: Colors.white38,
-                                      size: 20.sp,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.1),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12.r),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12.w,
-                                      vertical: 8.h,
-                                    ),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _searchQuery = value;
-                                    });
-                                  },
-                                ),
-                              )
-                              : const SizedBox.shrink(),
+                      showSearch
+                          ? Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          12.w,
+                          8.h,
+                          12.w,
+                          4.h,
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14.sp,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: context.l10n.searchEmotes,
+                            hintStyle: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 14.sp,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: Colors.white38,
+                              size: 20.sp,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12.w,
+                              vertical: 8.h,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                      )
+                          : const SizedBox.shrink(),
                     );
                   },
                 ),
@@ -1759,9 +1807,9 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
 
       // Filter emotes based on search query
       final emotes =
-          _searchQuery.isEmpty
-              ? widget.emoteService.emoteList.toList()
-              : widget.emoteService.searchEmotes(_searchQuery);
+      _searchQuery.isEmpty
+          ? widget.emoteService.emoteList.toList()
+          : widget.emoteService.searchEmotes(_searchQuery);
 
       if (emotes.isEmpty) {
         return Center(
@@ -1806,27 +1854,27 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                 fit: BoxFit.contain,
                 placeholder:
                     (context, url) => Center(
-                      child: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: Colors.white24,
-                        ),
-                      ),
+                  child: SizedBox(
+                    width: 16.sp,
+                    height: 16.sp,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: Colors.white24,
                     ),
+                  ),
+                ),
                 errorWidget:
                     (context, url, error) => Center(
-                      child: Text(
-                        emote.name.length > 2
-                            ? emote.name.substring(0, 2)
-                            : emote.name,
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10.sp,
-                        ),
-                      ),
+                  child: Text(
+                    emote.name.length > 2
+                        ? emote.name.substring(0, 2)
+                        : emote.name,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 10.sp,
                     ),
+                  ),
+                ),
               ),
             ),
           ),

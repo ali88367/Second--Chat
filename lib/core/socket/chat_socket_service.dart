@@ -423,21 +423,29 @@ class ChatSocketService extends GetxService {
           (map['platform'] ?? map['source'] ?? 'twitch').toString();
       final metadata = map['metadata'];
       final metaUser = metadata is Map
-          ? (metadata['user'] ??
-                  metadata['username'] ??
+          ? (metadata['login'] ??
+                  metadata['user_login'] ??
+                  metadata['userLogin'] ??
                   metadata['sender_username'] ??
                   metadata['senderUsername'] ??
+                  metadata['username'] ??
+                  metadata['user'] ??
                   metadata['name'] ??
-                  metadata['displayName'])
+                  metadata['displayName'] ??
+                  metadata['display_name'])
               ?.toString()
           : null;
 
       String user = (map['sender_username'] ??
               map['senderUsername'] ??
+              map['login'] ??
+              map['user_login'] ??
+              map['userLogin'] ??
               map['username'] ??
               map['user'] ??
               map['name'] ??
               map['displayName'] ??
+              map['display_name'] ??
               metaUser ??
               'Unknown')
           .toString()

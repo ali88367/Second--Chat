@@ -733,19 +733,25 @@ class LiveStreamService {
                 'twitch')
             .toString(),
       );
+      // Prefer canonical login (Twitch: user_login) over display_name, which may omit digits.
       final metaUser = metadata is Map
-          ? _nonEmptyString(metadata['user']) ??
-              _nonEmptyString(metadata['username']) ??
+          ? _nonEmptyString(metadata['login']) ??
+              _nonEmptyString(metadata['user_login']) ??
+              _nonEmptyString(metadata['userLogin']) ??
               _nonEmptyString(metadata['sender_username']) ??
               _nonEmptyString(metadata['senderUsername']) ??
+              _nonEmptyString(metadata['username']) ??
+              _nonEmptyString(metadata['user']) ??
               _nonEmptyString(metadata['name']) ??
               _nonEmptyString(metadata['displayName']) ??
-              _nonEmptyString(metadata['display_name']) ??
-              _nonEmptyString(metadata['login'])
+              _nonEmptyString(metadata['display_name'])
           : null;
 
       var user = _nonEmptyString(map['sender_username']) ??
           _nonEmptyString(map['senderUsername']) ??
+          _nonEmptyString(map['login']) ??
+          _nonEmptyString(map['user_login']) ??
+          _nonEmptyString(map['userLogin']) ??
           _nonEmptyString(map['username']) ??
           _nonEmptyString(map['user']) ??
           _nonEmptyString(map['name']) ??

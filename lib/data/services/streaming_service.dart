@@ -23,12 +23,12 @@ class StreamingService {
   /// Login/username for chat display from one `platforms[]` entry.
   String? _platformUsernameFromOverviewEntry(Map<String, dynamic> m) {
     var s = extractString(m, const [
-      'username',
       'user_login',
+      'login',
       'userLogin',
+      'username',
       'user_name',
       'userName',
-      'login',
       'display_name',
       'displayName',
     ]);
@@ -38,9 +38,10 @@ class StreamingService {
       final sm = si.cast<String, dynamic>();
       s = extractString(sm, const [
         'user_login',
-        'user_name',
+        'login',
         'userLogin',
         'username',
+        'user_name',
         'display_name',
         'displayName',
       ]);
