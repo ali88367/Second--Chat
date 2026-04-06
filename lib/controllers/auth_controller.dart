@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/app_api.dart';
@@ -25,14 +26,13 @@ import '../core/localization/get_l10n.dart';
 import '../core/utils/platform_token_provider.dart';
 
 class AuthController extends GetxController with WidgetsBindingObserver {
-  AuthController({
-    AppApi? api,
-    OAuthFlow? oauthFlow,
-  })  : _api = api ?? AppApi.create(),
-        _oauthFlow = oauthFlow ?? OAuthFlow();
+  AuthController({AppApi? api, OAuthFlow? oauthFlow})
+    : _api = api ?? AppApi.create(),
+      _oauthFlow = oauthFlow ?? OAuthFlow();
 
   final AppApi _api;
   final OAuthFlow _oauthFlow;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   AppApi get api => _api;
 
@@ -40,6 +40,8 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   final RxBool isAuthenticated = false.obs;
   final Rxn<Map<String, dynamic>> me = Rxn<Map<String, dynamic>>();
   final RxnString lastError = RxnString();
+
+  static const String _kIntroDoneUsers = 'second_chat.intro_done_users';
 
   AuthApi get authApi => _api.auth;
   OAuthApi get oauthApi => _api.oauth;
@@ -70,12 +72,371 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     final tokens = await _api.tokenStore.read();
     if (tokens != null) {
       await prefs.setBool(AppConstants.keyIntroOnboardingComplete, true);
+      try {
+        await rememberIntroOnboardingCompletedForCurrentUser();
+      } catch (_) {}
     }
   }
 
-  Future<void> _markIntroOnboardingPendingAfterLogin() async {
+  Future<void> _setIntroOnboardingComplete(bool isComplete) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(AppConstants.keyIntroOnboardingComplete, false);
+    await prefs.setBool(AppConstants.keyIntroOnboardingComplete, isComplete);
+  }
+
+  Future<void> _syncIntroOnboardingFlagAfterLogin() async {
+    final rememberedForUser =
+        await _isIntroOnboardingRememberedForCurrentUser();
+    final skipFromServer = await _shouldSkipIntroOnboardingFromServerState();
+    final shouldSkip = rememberedForUser || skipFromServer;
+
+    await _setIntroOnboardingComplete(shouldSkip);
+    if (shouldSkip) {
+      await rememberIntroOnboardingCompletedForCurrentUser();
+    }
+    if (kDebugMode) {
+      debugPrint(
+        'INTRO ONBOARDING FLAG AFTER LOGIN: '
+        '${shouldSkip ? 'complete (skip trial screens)' : 'pending (show trial screens)'}',
+      );
+    }
+  }
+
+  Future<bool> _shouldSkipIntroOnboardingFromServerState() async {
+    if (_looksPremiumLike(me.value) || _looksTrialPreviouslyUsed(me.value)) {
+      return true;
+    }
+
+    try {
+      final res = await _api.client.dio.get<dynamic>('/api/v1/settings');
+      final root = _toMap(res.data);
+      final data = _toMap(root?['data']) ?? root;
+      final account = _toMap(data?['account']);
+
+      if (_looksPremiumLike(data) ||
+          _looksPremiumLike(account) ||
+          _looksTrialPreviouslyUsed(data) ||
+          _looksTrialPreviouslyUsed(account)) {
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('INTRO ONBOARDING CHECK (/api/v1/settings) failed: $e');
+      }
+    }
+
+    return false;
+  }
+
+  bool _looksPremiumLike(Map<String, dynamic>? map) {
+    if (map == null || map.isEmpty) return false;
+
+    const premiumBoolKeys = <String>[
+      'isPremium',
+      'is_premium',
+      'premium',
+      'hasPremium',
+      'has_premium',
+      'isSubscribed',
+      'is_subscribed',
+      'isPaid',
+      'is_paid',
+    ];
+    for (final key in premiumBoolKeys) {
+      final parsed = _toBool(map[key]);
+      if (parsed == true) return true;
+    }
+
+    const planKeys = <String>[
+      'yourPlan',
+      'plan',
+      'planType',
+      'plan_type',
+      'subscriptionPlan',
+      'subscription_plan',
+      'accountType',
+      'account_type',
+    ];
+    for (final key in planKeys) {
+      final plan = _normalizeText(map[key]);
+      if (plan.isEmpty) continue;
+      if (plan.contains('premium') ||
+          plan.contains('pro') ||
+          plan.contains('plus') ||
+          plan.contains('paid')) {
+        return true;
+      }
+    }
+
+    const subscriptionStatusKeys = <String>[
+      'subscriptionStatus',
+      'subscription_status',
+      'billingStatus',
+      'billing_status',
+      'membershipStatus',
+      'membership_status',
+    ];
+    for (final key in subscriptionStatusKeys) {
+      final status = _normalizeText(map[key]);
+      if (_isPaidLikeStatus(status)) return true;
+    }
+
+    return false;
+  }
+
+  bool _looksTrialPreviouslyUsed(Map<String, dynamic>? map) {
+    if (map == null || map.isEmpty) return false;
+
+    var found = false;
+    _walkJsonEntries(map, (key, value) {
+      if (found) return;
+      final normalizedKey = _normalizeKey(key);
+
+      if (_trialUsedBoolKeys.contains(normalizedKey)) {
+        if (_toBool(value) == true) {
+          found = true;
+        }
+        return;
+      }
+
+      if (_trialEligibilityBoolKeys.contains(normalizedKey)) {
+        final eligible = _toBool(value);
+        if (eligible == false) {
+          found = true;
+        }
+        return;
+      }
+
+      if (_trialStatusKeys.contains(normalizedKey)) {
+        if (_trialStatusIndicatesUsed(_normalizeText(value))) {
+          found = true;
+        }
+        return;
+      }
+
+      if (_trialDateKeys.contains(normalizedKey)) {
+        if (_toDateTime(value) != null) {
+          found = true;
+        }
+        return;
+      }
+
+      if (_trialNumericKeys.contains(normalizedKey)) {
+        final count = _toNum(value);
+        if (count != null && count >= 0) {
+          found = true;
+        }
+      }
+    });
+
+    return found;
+  }
+
+  static const Set<String> _trialUsedBoolKeys = <String>{
+    'trialused',
+    'istrialused',
+    'hasusedtrial',
+    'usedtrial',
+    'trialconsumed',
+    'istrialconsumed',
+    'hadtrial',
+    'hashadtrial',
+    'freetrialused',
+    'hasclaimedtrial',
+    'trialclaimed',
+  };
+
+  static const Set<String> _trialEligibilityBoolKeys = <String>{
+    'iseligiblefortrial',
+    'eligiblefortrial',
+    'canstarttrial',
+    'canclaimtrial',
+    'istrialavailable',
+    'trialavailable',
+    'trialeligible',
+    'hasfreetrialavailable',
+  };
+
+  static const Set<String> _trialStatusKeys = <String>{
+    'trialstatus',
+    'freetrialstatus',
+    'subscriptiontrialstatus',
+    'trialstate',
+  };
+
+  static const Set<String> _trialDateKeys = <String>{
+    'trialstart',
+    'trialstartedat',
+    'trialstartdate',
+    'trialend',
+    'trialendedat',
+    'trialenddate',
+    'trialexpiresat',
+    'trialexpirydate',
+    'freetrialstart',
+    'freetrialend',
+  };
+
+  static const Set<String> _trialNumericKeys = <String>{
+    'trialdaysused',
+    'trialdaysremaining',
+    'freetrialdaysused',
+    'freetrialdaysremaining',
+  };
+
+  bool _trialStatusIndicatesUsed(String status) {
+    if (status.isEmpty) return false;
+
+    const eligibleStates = <String>{
+      'eligible',
+      'notstarted',
+      'never',
+      'new',
+      'none',
+      'available',
+    };
+    if (eligibleStates.contains(status)) return false;
+
+    return status.contains('active') ||
+        status.contains('started') ||
+        status.contains('expired') ||
+        status.contains('ended') ||
+        status.contains('used') ||
+        status.contains('consumed') ||
+        status.contains('converted') ||
+        status.contains('cancel');
+  }
+
+  bool _isPaidLikeStatus(String status) {
+    if (status.isEmpty) return false;
+    return status.contains('active') ||
+        status.contains('paid') ||
+        status.contains('subscribed') ||
+        status.contains('premium') ||
+        status.contains('trialing') ||
+        status.contains('trialactive') ||
+        status.contains('intrial');
+  }
+
+  bool? _toBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final v = value.trim().toLowerCase();
+      if (v == 'true' || v == '1' || v == 'yes') return true;
+      if (v == 'false' || v == '0' || v == 'no') return false;
+    }
+    return null;
+  }
+
+  num? _toNum(dynamic value) {
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value.trim());
+    return null;
+  }
+
+  DateTime? _toDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    return DateTime.tryParse(value.toString().trim());
+  }
+
+  String _normalizeText(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim().toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
+  }
+
+  String _normalizeKey(String key) {
+    return key
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '')
+        .replaceAll('_', '');
+  }
+
+  void _walkJsonEntries(
+    dynamic node,
+    void Function(String key, dynamic value) visit,
+  ) {
+    if (node is Map) {
+      for (final entry in node.entries) {
+        final key = entry.key.toString();
+        final value = entry.value;
+        visit(key, value);
+        _walkJsonEntries(value, visit);
+      }
+      return;
+    }
+    if (node is List) {
+      for (final item in node) {
+        _walkJsonEntries(item, visit);
+      }
+    }
+  }
+
+  Map<String, dynamic>? _toMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  String? _currentUserIdentity() {
+    final profile = me.value;
+    if (profile == null) return null;
+    const identityKeys = <String>[
+      'id',
+      'user_id',
+      'userId',
+      'email',
+      'google_id',
+      'googleId',
+      'sub',
+    ];
+    for (final key in identityKeys) {
+      final raw = profile[key];
+      if (raw == null) continue;
+      final normalized = raw.toString().trim().toLowerCase();
+      if (normalized.isNotEmpty) return normalized;
+    }
+    return null;
+  }
+
+  Future<Set<String>> _readRememberedIntroUsers() async {
+    try {
+      final raw = await _secureStorage.read(key: _kIntroDoneUsers);
+      if (raw == null || raw.trim().isEmpty) return <String>{};
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .map((e) => e.toString().trim().toLowerCase())
+            .where((e) => e.isNotEmpty)
+            .toSet();
+      }
+    } catch (_) {}
+    return <String>{};
+  }
+
+  Future<void> _writeRememberedIntroUsers(Set<String> users) async {
+    final payload = jsonEncode(users.toList()..sort());
+    await _secureStorage.write(key: _kIntroDoneUsers, value: payload);
+  }
+
+  Future<bool> _isIntroOnboardingRememberedForCurrentUser() async {
+    final id = _currentUserIdentity();
+    if (id == null) return false;
+    final users = await _readRememberedIntroUsers();
+    return users.contains(id);
+  }
+
+  Future<void> rememberIntroOnboardingCompletedForCurrentUser() async {
+    final id = _currentUserIdentity();
+    if (id == null) return;
+    final users = await _readRememberedIntroUsers();
+    if (users.add(id)) {
+      await _writeRememberedIntroUsers(users);
+    }
   }
 
   static const Duration _tokenExpiryLeeway = Duration(seconds: 30);
@@ -233,10 +594,16 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         await PlatformTokenProvider().setGoogleOAuthAccessToken(
           creds.accessToken,
         );
-        await _markIntroOnboardingPendingAfterLogin();
         isAuthenticated.value = true;
         lastError.value = null;
         await refreshMe(silent: true);
+        try {
+          await _syncIntroOnboardingFlagAfterLogin();
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('INTRO ONBOARDING SYNC (Google login) failed: $e');
+          }
+        }
       } on DioException catch (e) {
         lastError.value = _messageForGoogleLoginApiFailure(e);
         if (kDebugMode) {
@@ -245,7 +612,8 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         rethrow;
       } catch (e) {
         lastError.value = 'Could not complete sign-in. Please try again.';
-        if (kDebugMode) debugPrint('loginWithGoogle: Google OK, unexpected: $e');
+        if (kDebugMode)
+          debugPrint('loginWithGoogle: Google OK, unexpected: $e');
         rethrow;
       }
     } on GoogleSignInException catch (e) {
@@ -253,7 +621,8 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         lastError.value = null;
         return;
       }
-      lastError.value = 'Google sign-in failed: ${e.description ?? e.code.name}';
+      lastError.value =
+          'Google sign-in failed: ${e.description ?? e.code.name}';
       if (kDebugMode) debugPrint('Google sign-in: $e');
       rethrow;
     } catch (e) {
@@ -263,10 +632,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     try {
       var tokens = await authApi.login(email: email, password: password);
       if (tokens.accessTokenExpiresAt == null &&
@@ -278,10 +644,16 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       }
       await _api.tokenStore.write(tokens);
       await PlatformTokenProvider().setGoogleOAuthAccessToken(null);
-      await _markIntroOnboardingPendingAfterLogin();
       isAuthenticated.value = true;
       lastError.value = null;
       await refreshMe(silent: true);
+      try {
+        await _syncIntroOnboardingFlagAfterLogin();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('INTRO ONBOARDING SYNC (email login) failed: $e');
+        }
+      }
     } catch (e) {
       lastError.value = 'Login failed: $e';
       if (kDebugMode) debugPrint('API ERROR(login): $e');
@@ -301,9 +673,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     try {
       final res = await authApi.logout(accessToken: accessToken);
       // ignore: avoid_print
-      print(
-        'LOGOUT API response: status=${res.statusCode} data=${res.data}',
-      );
+      print('LOGOUT API response: status=${res.statusCode} data=${res.data}');
     } catch (e) {
       if (kDebugMode) debugPrint('LOGOUT API error: $e');
     }
@@ -352,12 +722,11 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         lastError.value = 'OAuth failed: $err';
         if (kDebugMode) {
           debugPrint('OAUTH ERROR(${provider.name}): $err');
-          debugPrint('OAUTH PARAMS(${provider.name}): ${parsed.rawParams ?? {}}');
+          debugPrint(
+            'OAUTH PARAMS(${provider.name}): ${parsed.rawParams ?? {}}',
+          );
         }
-        _showOauthError(
-          'Login failed. Please try again.',
-          error: err,
-        );
+        _showOauthError('Login failed. Please try again.', error: err);
         return false;
       }
 
@@ -503,9 +872,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     if (raw != null && raw.isNotEmpty) {
       try {
         final decoded = jsonDecode(raw);
-        map = decoded is Map<String, dynamic>
-            ? decoded
-            : Map<String, dynamic>.from(decoded as Map);
+        map =
+            decoded is Map<String, dynamic>
+                ? decoded
+                : Map<String, dynamic>.from(decoded as Map);
       } catch (_) {
         map = <String, dynamic>{};
       }
@@ -530,8 +900,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       'access_token',
       'token',
     ]);
-    final refreshToken =
-        extractString(json, const ['refreshToken', 'refresh_token']);
+    final refreshToken = extractString(json, const [
+      'refreshToken',
+      'refresh_token',
+    ]);
 
     if (accessToken == null || accessToken.isEmpty) return null;
     if (refreshToken == null || refreshToken.isEmpty) return null;
@@ -557,9 +929,3 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     }
   }
 }
-
-
-
-
-
-

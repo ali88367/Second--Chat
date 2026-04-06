@@ -591,11 +591,12 @@ class StreamStreaksController extends GetxController {
     try {
       final accessToken = await _getAccessToken(showErrors: showErrors);
       if (accessToken == null || accessToken.isEmpty) return false;
+      final freezeDate = await _resolveFreezeRequestDate(explicitDate: date);
 
       final auth = Get.find<AuthController>();
       final res = await auth.api.client.dio.post<dynamic>(
         '/api/v1/streaks/freeze/use',
-        data: {'date': _formatDate(date ?? DateTime.now())},
+        data: {'date': _formatDate(freezeDate)},
         options: Options(
           headers: {'Authorization': 'Bearer $accessToken'},
         ),
@@ -620,6 +621,250 @@ class StreamStreaksController extends GetxController {
       isMutating.value = false;
     }
     return false;
+  }
+
+  Future<DateTime> _resolveFreezeRequestDate({DateTime? explicitDate}) async {
+    if (explicitDate != null) {
+      return _stripTime(explicitDate);
+    }
+
+    final today = _stripTime(DateTime.now());
+    final refreshed = await fetchCurrentStreak(force: true, silent: true);
+    final snapshot = refreshed ?? current.value;
+    if (snapshot == null) {
+      return today;
+    }
+
+    final fromRaw = _extractDangerDateFromRaw(
+      snapshot.raw,
+      today: today,
+      streak: snapshot,
+    );
+    if (fromRaw != null) {
+      return fromRaw;
+    }
+
+    final inferred = _inferDangerDateFromStreak(snapshot, today: today);
+    if (inferred != null) {
+      return inferred;
+    }
+
+    return today;
+  }
+
+  DateTime? _extractDangerDateFromRaw(
+    Map<String, dynamic>? raw, {
+    required DateTime today,
+    required StreakData streak,
+  }) {
+    if (raw == null || raw.isEmpty) return null;
+
+    DateTime? candidate;
+    void considerDate(dynamic value) {
+      final parsed = _parseDate(value);
+      if (parsed == null) return;
+      final localDay = _stripTime(parsed);
+      if (!localDay.isBefore(today)) return;
+      if (_isCompletedOrFrozenOn(streak, localDay)) return;
+      if (candidate == null || localDay.isAfter(candidate!)) {
+        candidate = localDay;
+      }
+    }
+
+    const directDateKeys = <String>[
+      'freezeDate',
+      'freeze_date',
+      'dateToFreeze',
+      'date_to_freeze',
+      'dangerDate',
+      'danger_date',
+      'atRiskDate',
+      'at_risk_date',
+      'missedDate',
+      'missed_date',
+      'targetFreezeDate',
+      'target_freeze_date',
+    ];
+
+    final containers = <Map<String, dynamic>>[
+      raw,
+      _asMap(raw['streak']),
+      _asMap(raw['state']),
+      _asMap(raw['freeze']),
+      _asMap(raw['danger']),
+      _asMap(raw['weeklyGoal']),
+      _asMap(raw['weekly_goal']),
+    ];
+
+    for (final map in containers) {
+      if (map.isEmpty) continue;
+      for (final key in directDateKeys) {
+        considerDate(map[key]);
+      }
+    }
+
+    final weekEntries = _extractWeekEntriesFromRaw(raw);
+    for (final entry in weekEntries) {
+      final day = _asMap(entry);
+      if (day.isEmpty) continue;
+
+      final date = _parseDate(
+        day['date'] ??
+            day['dayDate'] ??
+            day['day_date'] ??
+            day['targetDate'] ??
+            day['target_date'],
+      );
+      if (date == null) continue;
+
+      final localDay = _stripTime(date);
+      if (!localDay.isBefore(today)) continue;
+      if (_isCompletedOrFrozenOn(streak, localDay)) continue;
+
+      final completed = _asBool(
+        day['completed'] ??
+            day['isCompleted'] ??
+            day['done'] ??
+            day['success'],
+      );
+      final frozen = _asBool(
+        day['frozen'] ?? day['isFrozen'] ?? day['freezeUsed'] ?? day['freeze'],
+      );
+      if (completed || frozen) continue;
+
+      final status = _asString(
+        day['status'] ?? day['state'] ?? day['result'] ?? day['type'],
+      ).trim().toLowerCase();
+      final looksMissed =
+          _asBool(
+            day['missed'] ??
+                day['isMissed'] ??
+                day['inDanger'] ??
+                day['isInDanger'] ??
+                day['in_danger'] ??
+                day['needsFreeze'] ??
+                day['needs_freeze'] ??
+                day['requiresFreeze'] ??
+                day['requires_freeze'],
+          ) ||
+          status.contains('miss') ||
+          status.contains('danger') ||
+          status.contains('risk') ||
+          status == 'failed' ||
+          status == 'cross';
+
+      final requiredButIncomplete = _asBool(
+        day['required'] ??
+            day['isRequired'] ??
+            day['scheduled'] ??
+            day['isScheduled'] ??
+            day['selected'] ??
+            day['isSelected'] ??
+            day['target'] ??
+            day['isTarget'],
+      );
+
+      if (looksMissed || requiredButIncomplete) {
+        considerDate(localDay);
+      }
+    }
+
+    return candidate;
+  }
+
+  List<dynamic> _extractWeekEntriesFromRaw(Map<String, dynamic> raw) {
+    final weeklyGoal = _asMap(raw['weeklyGoal'] ?? raw['weekly_goal']);
+    final streak = _asMap(raw['streak']);
+    final candidates = <dynamic>[
+      weeklyGoal['week'],
+      weeklyGoal['days'],
+      weeklyGoal['weekDays'],
+      weeklyGoal['week_days'],
+      raw['week'],
+      raw['days'],
+      raw['weekDays'],
+      raw['week_days'],
+      streak['week'],
+      streak['days'],
+      streak['weekDays'],
+      streak['week_days'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate is List) return candidate;
+      if (candidate is Map && candidate['days'] is List) {
+        return candidate['days'] as List;
+      }
+    }
+
+    return const <dynamic>[];
+  }
+
+  DateTime? _inferDangerDateFromStreak(
+    StreakData streak, {
+    required DateTime today,
+  }) {
+    final selectedSet =
+        streak.selectedDays
+            .map(_normalizeDay)
+            .where((d) => d.isNotEmpty)
+            .toSet();
+    DateTime? candidate;
+
+    if (selectedSet.isNotEmpty) {
+      final weekStart = _startOfWeek(streak.weekStartDate ?? today);
+      for (int i = 0; i < 7; i++) {
+        final day = weekStart.add(Duration(days: i));
+        if (!day.isBefore(today)) continue;
+        if (!selectedSet.contains(_weekdayKey(day))) continue;
+        if (_isCompletedOrFrozenOn(streak, day)) continue;
+        if (candidate == null || day.isAfter(candidate!)) {
+          candidate = day;
+        }
+      }
+
+      for (int offset = 1; offset <= 7; offset++) {
+        final day = today.subtract(Duration(days: offset));
+        if (!selectedSet.contains(_weekdayKey(day))) continue;
+        if (_isCompletedOrFrozenOn(streak, day)) continue;
+        if (candidate == null || day.isAfter(candidate!)) {
+          candidate = day;
+        }
+      }
+
+      if (candidate != null) {
+        return candidate;
+      }
+    }
+
+    if (streak.weekGrid.length == 7) {
+      final weekStart = _startOfWeek(streak.weekStartDate ?? today);
+      for (int i = 0; i < streak.weekGrid.length; i++) {
+        final day = weekStart.add(Duration(days: i));
+        if (!day.isBefore(today)) continue;
+        if (_isCompletedOrFrozenOn(streak, day)) continue;
+        final cell = streak.weekGrid[i];
+        if (cell == CellType.cross || cell == CellType.dot) {
+          if (candidate == null || day.isAfter(candidate!)) {
+            candidate = day;
+          }
+        }
+      }
+      if (candidate != null) {
+        return candidate;
+      }
+    }
+
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (!_isCompletedOrFrozenOn(streak, yesterday)) {
+      return yesterday;
+    }
+    return null;
+  }
+
+  bool _isCompletedOrFrozenOn(StreakData streak, DateTime day) {
+    final localDay = _stripTime(day);
+    return streak.isDateCompleted(localDay) || streak.isDateFrozen(localDay);
   }
 
   List<CellType> buildCurrentWeekRow() {

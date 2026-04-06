@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -208,8 +208,14 @@ class IntroScreen5 extends StatelessWidget {
                             },
                             child:
                                 controller.currentPage.value == 0
-                                    ? _buildSubscriptionContent(context, controller)
-                                    : _buildReferralContent(context, controller),
+                                    ? _buildSubscriptionContent(
+                                      context,
+                                      controller,
+                                    )
+                                    : _buildReferralContent(
+                                      context,
+                                      controller,
+                                    ),
                           ),
                         ),
 
@@ -264,25 +270,30 @@ class IntroScreen5 extends StatelessWidget {
     );
   }
 
-  Widget _buildSubscriptionContent(BuildContext context, IntroScreen5Controller c) {
+  Widget _buildSubscriptionContent(
+    BuildContext context,
+    IntroScreen5Controller c,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       key: const ValueKey('subscription'),
       children: [
         Obx(
-          () => c.plansLoading.value
-              ? Padding(
-                  padding: EdgeInsets.only(bottom: 10.h),
-                  child: SizedBox(
-                    height: 4.h,
-                    child: LinearProgressIndicator(
-                      backgroundColor: Colors.white.withOpacity(0.15),
-                      valueColor:
-                          const AlwaysStoppedAnimation<Color>(Colors.white),
+          () =>
+              c.plansLoading.value
+                  ? Padding(
+                    padding: EdgeInsets.only(bottom: 10.h),
+                    child: SizedBox(
+                      height: 4.h,
+                      child: LinearProgressIndicator(
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
-                )
-              : const SizedBox.shrink(),
+                  )
+                  : const SizedBox.shrink(),
         ),
         // Monthly Plan
         GestureDetector(
@@ -392,16 +403,17 @@ class IntroScreen5 extends StatelessWidget {
                         )
                         : RichText(
                           textAlign: TextAlign.center,
-                              text: TextSpan(
+                          text: TextSpan(
                             children: [
                               TextSpan(
                                 text: '${context.l10n.startFreeTrial}\n',
                                 style: sfProText600(17.sp, Colors.white),
                               ),
                               TextSpan(
-                                text: c.selectedPlan.value == 1
-                                    ? c.yearlyAfterTrialLabel.value
-                                    : c.monthlyAfterTrialLabel.value,
+                                text:
+                                    c.selectedPlan.value == 1
+                                        ? c.yearlyAfterTrialLabel.value
+                                        : c.monthlyAfterTrialLabel.value,
                                 style: sfProText400(
                                   12.sp,
                                   const Color.fromRGBO(0, 0, 0, 0.6),
@@ -603,9 +615,7 @@ class IntroScreen5Controller extends GetxController {
       plansError.value = null;
       final dio = _buildDio();
       print('SUBSCRIPTION PLANS REQUEST: GET /api/v1/subscriptions/plans');
-      final res = await dio.get<dynamic>(
-        '/api/v1/subscriptions/plans',
-      );
+      final res = await dio.get<dynamic>('/api/v1/subscriptions/plans');
       final data = res.data;
       print('SUBSCRIPTION PLANS RESPONSE RAW: $data');
       _applyPlans(data);
@@ -730,22 +740,15 @@ class IntroScreen5Controller extends GetxController {
       return fullDescription.trim();
     }
 
-    final description = _pickString(plan, const [
-      'description',
-    ]);
+    final description = _pickString(plan, const ['description']);
     if (description != null) {
       return description.trim();
     }
 
-    final totalPrice = _pickNum(plan, const [
-      'totalPrice',
-      'total_price',
-    ]);
+    final totalPrice = _pickNum(plan, const ['totalPrice', 'total_price']);
     if (totalPrice != null) {
-      final currency = _pickString(plan, const [
-            'currencySymbol',
-            'currency_symbol',
-          ]) ??
+      final currency =
+          _pickString(plan, const ['currencySymbol', 'currency_symbol']) ??
           _currencySymbolFromCode(
             _pickString(plan, const [
               'currency',
@@ -754,14 +757,13 @@ class IntroScreen5Controller extends GetxController {
             ]),
           ) ??
           '£';
-      final formatted = totalPrice % 1 == 0
-          ? totalPrice.toStringAsFixed(0)
-          : totalPrice.toStringAsFixed(2);
+      final formatted =
+          totalPrice % 1 == 0
+              ? totalPrice.toStringAsFixed(0)
+              : totalPrice.toStringAsFixed(2);
       final base = '$currency$formatted';
-      final interval = _pickString(plan, const [
-            'billingPeriod',
-            'billing_period',
-          ]) ??
+      final interval =
+          _pickString(plan, const ['billingPeriod', 'billing_period']) ??
           'year';
       return _appendIntervalIfMissing(base, interval);
     }
@@ -807,10 +809,8 @@ class IntroScreen5Controller extends GetxController {
     ]);
     if (amount == null) return null;
 
-    final currency = _pickString(plan, const [
-          'currencySymbol',
-          'currency_symbol',
-        ]) ??
+    final currency =
+        _pickString(plan, const ['currencySymbol', 'currency_symbol']) ??
         _currencySymbolFromCode(
           _pickString(plan, const [
             'currency',
@@ -819,9 +819,8 @@ class IntroScreen5Controller extends GetxController {
           ]),
         ) ??
         '£';
-    final formatted = amount % 1 == 0
-        ? amount.toStringAsFixed(0)
-        : amount.toStringAsFixed(2);
+    final formatted =
+        amount % 1 == 0 ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2);
     final base = '$currency$formatted';
     return _appendIntervalIfMissing(base, interval ?? fallbackType);
   }
@@ -960,11 +959,7 @@ class IntroScreen5Controller extends GetxController {
       final res = await dio.post<dynamic>(
         '/api/v1/subscriptions/trial/start',
         data: const {'planType': 'monthly'},
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       final data = res.data;
@@ -973,7 +968,8 @@ class IntroScreen5Controller extends GetxController {
         print('TRIAL START RESPONSE DATA: ${data['data']}');
       }
 
-      final isActive = data is Map &&
+      final isActive =
+          data is Map &&
           data['success'] == true &&
           data['data'] is Map &&
           data['data']['status']?.toString() == 'active';
@@ -1022,6 +1018,10 @@ class IntroScreen5Controller extends GetxController {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.keyIntroOnboardingComplete, true);
+      try {
+        await Get.find<AuthController>()
+            .rememberIntroOnboardingCompletedForCurrentUser();
+      } catch (_) {}
     } catch (_) {}
     Get.offAll(
       () => const HomeScreen2(),
@@ -1058,4 +1058,3 @@ class IntroScreen5Controller extends GetxController {
     super.onClose();
   }
 }
-
