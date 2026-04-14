@@ -54,15 +54,25 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _bootstrap() async {
-    await _oauthFlow.init();
+    try {
+      await _oauthFlow.init();
 
-    final hasSession = await ensureValidSession(refreshIfExpired: true);
-    if (hasSession) {
-      await refreshMe(silent: true);
+      final hasSession = await ensureValidSession(
+        refreshIfExpired: true,
+        failOnRefreshError: true,
+      );
+      if (hasSession) {
+        await refreshMe(silent: true, clearSessionOnFailure: true);
+      }
+      await _migrateIntroOnboardingFlagIfNeeded();
+    } catch (e) {
+      if (kDebugMode) debugPrint('AUTH BOOTSTRAP ERROR: $e');
+      await _api.tokenStore.clear();
+      isAuthenticated.value = false;
+      me.value = null;
+    } finally {
+      isReady.value = true;
     }
-    await _migrateIntroOnboardingFlagIfNeeded();
-
-    isReady.value = true;
   }
 
   /// Sessions created before intro onboarding existed: skip the notification → intro flow.
@@ -467,7 +477,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     await _api.tokenStore.write(r);
   }
 
-  Future<bool> ensureValidSession({bool refreshIfExpired = true}) async {
+  Future<bool> ensureValidSession({
+    bool refreshIfExpired = true,
+    bool failOnRefreshError = false,
+  }) async {
     final tokens = await _api.tokenStore.read();
     if (tokens == null) {
       isAuthenticated.value = false;
@@ -491,7 +504,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         return true;
       } on DioException catch (e) {
         final status = e.response?.statusCode;
-        if (status == 401 || status == 403) {
+        if (status == 401 || status == 403 || failOnRefreshError) {
           await _api.tokenStore.clear();
           isAuthenticated.value = false;
           me.value = null;
@@ -516,7 +529,14 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       try {
         final refreshed = await authApi.refresh(tokens.refreshToken);
         await _persistRefreshedSession(refreshed);
-      } catch (_) {
+      } catch (e) {
+        if (failOnRefreshError) {
+          if (kDebugMode) debugPrint('API ERROR(proactive refresh): $e');
+          await _api.tokenStore.clear();
+          isAuthenticated.value = false;
+          me.value = null;
+          return false;
+        }
         // Keep existing tokens; [AuthInterceptor] will retry refresh on 401.
       }
     }
@@ -525,7 +545,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     return true;
   }
 
-  Future<void> refreshMe({bool silent = false}) async {
+  Future<void> refreshMe({
+    bool silent = false,
+    bool clearSessionOnFailure = false,
+  }) async {
     try {
       final profile = await authApi.me();
       me.value = profile;
@@ -533,7 +556,8 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     } catch (e) {
       lastError.value = 'Failed to load profile: $e';
       if (kDebugMode) debugPrint('API ERROR(me): $e');
-      if (e is DioException && e.response?.statusCode == 401) {
+      final unauthorized = e is DioException && e.response?.statusCode == 401;
+      if (unauthorized || clearSessionOnFailure) {
         await _api.tokenStore.clear();
         isAuthenticated.value = false;
         me.value = null;

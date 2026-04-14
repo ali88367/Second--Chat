@@ -86,10 +86,20 @@ class AuthApi {
   Future<Map<String, dynamic>> me() async {
     final res = await _dio.get<dynamic>('/api/v1/users/me');
     final json = res.data;
-    if (json is Map<String, dynamic>) {
-      final data = json['data'];
+    if (json is Map) {
+      final root = Map<String, dynamic>.from(json);
+      if (root['success'] == false) {
+        final msg = root['message']?.toString().trim();
+        throw StateError(
+          (msg != null && msg.isNotEmpty)
+              ? msg
+              : 'Failed to fetch user profile',
+        );
+      }
+      final data = root['data'];
       if (data is Map<String, dynamic>) return data;
-      return json;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return root;
     }
     return <String, dynamic>{};
   }
