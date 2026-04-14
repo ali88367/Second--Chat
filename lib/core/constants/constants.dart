@@ -11,7 +11,7 @@ class AppConstants {
 
   // API Constants
   // Backend base URL (overridable at build/run time via `--dart-define=API_BASE_URL=...`).
-  static const String baseUrl = 'https://cafe7bygasco.com';
+  static const String baseUrl = 'https://api.secondchat.co';
 
   /// **Web application** OAuth client ID — must be from the **same** Firebase/Google project as
   /// `android/app/google-services.json` (see `oauth_client` with `client_type` 3 there).

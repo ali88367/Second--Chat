@@ -12,14 +12,13 @@ import 'package:second_chat/l10n/app_localizations.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/features/intro/login_screen.dart';
-import 'package:second_chat/features/intro/intro_screen2.dart';
-import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/core/utils/platform_token_provider.dart';
 import 'package:second_chat/data/services/live_stream_service.dart';
 import 'package:second_chat/controllers/edge_glow_notification_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
+import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/notifications.dart';
 import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
@@ -27,7 +26,6 @@ import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
 import 'core/constants/constants.dart';
-import 'core/localization/l10n.dart';
 import 'core/utils/debug_tokens.dart';
 
 void main() {
@@ -340,106 +338,108 @@ class StartupGate extends StatefulWidget {
 class _StartupGateState extends State<StartupGate> {
   @override
   Widget build(BuildContext context) {
-    final auth = Get.find<AuthController>();
-    return Obx(() {
-      if (!auth.isReady.value) {
-        return const _SessionCheckLoader();
-      }
+    return const _SplashScreen();
+  }
+}
 
-      if (auth.isAuthenticated.value) {
-        return const _PostAuthStartupGate();
-      }
+class _SplashScreen extends StatefulWidget {
+  const _SplashScreen();
 
-      return const LoginScreen();
+  @override
+  State<_SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<_SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+  late final Animation<double> _fadeIn = CurvedAnimation(
+    parent: _anim,
+    curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+  );
+  late final Animation<double> _popScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 0.82, end: 1.08)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 70,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.08, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeInOut)),
+      weight: 30,
+    ),
+  ]).animate(_anim);
+  late final Animation<double> _logoScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 0.9, end: 1.04)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 70,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.04, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeInOut)),
+      weight: 30,
+    ),
+  ]).animate(CurvedAnimation(parent: _anim, curve: const Interval(0.15, 1.0)));
+  late final Animation<Offset> _logoSlide = Tween<Offset>(
+    begin: const Offset(0, 0.2),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+  late final Animation<double> _glow = Tween<double>(begin: 0.0, end: 1.0)
+      .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+  @override
+  void initState() {
+    super.initState();
+    _anim.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _routeAfterSessionCheck();
     });
   }
-}
-
-/// After login, route by linked platform first, then intro onboarding, then home.
-class _PostAuthStartupGate extends StatefulWidget {
-  const _PostAuthStartupGate();
-
-  @override
-  State<_PostAuthStartupGate> createState() => _PostAuthStartupGateState();
-}
-
-class _PostAuthStartupGateState extends State<_PostAuthStartupGate> {
-  late final Future<Map<String, bool>> _routeStateFuture = _readRouteState();
-
-  Future<Map<String, bool>> _readRouteState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final introDone =
-        prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
-    bool hasLinkedPlatform = false;
-    try {
-      hasLinkedPlatform = await Get.find<PlatformConnectController>()
-          .hasAnyConnectedPlatformForStartup();
-    } catch (_) {
-      hasLinkedPlatform = false;
-    }
-    return <String, bool>{
-      'introDone': introDone,
-      'hasLinkedPlatform': hasLinkedPlatform,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, bool>>(
-      future: _routeStateFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _SessionCheckLoader();
-        }
-
-        final state = snapshot.data;
-        if (state == null) {
-          return const _SessionCheckLoader();
-        }
-
-        final hasLinkedPlatform = state['hasLinkedPlatform'] == true;
-        final introDone = state['introDone'] == true;
-        if (!hasLinkedPlatform) {
-          return const IntroScreen2();
-        }
-        if (introDone) {
-          return const HomeScreen2();
-        }
-
-        return const NotficationScreens();
-      },
-    );
-  }
-}
-
-class _SessionCheckLoader extends StatefulWidget {
-  const _SessionCheckLoader();
-
-  @override
-  State<_SessionCheckLoader> createState() => _SessionCheckLoaderState();
-}
-
-class _SessionCheckLoaderState extends State<_SessionCheckLoader>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  )..repeat();
-
-  late final Animation<double> _rotate = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.linear,
-  );
-
-  late final Animation<double> _pulse = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.easeInOut,
-  );
 
   @override
   void dispose() {
-    _controller.dispose();
+    _anim.dispose();
     super.dispose();
+  }
+
+  Future<void> _routeAfterSessionCheck() async {
+    if (!Get.isRegistered<AuthController>()) return;
+    final auth = Get.find<AuthController>();
+
+    while (!auth.isReady.value) {
+      await Future.delayed(const Duration(milliseconds: 60));
+      if (!mounted) return;
+    }
+
+    if (!auth.isAuthenticated.value) {
+      if (!mounted) return;
+      Get.offAll(() => const LoginScreen());
+      return;
+    }
+
+    if (!Get.isRegistered<ChatController>()) {
+      if (!mounted) return;
+      Get.offAll(() => const HomeScreen2());
+      return;
+    }
+
+    final chat = Get.find<ChatController>();
+    try {
+      await chat.ensureStreamRealtimeBootstrap();
+    } catch (_) {}
+    if (!mounted) return;
+
+    final anyLive =
+        chat.platformLive.values.any((v) => v == true) ||
+            (chat.overview.value?.live == true);
+    if (anyLive) {
+      Get.offAll(() => const Livestreaming());
+      return;
+    }
+
+    Get.offAll(() => const HomeScreen2());
   }
 
   @override
@@ -462,96 +462,51 @@ class _SessionCheckLoaderState extends State<_SessionCheckLoader>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 160.w,
-                  height: 160.w,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ScaleTransition(
-                        scale: Tween<double>(begin: 0.9, end: 1.1).animate(
-                          _pulse,
-                        ),
+                FadeTransition(
+                  opacity: _fadeIn,
+                  child: AnimatedBuilder(
+                    animation: _anim,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _popScale.value,
                         child: Container(
-                          width: 140.w,
-                          height: 140.w,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                const Color(0xFFFFE6A7).withOpacity(0.25),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        width: 90.w,
-                        height: 90.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFFFE6A7),
-                            width: 3.w,
-                          ),
-                        ),
-                      ),
-                      RotationTransition(
-                        turns: _rotate,
-                        child: SizedBox(
-                          width: 90.w,
-                          height: 90.w,
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: Container(
-                              width: 7.w,
-                              height: 7.w,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFFFE6A7),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFFFE6A7)
-                                        .withOpacity(0.7),
-                                    blurRadius: 10,
-                                  ),
-                                ],
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFE6A7)
+                                    .withOpacity(0.18 * _glow.value),
+                                blurRadius: 28 * _glow.value,
+                                spreadRadius: 6 * _glow.value,
                               ),
-                            ),
+                            ],
                           ),
+                          child: child,
                         ),
-                      ),
-                      Container(
-                        width: 58.w,
-                        height: 58.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: goldGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFFE6A7).withOpacity(0.5),
-                              blurRadius: 18,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(12.w),
-                          child: Image.asset('assets/icons/loader_icon.png'),
-                        ),
-                      ),
-                    ],
+                      );
+                    },
+                    child: Image.asset(
+                      'assets/images/bunnyGlow.png',
+                      width: 260.w,
+                      height: 260.w,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
-                SizedBox(height: 20.h),
-                Text(
-                  context.l10n.checkingSession,
-                  style: TextStyle(
-                    color: textInverse.withOpacity(0.78),
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.4,
+                SizedBox(height: 18.h),
+                FadeTransition(
+                  opacity: _fadeIn,
+                  child: SlideTransition(
+                    position: _logoSlide,
+                    child: ScaleTransition(
+                      scale: _logoScale,
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 110.w,
+                        height: 110.w,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ),
                 ),
               ],
