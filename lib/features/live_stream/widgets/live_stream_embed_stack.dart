@@ -15,12 +15,14 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
     required this.height,
     required this.muted,
     required this.streamViewKey,
+    this.onStreamReady,
   });
 
   final String platformKey;
   final double height;
   final bool muted;
   final Key streamViewKey;
+  final void Function(String platformKey, String runningUrl)? onStreamReady;
 
   @override
   State<_LiveStreamPlatformSlot> createState() => _LiveStreamPlatformSlotState();
@@ -55,6 +57,10 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
           key: widget.streamViewKey,
           url: webUrl,
           height: widget.height,
+          cacheKey: widget.platformKey,
+          onStreamReady: (runningUrl) {
+            widget.onStreamReady?.call(widget.platformKey, runningUrl);
+          },
           muted: widget.muted,
           streamExpectedLive: liveExpected,
         ),
@@ -69,9 +75,11 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
   const LiveStreamSingleEmbedStack({
     super.key,
     required this.streamPreviewHeight,
+    this.onStreamReady,
   });
 
   final double streamPreviewHeight;
+  final void Function(String platformKey, String runningUrl)? onStreamReady;
 
   static const _platforms = <String>['twitch', 'kick', 'youtube'];
 
@@ -99,6 +107,7 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
                 height: streamPreviewHeight,
                 muted: i != index,
                 streamViewKey: ValueKey('stream_single_${_platforms[i]}'),
+                onStreamReady: onStreamReady,
               ),
             ),
         ],
@@ -112,9 +121,11 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
   const LiveStreamMultiEmbedGrid({
     super.key,
     required this.streamPreviewHeight,
+    this.onStreamReady,
   });
 
   final double streamPreviewHeight;
+  final void Function(String platformKey, String runningUrl)? onStreamReady;
 
   static const _platforms = <String>['twitch', 'kick', 'youtube'];
 
@@ -136,6 +147,7 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
           height: height,
           muted: false,
           streamViewKey: ValueKey('stream_$platform'),
+          onStreamReady: onStreamReady,
         ),
       );
     }

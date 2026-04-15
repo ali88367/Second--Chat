@@ -20,12 +20,16 @@ class StreamWebView extends StatefulWidget {
     super.key,
     required this.url,
     required this.height,
+    required this.cacheKey,
+    this.onStreamReady,
     this.muted = false,
     this.streamExpectedLive = false,
   });
 
   final String url;
   final double height;
+  final String cacheKey;
+  final void Function(String runningUrl)? onStreamReady;
   final bool muted;
   final bool streamExpectedLive;
 
@@ -35,6 +39,9 @@ class StreamWebView extends StatefulWidget {
 
 class _StreamWebViewState extends State<StreamWebView>
     with SingleTickerProviderStateMixin {
+  static final Map<String, _StreamWebViewControllerSnapshot> _controllerCache =
+      <String, _StreamWebViewControllerSnapshot>{};
+
   /// In-app idle document (avoids `about:blank` on Android, which can trigger
   /// pigeon/WebViewClient races with resource error callbacks).
   static const String _kIdleBase = 'https://secondchat.idle/stream-view/';
@@ -43,7 +50,7 @@ class _StreamWebViewState extends State<StreamWebView>
       '<meta name="viewport" content="width=device-width,initial-scale=1">'
       '</head><body style="margin:0;background:#000;height:100vh"></body></html>';
 
-  late final WebViewController _controller;
+  late WebViewController _controller;
   String? _initialUrl;
   Uri? _initialUri;
   bool _restoringInitial = false;
@@ -54,6 +61,7 @@ class _StreamWebViewState extends State<StreamWebView>
 
   /// Same logical embed as [_lastCommittedNavigation] even if the raw string differs.
   String _lastCanonicalEmbedId = '';
+  String _lastStreamReadyReportedId = '';
 
   /// Avoids overlay flicker when [url] briefly toggles empty during socket/overview updates.
   bool _showNoStreamOverlay = false;
@@ -66,13 +74,7 @@ class _StreamWebViewState extends State<StreamWebView>
   bool get _shellIsIdle =>
       _initialUri != null && _initialUri!.host == 'secondchat.idle';
 
-  @override
-  void initState() {
-    super.initState();
-    _dotsController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
+  WebViewController _createController() {
     // Configure iOS autoplay/inline playback via WebKit params when available.
     // IMPORTANT: WKWebView params cause platform channel errors on Android, so
     // we only create them on iOS.
@@ -90,9 +92,41 @@ class _StreamWebViewState extends State<StreamWebView>
     } else {
       params = const PlatformWebViewControllerCreationParams();
     }
-
-    _controller = WebViewController.fromPlatformCreationParams(params)
+    return WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
+  }
+
+  void _persistSnapshot() {
+    _controllerCache[widget.cacheKey] = _StreamWebViewControllerSnapshot(
+      controller: _controller,
+      initialUrl: _initialUrl,
+      initialUri: _initialUri,
+      lastCommittedNavigation: _lastCommittedNavigation,
+      lastCanonicalEmbedId: _lastCanonicalEmbedId,
+    );
+  }
+
+  void _hydrateFromSnapshot(_StreamWebViewControllerSnapshot snapshot) {
+    _controller = snapshot.controller;
+    _initialUrl = snapshot.initialUrl;
+    _initialUri = snapshot.initialUri;
+    _lastCommittedNavigation = snapshot.lastCommittedNavigation;
+    _lastCanonicalEmbedId = snapshot.lastCanonicalEmbedId;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _dotsController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    final cached = _controllerCache[widget.cacheKey];
+    if (cached != null) {
+      _hydrateFromSnapshot(cached);
+    } else {
+      _controller = _createController();
+    }
     _ensureNavigationDelegate();
     _loadUrlIntoController(widget.url);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -103,6 +137,7 @@ class _StreamWebViewState extends State<StreamWebView>
 
   @override
   void dispose() {
+    _persistSnapshot();
     _noStreamOverlayTimer?.cancel();
     _dotsController.dispose();
     super.dispose();
@@ -191,6 +226,7 @@ class _StreamWebViewState extends State<StreamWebView>
         },
         onPageFinished: (_) {
           _applyMuteState();
+          _maybeReportStreamReady();
         },
         onNavigationRequest: (req) {
           final allowed = _isAllowedMainFrameNavigation(req.url);
@@ -220,6 +256,7 @@ class _StreamWebViewState extends State<StreamWebView>
         _controller
             .loadHtmlString(_kIdleHtml, baseUrl: _kIdleBase)
             .catchError(_logWebNavError);
+        _persistSnapshot();
         _applyMuteState();
         return;
       }
@@ -236,6 +273,7 @@ class _StreamWebViewState extends State<StreamWebView>
       _controller
           .loadRequest(Uri.parse(sanitized))
           .catchError(_logWebNavError);
+      _persistSnapshot();
       _applyMuteState();
     } catch (e) {
       if (kDebugMode) {
@@ -269,6 +307,19 @@ class _StreamWebViewState extends State<StreamWebView>
 })();
 ''');
     } catch (_) {}
+  }
+
+  Future<void> _maybeReportStreamReady() async {
+    final cb = widget.onStreamReady;
+    if (cb == null) return;
+    if (_shellIsIdle) return;
+    final currentUrl = _initialUrl?.trim() ?? '';
+    if (currentUrl.isEmpty) return;
+    final currentId = canonicalStreamEmbedIdentity(currentUrl);
+    if (currentId.isEmpty || currentId == _lastStreamReadyReportedId) return;
+    // A completed page load with non-idle URL is treated as stream-ready trigger.
+    _lastStreamReadyReportedId = currentId;
+    cb(currentUrl);
   }
 
   bool _isAllowedMainFrameNavigation(String rawUrl) {
@@ -321,6 +372,23 @@ class _StreamWebViewState extends State<StreamWebView>
   @override
   void didUpdateWidget(StreamWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.cacheKey != widget.cacheKey) {
+      _controllerCache[oldWidget.cacheKey] = _StreamWebViewControllerSnapshot(
+        controller: _controller,
+        initialUrl: _initialUrl,
+        initialUri: _initialUri,
+        lastCommittedNavigation: _lastCommittedNavigation,
+        lastCanonicalEmbedId: _lastCanonicalEmbedId,
+      );
+      final cached = _controllerCache[widget.cacheKey];
+      if (cached != null) {
+        _hydrateFromSnapshot(cached);
+      } else {
+        _controller = _createController();
+      }
+      _delegateAttached = false;
+      _ensureNavigationDelegate();
+    }
     final urlChanged =
         !streamEmbedUrlsCanonicallyEqual(oldWidget.url, widget.url);
     final liveFlagChanged =
@@ -328,6 +396,7 @@ class _StreamWebViewState extends State<StreamWebView>
     if (urlChanged) {
       _syncOverlays();
       _loadUrlIntoController(widget.url);
+      _lastStreamReadyReportedId = '';
     } else if (liveFlagChanged) {
       _syncOverlays();
     }
@@ -401,4 +470,20 @@ class _StreamWebViewState extends State<StreamWebView>
       ),
     );
   }
+}
+
+class _StreamWebViewControllerSnapshot {
+  _StreamWebViewControllerSnapshot({
+    required this.controller,
+    required this.initialUrl,
+    required this.initialUri,
+    required this.lastCommittedNavigation,
+    required this.lastCanonicalEmbedId,
+  });
+
+  final WebViewController controller;
+  final String? initialUrl;
+  final Uri? initialUri;
+  final String? lastCommittedNavigation;
+  final String lastCanonicalEmbedId;
 }

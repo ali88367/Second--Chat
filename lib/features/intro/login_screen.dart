@@ -7,6 +7,9 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/constants.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/features/live_stream/live_stream_screen.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/auth_controller.dart';
@@ -50,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final auth = Get.find<AuthController>();
       await auth.loginWithGoogle();
       if (!mounted) return;
-      Get.offAllNamed('/');
+      await _routeAfterLoginSuccess();
     } catch (_) {
       if (!mounted) return;
       final auth = Get.find<AuthController>();
@@ -69,6 +72,28 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _googleBusy = false);
     }
+  }
+
+  Future<void> _routeAfterLoginSuccess() async {
+    if (!Get.isRegistered<ChatController>()) {
+      Get.offAll(() => const HomeScreen2());
+      return;
+    }
+
+    final chat = Get.find<ChatController>();
+    try {
+      await chat.ensureStreamRealtimeBootstrap();
+    } catch (_) {}
+    if (!mounted) return;
+
+    final anyLive =
+        chat.platformLive.values.any((v) => v == true) ||
+        (chat.overview.value?.live == true);
+    if (anyLive) {
+      Get.offAll(() => const Livestreaming());
+      return;
+    }
+    Get.offAll(() => const HomeScreen2());
   }
 
   void _showAppleComingSoon() {

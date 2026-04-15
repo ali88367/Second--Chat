@@ -48,6 +48,7 @@ class _LivestreamingState extends State<Livestreaming> {
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
+  double? _bottomSectionMaxHeight;
   bool _activityPanelExpanded = false;
   double _activityLayoutMin = 0;
   double _activityLayoutMax = 0;
@@ -94,7 +95,11 @@ class _LivestreamingState extends State<Livestreaming> {
 
   void _syncSelectedPlatformFromFilter() {
     final chatCtrl = Get.find<ChatController>();
-    final selected = _chatFilter.value ?? 'twitch';
+    final selected = _chatFilter.value?.toLowerCase().trim();
+    if (selected == null || selected.isEmpty) {
+      // "All" is a chat aggregation mode; keep currently selected stream platform.
+      return;
+    }
     if (chatCtrl.platform.value.toLowerCase().trim() == selected) return;
     chatCtrl.selectPlatformInstant(selected);
   }
@@ -180,10 +185,13 @@ class _LivestreamingState extends State<Livestreaming> {
             12.h -
             bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
+    final effectiveMaxBottom = _bottomSectionMaxHeight == null
+        ? clampedMaxBottom
+        : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
     setState(() {
       final restored =
-      (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
-          .clamp(minHeight, clampedMaxBottom)
+      (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
+          .clamp(minHeight, effectiveMaxBottom)
           .toDouble();
       _bottomSectionHeight = restored;
       _bottomSectionHeightBeforeActivityExpand = null;
@@ -348,20 +356,23 @@ class _LivestreamingState extends State<Livestreaming> {
             12.h -
             bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
+    final effectiveMaxBottom = _bottomSectionMaxHeight == null
+        ? clampedMaxBottom
+        : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
 
     setState(() {
       final nextExpanded = !_activityPanelExpanded;
       if (nextExpanded) {
         _bottomSectionHeightBeforeActivityExpand ??=
-            _bottomSectionHeight.clamp(minHeight, clampedMaxBottom).toDouble();
+            _bottomSectionHeight.clamp(minHeight, effectiveMaxBottom).toDouble();
         _bottomSectionHeight = minHeight;
         if (_activityLayoutMax > 0) {
           _activityHeight = _activityLayoutMax;
         }
       } else {
         final restored =
-        (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
-            .clamp(minHeight, clampedMaxBottom)
+        (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
+            .clamp(minHeight, effectiveMaxBottom)
             .toDouble();
         _bottomSectionHeight = restored;
         _bottomSectionHeightBeforeActivityExpand = null;
@@ -960,6 +971,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                   legacyInitialHeight
                                       .clamp(minHeight, safeMaxHeight)
                                       .toDouble();
+                              _bottomSectionMaxHeight = _bottomSectionHeight;
                               _isInitialHeightSet = true;
                             });
                           }
@@ -1054,10 +1066,30 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                   ? LiveStreamMultiEmbedGrid(
                                                                 streamPreviewHeight:
                                                                 streamPreviewHeight,
+                                                                onStreamReady: (
+                                                                  platformKey,
+                                                                  runningUrl,
+                                                                ) {
+                                                                  Get.find<ChatController>()
+                                                                      .onPlatformStreamWebViewReady(
+                                                                        platformKey: platformKey,
+                                                                        runningUrl: runningUrl,
+                                                                      );
+                                                                },
                                                               )
                                                                   : LiveStreamSingleEmbedStack(
                                                                 streamPreviewHeight:
                                                                 streamPreviewHeight,
+                                                                onStreamReady: (
+                                                                  platformKey,
+                                                                  runningUrl,
+                                                                ) {
+                                                                  Get.find<ChatController>()
+                                                                      .onPlatformStreamWebViewReady(
+                                                                        platformKey: platformKey,
+                                                                        runningUrl: runningUrl,
+                                                                      );
+                                                                },
                                                               ),
                                                             ),
                                                           ),
@@ -1449,9 +1481,12 @@ class _LivestreamingState extends State<Livestreaming> {
             12.h -
             bottomInset;
     final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
+    final effectiveMaxHeight = _bottomSectionMaxHeight == null
+        ? clampedMaxHeight
+        : math.min(clampedMaxHeight, _bottomSectionMaxHeight!);
 
     final currentHeight =
-    _bottomSectionHeight.clamp(minHeight, clampedMaxHeight).toDouble();
+    _bottomSectionHeight.clamp(minHeight, effectiveMaxHeight).toDouble();
     _logValueChange('layout.currentHeight', currentHeight);
 
     return SizedBox(
@@ -1476,7 +1511,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 setState(() {
                   _bottomSectionHeight =
                       (_bottomSectionHeight - adjustedDelta)
-                          .clamp(minHeight, clampedMaxHeight)
+                          .clamp(minHeight, effectiveMaxHeight)
                           .toDouble();
                 });
               },
@@ -1484,7 +1519,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 setState(() {
                   _bottomSectionHeight =
                       _bottomSectionHeight
-                          .clamp(minHeight, clampedMaxHeight)
+                          .clamp(minHeight, effectiveMaxHeight)
                           .toDouble();
                 });
               },
