@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -114,9 +113,14 @@ class SettingsController extends GetxController {
   }
 
   void loadSettingsIfNeeded() {
+    // Avoid refetching if we already have settings (e.g. warmed up on splash).
+    if (settingsPayload.value != null) {
+      _settingsRequested = true;
+      return;
+    }
     if (_settingsRequested) return;
     _settingsRequested = true;
-    loadSettings(force: true);
+    unawaited(loadSettings(force: true));
   }
 
   /// After full logout + prefs wipe; next settings open will refetch.
@@ -127,6 +131,11 @@ class SettingsController extends GetxController {
   }
 
   Future<void> loadSettings({bool force = false}) async {
+    // If already loaded and caller didn't request a refresh, do nothing.
+    if (settingsPayload.value != null && !force) {
+      _settingsRequested = true;
+      return;
+    }
     if (_settingsRequested && !force) return;
     _settingsRequested = true;
     settingsLoading.value = true;

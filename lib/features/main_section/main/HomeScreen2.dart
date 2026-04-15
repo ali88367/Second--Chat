@@ -42,7 +42,10 @@ class _HomeScreen2State extends State<HomeScreen2> {
   void initState() {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
-    _loadStreakOnLaunch();
+    // Splash warms up streak/settings; avoid refetching on first paint.
+    if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
+      unawaited(_loadStreakOnLaunch());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(Get.find<ChatController>().ensureStreamRealtimeBootstrap());
@@ -50,29 +53,16 @@ class _HomeScreen2State extends State<HomeScreen2> {
   }
 
   Future<void> _loadStreakOnLaunch() async {
+    if (_streakCtrl.current.value != null) return;
     final hasSession = await _streakCtrl.ensureSession(showErrors: false);
     if (!hasSession) return;
-    await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+    await _streakCtrl.fetchCurrentStreak(force: false, silent: true);
   }
 
   Future<void> _openStreakSheet() async {
     if (_streakSheetOpening) return;
     _streakSheetOpening = true;
-    var loadingSheetOpen = false;
     try {
-      if (!mounted) return;
-      Get.bottomSheet(
-        const _StreakLoadingBottomSheet(),
-        isDismissible: false,
-        isScrollControlled: true,
-        enableDrag: false,
-        backgroundColor: Colors.transparent,
-        enterBottomSheetDuration: const Duration(milliseconds: 120),
-        exitBottomSheetDuration: const Duration(milliseconds: 120),
-      );
-      loadingSheetOpen = true;
-      await Future<void>.delayed(const Duration(milliseconds: 16));
-
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
 
@@ -83,10 +73,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
       if (!mounted) return;
 
       final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
-      if (loadingSheetOpen && (Get.isBottomSheetOpen ?? false)) {
-        Get.back();
-        loadingSheetOpen = false;
-      }
+      if (streak == null && !hasCreatedStreak) return;
 
       if (!hasCreatedStreak) {
         await Get.bottomSheet(
@@ -106,7 +93,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
 
       if (streak?.isInDanger == true) {
         await Get.bottomSheet(
-          const StreakFreezePreviewBottomSheet(),
+          const StreakFreezePreviewBottomSheet(fetchOnInit: false),
           isDismissible: true,
           isScrollControlled: true,
           enableDrag: true,
@@ -116,7 +103,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
         );
       } else {
         await Get.bottomSheet(
-          const StreakFreezeSingleRowPreviewBottomSheet(),
+          const StreakFreezeSingleRowPreviewBottomSheet(fetchOnInit: false),
           isDismissible: true,
           isScrollControlled: true,
           enableDrag: true,
@@ -126,9 +113,6 @@ class _HomeScreen2State extends State<HomeScreen2> {
         );
       }
     } finally {
-      if (loadingSheetOpen && (Get.isBottomSheetOpen ?? false)) {
-        Get.back();
-      }
       _streakSheetOpening = false;
     }
   }
@@ -486,40 +470,6 @@ class _HomeScreen2State extends State<HomeScreen2> {
   }
 }
 
-class _StreakLoadingBottomSheet extends StatelessWidget {
-  const _StreakLoadingBottomSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: Get.height * 0.9,
-      decoration: BoxDecoration(
-        color: bottomSheetGrey,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(
-              strokeWidth: 2.8,
-              color: Colors.white,
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              'Loading streak...',
-              style: sfProText600(
-                15.sp,
-                const Color.fromRGBO(235, 235, 245, 0.85),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class GettingStartedCard extends StatefulWidget {
   const GettingStartedCard({super.key});
 
@@ -542,7 +492,9 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
         : Get.put(SettingsController());
     _streakCtrl = Get.find<StreamStreaksController>();
     _settingsCtrl.loadSettingsIfNeeded();
-    _checkStreakExists();
+    if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
+      _checkStreakExists();
+    }
   }
 
   Future<void> _checkStreakExists() async {
@@ -550,7 +502,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     setState(() => _streakLoading = true);
     try {
       await _streakCtrl.fetchCurrentStreak(
-        force: true,
+        force: false,
         silent: true,
       );
     } finally {
@@ -586,7 +538,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
 
     if (streak?.isInDanger == true) {
       await Get.bottomSheet(
-        const StreakFreezePreviewBottomSheet(),
+        const StreakFreezePreviewBottomSheet(fetchOnInit: false),
         isDismissible: true,
         isScrollControlled: true,
         enableDrag: true,
@@ -596,7 +548,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
       );
     } else {
       await Get.bottomSheet(
-        const StreakFreezeSingleRowPreviewBottomSheet(),
+        const StreakFreezeSingleRowPreviewBottomSheet(fetchOnInit: false),
         isDismissible: true,
         isScrollControlled: true,
         enableDrag: true,

@@ -599,7 +599,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   }
 
   /// Google Sign-In, then POST tokens to [AuthApi.loginWithGoogle] and persist the app session.
-  Future<void> loginWithGoogle() async {
+  ///
+  /// Returns `true` only when the backend session is created successfully.
+  /// Returns `false` when the user cancels the Google UI (no navigation should happen).
+  Future<bool> loginWithGoogle() async {
     try {
       final creds = await fetchGoogleAccountCredentials();
       try {
@@ -621,6 +624,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         isAuthenticated.value = true;
         lastError.value = null;
         await refreshMe(silent: true);
+        if (!isAuthenticated.value) {
+          // If `/me` decided the session is invalid, treat login as failed.
+          throw StateError('Could not verify session after sign-in.');
+        }
         try {
           await _syncIntroOnboardingFlagAfterLogin();
         } catch (e) {
@@ -628,6 +635,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
             debugPrint('INTRO ONBOARDING SYNC (Google login) failed: $e');
           }
         }
+        return true;
       } on DioException catch (e) {
         lastError.value = _messageForGoogleLoginApiFailure(e);
         if (kDebugMode) {
@@ -643,7 +651,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         lastError.value = null;
-        return;
+        return false;
       }
       lastError.value =
           'Google sign-in failed: ${e.description ?? e.code.name}';
