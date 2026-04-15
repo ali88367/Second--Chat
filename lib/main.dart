@@ -351,7 +351,6 @@ class _SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<_SplashScreen>
     with TickerProviderStateMixin {
-  late final DateTime _startedAt;
   bool _startupInProgress = false;
   String? _startupError;
 
@@ -359,6 +358,7 @@ class _SplashScreenState extends State<_SplashScreen>
     vsync: this,
     duration: const Duration(milliseconds: 1400),
   );
+  late final TickerFuture _animForward;
   late final AnimationController _loaderAnim = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
@@ -400,8 +400,7 @@ class _SplashScreenState extends State<_SplashScreen>
   @override
   void initState() {
     super.initState();
-    _startedAt = DateTime.now();
-    _anim.forward();
+    _animForward = _anim.forward();
     _loaderAnim.repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _routeAfterSessionCheck();
@@ -413,12 +412,6 @@ class _SplashScreenState extends State<_SplashScreen>
     _anim.dispose();
     _loaderAnim.dispose();
     super.dispose();
-  }
-
-  Future<void> _ensureMinimumSplashVisible(Duration minDuration) async {
-    final elapsed = DateTime.now().difference(_startedAt);
-    if (elapsed >= minDuration) return;
-    await Future.delayed(minDuration - elapsed);
   }
 
   Future<bool> _prefetchEssentialData() async {
@@ -471,8 +464,10 @@ class _SplashScreenState extends State<_SplashScreen>
         if (!mounted) return;
       }
 
-      // Always show splash briefly even for logged-out startups.
-      await _ensureMinimumSplashVisible(const Duration(milliseconds: 900));
+      // Let the splash animation finish (no explicit timer).
+      try {
+        await _animForward.orCancel;
+      } catch (_) {}
       if (!mounted) return;
 
       if (!auth.isAuthenticated.value) {

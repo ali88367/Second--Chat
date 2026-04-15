@@ -13,6 +13,7 @@ import '../../../../core/themes/textstyles.dart';
 import '../../../controllers/Main%20Section%20Controllers/settings_controller.dart';
 import '../../../core/helper/emote_parser.dart';
 import '../../../core/widgets/custom_black_glass_widget.dart';
+import '../../../data/models/chat_message.dart';
 import '../../../services/emote_service.dart';
 import 'live_stream_helper_widgets.dart';
 
@@ -376,54 +377,51 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   List<Map<String, dynamic>> _getFilteredComments(String? filter) {
     // Obx callers depend on reading these reactives here.
     final hideNames = _settingsController.hideViewerNames.value;
-    final merged = _settingsController.multiChatMergedMode.value;
+    _settingsController.multiChatMergedMode.value;
 
-    // Prefer live controller messages, fall back to local list if empty.
-    // Non-normal chat lines (subs, raids, etc.) go to the activity feed only.
-    List<Map<String, dynamic>> source;
-    if (merged) {
-      final rows = <Map<String, dynamic>>[];
+    final normalizedFilter = filter?.toLowerCase().trim();
+    final rows = <Map<String, dynamic>>[];
+
+    void addRow(ChatMessage m) {
+      final key = (m.platform).toLowerCase().trim();
+      rows.add({
+        'platformKey': key,
+        'platform': _getPlatformAsset(key),
+        'name': hideNames ? '' : m.userName,
+        'message': m.message,
+        'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
+        '_ts': m.timestamp,
+      });
+    }
+
+    if (normalizedFilter == null || normalizedFilter.isEmpty) {
+      // "All" should always merge all platform histories + live socket lines.
       for (final entry in _chatCtrl.platformMessages.entries) {
         for (final m in entry.value.where(ChatController.isMainChatFeedLine)) {
-          rows.add({
-            'platform': _getPlatformAsset(m.platform),
-            'name': hideNames ? '' : m.userName,
-            'message': m.message,
-            'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
-            '_ts': m.timestamp,
-          });
+          addRow(m);
         }
-      }
-      if (rows.isNotEmpty) {
-        rows.sort(
-              (a, b) =>
-              (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime),
-        );
-        for (final r in rows) {
-          r.remove('_ts');
-        }
-        source = rows;
-      } else {
-        source = _commentsWithNamePrivacy(hideNames);
       }
     } else {
-      final normalMessages =
-      _chatCtrl.messages
-          .where(ChatController.isMainChatFeedLine)
-          .toList(growable: false);
-      source =
-      normalMessages.isNotEmpty
-          ? normalMessages
-          .map<Map<String, dynamic>>(
-            (m) => {
-          'platform': _getPlatformAsset(m.platform),
-          'name': hideNames ? '' : m.userName,
-          'message': m.message,
-          'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
-        },
-      )
-          .toList(growable: false)
-          : _commentsWithNamePrivacy(hideNames);
+      final list = _chatCtrl.platformMessages[normalizedFilter];
+      if (list != null && list.isNotEmpty) {
+        for (final m in list.where(ChatController.isMainChatFeedLine)) {
+          addRow(m);
+        }
+      } else {
+        // Safe fallback while platform cache warms.
+        for (final m in _chatCtrl.messages.where(ChatController.isMainChatFeedLine)) {
+          addRow(m);
+        }
+      }
+    }
+
+    if (rows.isEmpty) {
+      return _commentsWithNamePrivacy(hideNames);
+    }
+
+    rows.sort((a, b) => (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime));
+    for (final row in rows) {
+      row.remove('_ts');
     }
 
     // If no streams are live, hide chat entirely.
@@ -432,29 +430,27 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       return const [];
     }
 
-    if (filter == null) {
-      // When showing All, keep messages only for platforms that are live (if known).
+    if (normalizedFilter == null || normalizedFilter.isEmpty) {
+      // Keep "All" scoped to currently live platforms when live-map is known.
       if (_chatCtrl.platformLive.isNotEmpty) {
-        return source.where((item) {
-          final platformPath = item['platform'].toString().toLowerCase();
-          if (platformPath.contains('twitch')) return _chatCtrl.isPlatformLive('twitch');
-          if (platformPath.contains('kick')) return _chatCtrl.isPlatformLive('kick');
-          if (platformPath.contains('youtube')) return _chatCtrl.isPlatformLive('youtube');
-          return true;
-        }).toList();
+        return rows
+            .where(
+              (item) =>
+                  _chatCtrl.isPlatformLive((item['platformKey'] ?? '').toString()),
+            )
+            .toList(growable: false);
       }
-      return source;
+      return rows;
     }
 
     // If selected platform is offline, hide messages.
-    if (_chatCtrl.platformLive.isNotEmpty && !_chatCtrl.isPlatformLive(filter)) {
+    if (_chatCtrl.platformLive.isNotEmpty &&
+        !_chatCtrl.isPlatformLive(normalizedFilter)) {
       return const [];
     }
-    return source.where((item) {
-      final platformPath = item['platform'].toString().toLowerCase();
-      final filterKey = filter.toLowerCase();
-      return platformPath.contains(filterKey);
-    }).toList();
+    return rows
+        .where((item) => (item['platformKey'] ?? '').toString() == normalizedFilter)
+        .toList(growable: false);
   }
 
   void _sendMessage() {
@@ -648,11 +644,21 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                       'YouTube',
                     ],
                     isWeek: false,
+                    initialSelectedItem: (() {
+                      final f = currentFilter?.toLowerCase().trim();
+                      if (f == null || f.isEmpty) return context.l10n.all;
+                      if (f == 'twitch') return 'Twitch';
+                      if (f == 'kick') return 'Kick';
+                      if (f == 'youtube') return 'YouTube';
+                      return filterController.currentFilter.value;
+                    })(),
                     onItemSelected: (selected) {
                       // Convert selection to filter value
                       String? filterValue;
+                      final allLabel = context.l10n.all.toLowerCase();
+                      final selectedKey = selected.toLowerCase();
 
-                      if (selected.toLowerCase() == 'all') {
+                      if (selectedKey == 'all' || selectedKey == allLabel) {
                         filterValue = null; // null means show all
                       } else {
                         filterValue =

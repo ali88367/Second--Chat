@@ -48,6 +48,7 @@ class _LivestreamingState extends State<Livestreaming> {
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
+  double? _bottomSectionMaxHeight;
   bool _activityPanelExpanded = false;
   double _activityLayoutMin = 0;
   double _activityLayoutMax = 0;
@@ -94,7 +95,11 @@ class _LivestreamingState extends State<Livestreaming> {
 
   void _syncSelectedPlatformFromFilter() {
     final chatCtrl = Get.find<ChatController>();
-    final selected = _chatFilter.value ?? 'twitch';
+    final selected = _chatFilter.value?.toLowerCase().trim();
+    if (selected == null || selected.isEmpty) {
+      // "All" is a chat aggregation mode; keep currently selected stream platform.
+      return;
+    }
     if (chatCtrl.platform.value.toLowerCase().trim() == selected) return;
     chatCtrl.selectPlatformInstant(selected);
   }
@@ -134,15 +139,35 @@ class _LivestreamingState extends State<Livestreaming> {
     if (_streakSheetOpening) return;
     _streakSheetOpening = true;
     try {
+      final hasSession = await _streakCtrl.ensureSession(showErrors: true);
+      if (!hasSession || !mounted) return;
+
+      // Avoid showing an intermediate loader bottom sheet.
+      var streak = _streakCtrl.current.value;
+      streak ??= await _streakCtrl.fetchCurrentStreak(force: true, silent: false);
       if (!mounted) return;
+      if (streak == null) return;
+
+      final hasCreatedStreak = streak.hasCreatedStreak;
+      final isInDanger = streak.isInDanger;
+
+      final Widget sheet =
+          !hasCreatedStreak
+              ? const StreamStreakSetupBottomSheet()
+              : (isInDanger
+                  ? const StreakFreezePreviewBottomSheet(fetchOnInit: false)
+                  : const StreakFreezeSingleRowPreviewBottomSheet(
+                      fetchOnInit: false,
+                    ));
+
       await Get.bottomSheet(
-        _LiveStreamStreakEntryBottomSheet(streakCtrl: _streakCtrl),
+        sheet,
         isDismissible: true,
         isScrollControlled: true,
         enableDrag: true,
         backgroundColor: Colors.transparent,
-        enterBottomSheetDuration: const Duration(milliseconds: 120),
-        exitBottomSheetDuration: const Duration(milliseconds: 120),
+        enterBottomSheetDuration: const Duration(milliseconds: 220),
+        exitBottomSheetDuration: const Duration(milliseconds: 200),
       );
     } finally {
       _streakSheetOpening = false;
@@ -180,10 +205,13 @@ class _LivestreamingState extends State<Livestreaming> {
             12.h -
             bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
+    final effectiveMaxBottom = _bottomSectionMaxHeight == null
+        ? clampedMaxBottom
+        : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
     setState(() {
       final restored =
-      (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
-          .clamp(minHeight, clampedMaxBottom)
+      (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
+          .clamp(minHeight, effectiveMaxBottom)
           .toDouble();
       _bottomSectionHeight = restored;
       _bottomSectionHeightBeforeActivityExpand = null;
@@ -348,20 +376,23 @@ class _LivestreamingState extends State<Livestreaming> {
             12.h -
             bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
+    final effectiveMaxBottom = _bottomSectionMaxHeight == null
+        ? clampedMaxBottom
+        : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
 
     setState(() {
       final nextExpanded = !_activityPanelExpanded;
       if (nextExpanded) {
         _bottomSectionHeightBeforeActivityExpand ??=
-            _bottomSectionHeight.clamp(minHeight, clampedMaxBottom).toDouble();
+            _bottomSectionHeight.clamp(minHeight, effectiveMaxBottom).toDouble();
         _bottomSectionHeight = minHeight;
         if (_activityLayoutMax > 0) {
           _activityHeight = _activityLayoutMax;
         }
       } else {
         final restored =
-        (_bottomSectionHeightBeforeActivityExpand ?? clampedMaxBottom)
-            .clamp(minHeight, clampedMaxBottom)
+        (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
+            .clamp(minHeight, effectiveMaxBottom)
             .toDouble();
         _bottomSectionHeight = restored;
         _bottomSectionHeightBeforeActivityExpand = null;
@@ -960,6 +991,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                   legacyInitialHeight
                                       .clamp(minHeight, safeMaxHeight)
                                       .toDouble();
+                              _bottomSectionMaxHeight = _bottomSectionHeight;
                               _isInitialHeightSet = true;
                             });
                           }
@@ -1054,10 +1086,30 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                   ? LiveStreamMultiEmbedGrid(
                                                                 streamPreviewHeight:
                                                                 streamPreviewHeight,
+                                                                onStreamReady: (
+                                                                  platformKey,
+                                                                  runningUrl,
+                                                                ) {
+                                                                  Get.find<ChatController>()
+                                                                      .onPlatformStreamWebViewReady(
+                                                                        platformKey: platformKey,
+                                                                        runningUrl: runningUrl,
+                                                                      );
+                                                                },
                                                               )
                                                                   : LiveStreamSingleEmbedStack(
                                                                 streamPreviewHeight:
                                                                 streamPreviewHeight,
+                                                                onStreamReady: (
+                                                                  platformKey,
+                                                                  runningUrl,
+                                                                ) {
+                                                                  Get.find<ChatController>()
+                                                                      .onPlatformStreamWebViewReady(
+                                                                        platformKey: platformKey,
+                                                                        runningUrl: runningUrl,
+                                                                      );
+                                                                },
                                                               ),
                                                             ),
                                                           ),
@@ -1449,9 +1501,12 @@ class _LivestreamingState extends State<Livestreaming> {
             12.h -
             bottomInset;
     final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
+    final effectiveMaxHeight = _bottomSectionMaxHeight == null
+        ? clampedMaxHeight
+        : math.min(clampedMaxHeight, _bottomSectionMaxHeight!);
 
     final currentHeight =
-    _bottomSectionHeight.clamp(minHeight, clampedMaxHeight).toDouble();
+    _bottomSectionHeight.clamp(minHeight, effectiveMaxHeight).toDouble();
     _logValueChange('layout.currentHeight', currentHeight);
 
     return SizedBox(
@@ -1476,7 +1531,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 setState(() {
                   _bottomSectionHeight =
                       (_bottomSectionHeight - adjustedDelta)
-                          .clamp(minHeight, clampedMaxHeight)
+                          .clamp(minHeight, effectiveMaxHeight)
                           .toDouble();
                 });
               },
@@ -1484,7 +1539,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 setState(() {
                   _bottomSectionHeight =
                       _bottomSectionHeight
-                          .clamp(minHeight, clampedMaxHeight)
+                          .clamp(minHeight, effectiveMaxHeight)
                           .toDouble();
                 });
               },
@@ -1494,94 +1549,5 @@ class _LivestreamingState extends State<Livestreaming> {
         ],
       ),
     );
-  }
-}
-
-enum _StreakEntryView { loading, setup, danger, normal }
-
-class _LiveStreamStreakEntryBottomSheet extends StatefulWidget {
-  const _LiveStreamStreakEntryBottomSheet({required this.streakCtrl});
-
-  final StreamStreaksController streakCtrl;
-
-  @override
-  State<_LiveStreamStreakEntryBottomSheet> createState() =>
-      _LiveStreamStreakEntryBottomSheetState();
-}
-
-class _LiveStreamStreakEntryBottomSheetState
-    extends State<_LiveStreamStreakEntryBottomSheet> {
-  _StreakEntryView _view = _StreakEntryView.loading;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveSheetView();
-  }
-
-  Future<void> _resolveSheetView() async {
-    final hasSession = await widget.streakCtrl.ensureSession(showErrors: true);
-    if (!mounted) return;
-    if (!hasSession) {
-      if (Get.isBottomSheetOpen ?? false) {
-        Get.back();
-      }
-      return;
-    }
-
-    final streak = await widget.streakCtrl.fetchCurrentStreak(
-      force: true,
-      silent: false,
-    );
-    if (!mounted) return;
-
-    final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
-    final isInDanger = streak?.isInDanger == true;
-    setState(() {
-      if (!hasCreatedStreak) {
-        _view = _StreakEntryView.setup;
-      } else {
-        _view = isInDanger ? _StreakEntryView.danger : _StreakEntryView.normal;
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    switch (_view) {
-      case _StreakEntryView.setup:
-        return const StreamStreakSetupBottomSheet();
-      case _StreakEntryView.danger:
-        return const StreakFreezePreviewBottomSheet(fetchOnInit: false);
-      case _StreakEntryView.normal:
-        return const StreakFreezeSingleRowPreviewBottomSheet(fetchOnInit: false);
-      case _StreakEntryView.loading:
-        return Container(
-          height: Get.height * 0.9,
-          decoration: BoxDecoration(
-            color: bottomSheetGrey,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(38.r)),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(
-                  strokeWidth: 2.8,
-                  color: Colors.white,
-                ),
-                SizedBox(height: 12.h),
-                Text(
-                  'Loading streak...',
-                  style: sfProText600(
-                    15.sp,
-                    const Color.fromRGBO(235, 235, 245, 0.85),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-    }
   }
 }

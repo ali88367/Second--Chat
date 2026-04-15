@@ -12,12 +12,16 @@ class CustomBlackGlassWidget extends StatelessWidget {
   final List<String> items;
   final bool isWeek;
   final Function(String)? onItemSelected;
+  final int? initialSelectedIndex;
+  final String? initialSelectedItem;
 
   CustomBlackGlassWidget({
     super.key,
     required this.items,
     required this.isWeek,
     this.onItemSelected,
+    this.initialSelectedIndex,
+    this.initialSelectedItem,
   });
 
   final controller = Get.put(GlassSelectorController());
@@ -28,6 +32,12 @@ class CustomBlackGlassWidget extends StatelessWidget {
     // This ensures each widget instance starts with a valid selection
     if (controller.selectedIndex.value >= items.length) {
       controller.selectedIndex.value = 0;
+    }
+    final wanted = _resolveInitialIndex();
+    if (wanted >= 0 &&
+        wanted < items.length &&
+        controller.selectedIndex.value != wanted) {
+      controller.selectedIndex.value = wanted;
     }
     
     return LayoutBuilder(
@@ -47,6 +57,17 @@ class CustomBlackGlassWidget extends StatelessWidget {
         );
       },
     );
+  }
+
+  int _resolveInitialIndex() {
+    final direct = initialSelectedIndex;
+    if (direct != null) return direct;
+    final selectedItem = initialSelectedItem?.trim();
+    if (selectedItem == null || selectedItem.isEmpty) return 0;
+    final idx = items.indexWhere(
+      (e) => e.toLowerCase().trim() == selectedItem.toLowerCase(),
+    );
+    return idx >= 0 ? idx : 0;
   }
 
   double _calculateResponsiveRadius() {
@@ -161,7 +182,12 @@ class CustomBlackGlassWidget extends StatelessWidget {
           child: Text(
             items[i],
             textAlign: TextAlign.center,
-            style: sfProText400(15, _color(items[i])),
+            style: sfProText400(
+              15,
+              items[i].toLowerCase().trim() == 'all'
+                  ? Colors.white
+                  : _color(items[i]),
+            ),
           ),
         ),
       );

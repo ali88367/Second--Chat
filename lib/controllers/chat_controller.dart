@@ -11,6 +11,7 @@ import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/streaming_overview.dart';
 import '../data/services/live_stream_service.dart';
+import '../api/auth/google_sign_in_service.dart';
 
 class ChatController extends GetxController {
   ChatController({
@@ -53,7 +54,6 @@ class ChatController extends GetxController {
   bool _socketConnecting = false;
   Future<void>? _bootstrapInFlight;
   DateTime _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
-  DateTime _lastPlatformSocketSwitchAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
   static const Duration _historyMinRefreshInterval = Duration(seconds: 25);
 
@@ -68,6 +68,14 @@ class ChatController extends GetxController {
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
   final Map<String, DateTime> _edgeGlowEventSeenAt = <String, DateTime>{};
+  final Set<String> _historyTriggeredForRunningStream = <String>{};
+  final Map<String, Timer> _pendingOfflineTimers = <String, Timer>{};
+  final Map<String, int> _pendingOfflineVotes = <String, int>{};
+  final Map<String, DateTime> _lastConfirmedLiveAt = <String, DateTime>{};
+  final Map<String, DateTime> _lastPlayerUrlUpdateAt = <String, DateTime>{};
+  static const int _offlineConfirmationVotes = 2;
+  static const Duration _offlineConfirmationDelay = Duration(seconds: 6);
+  static const Duration _minLiveHoldAfterTrue = Duration(seconds: 18);
 
   /// Own messages: show immediately, then replace with the socket echo (same text).
   final List<_PendingLocalChatEcho> _pendingLocalChatEchoes = [];
@@ -82,8 +90,6 @@ class ChatController extends GetxController {
   String? _socketAuthToken;
   String? _socketBaseUrl;
   String? _socketPath;
-  String? _socketConnectedPlatform;
-  String? _socketConnectedToken;
 
   /// Newest-first lines: `time | event | payload` — socket session (`socket:connect`, `connected`),
   /// `chat:*` / activity, and `api:chat/history` (REST `data` only on success/error body).
@@ -126,20 +132,50 @@ class ChatController extends GetxController {
   /// Backend session JWT (same as [AuthInterceptor]) + platform tokens for overview/socket.
   /// Google Sign-In supplies an **id token** once to `/auth/google`; the server returns this JWT.
   Future<String?> _resolveStreamingRestToken(String platformKey) async {
+    final p = platformKey.toLowerCase().trim();
+    if (p.isEmpty) return null;
+
+    // Prefer Google OAuth when accepted by endpoint.
+    final googleToken =
+        (await GoogleSignInService.instance.readStoredGoogleAccessToken())
+            ?.trim();
+    if (googleToken != null && googleToken.isNotEmpty) return googleToken;
+
+    // Fallback to app session JWT.
     try {
       final session = await Get.find<AuthController>().api.tokenStore.read();
       final appJwt = session?.accessToken.trim();
       if (appJwt != null && appJwt.isNotEmpty) return appJwt;
     } catch (_) {}
-    final p = platformKey.toLowerCase().trim();
-    if (p.isEmpty) return null;
+
+    // Last fallback: platform token.
     return await _live.ensureFreshPlatformAccessToken(platform: p) ??
         await _tokenProvider.getAccessToken(p);
   }
 
   /// REST + Socket.IO: **backend session JWT** (not Google `ya29…` — server `authenticate` expects JWT).
   Future<String?> _resolveChatAuthToken(String platformKey) async {
-    return _resolveStreamingRestToken(platformKey);
+    final p = platformKey.toLowerCase().trim();
+    if (p.isEmpty) return null;
+
+    // Prefer backend session JWT for socket chat auth.
+    try {
+      final session = await Get.find<AuthController>().api.tokenStore.read();
+      final appJwt = session?.accessToken.trim();
+      if (appJwt != null && appJwt.isNotEmpty) return appJwt;
+    } catch (_) {}
+
+    final platformToken = await _live.ensureFreshPlatformAccessToken(platform: p) ??
+        await _tokenProvider.getAccessToken(p);
+    if (platformToken != null && platformToken.trim().isNotEmpty) {
+      return platformToken.trim();
+    }
+
+    final googleToken =
+        (await GoogleSignInService.instance.readStoredGoogleAccessToken())
+            ?.trim();
+    if (googleToken != null && googleToken.isNotEmpty) return googleToken;
+    return null;
   }
 
   String _normalizedApiPlatform(String? raw, {String fallback = ''}) {
@@ -266,20 +302,12 @@ class ChatController extends GetxController {
         return;
       }
 
-      if (isConnected.value == true &&
-          _socketConnectedPlatform == selected &&
-          _socketConnectedToken == _socketAuthToken) {
-        return;
-      }
-
       await _live.connect(
         baseUrl: socketUrl.trim(),
         path: socketPath.trim(),
         accessToken: _socketAuthToken!,
         label: selected,
       );
-      _socketConnectedPlatform = selected;
-      _socketConnectedToken = _socketAuthToken;
 
       _wireObserversOnce();
     } catch (_) {
@@ -334,8 +362,6 @@ class ChatController extends GetxController {
           accessToken: _socketAuthToken!,
           label: selected,
         );
-        _socketConnectedPlatform = selected;
-        _socketConnectedToken = _socketAuthToken;
       }
 
       _wireObserversOnce();
@@ -423,7 +449,15 @@ class ChatController extends GetxController {
       );
 
       if (mergedViewer.isNotEmpty) platformViewerCounts.assignAll(mergedViewer);
-      if (mergedLive.isNotEmpty) platformLive.assignAll(mergedLive);
+      if (mergedLive.isNotEmpty) {
+        for (final e in mergedLive.entries) {
+          _setPlatformLiveStable(
+            e.key,
+            e.value,
+            source: 'rest:overview_multi',
+          );
+        }
+      }
       if (mergedEmbed.isNotEmpty) platformEmbedUrls.assignAll(mergedEmbed);
       if (mergedUsernames.isNotEmpty) {
         for (final e in mergedUsernames.entries) {
@@ -436,7 +470,7 @@ class ChatController extends GetxController {
       // Update currently selected stream URL.
       final currentUrl = mergedEmbed[current] ?? primary.watchUrl;
       watchUrl.value = currentUrl;
-      isLive.value = mergedLive[current] ?? primary.live;
+      isLive.value = platformLive[current] == true;
       _logStreamSnapshot('rest:overview_multi');
     } catch (_) {}
   }
@@ -533,7 +567,6 @@ class ChatController extends GetxController {
         if (platform.value.toLowerCase().trim() != p.toLowerCase().trim()) {
           platform.value = p;
         }
-        unawaited(_switchSocketToPlatform(p));
         final key = p.toLowerCase();
         isLive.value = platformLive[key] ?? isLive.value;
         watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
@@ -567,24 +600,33 @@ class ChatController extends GetxController {
       if (platform.value.toLowerCase().trim() != p.toLowerCase().trim()) {
         platform.value = p;
       }
-      unawaited(_switchSocketToPlatform(p));
-      isLive.value = ov.live;
       watchUrl.value = ov.watchUrl;
       // multi-platform state
       if (ov.viewerCountsByPlatform.isNotEmpty) {
         platformViewerCounts.assignAll(ov.viewerCountsByPlatform);
       }
       if (ov.liveByPlatform.isNotEmpty) {
-        platformLive.assignAll(ov.liveByPlatform);
+        for (final e in ov.liveByPlatform.entries) {
+          _setPlatformLiveStable(
+            e.key,
+            e.value,
+            source: 'rest:overview_single_map',
+          );
+        }
       } else {
-        platformLive[p.toLowerCase()] = ov.live;
+        _setPlatformLiveStable(
+          p.toLowerCase(),
+          ov.live,
+          source: 'rest:overview_single_fallback',
+        );
       }
       if (ov.embedUrlByPlatform.isNotEmpty) {
         platformEmbedUrls.assignAll(ov.embedUrlByPlatform);
       } else {
         platformEmbedUrls[p.toLowerCase()] = ov.watchUrl;
       }
-      if (ov.live == true) {
+      isLive.value = platformLive[p.toLowerCase()] == true;
+      if (platformLive[p.toLowerCase()] == true) {
         unawaited(
           _ensureChatForLivePlatform(p.toLowerCase(), forceHistory: forceChatHistory),
         );
@@ -600,50 +642,109 @@ class ChatController extends GetxController {
     } catch (_) {}
   }
 
-  Future<void> _switchSocketToPlatform(String p) async {
-    final key = p.toLowerCase().trim();
-    if (key.isEmpty) return;
-    // Debounce platform socket switching (chip tap + swipe can fire quickly).
-    final now = DateTime.now();
-    if (now.difference(_lastPlatformSocketSwitchAttempt) <
-        const Duration(milliseconds: 120)) {
-      return;
-    }
-    _lastPlatformSocketSwitchAttempt = now;
+  Future<void> onPlatformStreamWebViewReady({
+    required String platformKey,
+    required String runningUrl,
+  }) async {
+    final key = _normalizedApiPlatform(platformKey, fallback: 'twitch');
+    final url = runningUrl.trim();
+    if (key.isEmpty || url.isEmpty) return;
+    final onceKey = '$key|$url';
+    if (_historyTriggeredForRunningStream.contains(onceKey)) return;
 
-    final token = await _resolveChatAuthToken(key);
-    if (token == null || token.trim().isEmpty) return;
-    _socketAuthToken = token.trim();
-    if (isConnected.value == true &&
-        _socketConnectedPlatform == key &&
-        _socketConnectedToken == _socketAuthToken) {
-      return;
+    _historyTriggeredForRunningStream.add(onceKey);
+    if (_historyTriggeredForRunningStream.length > 400) {
+      _historyTriggeredForRunningStream.clear();
+      _historyTriggeredForRunningStream.add(onceKey);
     }
-
-    // Ensure socket url/path is available (from last overview fetch).
-    final socketUrl = _socketBaseUrl;
-    final socketPath = _socketPath;
-    if (socketUrl == null ||
-        socketUrl.trim().isEmpty ||
-        socketPath == null ||
-        socketPath.trim().isEmpty) {
-      return;
-    }
-
-    await _live.connect(
-      baseUrl: socketUrl.trim(),
-      path: socketPath.trim(),
-      accessToken: _socketAuthToken!,
-      label: key,
-    );
-    _socketConnectedPlatform = key;
-    _socketConnectedToken = _socketAuthToken;
+    // Attempt socket first, but do not block history while socket reconnects.
+    await _tryConnectIfPossible();
+    await _refreshHistoryForPlatform(key, force: true);
   }
 
   bool isPlatformLive(String p) {
     final key = _normalizedApiPlatform(p);
     if (key.isEmpty) return false;
     return platformLive[key] == true;
+  }
+
+  void _setPlatformLiveStable(
+    String key,
+    bool nextLive, {
+    required String source,
+  }) {
+    final platformKey = _normalizedApiPlatform(key);
+    if (platformKey.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+
+    if (nextLive) {
+      _pendingOfflineTimers.remove(platformKey)?.cancel();
+      _pendingOfflineVotes[platformKey] = 0;
+      _lastConfirmedLiveAt[platformKey] = now;
+      platformLive[platformKey] = true;
+      platformLive.refresh();
+      if (selected == platformKey) {
+        isLive.value = true;
+        final u = platformEmbedUrls[platformKey];
+        if (u != null && u.trim().isNotEmpty) watchUrl.value = u;
+      }
+      return;
+    }
+
+    final wasLive = platformLive[platformKey] == true;
+    if (!wasLive) {
+      platformLive[platformKey] = false;
+      platformLive.refresh();
+      if (selected == platformKey) isLive.value = false;
+      return;
+    }
+
+    final recentLive = _lastConfirmedLiveAt[platformKey];
+    if (recentLive != null && now.difference(recentLive) < _minLiveHoldAfterTrue) {
+      if (kDebugMode) {
+        debugPrint(
+          '[ChatController] live-off ignored (hold) platform=$platformKey source=$source',
+        );
+      }
+      return;
+    }
+
+    final votes = (_pendingOfflineVotes[platformKey] ?? 0) + 1;
+    _pendingOfflineVotes[platformKey] = votes;
+    if (votes < _offlineConfirmationVotes) {
+      return;
+    }
+
+    _pendingOfflineTimers.remove(platformKey)?.cancel();
+    _pendingOfflineTimers[platformKey] = Timer(_offlineConfirmationDelay, () {
+      _pendingOfflineTimers.remove(platformKey);
+      final selectedNow = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      final lastPlayerUpdate = _lastPlayerUrlUpdateAt[platformKey];
+      final now2 = DateTime.now().toUtc();
+      if (lastPlayerUpdate != null &&
+          now2.difference(lastPlayerUpdate) < const Duration(seconds: 4)) {
+        return;
+      }
+      if ((_pendingOfflineVotes[platformKey] ?? 0) < _offlineConfirmationVotes) {
+        return;
+      }
+      _pendingOfflineVotes[platformKey] = 0;
+      platformLive[platformKey] = false;
+      platformLive.refresh();
+      if (selectedNow == platformKey) {
+        isLive.value = false;
+        watchUrl.value = '';
+        platformMessages[platformKey] = const <ChatMessage>[];
+        messages.clear();
+        _bumpScroll();
+      }
+      if (kDebugMode) {
+        debugPrint(
+          '[ChatController] live-off confirmed platform=$platformKey source=$source',
+        );
+      }
+    });
   }
 
   String? urlForPlatform(String p) {
@@ -1328,6 +1429,13 @@ class ChatController extends GetxController {
     _historyLastFetchAt.clear();
     _activityChatSourceDedupeIds.clear();
     _edgeGlowEventSeenAt.clear();
+    for (final t in _pendingOfflineTimers.values) {
+      t.cancel();
+    }
+    _pendingOfflineTimers.clear();
+    _pendingOfflineVotes.clear();
+    _lastConfirmedLiveAt.clear();
+    _lastPlayerUrlUpdateAt.clear();
     _realtimeObserversWired = false;
     try {
       await _live.disconnect();
@@ -1335,8 +1443,6 @@ class ChatController extends GetxController {
     _socketAuthToken = null;
     _socketBaseUrl = null;
     _socketPath = null;
-    _socketConnectedPlatform = null;
-    _socketConnectedToken = null;
     platformMessages.clear();
     messages.clear();
     activityEvents.clear();
@@ -1360,9 +1466,6 @@ class ChatController extends GetxController {
     _live.onSocketInbound = _appendSocketInboundLog;
     _live.onSocketConnected = () {
       isConnected.value = true;
-      _socketConnectedPlatform =
-          _normalizedApiPlatform(platform.value, fallback: 'twitch');
-      _socketConnectedToken = _socketAuthToken;
       final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       if (selected.isNotEmpty) {
         // Overview’s `_ensureChatForLivePlatform` usually loads history; avoid a second immediate GET.
@@ -1371,8 +1474,6 @@ class ChatController extends GetxController {
     };
     _live.onSocketDisconnected = (_) {
       isConnected.value = false;
-      _socketConnectedPlatform = null;
-      _socketConnectedToken = null;
     };
     _live.onSocketError = (m) async {
       final msg = (m['message'] ?? '').toString();
@@ -1405,18 +1506,11 @@ class ChatController extends GetxController {
     _live.onLiveUpdate = (p, live) {
       final key = _normalizedApiPlatform(p);
       if (key.isEmpty) return;
-      platformLive[key] = live;
-      platformLive.refresh();
+      _setPlatformLiveStable(key, live, source: 'socket:live_update');
       final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
       if (key != selected) return;
 
-      if (!live) {
-        isLive.value = false;
-        watchUrl.value = '';
-        platformMessages[selected] = const <ChatMessage>[];
-        messages.clear();
-        _bumpScroll();
-      } else {
+      if (platformLive[selected] == true) {
         isLive.value = true;
         final u = platformEmbedUrls[selected];
         if (u != null && u.trim().isNotEmpty) watchUrl.value = u;
@@ -1427,6 +1521,9 @@ class ChatController extends GetxController {
     _live.onPlayerUrlUpdate = (p, url) {
       final key = _normalizedApiPlatform(p);
       if (key.isEmpty) return;
+      if (url != null && url.trim().isNotEmpty) {
+        _lastPlayerUrlUpdateAt[key] = DateTime.now().toUtc();
+      }
       platformEmbedUrls[key] = url;
       platformEmbedUrls.refresh();
       final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
@@ -1535,8 +1632,13 @@ class ChatController extends GetxController {
     _historyRefreshCoalesce.clear();
     _historyLastFetchAt.clear();
     _edgeGlowEventSeenAt.clear();
-    _socketConnectedPlatform = null;
-    _socketConnectedToken = null;
+    for (final t in _pendingOfflineTimers.values) {
+      t.cancel();
+    }
+    _pendingOfflineTimers.clear();
+    _pendingOfflineVotes.clear();
+    _lastConfirmedLiveAt.clear();
+    _lastPlayerUrlUpdateAt.clear();
     try {
       _live.disconnect();
     } catch (_) {}

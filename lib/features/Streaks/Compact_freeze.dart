@@ -339,7 +339,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       final longestStreak = streak?.longestStreak ?? 0;
       final currentStreakCount = streak?.currentStreak ?? 0;
       final rowData = _streakCtrl.buildCurrentWeekRow();
-      final isLoading = _streakCtrl.isLoading.value;
+      // Avoid showing a loader when we already have data (we prefetch before opening).
+      // Only show a loader when there is no streak snapshot yet.
+      final showLoader = streak == null && _streakCtrl.isLoading.value;
 
       return Container(
         height: Get.height * 0.91,
@@ -517,7 +519,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                       : '$currentStreakCount ${context.l10n.dayStreak}',
                   style: sfProDisplay600(34.sp, Colors.white),
                 ),
-                if (isLoading) ...[
+                if (showLoader) ...[
                   SizedBox(height: 6.h),
                   SizedBox(
                     width: 18.w,
@@ -543,7 +545,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                           ? null
                           : () {
                             Get.bottomSheet(
-                              const StreakFreezePreviewBottomSheet(),
+                              const StreakFreezePreviewBottomSheet(
+                                fetchOnInit: false,
+                              ),
                               isDismissible: true,
                               isScrollControlled: true,
                               enableDrag: true,
