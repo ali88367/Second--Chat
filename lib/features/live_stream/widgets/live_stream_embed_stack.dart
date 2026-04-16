@@ -39,19 +39,17 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
       final fresh = chatCtrl.urlForPlatform(widget.platformKey)?.trim() ?? '';
       final hardOff = chatCtrl.isPlatformExplicitlyOffline(widget.platformKey);
 
-      if (!liveExpected) {
-        _latchedEmbedUrl = '';
-      } else if (fresh.isNotEmpty) {
+      if (fresh.isNotEmpty) {
         if (_latchedEmbedUrl.isEmpty ||
             !streamEmbedUrlsCanonicallyEqual(fresh, _latchedEmbedUrl)) {
           _latchedEmbedUrl = fresh;
         }
-      } else if (hardOff) {
+      } else if (hardOff && !liveExpected) {
         _latchedEmbedUrl = '';
       }
 
-      // Always keep WebView mounted: no embed URL when offline; idle shell only.
-      final webUrl = liveExpected ? _latchedEmbedUrl : '';
+      // Keep last good URL latched to avoid Kick disconnect churn on brief status races.
+      final webUrl = _latchedEmbedUrl;
       return RepaintBoundary(
         child: StreamWebView(
           key: widget.streamViewKey,
