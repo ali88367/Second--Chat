@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/core/localization/get_l10n.dart';
 
@@ -140,9 +142,7 @@ class StreakData {
       if (parsed != null) return parsed;
     }
     final map = _extractStreakMap(payload);
-    final settings = _asMap(
-      map['settings'] ?? map['setting'] ?? map['config'],
-    );
+    final settings = _asMap(map['settings'] ?? map['setting'] ?? map['config']);
     final state = _asMap(
       map['state'] ?? map['status'] ?? map['data'] ?? map['current'],
     );
@@ -273,8 +273,10 @@ class StreakData {
           map['remaining_this_week'] ??
           state['remainingThisWeek'] ??
           state['remaining_this_week'],
-      fallback: (targetDaysPerWeek - completedThisWeek)
-          .clamp(0, targetDaysPerWeek),
+      fallback: (targetDaysPerWeek - completedThisWeek).clamp(
+        0,
+        targetDaysPerWeek,
+      ),
     );
     final freezeAllowancePerMonth = _asInt(
       settings['freezeAllowancePerMonth'] ??
@@ -334,6 +336,8 @@ class StreakCompleteResult {
 }
 
 class StreamStreaksController extends GetxController {
+  static const String _kStreakCacheKey = 'second_chat.streak_overview_cache';
+
   var selectedDays =
       <String, bool>{
         'Mon': false,
@@ -370,6 +374,12 @@ class StreamStreaksController extends GetxController {
   StreakData? get streak => current.value;
   bool get hasStreak => current.value?.hasCreatedStreak ?? false;
   bool get supportsDayEditing => false;
+
+  @override
+  void onInit() {
+    super.onInit();
+    unawaited(_hydrateFromCache());
+  }
 
   List<String> selectedDaysPayload() {
     return _uiDayOrder
@@ -424,11 +434,10 @@ class StreamStreaksController extends GetxController {
       final auth = Get.find<AuthController>();
       final res = await auth.api.client.dio.get<dynamic>(
         '/api/v1/streaks/overview',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
 
+      unawaited(_persistCache(res.data));
       final snapshot = StreakData.fromPayload(res.data);
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
@@ -452,6 +461,35 @@ class StreamStreaksController extends GetxController {
       isLoading.value = false;
     }
     return current.value;
+  }
+
+  Future<void> _hydrateFromCache() async {
+    if (current.value != null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kStreakCacheKey);
+      if (raw == null || raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      final snapshot = StreakData.fromPayload(decoded);
+      if (!snapshot.isConfigured) return;
+      current.value = snapshot;
+      historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('STREAK CACHE HYDRATE ERROR: $e');
+      }
+    }
+  }
+
+  Future<void> _persistCache(dynamic payload) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kStreakCacheKey, jsonEncode(payload));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('STREAK CACHE WRITE ERROR: $e');
+      }
+    }
   }
 
   Future<List<List<CellType>>> fetchHistory({
@@ -500,6 +538,7 @@ class StreamStreaksController extends GetxController {
   Future<StreakCompleteResult> markStreakComplete({
     required DateTime date,
     bool showErrors = false,
+    bool bypassFreezeGate = false,
   }) async {
     final accessToken = await _getAccessToken(showErrors: showErrors);
     if (accessToken == null || accessToken.isEmpty) {
@@ -511,14 +550,27 @@ class StreamStreaksController extends GetxController {
       );
     }
 
-    final currentStreak =
-        await fetchCurrentStreak(force: true, silent: true);
+    final currentStreak = await fetchCurrentStreak(force: true, silent: true);
     if (currentStreak == null) {
       return const StreakCompleteResult(
         success: false,
         alreadyCompleted: false,
         skipped: true,
         message: 'no_streak',
+      );
+    }
+
+    if (!bypassFreezeGate &&
+        _shouldGateCheckInUntilFreeze(
+          streak: currentStreak,
+          checkInDate: date,
+          now: DateTime.now(),
+        )) {
+      return const StreakCompleteResult(
+        success: false,
+        alreadyCompleted: false,
+        skipped: true,
+        message: 'needs_freeze',
       );
     }
 
@@ -537,9 +589,7 @@ class StreamStreaksController extends GetxController {
       final res = await auth.api.client.dio.post<dynamic>(
         '/api/v1/streaks/check-in',
         data: {'date': _formatDate(date)},
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
 
       _logStreakResponse('POST /api/v1/streaks/check-in', res.data);
@@ -582,10 +632,57 @@ class StreamStreaksController extends GetxController {
     );
   }
 
-  Future<bool> freezeStreak({
-    DateTime? date,
-    bool showErrors = true,
-  }) async {
+  bool _shouldGateCheckInUntilFreeze({
+    required StreakData streak,
+    required DateTime checkInDate,
+    required DateTime now,
+  }) {
+    final localNowDay = _stripTime(now);
+    final localCheckInDay = _stripTime(checkInDate);
+
+    // Only gate "today" check-ins; other flows can bypass this by passing
+    // `bypassFreezeGate: true`.
+    if (!_isSameDay(localNowDay, localCheckInDay)) return false;
+
+    final dangerDate =
+        _extractDangerDateFromRaw(
+          streak.raw,
+          today: localNowDay,
+          streak: streak,
+        ) ??
+        _inferDangerDateFromStreak(streak, today: localNowDay);
+
+    if (dangerDate == null) return false;
+
+    // Only gate for a single missed day and only within a 24 hour window.
+    // Missed day D can be frozen until start of day (D + 2).
+    final localDangerDay = _stripTime(dangerDate);
+    final yesterday = localNowDay.subtract(const Duration(days: 1));
+    if (!_isSameDay(localDangerDay, yesterday)) return false;
+
+    if (!_isRequiredDayForStreak(streak, localDangerDay)) return false;
+    if (streak.isDateCompleted(localDangerDay) ||
+        streak.isDateFrozen(localDangerDay)) {
+      return false;
+    }
+
+    final freezeWindowEnds = localDangerDay.add(const Duration(days: 2));
+    if (!now.isBefore(freezeWindowEnds)) return false;
+
+    return true;
+  }
+
+  bool _isRequiredDayForStreak(StreakData streak, DateTime day) {
+    final selected =
+        streak.selectedDays
+            .map(_normalizeDay)
+            .where((d) => d.isNotEmpty)
+            .toSet();
+    if (selected.isEmpty) return true;
+    return selected.contains(_weekdayKey(day));
+  }
+
+  Future<bool> freezeStreak({DateTime? date, bool showErrors = true}) async {
     if (isMutating.value) return false;
     isMutating.value = true;
     try {
@@ -597,9 +694,7 @@ class StreamStreaksController extends GetxController {
       final res = await auth.api.client.dio.post<dynamic>(
         '/api/v1/streaks/freeze/use',
         data: {'date': _formatDate(freezeDate)},
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
 
       _logStreakResponse('POST /api/v1/streaks/freeze/use', res.data);
@@ -722,19 +817,17 @@ class StreamStreaksController extends GetxController {
       if (_isCompletedOrFrozenOn(streak, localDay)) continue;
 
       final completed = _asBool(
-        day['completed'] ??
-            day['isCompleted'] ??
-            day['done'] ??
-            day['success'],
+        day['completed'] ?? day['isCompleted'] ?? day['done'] ?? day['success'],
       );
       final frozen = _asBool(
         day['frozen'] ?? day['isFrozen'] ?? day['freezeUsed'] ?? day['freeze'],
       );
       if (completed || frozen) continue;
 
-      final status = _asString(
-        day['status'] ?? day['state'] ?? day['result'] ?? day['type'],
-      ).trim().toLowerCase();
+      final status =
+          _asString(
+            day['status'] ?? day['state'] ?? day['result'] ?? day['type'],
+          ).trim().toLowerCase();
       final looksMissed =
           _asBool(
             day['missed'] ??
@@ -1252,15 +1345,16 @@ Map<String, dynamic> _extractStreakMap(dynamic payload) {
   }
   if (data is Map) {
     final pref =
-        data['userPreference'] ?? data['user_preference'] ?? data['preferences'];
+        data['userPreference'] ??
+        data['user_preference'] ??
+        data['preferences'];
     if (pref is Map) {
       final notif =
           pref['notification_settings'] ??
           pref['notificationSettings'] ??
           pref['notifications'];
       if (notif is Map) {
-        final streamStreaks =
-            notif['streamStreaks'] ?? notif['stream_streaks'];
+        final streamStreaks = notif['streamStreaks'] ?? notif['stream_streaks'];
         if (streamStreaks is Map) {
           data = streamStreaks;
         }
@@ -1313,8 +1407,7 @@ Map<String, dynamic>? _extractOverviewData(dynamic payload) {
 
 StreakData? _fromOverviewData(Map<String, dynamic> data) {
   final streakMap = _asMap(data['streak']);
-  final weeklyGoal =
-      _asMap(data['weeklyGoal'] ?? data['weekly_goal']);
+  final weeklyGoal = _asMap(data['weeklyGoal'] ?? data['weekly_goal']);
   final freezeMap = _asMap(data['freeze']);
   if (streakMap.isEmpty && weeklyGoal.isEmpty && freezeMap.isEmpty) {
     return null;
@@ -1416,7 +1509,9 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
       final frozen = _asBool(day['frozen']);
       final date = _parseDate(day['date']);
       final cell =
-          frozen ? CellType.freeze : (completed ? CellType.tick : CellType.cross);
+          frozen
+              ? CellType.freeze
+              : (completed ? CellType.tick : CellType.cross);
       final idx = date != null ? _weekdayIndexFromDate(date) : i;
       row[idx] = cell;
       if (date != null) {
@@ -1427,8 +1522,7 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
           )) {
             completedDates.add(date);
           }
-          if (lastCompletedDate == null ||
-              lastCompletedDate.isBefore(date)) {
+          if (lastCompletedDate == null || lastCompletedDate.isBefore(date)) {
             lastCompletedDate = date;
           }
         }
@@ -1456,8 +1550,7 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
   }
 
   final freezeAllowancePerMonth = _asInt(
-    freezeMap['allowancePerMonth'] ??
-        freezeMap['allowance_per_month'],
+    freezeMap['allowancePerMonth'] ?? freezeMap['allowance_per_month'],
   );
   final freezeUsedThisMonth = _asInt(
     freezeMap['usedThisMonth'] ?? freezeMap['used_this_month'],
@@ -1626,10 +1719,7 @@ DateTime? _parseDate(dynamic value) {
 
 List<DateTime> _asDateList(dynamic value) {
   if (value is List) {
-    return value
-        .map(_parseDate)
-        .whereType<DateTime>()
-        .toList();
+    return value.map(_parseDate).whereType<DateTime>().toList();
   }
   final single = _parseDate(value);
   if (single != null) return [single];
@@ -1716,10 +1806,8 @@ List<CellType> _buildRowFromSelected({
   List<DateTime> frozenDates = const <DateTime>[],
 }) {
   final row = List<CellType>.filled(7, CellType.cross);
-  final selectedSet = selectedDays
-      .map(_normalizeDay)
-      .where((d) => d.isNotEmpty)
-      .toSet();
+  final selectedSet =
+      selectedDays.map(_normalizeDay).where((d) => d.isNotEmpty).toSet();
 
   for (int i = 0; i < _orderedDays.length; i++) {
     if (selectedSet.contains(_orderedDays[i])) {
@@ -1784,21 +1872,19 @@ List<List<CellType>> _buildHistoryRowsFromDates(StreakData data) {
 
   for (final d in data.completedDates) {
     final start = _startOfWeek(d);
-    final row =
-        rowsByWeek.putIfAbsent(
-          start,
-          () => List<CellType>.filled(7, CellType.cross),
-        );
+    final row = rowsByWeek.putIfAbsent(
+      start,
+      () => List<CellType>.filled(7, CellType.cross),
+    );
     row[_weekdayIndexFromDate(d)] = CellType.tick;
   }
 
   for (final d in data.frozenDates) {
     final start = _startOfWeek(d);
-    final row =
-        rowsByWeek.putIfAbsent(
-          start,
-          () => List<CellType>.filled(7, CellType.cross),
-        );
+    final row = rowsByWeek.putIfAbsent(
+      start,
+      () => List<CellType>.filled(7, CellType.cross),
+    );
     row[_weekdayIndexFromDate(d)] = CellType.freeze;
   }
 
@@ -1808,8 +1894,7 @@ List<List<CellType>> _buildHistoryRowsFromDates(StreakData data) {
           : _startOfWeek(DateTime.now());
   rowsByWeek.removeWhere((key, _) => _isSameDay(key, currentWeekStart));
 
-  final keys = rowsByWeek.keys.toList()
-    ..sort((a, b) => b.compareTo(a));
+  final keys = rowsByWeek.keys.toList()..sort((a, b) => b.compareTo(a));
   return keys.map((k) => _normalizeRow(rowsByWeek[k]!)).toList();
 }
 

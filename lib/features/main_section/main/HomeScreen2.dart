@@ -10,9 +10,7 @@ import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
-import 'package:second_chat/features/Streaks/Compact_freeze.dart';
-import 'package:second_chat/features/Streaks/Freeze_bottomsheet.dart';
-import 'package:second_chat/features/Streaks/Streaksbottomsheet.dart';
+import 'package:second_chat/features/Streaks/streak_sheet_router.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
@@ -46,6 +44,11 @@ class _HomeScreen2State extends State<HomeScreen2> {
     if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
       unawaited(_loadStreakOnLaunch());
     }
+    final invites =
+        Get.isRegistered<InviteController>()
+            ? Get.find<InviteController>()
+            : Get.put(InviteController(), permanent: true);
+    invites.loadInvitesIfNeeded();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(Get.find<ChatController>().ensureStreamRealtimeBootstrap());
@@ -66,52 +69,15 @@ class _HomeScreen2State extends State<HomeScreen2> {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
 
-      final streak = await _streakCtrl.fetchCurrentStreak(
-        force: true,
-        silent: false,
+      await Get.bottomSheet(
+        const StreakSheetRouter(),
+        isDismissible: true,
+        isScrollControlled: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+        enterBottomSheetDuration: const Duration(milliseconds: 300),
+        exitBottomSheetDuration: const Duration(milliseconds: 250),
       );
-      if (!mounted) return;
-
-      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
-      if (streak == null && !hasCreatedStreak) return;
-
-      if (!hasCreatedStreak) {
-        await Get.bottomSheet(
-          const StreamStreakSetupBottomSheet(),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-        if (mounted) {
-          await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
-        }
-        return;
-      }
-
-      if (streak?.isInDanger == true) {
-        await Get.bottomSheet(
-          const StreakFreezePreviewBottomSheet(fetchOnInit: false),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-      } else {
-        await Get.bottomSheet(
-          const StreakFreezeSingleRowPreviewBottomSheet(fetchOnInit: false),
-          isDismissible: true,
-          isScrollControlled: true,
-          enableDrag: true,
-          backgroundColor: Colors.transparent,
-          enterBottomSheetDuration: const Duration(milliseconds: 300),
-          exitBottomSheetDuration: const Duration(milliseconds: 250),
-        );
-      }
     } finally {
       _streakSheetOpening = false;
     }
@@ -283,9 +249,9 @@ class _HomeScreen2State extends State<HomeScreen2> {
                     SizedBox(height: 24.h),
                     Obx(() {
                       final chatCtrl = Get.find<ChatController>();
-                      final streamOnline = chatCtrl.isConnected.value &&
-                          chatCtrl.platformLive.values
-                              .any((v) => v == true);
+                      final streamOnline =
+                          chatCtrl.isConnected.value &&
+                          chatCtrl.platformLive.values.any((v) => v == true);
                       return Text(
                         streamOnline
                             ? context.l10n.homeStreamLiveMessage
@@ -326,12 +292,13 @@ class _HomeScreen2State extends State<HomeScreen2> {
                   Obx(() {
                     final chatCtrl = Get.find<ChatController>();
                     final socketConnected = chatCtrl.isConnected.value;
-                    final anyLive = chatCtrl.platformLive.values.any((v) => v == true);
+                    final anyLive = chatCtrl.platformLive.values.any(
+                      (v) => v == true,
+                    );
                     final streamOnline = socketConnected && anyLive;
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                      
                         StreamStatusButton(
                           isOnline: streamOnline,
                           onTap: () {
@@ -352,14 +319,12 @@ class _HomeScreen2State extends State<HomeScreen2> {
                   }),
 
                   // Right Buttons
-
-                Obx(() {
+                  Obx(() {
                     final streakTotal =
                         _streakCtrl.current.value?.headerStreakTotal ?? 0;
-                    return 
-                  Row(
-                    children: [
-                      StreakButton(
+                    return Row(
+                      children: [
+                        StreakButton(
                           count: streakTotal,
                           onTap: _openStreakSheet,
                           padding: EdgeInsets.symmetric(
@@ -367,72 +332,72 @@ class _HomeScreen2State extends State<HomeScreen2> {
                             vertical: 4.h,
                           ),
                         ),
-                      SizedBox(width: 6.w),
-                      InkWell(
-                        onTap: () {
-                          Get.bottomSheet(
-                            Container(
-                              height: Get.height * .9,
-                              decoration: BoxDecoration(
-                                color: bottomSheetGrey,
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(18.r),
-                                  topLeft: Radius.circular(18.r),
+                        SizedBox(width: 6.w),
+                        InkWell(
+                          onTap: () {
+                            Get.bottomSheet(
+                              Container(
+                                height: Get.height * .9,
+                                decoration: BoxDecoration(
+                                  color: bottomSheetGrey,
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(18.r),
+                                    topLeft: Radius.circular(18.r),
+                                  ),
                                 ),
+                                child: InviteBottomSheet(),
                               ),
-                              child: InviteBottomSheet(),
-                            ),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          );
-                        },
-                        child: _buildImageButton(
-                          'assets/images/gift.png',
-                          width: 36.w,
-                          height: 36.w,
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              enableDrag: true,
+                              enterBottomSheetDuration: const Duration(
+                                milliseconds: 300,
+                              ),
+                              exitBottomSheetDuration: const Duration(
+                                milliseconds: 250,
+                              ),
+                            );
+                          },
+                          child: _buildImageButton(
+                            'assets/images/gift.png',
+                            width: 36.w,
+                            height: 36.w,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 6.w),
-                      GestureDetector(
-                        onTap: () {
-                          Get.bottomSheet(
-                            Container(
-                              height: Get.height * .9,
-                              decoration: BoxDecoration(
-                                color: bottomSheetGrey,
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(18.r),
-                                  topLeft: Radius.circular(18.r),
+                        SizedBox(width: 6.w),
+                        GestureDetector(
+                          onTap: () {
+                            Get.bottomSheet(
+                              Container(
+                                height: Get.height * .9,
+                                decoration: BoxDecoration(
+                                  color: bottomSheetGrey,
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(18.r),
+                                    topLeft: Radius.circular(18.r),
+                                  ),
                                 ),
+                                child: SettingsBottomsheetColumn(),
                               ),
-                              child: SettingsBottomsheetColumn(),
-                            ),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          );
-                        },
-                        child: _buildImageButton(
-                          'assets/images/settings.png',
-                          width: 36.w,
-                          height: 36.w,
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              enableDrag: true,
+                              enterBottomSheetDuration: const Duration(
+                                milliseconds: 300,
+                              ),
+                              exitBottomSheetDuration: const Duration(
+                                milliseconds: 250,
+                              ),
+                            );
+                          },
+                          child: _buildImageButton(
+                            'assets/images/settings.png',
+                            width: 36.w,
+                            height: 36.w,
+                          ),
                         ),
-                      ),
-                    ],
-                  );
+                      ],
+                    );
                   }),
                 ],
               ),
@@ -487,9 +452,10 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
   @override
   void initState() {
     super.initState();
-    _settingsCtrl = Get.isRegistered<SettingsController>()
-        ? Get.find<SettingsController>()
-        : Get.put(SettingsController());
+    _settingsCtrl =
+        Get.isRegistered<SettingsController>()
+            ? Get.find<SettingsController>()
+            : Get.put(SettingsController());
     _streakCtrl = Get.find<StreamStreaksController>();
     _settingsCtrl.loadSettingsIfNeeded();
     if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
@@ -501,10 +467,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     if (_streakLoading) return;
     setState(() => _streakLoading = true);
     try {
-      await _streakCtrl.fetchCurrentStreak(
-        force: false,
-        silent: true,
-      );
+      await _streakCtrl.fetchCurrentStreak(force: false, silent: true);
     } finally {
       if (mounted) {
         setState(() => _streakLoading = false);
@@ -514,49 +477,20 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
 
   Future<void> _openStreakOverview() async {
     if (_streakLoading) return;
-    final streak = await _streakCtrl.fetchCurrentStreak(
-      force: true,
-      silent: false,
-    );
-    if (!mounted) return;
-    final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
-    if (!hasCreatedStreak) {
-      await Get.bottomSheet(
-        const StreamStreakSetupBottomSheet(),
-        isDismissible: true,
-        isScrollControlled: true,
-        enableDrag: true,
-        backgroundColor: Colors.transparent,
-        enterBottomSheetDuration: const Duration(milliseconds: 300),
-        exitBottomSheetDuration: const Duration(milliseconds: 250),
-      );
-      if (mounted) {
-        await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
-      }
-      return;
-    }
+    final hasSession = await _streakCtrl.ensureSession(showErrors: true);
+    if (!hasSession || !mounted) return;
 
-    if (streak?.isInDanger == true) {
-      await Get.bottomSheet(
-        const StreakFreezePreviewBottomSheet(fetchOnInit: false),
-        isDismissible: true,
-        isScrollControlled: true,
-        enableDrag: true,
-        backgroundColor: Colors.transparent,
-        enterBottomSheetDuration: const Duration(milliseconds: 300),
-        exitBottomSheetDuration: const Duration(milliseconds: 250),
-      );
-    } else {
-      await Get.bottomSheet(
-        const StreakFreezeSingleRowPreviewBottomSheet(fetchOnInit: false),
-        isDismissible: true,
-        isScrollControlled: true,
-        enableDrag: true,
-        backgroundColor: Colors.transparent,
-        enterBottomSheetDuration: const Duration(milliseconds: 300),
-        exitBottomSheetDuration: const Duration(milliseconds: 250),
-      );
-    }
+    // Open instantly using cached snapshot; refresh in the background.
+    unawaited(_streakCtrl.fetchCurrentStreak(force: true, silent: true));
+    await Get.bottomSheet(
+      const StreakSheetRouter(),
+      isDismissible: true,
+      isScrollControlled: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      enterBottomSheetDuration: const Duration(milliseconds: 300),
+      exitBottomSheetDuration: const Duration(milliseconds: 250),
+    );
   }
 
   @override
@@ -564,7 +498,8 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     return Obx(() {
       final notificationsEnabled = _settingsCtrl.notifications.value;
       final streaksCustomized = _streakCtrl.hasStreak;
-      final completedCount = (notificationsEnabled ? 1 : 0) +
+      final completedCount =
+          (notificationsEnabled ? 1 : 0) +
           (_streamServiceAdded ? 1 : 0) +
           (_settingsOpened ? 1 : 0) +
           (streaksCustomized ? 1 : 0);
@@ -606,22 +541,28 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         SizedBox(
                           width: 20.w,
                           height: 20.w,
-                          child: isAllCompleted
-                              ? Image.asset(
-                                  'assets/images/check.png',
-                                  fit: BoxFit.contain,
-                                )
-                              : CircularProgressIndicator(
-                                  value: completedCount / 4.0,
-                                  strokeWidth: 3.0,
-                                  color: const Color.fromRGBO(176, 218, 200, 1),
-                                  backgroundColor: const Color.fromRGBO(
-                                    120,
-                                    120,
-                                    128,
-                                    0.36,
+                          child:
+                              isAllCompleted
+                                  ? Image.asset(
+                                    'assets/images/check.png',
+                                    fit: BoxFit.contain,
+                                  )
+                                  : CircularProgressIndicator(
+                                    value: completedCount / 4.0,
+                                    strokeWidth: 3.0,
+                                    color: const Color.fromRGBO(
+                                      176,
+                                      218,
+                                      200,
+                                      1,
+                                    ),
+                                    backgroundColor: const Color.fromRGBO(
+                                      120,
+                                      120,
+                                      128,
+                                      0.36,
+                                    ),
                                   ),
-                                ),
                         ),
                       ],
                     ),
@@ -654,175 +595,175 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                         ),
                         _buildDivider(),
 
-                      // 2. Add new stream service
-                      InkWell(
-                        onTap: () {
-                          Get.bottomSheet(
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: 12.w,
-                                right: 12.w,
-                                bottom: 15.h,
-                              ),
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                child: Container(
-                                  width: 361.w,
-                                  height: 730.h,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2C2C2E),
-                                    borderRadius: BorderRadius.circular(36.r),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(36.r),
-                                    child: ConnectPlatformSetting(),
+                        // 2. Add new stream service
+                        InkWell(
+                          onTap: () {
+                            Get.bottomSheet(
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  left: 12.w,
+                                  right: 12.w,
+                                  bottom: 15.h,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Container(
+                                    width: 361.w,
+                                    height: 730.h,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2C2C2E),
+                                      borderRadius: BorderRadius.circular(36.r),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(36.r),
+                                      child: ConnectPlatformSetting(),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            backgroundColor: Colors.transparent,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          ).then((_) {
-                            setState(() {
-                              _streamServiceAdded = true;
-                            });
-                          });
-                        },
-                        child: _buildMenuItem(
-                          imagePath: 'assets/images/signals.png',
-                          title: context.l10n.addNewStreamService,
-                          hasArrow: true,
-                          isChecked: _streamServiceAdded,
-                        ),
-                      ),
-                      _buildDivider(),
-
-                      // 3. Open settings
-                      InkWell(
-                        onTap: () {
-                          Get.bottomSheet(
-                            Container(
-                              height: Get.height * .9,
-                              decoration: BoxDecoration(
-                                color: bottomSheetGrey,
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(18.r),
-                                  topLeft: Radius.circular(18.r),
-                                ),
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              enableDrag: true,
+                              backgroundColor: Colors.transparent,
+                              enterBottomSheetDuration: const Duration(
+                                milliseconds: 300,
                               ),
-                              child: SettingsBottomsheetColumn(),
-                            ),
-                            isDismissible: true,
-                            isScrollControlled: true,
-                            enableDrag: true,
-                            enterBottomSheetDuration: const Duration(
-                              milliseconds: 300,
-                            ),
-                            exitBottomSheetDuration: const Duration(
-                              milliseconds: 250,
-                            ),
-                          ).then((_) {
-                            setState(() {
-                              _settingsOpened = true;
+                              exitBottomSheetDuration: const Duration(
+                                milliseconds: 250,
+                              ),
+                            ).then((_) {
+                              setState(() {
+                                _streamServiceAdded = true;
+                              });
                             });
-                          });
-                        },
-                        child: _buildMenuItem(
-                          imagePath: 'assets/images/settingHome.png',
-                          title: context.l10n.openSettings,
-                          hasArrow: true,
-                          isChecked: _settingsOpened,
+                          },
+                          child: _buildMenuItem(
+                            imagePath: 'assets/images/signals.png',
+                            title: context.l10n.addNewStreamService,
+                            hasArrow: true,
+                            isChecked: _streamServiceAdded,
+                          ),
                         ),
-                      ),
-                      _buildDivider(),
+                        _buildDivider(),
 
-                      // 4. Customisable streaks
-                      InkWell(
-                        onTap: _openStreakOverview,
-                        child: _buildMenuItem(
-                          imagePath: 'assets/images/calendar.png',
-                          title: context.l10n.customisableStreaks,
-                          hasArrow: true,
-                          isChecked: streaksCustomized,
+                        // 3. Open settings
+                        InkWell(
+                          onTap: () {
+                            Get.bottomSheet(
+                              Container(
+                                height: Get.height * .9,
+                                decoration: BoxDecoration(
+                                  color: bottomSheetGrey,
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(18.r),
+                                    topLeft: Radius.circular(18.r),
+                                  ),
+                                ),
+                                child: SettingsBottomsheetColumn(),
+                              ),
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              enableDrag: true,
+                              enterBottomSheetDuration: const Duration(
+                                milliseconds: 300,
+                              ),
+                              exitBottomSheetDuration: const Duration(
+                                milliseconds: 250,
+                              ),
+                            ).then((_) {
+                              setState(() {
+                                _settingsOpened = true;
+                              });
+                            });
+                          },
+                          child: _buildMenuItem(
+                            imagePath: 'assets/images/settingHome.png',
+                            title: context.l10n.openSettings,
+                            hasArrow: true,
+                            isChecked: _settingsOpened,
+                          ),
                         ),
-                      ),
-                    ],
+                        _buildDivider(),
+
+                        // 4. Customisable streaks
+                        InkWell(
+                          onTap: _openStreakOverview,
+                          child: _buildMenuItem(
+                            imagePath: 'assets/images/calendar.png',
+                            title: context.l10n.customisableStreaks,
+                            hasArrow: true,
+                            isChecked: streaksCustomized,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 2. The Next Button
+          // FIX: Positioned at bottom: 0.
+          // Since we added 68.h padding to the container above, bottom: 0 here
+          // is visually equivalent to bottom: -68.h in the old code,
+          // but now it is valid for clicks.
+          if (isAllCompleted)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: () {
+                  Get.to(Livestreaming());
+                },
+                child: Container(
+                  height: 52.h,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    context.l10n.next,
+                    style: sfProText600(17.sp, Colors.black),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
 
-        // 2. The Next Button
-        // FIX: Positioned at bottom: 0.
-        // Since we added 68.h padding to the container above, bottom: 0 here
-        // is visually equivalent to bottom: -68.h in the old code,
-        // but now it is valid for clicks.
-        if (isAllCompleted)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () {
-                Get.to(Livestreaming());
-              },
-              child: Container(
-                height: 52.h,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30.r),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  context.l10n.next,
-                  style: sfProText600(17.sp, Colors.black),
+          // 3. The Skip Button - Shows only when not all tasks are completed
+          if (!isAllCompleted)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: () {
+                  Get.to(
+                    () => Livestreaming(),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.fastOutSlowIn,
+                  );
+                },
+                child: Container(
+                  height: 52.h,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    context.l10n.skip,
+                    style: sfProText600(17.sp, Colors.black),
+                  ),
                 ),
               ),
             ),
-          ),
-
-        // 3. The Skip Button - Shows only when not all tasks are completed
-        if (!isAllCompleted)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () {
-                Get.to(
-                  () => Livestreaming(),
-                  transition: Transition.cupertino,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.fastOutSlowIn,
-                );
-              },
-              child: Container(
-                height: 52.h,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30.r),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  context.l10n.skip,
-                  style: sfProText600(17.sp, Colors.black),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  });
+        ],
+      );
+    });
   }
 
   Widget _buildMenuItem({

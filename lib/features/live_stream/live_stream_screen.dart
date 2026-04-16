@@ -16,9 +16,7 @@ import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/widgets/stream_header_buttons.dart';
 import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
-import '../Streaks/Compact_freeze.dart';
-import '../Streaks/Freeze_bottomsheet.dart';
-import '../Streaks/Streaksbottomsheet.dart';
+import '../Streaks/streak_sheet_router.dart';
 import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
@@ -77,11 +75,29 @@ class _LivestreamingState extends State<Livestreaming> {
     _chatFilter.addListener(_updateImageBasedOnFilter);
     _chatFilter.addListener(_syncSelectedPlatformFromFilter);
     _showActivity.addListener(_onShowActivityOpened);
+    _warmPrefetchBottomSheets();
     _maybeCompleteStreakForToday();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(Get.find<ChatController>().ensureStreamRealtimeBootstrap());
     });
+  }
+
+  void _warmPrefetchBottomSheets() {
+    unawaited(_warmStreakData());
+    final invites =
+        Get.isRegistered<InviteController>()
+            ? Get.find<InviteController>()
+            : Get.put(InviteController(), permanent: true);
+    invites.loadInvitesIfNeeded();
+  }
+
+  Future<void> _warmStreakData() async {
+    if (_streakCtrl.current.value != null) return;
+    if (_streakCtrl.isLoading.value) return;
+    final hasSession = await _streakCtrl.ensureSession(showErrors: false);
+    if (!hasSession) return;
+    await _streakCtrl.fetchCurrentStreak(force: false, silent: true);
   }
 
   void _onShowActivityOpened() {
@@ -126,42 +142,34 @@ class _LivestreamingState extends State<Livestreaming> {
     _streakCompletionChecked = true;
 
     try {
-      await _streakCtrl.markStreakComplete(
+      final result = await _streakCtrl.markStreakComplete(
         date: DateTime.now(),
         showErrors: false,
       );
+
+      // Never auto-open streak UI on app restart; user can open it explicitly via
+      // the streak button.
+      if (result.skipped && result.message == 'needs_freeze') {
+        if (kDebugMode) {
+          debugPrint(
+            '[STREAK] check-in gated: needs freeze (not auto-opening sheet)',
+          );
+        }
+      }
     } catch (e) {
       debugPrint('STREAK COMPLETE ERROR: $e');
     }
   }
 
-  Future<void> _openStreakSheet() async {
+  Future<void> _openStreakSheet({bool forceFreezePreview = false}) async {
     if (_streakSheetOpening) return;
     _streakSheetOpening = true;
     try {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
 
-      // Avoid showing an intermediate loader bottom sheet.
-      var streak = _streakCtrl.current.value;
-      streak ??= await _streakCtrl.fetchCurrentStreak(force: true, silent: false);
-      if (!mounted) return;
-      if (streak == null) return;
-
-      final hasCreatedStreak = streak.hasCreatedStreak;
-      final isInDanger = streak.isInDanger;
-
-      final Widget sheet =
-          !hasCreatedStreak
-              ? const StreamStreakSetupBottomSheet()
-              : (isInDanger
-                  ? const StreakFreezePreviewBottomSheet(fetchOnInit: false)
-                  : const StreakFreezeSingleRowPreviewBottomSheet(
-                      fetchOnInit: false,
-                    ));
-
       await Get.bottomSheet(
-        sheet,
+        StreakSheetRouter(forceFreezePreview: forceFreezePreview),
         isDismissible: true,
         isScrollControlled: true,
         enableDrag: true,
@@ -199,20 +207,21 @@ class _LivestreamingState extends State<Livestreaming> {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final maxBottom =
         screenHeight -
-            _layoutTopPadding(context) -
-            16.h -
-            _minUpperSectionHeight -
-            12.h -
-            bottomInset;
+        _layoutTopPadding(context) -
+        16.h -
+        _minUpperSectionHeight -
+        12.h -
+        bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
-    final effectiveMaxBottom = _bottomSectionMaxHeight == null
-        ? clampedMaxBottom
-        : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
+    final effectiveMaxBottom =
+        _bottomSectionMaxHeight == null
+            ? clampedMaxBottom
+            : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
     setState(() {
       final restored =
-      (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
-          .clamp(minHeight, effectiveMaxBottom)
-          .toDouble();
+          (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
+              .clamp(minHeight, effectiveMaxBottom)
+              .toDouble();
       _bottomSectionHeight = restored;
       _bottomSectionHeightBeforeActivityExpand = null;
       if (_activityLayoutMin > 0) {
@@ -322,11 +331,14 @@ class _LivestreamingState extends State<Livestreaming> {
         type == 'followoff') {
       return (u.isNotEmpty ? '$u unfollowed' : 'Someone unfollowed', '');
     }
-    final primary = u.isNotEmpty ? u : (typeRaw.isNotEmpty ? typeRaw : 'Activity');
+    final primary =
+        u.isNotEmpty ? u : (typeRaw.isNotEmpty ? typeRaw : 'Activity');
     final secondary =
-    u.isNotEmpty && typeRaw.isNotEmpty && typeRaw.toLowerCase() != u.toLowerCase()
-        ? typeRaw
-        : '';
+        u.isNotEmpty &&
+                typeRaw.isNotEmpty &&
+                typeRaw.toLowerCase() != u.toLowerCase()
+            ? typeRaw
+            : '';
     return (primary, secondary);
   }
 
@@ -343,8 +355,8 @@ class _LivestreamingState extends State<Livestreaming> {
     // Keep collapsed size large enough for fixed header UI + counter row.
     final minByContent =
         (12.h + 59.4.h + 12.h) + // counter row wrapper in parent
-            (10.h + 8.h + 4.h + 8.h + 16.h + 36.h + 16.h) + // chat header chrome
-            8.h; // small safety buffer to avoid edge overflow on some devices
+        (10.h + 8.h + 4.h + 8.h + 16.h + 36.h + 16.h) + // chat header chrome
+        8.h; // small safety buffer to avoid edge overflow on some devices
 
     return minByFactor > minByContent ? minByFactor : minByContent;
   }
@@ -353,9 +365,9 @@ class _LivestreamingState extends State<Livestreaming> {
     final safeTop = MediaQuery.of(context).viewPadding.top;
     final dynamicOffset =
         safeTop +
-            28.h + // top padding used by top icon row
-            36.w + // icon row visual height
-            12.h; // spacing below row
+        28.h + // top padding used by top icon row
+        36.w + // icon row visual height
+        12.h; // spacing below row
     final legacyOffset = 117.h;
     return dynamicOffset > legacyOffset ? dynamicOffset : legacyOffset;
   }
@@ -370,30 +382,33 @@ class _LivestreamingState extends State<Livestreaming> {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final maxBottom =
         screenHeight -
-            _layoutTopPadding(context) -
-            16.h -
-            _minUpperSectionHeight -
-            12.h -
-            bottomInset;
+        _layoutTopPadding(context) -
+        16.h -
+        _minUpperSectionHeight -
+        12.h -
+        bottomInset;
     final clampedMaxBottom = maxBottom > minHeight ? maxBottom : minHeight;
-    final effectiveMaxBottom = _bottomSectionMaxHeight == null
-        ? clampedMaxBottom
-        : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
+    final effectiveMaxBottom =
+        _bottomSectionMaxHeight == null
+            ? clampedMaxBottom
+            : math.min(clampedMaxBottom, _bottomSectionMaxHeight!);
 
     setState(() {
       final nextExpanded = !_activityPanelExpanded;
       if (nextExpanded) {
         _bottomSectionHeightBeforeActivityExpand ??=
-            _bottomSectionHeight.clamp(minHeight, effectiveMaxBottom).toDouble();
+            _bottomSectionHeight
+                .clamp(minHeight, effectiveMaxBottom)
+                .toDouble();
         _bottomSectionHeight = minHeight;
         if (_activityLayoutMax > 0) {
           _activityHeight = _activityLayoutMax;
         }
       } else {
         final restored =
-        (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
-            .clamp(minHeight, effectiveMaxBottom)
-            .toDouble();
+            (_bottomSectionHeightBeforeActivityExpand ?? effectiveMaxBottom)
+                .clamp(minHeight, effectiveMaxBottom)
+                .toDouble();
         _bottomSectionHeight = restored;
         _bottomSectionHeightBeforeActivityExpand = null;
         if (_activityLayoutMin > 0) {
@@ -428,9 +443,8 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('twitch');
                 return counterPill(
                   asset: 'assets/images/twitch.png',
-                  count: showViewerCounts
-                      ? _formatViewerCount(twitchViews)
-                      : '-',
+                  count:
+                      showViewerCounts ? _formatViewerCount(twitchViews) : '-',
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -443,9 +457,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('kick');
                 return counterPill(
                   asset: 'assets/images/kick.png',
-                  count: showViewerCounts
-                      ? _formatViewerCount(kickViews)
-                      : '-',
+                  count: showViewerCounts ? _formatViewerCount(kickViews) : '-',
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -458,9 +470,8 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('youtube');
                 return counterPill(
                   asset: 'assets/images/youtube.png',
-                  count: showViewerCounts
-                      ? _formatViewerCount(youtubeViews)
-                      : '-',
+                  count:
+                      showViewerCounts ? _formatViewerCount(youtubeViews) : '-',
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -476,23 +487,22 @@ class _LivestreamingState extends State<Livestreaming> {
   static const double _activityDragSensitivity = 1.5;
 
   Widget _buildResizableActivityContainer(
-      BuildContext context,
-      double availableHeight,
-      ) {
+    BuildContext context,
+    double availableHeight,
+  ) {
     final double screenHeight = Get.height;
     final double minHeightFromScreen = screenHeight * _activityMinHeight;
     final double maxHeightFromScreen = screenHeight * _activityMaxHeight;
     final double slotCap =
-    (availableHeight > 0 ? availableHeight : maxHeightFromScreen)
-        .toDouble();
+        (availableHeight > 0 ? availableHeight : maxHeightFromScreen)
+            .toDouble();
     // Fill the upper stream slot when expanded (no artificial shrink).
     final double maxHeight = math.max(minHeightFromScreen, slotCap);
     final double originalHeight =
-    minHeightFromScreen.clamp(0, maxHeight).toDouble();
+        minHeightFromScreen.clamp(0, maxHeight).toDouble();
 
     if (_activityHeight == 0) {
-      _activityHeight =
-      _activityPanelExpanded ? maxHeight : originalHeight;
+      _activityHeight = _activityPanelExpanded ? maxHeight : originalHeight;
     }
 
     final double clampedHeight = _activityHeight.clamp(
@@ -503,11 +513,14 @@ class _LivestreamingState extends State<Livestreaming> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final parentMax =
-        constraints.maxHeight.isFinite && constraints.maxHeight > 0
-            ? constraints.maxHeight
-            : slotCap;
+            constraints.maxHeight.isFinite && constraints.maxHeight > 0
+                ? constraints.maxHeight
+                : slotCap;
         final effectiveMax =
-        math.min(parentMax, maxHeight).clamp(0.0, double.infinity).toDouble();
+            math
+                .min(parentMax, maxHeight)
+                .clamp(0.0, double.infinity)
+                .toDouble();
         final effectiveMin = originalHeight.clamp(0, effectiveMax).toDouble();
         _activityLayoutMin = effectiveMin;
         _activityLayoutMax = effectiveMax;
@@ -543,9 +556,7 @@ class _LivestreamingState extends State<Livestreaming> {
               Positioned.fill(
                 child: ScrollbarTheme(
                   data: ScrollbarThemeData(
-                    thumbColor: MaterialStateProperty.all(
-                      Colors.grey.shade500,
-                    ),
+                    thumbColor: MaterialStateProperty.all(Colors.grey.shade500),
                   ),
                   child: Scrollbar(
                     controller: _activityScrollController,
@@ -562,31 +573,33 @@ class _LivestreamingState extends State<Livestreaming> {
                         bottom: 28.h,
                       ),
                       physics:
-                      _isDraggingActivity
-                          ? const NeverScrollableScrollPhysics()
-                          : const BouncingScrollPhysics(),
+                          _isDraggingActivity
+                              ? const NeverScrollableScrollPhysics()
+                              : const BouncingScrollPhysics(),
                       child: Obx(() {
                         final chatCtrl = Get.find<ChatController>();
                         chatCtrl.platform.value;
                         _settingsCtrl.clockFormat.value;
-                        final selected =
-                        _normalizeUiPlatform(chatCtrl.platform.value);
+                        final selected = _normalizeUiPlatform(
+                          chatCtrl.platform.value,
+                        );
                         // Prefer controller activity list (wired to sockets).
                         // Chat "normal" lines stay in chat; activity = everything else.
                         final events = chatCtrl.activityEvents
                             .where((e) {
-                          final t = (e['type'] ?? e['eventType'] ?? '')
-                              .toString()
-                              .trim()
-                              .toLowerCase();
-                          return t != 'normal';
-                        })
+                              final t =
+                                  (e['type'] ?? e['eventType'] ?? '')
+                                      .toString()
+                                      .trim()
+                                      .toLowerCase();
+                              return t != 'normal';
+                            })
                             .where((e) {
-                          final raw =
-                          (e['platform'] ?? '').toString().trim();
-                          if (raw.isEmpty) return true;
-                          return _normalizeUiPlatform(raw) == selected;
-                        })
+                              final raw =
+                                  (e['platform'] ?? '').toString().trim();
+                              if (raw.isEmpty) return true;
+                              return _normalizeUiPlatform(raw) == selected;
+                            })
                             .toList(growable: false);
                         if (events.isEmpty) {
                           return Center(
@@ -595,10 +608,7 @@ class _LivestreamingState extends State<Livestreaming> {
                               child: Text(
                                 context.l10n.noActivityYet,
                                 textAlign: TextAlign.center,
-                                style: sfProText400(
-                                  13.sp,
-                                  Colors.white54,
-                                ),
+                                style: sfProText400(13.sp, Colors.white54),
                               ),
                             ),
                           );
@@ -614,24 +624,26 @@ class _LivestreamingState extends State<Livestreaming> {
                                   builder: (ctx) {
                                     final e = list[i];
                                     final platform =
-                                    (e['platform'] ?? '').toString();
+                                        (e['platform'] ?? '').toString();
                                     final meta = e['metadata'];
-                                    final metaMap = meta is Map
-                                        ? meta.cast<String, dynamic>()
-                                        : const <String, dynamic>{};
-                                    final user = (metaMap['user'] ??
-                                        metaMap['username'] ??
-                                        metaMap['user_name'] ??
-                                        metaMap['user_login'] ??
-                                        metaMap['name'] ??
-                                        e['username'] ??
-                                        '')
-                                        .toString()
-                                        .trim();
+                                    final metaMap =
+                                        meta is Map
+                                            ? meta.cast<String, dynamic>()
+                                            : const <String, dynamic>{};
+                                    final user =
+                                        (metaMap['user'] ??
+                                                metaMap['username'] ??
+                                                metaMap['user_name'] ??
+                                                metaMap['user_login'] ??
+                                                metaMap['name'] ??
+                                                e['username'] ??
+                                                '')
+                                            .toString()
+                                            .trim();
                                     final type =
-                                    (e['type'] ?? e['eventType'] ?? '')
-                                        .toString()
-                                        .trim();
+                                        (e['type'] ?? e['eventType'] ?? '')
+                                            .toString()
+                                            .trim();
                                     final time = _formatActivityTime(
                                       e['timestamp'] ?? e['created_at'],
                                     );
@@ -640,9 +652,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                       typeRaw: type,
                                     );
                                     final pKey = _normalizeUiPlatform(
-                                      platform.isNotEmpty
-                                          ? platform
-                                          : selected,
+                                      platform.isNotEmpty ? platform : selected,
                                     );
                                     return activityRow(
                                       _assetForPlatform(pKey),
@@ -703,8 +713,7 @@ class _LivestreamingState extends State<Livestreaming> {
           onVerticalDragStart: (_) {
             setState(() {
               _isDraggingActivity = true;
-              final startH =
-              _activityHeight.clamp(effectiveMin, effectiveMax);
+              final startH = _activityHeight.clamp(effectiveMin, effectiveMax);
               _activityHeight = startH;
             });
           },
@@ -775,14 +784,14 @@ class _LivestreamingState extends State<Livestreaming> {
                             if (filter == 'twitch') {
                               filterColor =
                                   _settingsCtrl.twitchColor.value ??
-                                      twitchPurple;
+                                  twitchPurple;
                             } else if (filter == 'kick') {
                               filterColor =
                                   _settingsCtrl.kickColor.value ?? kickGreen;
                             } else if (filter == 'youtube') {
                               filterColor =
                                   _settingsCtrl.youtubeColor.value ??
-                                      youtubeRed;
+                                  youtubeRed;
                             } else {
                               filterColor = Colors.transparent;
                             }
@@ -960,32 +969,32 @@ class _LivestreamingState extends State<Livestreaming> {
                             final spacing = 12.h;
                             final bottomPadding =
                                 16.h +
-                                    MediaQuery.of(context).viewPadding.bottom;
+                                MediaQuery.of(context).viewPadding.bottom;
                             final minHeight = _bottomSectionMinHeight(
                               screenHeight,
                             );
                             final maxHeight =
                                 screenHeight -
-                                    topPadding -
-                                    spacing -
-                                    _minUpperSectionHeight -
-                                    bottomPadding;
+                                topPadding -
+                                spacing -
+                                _minUpperSectionHeight -
+                                bottomPadding;
                             final safeMaxHeight =
-                            maxHeight > minHeight ? maxHeight : minHeight;
+                                maxHeight > minHeight ? maxHeight : minHeight;
                             final upperSectionHeight = 236.h + spacing;
                             final counterRowHeight = 59.4.h + 24.h;
                             final availableHeight =
                                 screenHeight - topPadding - bottomPadding;
                             final calculatedHeight =
                                 availableHeight -
-                                    upperSectionHeight -
-                                    spacing -
-                                    counterRowHeight;
+                                upperSectionHeight -
+                                spacing -
+                                counterRowHeight;
                             final initialBottomHeight = calculatedHeight * 1.4;
                             final legacyInitialHeight =
-                            initialBottomHeight > 200.h
-                                ? initialBottomHeight
-                                : 200.h;
+                                initialBottomHeight > 200.h
+                                    ? initialBottomHeight
+                                    : 200.h;
                             setState(() {
                               _bottomSectionHeight =
                                   legacyInitialHeight
@@ -1010,12 +1019,12 @@ class _LivestreamingState extends State<Livestreaming> {
                             child: LayoutBuilder(
                               builder: (context, upperConstraints) {
                                 final upperSectionHeight =
-                                upperConstraints.maxHeight.isFinite &&
-                                    upperConstraints.maxHeight > 0
-                                    ? upperConstraints.maxHeight
-                                    : 226.h;
+                                    upperConstraints.maxHeight.isFinite &&
+                                            upperConstraints.maxHeight > 0
+                                        ? upperConstraints.maxHeight
+                                        : 226.h;
                                 final streamPreviewHeight =
-                                upperSectionHeight.toDouble();
+                                    upperSectionHeight.toDouble();
 
                                 return ValueListenableBuilder<bool>(
                                   valueListenable: _showActivity,
@@ -1030,87 +1039,112 @@ class _LivestreamingState extends State<Livestreaming> {
                                             ignoring: showActivity,
                                             child: SingleChildScrollView(
                                               physics:
-                                              _isDraggingActivity
-                                                  ? const NeverScrollableScrollPhysics()
-                                                  : const ClampingScrollPhysics(),
+                                                  _isDraggingActivity
+                                                      ? const NeverScrollableScrollPhysics()
+                                                      : const ClampingScrollPhysics(),
                                               padding: EdgeInsets.only(
                                                 bottom:
-                                                MediaQuery.of(
-                                                  context,
-                                                ).viewPadding.bottom,
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).viewPadding.bottom,
                                               ),
                                               child: ConstrainedBox(
                                                 constraints: BoxConstraints(
                                                   minHeight: upperSectionHeight,
                                                 ),
-                                                child: ValueListenableBuilder<bool>(
-                                                  valueListenable: _showServiceCard,
-                                                  builder: (context, showCard, child) {
+                                                child: ValueListenableBuilder<
+                                                  bool
+                                                >(
+                                                  valueListenable:
+                                                      _showServiceCard,
+                                                  builder: (
+                                                    context,
+                                                    showCard,
+                                                    child,
+                                                  ) {
                                                     final chatCtrl =
-                                                    Get.find<ChatController>();
+                                                        Get.find<
+                                                          ChatController
+                                                        >();
                                                     final settingsCtrl =
-                                                    Get.find<SettingsController>();
+                                                        Get.find<
+                                                          SettingsController
+                                                        >();
 
                                                     final webView = SizedBox(
-                                                      height: streamPreviewHeight,
+                                                      height:
+                                                          streamPreviewHeight,
                                                       child: Obx(() {
                                                         final multi =
                                                             settingsCtrl
                                                                 .multiScreenPreview
                                                                 .value ==
-                                                                true;
+                                                            true;
                                                         return Container(
                                                           width:
-                                                          MediaQuery.of(
-                                                            context,
-                                                          ).size.width,
-                                                          margin: EdgeInsets.symmetric(
-                                                            horizontal: 5.w,
-                                                          ),
+                                                              MediaQuery.of(
+                                                                context,
+                                                              ).size.width,
+                                                          margin:
+                                                              EdgeInsets.symmetric(
+                                                                horizontal: 5.w,
+                                                              ),
                                                           decoration: BoxDecoration(
                                                             borderRadius:
-                                                            BorderRadius.circular(
-                                                              24.r,
-                                                            ),
+                                                                BorderRadius.circular(
+                                                                  24.r,
+                                                                ),
                                                           ),
                                                           child: ClipRRect(
                                                             borderRadius:
-                                                            BorderRadius.circular(
-                                                              24.r,
-                                                            ),
+                                                                BorderRadius.circular(
+                                                                  24.r,
+                                                                ),
                                                             child: Padding(
-                                                              padding: EdgeInsets.all(
-                                                                multi ? 8.w : 0,
-                                                              ),
-                                                              child: multi
-                                                                  ? LiveStreamMultiEmbedGrid(
-                                                                streamPreviewHeight:
-                                                                streamPreviewHeight,
-                                                                onStreamReady: (
-                                                                  platformKey,
-                                                                  runningUrl,
-                                                                ) {
-                                                                  Get.find<ChatController>()
-                                                                      .onPlatformStreamWebViewReady(
-                                                                        platformKey: platformKey,
-                                                                        runningUrl: runningUrl,
-                                                                      );
-                                                                },
-                                                              )
-                                                                  : LiveStreamSingleEmbedStack(
-                                                                streamPreviewHeight:
-                                                                streamPreviewHeight,
-                                                                onStreamReady: (
-                                                                  platformKey,
-                                                                  runningUrl,
-                                                                ) {
-                                                                  Get.find<ChatController>()
-                                                                      .onPlatformStreamWebViewReady(
-                                                                        platformKey: platformKey,
-                                                                        runningUrl: runningUrl,
-                                                                      );
-                                                                },
-                                                              ),
+                                                              padding:
+                                                                  EdgeInsets.all(
+                                                                    multi
+                                                                        ? 8.w
+                                                                        : 0,
+                                                                  ),
+                                                              child:
+                                                                  multi
+                                                                      ? LiveStreamMultiEmbedGrid(
+                                                                        streamPreviewHeight:
+                                                                            streamPreviewHeight,
+                                                                        onStreamReady: (
+                                                                          platformKey,
+                                                                          runningUrl,
+                                                                        ) {
+                                                                          Get.find<
+                                                                                ChatController
+                                                                              >()
+                                                                              .onPlatformStreamWebViewReady(
+                                                                                platformKey:
+                                                                                    platformKey,
+                                                                                runningUrl:
+                                                                                    runningUrl,
+                                                                              );
+                                                                        },
+                                                                      )
+                                                                      : LiveStreamSingleEmbedStack(
+                                                                        streamPreviewHeight:
+                                                                            streamPreviewHeight,
+                                                                        onStreamReady: (
+                                                                          platformKey,
+                                                                          runningUrl,
+                                                                        ) {
+                                                                          Get.find<
+                                                                                ChatController
+                                                                              >()
+                                                                              .onPlatformStreamWebViewReady(
+                                                                                platformKey:
+                                                                                    platformKey,
+                                                                                runningUrl:
+                                                                                    runningUrl,
+                                                                              );
+                                                                        },
+                                                                      ),
                                                             ),
                                                           ),
                                                         );
@@ -1118,10 +1152,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                                     );
 
                                                     return SizedBox(
-                                                      height: streamPreviewHeight,
+                                                      height:
+                                                          streamPreviewHeight,
                                                       child: Stack(
                                                         fit: StackFit.expand,
-                                                        clipBehavior: Clip.hardEdge,
+                                                        clipBehavior:
+                                                            Clip.hardEdge,
                                                         children: [
                                                           Offstage(
                                                             offstage: showCard,
@@ -1129,44 +1165,48 @@ class _LivestreamingState extends State<Livestreaming> {
                                                           ),
                                                           if (showCard)
                                                             Positioned.fill(
-                                                              child: ValueListenableBuilder<bool>(
+                                                              child: ValueListenableBuilder<
+                                                                bool
+                                                              >(
                                                                 valueListenable:
-                                                                _titleSelected,
+                                                                    _titleSelected,
                                                                 builder: (
-                                                                    context,
-                                                                    titleSelected,
-                                                                    _,
-                                                                    ) {
+                                                                  context,
+                                                                  titleSelected,
+                                                                  _,
+                                                                ) {
                                                                   if (titleSelected) {
                                                                     return ValueListenableBuilder<
-                                                                        String?
+                                                                      String?
                                                                     >(
                                                                       valueListenable:
-                                                                      _selectedPlatform,
+                                                                          _selectedPlatform,
                                                                       builder: (
-                                                                          context,
-                                                                          platform,
-                                                                          _,
-                                                                          ) {
+                                                                        context,
+                                                                        platform,
+                                                                        _,
+                                                                      ) {
                                                                         if (platform !=
                                                                             null) {
-                                                                          final activePlatform =
-                                                                          _normalizeUiPlatform(
+                                                                          final activePlatform = _normalizeUiPlatform(
                                                                             platform,
                                                                           );
                                                                           return Column(
                                                                             children: [
                                                                               Expanded(
                                                                                 child: Container(
-                                                                                  width: double.infinity,
+                                                                                  width:
+                                                                                      double.infinity,
                                                                                   padding: EdgeInsets.symmetric(
-                                                                                    horizontal: 12.w,
-                                                                                    vertical: 12.h,
+                                                                                    horizontal:
+                                                                                        12.w,
+                                                                                    vertical:
+                                                                                        12.h,
                                                                                   ),
                                                                                   decoration: BoxDecoration(
-                                                                                    color: black,
-                                                                                    borderRadius:
-                                                                                    BorderRadius.circular(
+                                                                                    color:
+                                                                                        black,
+                                                                                    borderRadius: BorderRadius.circular(
                                                                                       20.r,
                                                                                     ),
                                                                                   ),
@@ -1175,21 +1215,23 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                       Padding(
                                                                                         padding: EdgeInsets.symmetric(
                                                                                           horizontal:
-                                                                                          8.w,
+                                                                                              8.w,
                                                                                         ),
                                                                                         child: Row(
                                                                                           children: [
                                                                                             GestureDetector(
                                                                                               onTap: () {
-                                                                                                _collapseActivityExpandedIfNeeded(context);
+                                                                                                _collapseActivityExpandedIfNeeded(
+                                                                                                  context,
+                                                                                                );
                                                                                                 _selectedPlatform.value = null;
                                                                                                 _showServiceCard.value = false;
                                                                                                 _titleSelected.value = false;
                                                                                                 _showActivity.value = false;
                                                                                                 _activityHeight =
-                                                                                                0;
+                                                                                                    0;
                                                                                                 _isDraggingActivity =
-                                                                                                false;
+                                                                                                    false;
                                                                                               },
                                                                                               child: Container(
                                                                                                 padding: EdgeInsets.all(
@@ -1197,9 +1239,9 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                 ),
                                                                                                 decoration: BoxDecoration(
                                                                                                   color:
-                                                                                                  Colors.grey.shade900,
+                                                                                                      Colors.grey.shade900,
                                                                                                   shape:
-                                                                                                  BoxShape.circle,
+                                                                                                      BoxShape.circle,
                                                                                                 ),
                                                                                                 child: Transform.translate(
                                                                                                   offset: const Offset(
@@ -1209,129 +1251,135 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   child: Icon(
                                                                                                     Icons.arrow_back_ios,
                                                                                                     color:
-                                                                                                    Colors.white,
+                                                                                                        Colors.white,
                                                                                                     size:
-                                                                                                    16.sp,
+                                                                                                        16.sp,
                                                                                                   ),
                                                                                                 ),
                                                                                               ),
                                                                                             ),
                                                                                             const Spacer(),
-                                                                                            ValueListenableBuilder<String?>(
-                                                                                              valueListenable: _chatFilter,
+                                                                                            ValueListenableBuilder<
+                                                                                              String?
+                                                                                            >(
+                                                                                              valueListenable:
+                                                                                                  _chatFilter,
                                                                                               builder: (
-                                                                                                  context,
-                                                                                                  chatFilterSnap,
-                                                                                                  _,
-                                                                                                  ) {
-                                                                                                return Obx(() {
-                                                                                                  chatCtrl.platform.value;
-                                                                                                  final cfs =
-                                                                                                      chatFilterSnap
-                                                                                                          ?.trim();
-                                                                                                  final raw =
-                                                                                                      (cfs !=
-                                                                                                              null &&
-                                                                                                          cfs
-                                                                                                              .isNotEmpty)
-                                                                                                          ? cfs
-                                                                                                          : chatCtrl
-                                                                                                              .platform
-                                                                                                              .value
-                                                                                                              .toString()
-                                                                                                              .trim();
-                                                                                                  final displayKey =
-                                                                                                      _normalizeUiPlatform(
-                                                                                                    raw.isNotEmpty
-                                                                                                        ? raw
-                                                                                                        : activePlatform,
-                                                                                                  );
-                                                                                                  final iconAsset =
-                                                                                                  _assetForPlatform(
-                                                                                                    displayKey,
-                                                                                                  );
-                                                                                                  final iconColor =
-                                                                                                  _settingsCtrl
-                                                                                                      .getPlatformColor(
-                                                                                                    displayKey,
-                                                                                                  );
-                                                                                                  return Center(
-                                                                                                    child: Image.asset(
-                                                                                                      iconAsset,
-                                                                                                      color: iconColor,
-                                                                                                      width: 22.w,
-                                                                                                      height: 22.h,
-                                                                                                    ),
-                                                                                                  );
-                                                                                                });
+                                                                                                context,
+                                                                                                chatFilterSnap,
+                                                                                                _,
+                                                                                              ) {
+                                                                                                return Obx(
+                                                                                                  () {
+                                                                                                    chatCtrl.platform.value;
+                                                                                                    final cfs =
+                                                                                                        chatFilterSnap?.trim();
+                                                                                                    final raw =
+                                                                                                        (cfs !=
+                                                                                                                    null &&
+                                                                                                                cfs.isNotEmpty)
+                                                                                                            ? cfs
+                                                                                                            : chatCtrl.platform.value.toString().trim();
+                                                                                                    final displayKey = _normalizeUiPlatform(
+                                                                                                      raw.isNotEmpty
+                                                                                                          ? raw
+                                                                                                          : activePlatform,
+                                                                                                    );
+                                                                                                    final iconAsset = _assetForPlatform(
+                                                                                                      displayKey,
+                                                                                                    );
+                                                                                                    final iconColor = _settingsCtrl.getPlatformColor(
+                                                                                                      displayKey,
+                                                                                                    );
+                                                                                                    return Center(
+                                                                                                      child: Image.asset(
+                                                                                                        iconAsset,
+                                                                                                        color:
+                                                                                                            iconColor,
+                                                                                                        width:
+                                                                                                            22.w,
+                                                                                                        height:
+                                                                                                            22.h,
+                                                                                                      ),
+                                                                                                    );
+                                                                                                  },
+                                                                                                );
                                                                                               },
                                                                                             ),
                                                                                             const Spacer(),
                                                                                             SizedBox(
                                                                                               width:
-                                                                                              40.w,
+                                                                                                  40.w,
                                                                                             ),
                                                                                           ],
                                                                                         ),
                                                                                       ),
                                                                                       SizedBox(
                                                                                         height:
-                                                                                        16.h,
+                                                                                            16.h,
                                                                                       ),
-                                                                                      ValueListenableBuilder<String?>(
-                                                                                        valueListenable: _chatFilter,
-                                                                                        builder:
-                                                                                            (
-                                                                                            context,
-                                                                                            chatFilter,
-                                                                                            _,
-                                                                                            ) {
-                                                                                          return Obx(() {
-                                                                                            chatCtrl.platform.value;
-                                                                                            final cf =
-                                                                                                chatFilter?.trim();
-                                                                                            final metaKey =
-                                                                                                _normalizeUiPlatform(
-                                                                                              (cf != null &&
-                                                                                                      cf.isNotEmpty)
-                                                                                                  ? cf
-                                                                                                  : chatCtrl
-                                                                                                      .platform
-                                                                                                      .value
-                                                                                                      .toString()
-                                                                                                      .trim(),
-                                                                                            )
-                                                                                                .toString()
-                                                                                                .trim();
-                                                                                            final titleLive =
-                                                                                            (chatCtrl.streamTitleByPlatform[metaKey] ?? '')
-                                                                                                .trim();
-                                                                                            final categoryLive =
-                                                                                            (chatCtrl.streamCategoryByPlatform[metaKey] ?? '')
-                                                                                                .trim();
-                                                                                            final titlePanel =
-                                                                                            titleLive.isNotEmpty
-                                                                                                ? titleLive
-                                                                                                : context.l10n.streamMetaEmpty;
-                                                                                            final categoryPanel =
-                                                                                            categoryLive.isNotEmpty
-                                                                                                ? categoryLive
-                                                                                                : context.l10n.streamMetaEmpty;
-                                                                                            return Column(
-                                                                                              mainAxisSize:
-                                                                                              MainAxisSize.min,
-                                                                                              children: [
-                                                                                                panelRow(titlePanel),
-                                                                                                SizedBox(height: 12.h),
-                                                                                                // Category row: no chevron / picker (disabled).
-                                                                                                panelRow(
-                                                                                                  categoryPanel,
-                                                                                                  showChevron: false,
-                                                                                                  onTap: null,
-                                                                                                ),
-                                                                                              ],
-                                                                                            );
-                                                                                          });
+                                                                                      ValueListenableBuilder<
+                                                                                        String?
+                                                                                      >(
+                                                                                        valueListenable:
+                                                                                            _chatFilter,
+                                                                                        builder: (
+                                                                                          context,
+                                                                                          chatFilter,
+                                                                                          _,
+                                                                                        ) {
+                                                                                          return Obx(
+                                                                                            () {
+                                                                                              chatCtrl.platform.value;
+                                                                                              final cf =
+                                                                                                  chatFilter?.trim();
+                                                                                              final metaKey =
+                                                                                                  _normalizeUiPlatform(
+                                                                                                    (cf !=
+                                                                                                                null &&
+                                                                                                            cf.isNotEmpty)
+                                                                                                        ? cf
+                                                                                                        : chatCtrl.platform.value.toString().trim(),
+                                                                                                  ).toString().trim();
+                                                                                              final titleLive =
+                                                                                                  (chatCtrl.streamTitleByPlatform[metaKey] ??
+                                                                                                          '')
+                                                                                                      .trim();
+                                                                                              final categoryLive =
+                                                                                                  (chatCtrl.streamCategoryByPlatform[metaKey] ??
+                                                                                                          '')
+                                                                                                      .trim();
+                                                                                              final titlePanel =
+                                                                                                  titleLive.isNotEmpty
+                                                                                                      ? titleLive
+                                                                                                      : context.l10n.streamMetaEmpty;
+                                                                                              final categoryPanel =
+                                                                                                  categoryLive.isNotEmpty
+                                                                                                      ? categoryLive
+                                                                                                      : context.l10n.streamMetaEmpty;
+                                                                                              return Column(
+                                                                                                mainAxisSize:
+                                                                                                    MainAxisSize.min,
+                                                                                                children: [
+                                                                                                  panelRow(
+                                                                                                    titlePanel,
+                                                                                                  ),
+                                                                                                  SizedBox(
+                                                                                                    height:
+                                                                                                        12.h,
+                                                                                                  ),
+                                                                                                  // Category row: no chevron / picker (disabled).
+                                                                                                  panelRow(
+                                                                                                    categoryPanel,
+                                                                                                    showChevron:
+                                                                                                        false,
+                                                                                                    onTap:
+                                                                                                        null,
+                                                                                                  ),
+                                                                                                ],
+                                                                                              );
+                                                                                            },
+                                                                                          );
                                                                                         },
                                                                                       ),
                                                                                     ],
@@ -1348,59 +1396,57 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                               child: Center(
                                                                                 child: Container(
                                                                                   width:
-                                                                                  double.infinity,
+                                                                                      double.infinity,
                                                                                   padding: EdgeInsets.symmetric(
                                                                                     horizontal:
-                                                                                    14.w,
+                                                                                        14.w,
                                                                                     vertical:
-                                                                                    14.h,
+                                                                                        14.h,
                                                                                   ),
                                                                                   decoration: BoxDecoration(
                                                                                     color:
-                                                                                    black,
+                                                                                        black,
                                                                                     borderRadius: BorderRadius.circular(
                                                                                       20.r,
                                                                                     ),
                                                                                   ),
                                                                                   child: Column(
                                                                                     mainAxisSize:
-                                                                                    MainAxisSize.min,
+                                                                                        MainAxisSize.min,
                                                                                     mainAxisAlignment:
-                                                                                    MainAxisAlignment.center,
+                                                                                        MainAxisAlignment.center,
                                                                                     children: [
-                                                                                      Obx(() {
-                                                                                        final currentPlatform =
-                                                                                        _normalizeUiPlatform(
-                                                                                          _chatFilter
-                                                                                              .value ??
-                                                                                              chatCtrl
-                                                                                                  .platform
-                                                                                                  .value,
-                                                                                        );
-                                                                                        return serviceRow(
-                                                                                          asset: _assetForPlatform(
-                                                                                            currentPlatform,
-                                                                                          ),
-                                                                                          iconColor: _settingsCtrl
-                                                                                              .getPlatformColor(
-                                                                                            currentPlatform,
-                                                                                          ),
-                                                                                          title:
-                                                                                          context.l10n.title,
-                                                                                          subtitle:
-                                                                                          context.l10n.category,
-                                                                                          onTap: () {
-                                                                                            _collapseActivityExpandedIfNeeded(context);
-                                                                                            _selectedPlatform.value =
-                                                                                                currentPlatform;
-                                                                                            _titleSelected.value = true;
-                                                                                            _showServiceCard.value = true;
-                                                                                          },
-                                                                                        );
-                                                                                      }),
+                                                                                      Obx(
+                                                                                        () {
+                                                                                          final currentPlatform = _normalizeUiPlatform(
+                                                                                            _chatFilter.value ??
+                                                                                                chatCtrl.platform.value,
+                                                                                          );
+                                                                                          return serviceRow(
+                                                                                            asset: _assetForPlatform(
+                                                                                              currentPlatform,
+                                                                                            ),
+                                                                                            iconColor: _settingsCtrl.getPlatformColor(
+                                                                                              currentPlatform,
+                                                                                            ),
+                                                                                            title:
+                                                                                                context.l10n.title,
+                                                                                            subtitle:
+                                                                                                context.l10n.category,
+                                                                                            onTap: () {
+                                                                                              _collapseActivityExpandedIfNeeded(
+                                                                                                context,
+                                                                                              );
+                                                                                              _selectedPlatform.value = currentPlatform;
+                                                                                              _titleSelected.value = true;
+                                                                                              _showServiceCard.value = true;
+                                                                                            },
+                                                                                          );
+                                                                                        },
+                                                                                      ),
                                                                                       SizedBox(
                                                                                         height:
-                                                                                        36.h,
+                                                                                            36.h,
                                                                                       ),
                                                                                     ],
                                                                                   ),
@@ -1427,10 +1473,11 @@ class _LivestreamingState extends State<Livestreaming> {
                                           ),
                                           if (showActivity)
                                             Positioned.fill(
-                                              child: _buildResizableActivityContainer(
-                                                context,
-                                                upperSectionHeight,
-                                              ),
+                                              child:
+                                                  _buildResizableActivityContainer(
+                                                    context,
+                                                    upperSectionHeight,
+                                                  ),
                                             ),
                                         ],
                                       ),
@@ -1456,9 +1503,9 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   Widget _buildResizableBottomSection(
-      BuildContext context,
-      BoxConstraints constraints,
-      ) {
+    BuildContext context,
+    BoxConstraints constraints,
+  ) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
     _logValueChange('layout.bottomInset', bottomInset);
@@ -1495,18 +1542,19 @@ class _LivestreamingState extends State<Livestreaming> {
     final minHeight = _bottomSectionMinHeight(screenHeight);
     final maxHeight =
         screenHeight -
-            _layoutTopPadding(context) -
-            _minUpperSectionHeight -
-            bottomGap.h -
-            12.h -
-            bottomInset;
+        _layoutTopPadding(context) -
+        _minUpperSectionHeight -
+        bottomGap.h -
+        12.h -
+        bottomInset;
     final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
-    final effectiveMaxHeight = _bottomSectionMaxHeight == null
-        ? clampedMaxHeight
-        : math.min(clampedMaxHeight, _bottomSectionMaxHeight!);
+    final effectiveMaxHeight =
+        _bottomSectionMaxHeight == null
+            ? clampedMaxHeight
+            : math.min(clampedMaxHeight, _bottomSectionMaxHeight!);
 
     final currentHeight =
-    _bottomSectionHeight.clamp(minHeight, effectiveMaxHeight).toDouble();
+        _bottomSectionHeight.clamp(minHeight, effectiveMaxHeight).toDouble();
     _logValueChange('layout.currentHeight', currentHeight);
 
     return SizedBox(

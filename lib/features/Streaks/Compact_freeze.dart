@@ -128,10 +128,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
     super.dispose();
   }
 
-  Widget _lowPowerCompactFireGraphic(
-    BuildContext context,
-    int longestStreak,
-  ) {
+  Widget _lowPowerCompactFireGraphic(BuildContext context, int longestStreak) {
     const glow = 0.325;
     return Stack(
       alignment: Alignment.center,
@@ -141,9 +138,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
           height: 240.h,
           decoration: BoxDecoration(
             shape: BoxShape.rectangle,
-            borderRadius: BorderRadius.all(
-              Radius.elliptical(70.w, 110.h),
-            ),
+            borderRadius: BorderRadius.all(Radius.elliptical(70.w, 110.h)),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFFFFF9C4).withOpacity(glow),
@@ -164,8 +159,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
           width: 255.w,
           fit: BoxFit.contain,
           gaplessPlayback: true,
-          cacheWidth:
-              (255.w * MediaQuery.of(context).devicePixelRatio).round(),
+          cacheWidth: (255.w * MediaQuery.of(context).devicePixelRatio).round(),
           cacheHeight:
               (255.h * MediaQuery.of(context).devicePixelRatio).round(),
           errorBuilder: (context, error, stackTrace) {
@@ -218,9 +212,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
   Widget _tick({bool highlighted = false}) {
     return Container(
       padding: EdgeInsets.all(4.w),
-      decoration: highlighted
-          ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
-          : null,
+      decoration:
+          highlighted
+              ? const BoxDecoration(color: Colors.white, shape: BoxShape.circle)
+              : null,
       child: Icon(
         Icons.check,
         size: 18.sp,
@@ -269,9 +264,10 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       top: 0,
       bottom: 0,
       child: Container(
-        margin: count == 1
-            ? EdgeInsets.zero
-            : EdgeInsets.symmetric(horizontal: 2.w),
+        margin:
+            count == 1
+                ? EdgeInsets.zero
+                : EdgeInsets.symmetric(horizontal: 2.w),
         decoration: decoration,
       ),
     );
@@ -339,9 +335,9 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       final longestStreak = streak?.longestStreak ?? 0;
       final currentStreakCount = streak?.currentStreak ?? 0;
       final rowData = _streakCtrl.buildCurrentWeekRow();
-      // Avoid showing a loader when we already have data (we prefetch before opening).
-      // Only show a loader when there is no streak snapshot yet.
-      final showLoader = streak == null && _streakCtrl.isLoading.value;
+      // No loaders in the streak sheets. Prefetch/cached snapshots are used
+      // so the UI can render immediately.
+      const showLoader = false;
 
       return Container(
         height: Get.height * 0.91,
@@ -410,211 +406,227 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                     ),
                   ),
 
-                // --- ANIMATED FIRE SECTION ---
-                RepaintBoundary(
-                  child: _settings.lowPowerMode.value
-                      ? _lowPowerCompactFireGraphic(context, longestStreak)
-                      : AnimatedBuilder(
-                          animation: Listenable.merge([
-                            _fireController,
-                            _frameController,
-                          ]),
-                          builder: (context, child) {
-                            double animValue =
-                                _frameController.value.clamp(0.0, 1.0);
-                            int frame =
-                                ((animValue * totalFrames).round() %
-                                    totalFrames);
-                            frame = (frame == 0 ? totalFrames : frame).clamp(
-                              1,
-                              totalFrames,
-                            );
-                            String frameNumber =
-                                frame.toString().padLeft(4, '0');
+                  // --- ANIMATED FIRE SECTION ---
+                  RepaintBoundary(
+                    child:
+                        _settings.lowPowerMode.value
+                            ? _lowPowerCompactFireGraphic(
+                              context,
+                              longestStreak,
+                            )
+                            : AnimatedBuilder(
+                              animation: Listenable.merge([
+                                _fireController,
+                                _frameController,
+                              ]),
+                              builder: (context, child) {
+                                double animValue = _frameController.value.clamp(
+                                  0.0,
+                                  1.0,
+                                );
+                                int frame =
+                                    ((animValue * totalFrames).round() %
+                                        totalFrames);
+                                frame = (frame == 0 ? totalFrames : frame)
+                                    .clamp(1, totalFrames);
+                                String frameNumber = frame.toString().padLeft(
+                                  4,
+                                  '0',
+                                );
 
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 200.w,
-                                  height: 240.h,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.rectangle,
-                                    borderRadius: BorderRadius.all(
-                                      Radius.elliptical(70.w, 110.h),
+                                return Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Container(
+                                      width: 200.w,
+                                      height: 240.h,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.rectangle,
+                                        borderRadius: BorderRadius.all(
+                                          Radius.elliptical(70.w, 110.h),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFFFFF9C4,
+                                            ).withOpacity(_glowPulse.value),
+                                            blurRadius: 180,
+                                            spreadRadius: 10,
+                                          ),
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFFFDEBB2,
+                                            ).withOpacity(
+                                              _glowPulse.value * 0.6,
+                                            ),
+                                            blurRadius: 40,
+                                            spreadRadius: -5,
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(
-                                          0xFFFFF9C4,
-                                        ).withOpacity(_glowPulse.value),
-                                        blurRadius: 180,
-                                        spreadRadius: 10,
-                                      ),
-                                      BoxShadow(
-                                        color: const Color(
-                                          0xFFFDEBB2,
-                                        ).withOpacity(_glowPulse.value * 0.6),
-                                        blurRadius: 40,
-                                        spreadRadius: -5,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Transform.translate(
-                                  offset: Offset(0, _fireJitter.value),
-                                  child: Image.asset(
-                                    'assets/FIreAnimation2/frame_lq_$frameNumber.png',
-                                    height: 255.h,
-                                    width: 255.w,
-                                    fit: BoxFit.contain,
-                                    gaplessPlayback: true,
-                                    cacheWidth: (255.w *
-                                            MediaQuery.of(context)
-                                                .devicePixelRatio)
-                                        .round(),
-                                    cacheHeight: (255.h *
-                                            MediaQuery.of(context)
-                                                .devicePixelRatio)
-                                        .round(),
-                                    errorBuilder:
-                                        (context, error, stackTrace) {
-                                      return Container(
+                                    Transform.translate(
+                                      offset: Offset(0, _fireJitter.value),
+                                      child: Image.asset(
+                                        'assets/FIreAnimation2/frame_lq_$frameNumber.png',
                                         height: 255.h,
                                         width: 255.w,
-                                        color: Colors.transparent,
-                                      );
-                                    },
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: 0.h,
-                                  child: SizedBox(
-                                    width: 155.w,
-                                    height: 75.h,
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        Text(
-                                          '$longestStreak',
-                                          style: sfProDisplay600(
-                                            55.sp,
-                                            Colors.white,
-                                          ),
-                                        ),
-                                      ],
+                                        fit: BoxFit.contain,
+                                        gaplessPlayback: true,
+                                        cacheWidth:
+                                            (255.w *
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).devicePixelRatio)
+                                                .round(),
+                                        cacheHeight:
+                                            (255.h *
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).devicePixelRatio)
+                                                .round(),
+                                        errorBuilder: (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) {
+                                          return Container(
+                                            height: 255.h,
+                                            width: 255.w,
+                                            color: Colors.transparent,
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                ),
-                SizedBox(height: 10.h),
-
-                Text(
-                  !hasCreatedStreak
-                      ? context.l10n.dayStreak
-                      : '$currentStreakCount ${context.l10n.dayStreak}',
-                  style: sfProDisplay600(34.sp, Colors.white),
-                ),
-                if (showLoader) ...[
-                  SizedBox(height: 6.h),
-                  SizedBox(
-                    width: 18.w,
-                    height: 18.w,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-                Text(
-                  context.l10n.youVeNeverBeenHotterKeepStreakBurning,
-                  style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 20.h),
-
-                // --- CALENDAR CARD (Static) ---
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap:
-                      !hasCreatedStreak
-                          ? null
-                          : () {
-                            Get.bottomSheet(
-                              const StreakFreezePreviewBottomSheet(
-                                fetchOnInit: false,
-                              ),
-                              isDismissible: true,
-                              isScrollControlled: true,
-                              enableDrag: true,
-                              backgroundColor: Colors.transparent,
-                              enterBottomSheetDuration: const Duration(
-                                milliseconds: 300,
-                              ),
-                              exitBottomSheetDuration: const Duration(
-                                milliseconds: 250,
-                              ),
-                            );
-                          },
-                  child: Container(
-                    width: 361.w,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding.w,
-                      vertical: 16.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1D20),
-                      borderRadius: BorderRadius.circular(24.r),
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final totalWidth = constraints.maxWidth;
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children:
-                                  [
-                                    'Mon',
-                                    'Tue',
-                                    'Wed',
-                                    'Thur',
-                                    'Fri',
-                                    'Sat',
-                                    'Sun',
-                                  ].map((d) {
-                                    return Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          d,
-                                          maxLines: 1,
-                                          style: TextStyle(
-                                            color: const Color(0xFF8E8E93),
-                                            fontSize: 13.sp,
-                                          ),
+                                    Positioned(
+                                      bottom: 0.h,
+                                      child: SizedBox(
+                                        width: 155.w,
+                                        height: 75.h,
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            Text(
+                                              '$longestStreak',
+                                              style: sfProDisplay600(
+                                                55.sp,
+                                                Colors.white,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    );
-                                  }).toList(),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
-                            SizedBox(height: 16.h),
-                            _row(rowData, totalWidth),
-                          ],
-                        );
-                      },
+                  ),
+                  SizedBox(height: 10.h),
+
+                  Text(
+                    !hasCreatedStreak
+                        ? context.l10n.dayStreak
+                        : '$currentStreakCount ${context.l10n.dayStreak}',
+                    style: sfProDisplay600(34.sp, Colors.white),
+                  ),
+                  if (showLoader) ...[
+                    SizedBox(height: 6.h),
+                    SizedBox(
+                      width: 18.w,
+                      height: 18.w,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                  Text(
+                    context.l10n.youVeNeverBeenHotterKeepStreakBurning,
+                    style: sfProDisplay400(15.sp, const Color(0xFFB0B3B8)),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 20.h),
+
+                  // --- CALENDAR CARD (Static) ---
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap:
+                        !hasCreatedStreak
+                            ? null
+                            : () {
+                              Get.bottomSheet(
+                                const StreakFreezePreviewBottomSheet(
+                                  fetchOnInit: false,
+                                ),
+                                isDismissible: true,
+                                isScrollControlled: true,
+                                enableDrag: true,
+                                backgroundColor: Colors.transparent,
+                                enterBottomSheetDuration: const Duration(
+                                  milliseconds: 300,
+                                ),
+                                exitBottomSheetDuration: const Duration(
+                                  milliseconds: 250,
+                                ),
+                              );
+                            },
+                    child: Container(
+                      width: 361.w,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding.w,
+                        vertical: 16.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1D20),
+                        borderRadius: BorderRadius.circular(24.r),
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final totalWidth = constraints.maxWidth;
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children:
+                                    [
+                                      'Mon',
+                                      'Tue',
+                                      'Wed',
+                                      'Thur',
+                                      'Fri',
+                                      'Sat',
+                                      'Sun',
+                                    ].map((d) {
+                                      return Expanded(
+                                        child: Center(
+                                          child: Text(
+                                            d,
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              color: const Color(0xFF8E8E93),
+                                              fontSize: 13.sp,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                              ),
+                              SizedBox(height: 16.h),
+                              _row(rowData, totalWidth),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(height: 40.h),
-              ],
+                  SizedBox(height: 40.h),
+                ],
+              ),
             ),
           ),
         ),
-      ));
+      );
     });
   }
 }
