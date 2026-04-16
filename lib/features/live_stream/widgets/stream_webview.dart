@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
@@ -408,12 +409,18 @@ class _StreamWebViewState extends State<StreamWebView>
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final eagerGestures = <Factory<OneSequenceGestureRecognizer>>{
+      Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+    };
     return SizedBox(
       height: widget.height,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          WebViewWidget(controller: _controller),
+          WebViewWidget(
+            controller: _controller,
+            gestureRecognizers: eagerGestures,
+          ),
           if (_showLiveLoadingOverlay)
             ColoredBox(
               color: Colors.black,

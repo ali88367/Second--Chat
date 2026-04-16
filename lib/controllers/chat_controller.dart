@@ -776,11 +776,22 @@ class ChatController extends GetxController {
     return platformLive[key] == false;
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(
+    String text, {
+    String? platformForApi,
+    String? authPlatform,
+  }) async {
     final msg = text.trim();
     if (msg.isEmpty) return;
-    final p = _normalizedApiPlatform(platform.value, fallback: 'twitch');
-    final token = await _resolveChatAuthToken(p);
+    final requestedRaw = (platformForApi ?? platform.value).toLowerCase().trim();
+    final isAllTarget = requestedRaw == 'all';
+    final apiPlatform =
+        isAllTarget ? 'all' : _normalizedApiPlatform(requestedRaw, fallback: 'twitch');
+    final tokenPlatform = _normalizedApiPlatform(
+      (authPlatform ?? platform.value),
+      fallback: 'twitch',
+    );
+    final token = await _resolveChatAuthToken(tokenPlatform);
     if (token == null || token.isEmpty) return;
     _socketAuthToken = token.trim();
 
@@ -789,7 +800,7 @@ class ChatController extends GetxController {
     final localId = 'local:${DateTime.now().microsecondsSinceEpoch}';
     _pendingLocalChatEchoes.add(
       _PendingLocalChatEcho(
-        platform: p,
+        platform: isAllTarget ? tokenPlatform : apiPlatform,
         normalizedText: msg.toLowerCase(),
         localMessageId: localId,
         createdAt: DateTime.now().toUtc(),
@@ -797,25 +808,28 @@ class ChatController extends GetxController {
     );
 
     final optimistic = ChatMessage(
-      platform: p,
+      platform: isAllTarget ? tokenPlatform : apiPlatform,
       userName: _outgoingChatDisplayName(),
       message: msg,
       timestamp: DateTime.now().toUtc(),
       id: localId,
       raw: const <String, dynamic>{},
     );
-    _appendAndSortPlatformMessages(p, optimistic);
+    _appendAndSortPlatformMessages(
+      isAllTarget ? tokenPlatform : apiPlatform,
+      optimistic,
+    );
 
     try {
       await _live.sendMessage(
-        platform: p,
+        platform: apiPlatform,
         accessToken: _socketAuthToken!,
         message: msg,
       );
     } catch (_) {
       // Drop optimistic row if send fails.
       _pendingLocalChatEchoes.removeWhere((e) => e.localMessageId == localId);
-      _removeMessageById(p, localId);
+      _removeMessageById(isAllTarget ? tokenPlatform : apiPlatform, localId);
     }
     _bumpScroll();
   }

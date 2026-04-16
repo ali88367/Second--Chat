@@ -114,7 +114,14 @@ class _LivestreamingState extends State<Livestreaming> {
     final selected = _chatFilter.value?.toLowerCase().trim();
     if (selected == null || selected.isEmpty) {
       // "All" is a chat aggregation mode; keep currently selected stream platform.
+      final fallback = _normalizeUiPlatform(chatCtrl.platform.value);
+      if (_selectedPlatform.value != fallback) {
+        _selectedPlatform.value = fallback;
+      }
       return;
+    }
+    if (_selectedPlatform.value != selected) {
+      _selectedPlatform.value = selected;
     }
     if (chatCtrl.platform.value.toLowerCase().trim() == selected) return;
     chatCtrl.selectPlatformInstant(selected);

@@ -457,18 +457,25 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Keep existing platform selection behavior.
-    String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
-      currentPlatform = widget.selectedPlatform.value!;
+    final selectedFilter = widget.chatFilter.value?.toLowerCase().trim();
+    final bool isAllSelected = selectedFilter == null || selectedFilter.isEmpty;
+    String currentPlatform = selectedFilter ?? 'twitch';
+    if (isAllSelected && widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!.toLowerCase().trim();
     }
-    if (_streamOffForSendTarget(currentPlatform)) {
+    final authPlatform = _chatCtrl.platform.value.toLowerCase().trim().isEmpty
+        ? 'twitch'
+        : _chatCtrl.platform.value.toLowerCase().trim();
+
+    if (!isAllSelected && _streamOffForSendTarget(currentPlatform)) {
       _messageController.clear();
       return;
     }
-    _chatCtrl.platform.value = currentPlatform;
-    _chatCtrl.sendMessage(text);
+    _chatCtrl.sendMessage(
+      text,
+      platformForApi: isAllSelected ? 'all' : currentPlatform,
+      authPlatform: authPlatform,
+    );
 
     _messageController.clear();
     _focusNode.requestFocus();
@@ -493,16 +500,24 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
   /// Send emote directly to chat (not to text field)
   void _sendEmoteDirectly(String emoteName) {
-    String currentPlatform = widget.chatFilter.value ?? 'twitch';
-    if (widget.chatFilter.value == null &&
-        widget.selectedPlatform.value != null) {
-      currentPlatform = widget.selectedPlatform.value!;
+    final selectedFilter = widget.chatFilter.value?.toLowerCase().trim();
+    final bool isAllSelected = selectedFilter == null || selectedFilter.isEmpty;
+    String currentPlatform = selectedFilter ?? 'twitch';
+    if (isAllSelected && widget.selectedPlatform.value != null) {
+      currentPlatform = widget.selectedPlatform.value!.toLowerCase().trim();
     }
-    if (_streamOffForSendTarget(currentPlatform)) {
+    final authPlatform = _chatCtrl.platform.value.toLowerCase().trim().isEmpty
+        ? 'twitch'
+        : _chatCtrl.platform.value.toLowerCase().trim();
+
+    if (!isAllSelected && _streamOffForSendTarget(currentPlatform)) {
       return;
     }
-    _chatCtrl.platform.value = currentPlatform;
-    _chatCtrl.sendMessage(emoteName);
+    _chatCtrl.sendMessage(
+      emoteName,
+      platformForApi: isAllSelected ? 'all' : currentPlatform,
+      authPlatform: authPlatform,
+    );
 
     // Track recently used
     _emoteService.addToRecentlyUsed(emoteName);
