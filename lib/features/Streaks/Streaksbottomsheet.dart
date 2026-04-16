@@ -155,8 +155,7 @@ class _StreamStreakSetupBottomSheetState
           width: 157.w,
           fit: BoxFit.contain,
           gaplessPlayback: true,
-          cacheWidth:
-              (177.w * MediaQuery.of(context).devicePixelRatio).round(),
+          cacheWidth: (177.w * MediaQuery.of(context).devicePixelRatio).round(),
           cacheHeight:
               (177.h * MediaQuery.of(context).devicePixelRatio).round(),
           errorBuilder: (context, error, stackTrace) {
@@ -180,7 +179,7 @@ class _StreamStreakSetupBottomSheetState
       return await controller.createStreak(
         selectedDays: selectedDays,
         targetDaysPerWeek: targetDaysPerWeek,
-        showErrors: true,
+        showErrors: false,
       );
     } finally {
       if (mounted) {
@@ -275,92 +274,95 @@ class _StreamStreakSetupBottomSheetState
                     // Main Graphic and Text Section
                     SizedBox(height: 10.h),
                     RepaintBoundary(
-                      child: _settings.lowPowerMode.value
-                          ? _lowPowerStreakGraphic(context)
-                          : AnimatedBuilder(
-                              animation: Listenable.merge([
-                                _glowController,
-                                _frameController,
-                              ]),
-                              builder: (context, child) {
-                                double animValue = _frameController.value.clamp(
-                                  0.0,
-                                  1.0,
-                                );
-                                int frame =
-                                    ((animValue * totalFrames).round() %
-                                        totalFrames);
-                                frame = (frame == 0 ? totalFrames : frame).clamp(
-                                  1,
-                                  totalFrames,
-                                );
-                                String frameNumber =
-                                    frame.toString().padLeft(4, '0');
+                      child:
+                          _settings.lowPowerMode.value
+                              ? _lowPowerStreakGraphic(context)
+                              : AnimatedBuilder(
+                                animation: Listenable.merge([
+                                  _glowController,
+                                  _frameController,
+                                ]),
+                                builder: (context, child) {
+                                  double animValue = _frameController.value
+                                      .clamp(0.0, 1.0);
+                                  int frame =
+                                      ((animValue * totalFrames).round() %
+                                          totalFrames);
+                                  frame = (frame == 0 ? totalFrames : frame)
+                                      .clamp(1, totalFrames);
+                                  String frameNumber = frame.toString().padLeft(
+                                    4,
+                                    '0',
+                                  );
 
-                                return Stack(
-                                  alignment: Alignment.center,
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Transform.scale(
-                                      scale: _scaleAnimation.value,
-                                      child: Container(
-                                        width: 150.h,
-                                        height: 150.h,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: const Color(
-                                                0XFFFFE6A7,
-                                              ).withOpacity(
-                                                  _opacityAnimation.value),
-                                              blurRadius: 50,
-                                              spreadRadius: 20,
-                                            ),
-                                            BoxShadow(
-                                              color: const Color(
-                                                0XFFF2B269,
-                                              ).withOpacity(
-                                                _opacityAnimation.value * 0.5,
+                                  return Stack(
+                                    alignment: Alignment.center,
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Transform.scale(
+                                        scale: _scaleAnimation.value,
+                                        child: Container(
+                                          width: 150.h,
+                                          height: 150.h,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0XFFFFE6A7,
+                                                ).withOpacity(
+                                                  _opacityAnimation.value,
+                                                ),
+                                                blurRadius: 50,
+                                                spreadRadius: 20,
                                               ),
-                                              blurRadius: 30,
-                                              spreadRadius: 5,
-                                            ),
-                                          ],
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0XFFF2B269,
+                                                ).withOpacity(
+                                                  _opacityAnimation.value * 0.5,
+                                                ),
+                                                blurRadius: 30,
+                                                spreadRadius: 5,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    Image.asset(
-                                      'assets/Fire3/frame_mq_$frameNumber.png',
-                                      height: 157.h,
-                                      width: 157.w,
-                                      fit: BoxFit.contain,
-                                      gaplessPlayback: true,
-                                      cacheWidth:
-                                          (177.w *
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).devicePixelRatio)
-                                              .round(),
-                                      cacheHeight:
-                                          (177.h *
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).devicePixelRatio)
-                                              .round(),
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          height: 177.h,
-                                          width: 177.w,
-                                          color: Colors.transparent,
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
+                                      Image.asset(
+                                        'assets/Fire3/frame_mq_$frameNumber.png',
+                                        height: 157.h,
+                                        width: 157.w,
+                                        fit: BoxFit.contain,
+                                        gaplessPlayback: true,
+                                        cacheWidth:
+                                            (177.w *
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).devicePixelRatio)
+                                                .round(),
+                                        cacheHeight:
+                                            (177.h *
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).devicePixelRatio)
+                                                .round(),
+                                        errorBuilder: (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) {
+                                          return Container(
+                                            height: 177.h,
+                                            width: 177.w,
+                                            color: Colors.transparent,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
                     ),
                     SizedBox(height: 3.h),
                     Text(
@@ -400,27 +402,44 @@ class _StreamStreakSetupBottomSheetState
                   height: 50.h,
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () async {
-                      if (!controller.isThreeTimesSelectionComplete) {
-                        Get.snackbar(
-                          context.l10n.pickYourDays,
-                          context.l10n.selectExactlyDaysBeforeContinuing(
-                            controller.selectedTimesPerWeek.value,
-                          ),
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: const Color(0xFF2C2C2E),
-                          colorText: Colors.white,
-                          margin: EdgeInsets.all(12.w),
-                          duration: const Duration(seconds: 2),
-                        );
-                        return;
-                      }
-                      final ok = await _createStreak(controller);
-                      if (!ok || !mounted) return;
-                      Get.back();
-                    },
+                    onPressed:
+                        _isSubmitting
+                            ? null
+                            : () async {
+                              if (!controller.isThreeTimesSelectionComplete) {
+                                Get.snackbar(
+                                  context.l10n.pickYourDays,
+                                  context.l10n
+                                      .selectExactlyDaysBeforeContinuing(
+                                        controller.selectedTimesPerWeek.value,
+                                      ),
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  backgroundColor: const Color(0xFF2C2C2E),
+                                  colorText: Colors.white,
+                                  margin: EdgeInsets.all(12.w),
+                                  duration: const Duration(seconds: 2),
+                                );
+                                return;
+                              }
+                              final ok = await _createStreak(controller);
+                              if (!ok) {
+                                final msg =
+                                    controller.mutationError.value ??
+                                    context.l10n.pleaseTryAgain;
+                                Get.snackbar(
+                                  context.l10n.connectionIssue,
+                                  msg,
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  backgroundColor: const Color(0xFF2C2C2E),
+                                  colorText: Colors.white,
+                                  margin: EdgeInsets.all(12.w),
+                                  duration: const Duration(seconds: 2),
+                                );
+                                return;
+                              }
+                              if (!mounted) return;
+                              Get.back();
+                            },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
@@ -428,19 +447,20 @@ class _StreamStreakSetupBottomSheetState
                       ),
                       padding: EdgeInsets.zero,
                     ),
-                    child: _isSubmitting
-                        ? SizedBox(
-                            width: 20.w,
-                            height: 20.w,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
+                    child:
+                        _isSubmitting
+                            ? SizedBox(
+                              width: 20.w,
+                              height: 20.w,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                            : Text(
+                              context.l10n.next,
+                              style: sfProText600(17.sp, Colors.black),
                             ),
-                          )
-                        : Text(
-                            context.l10n.next,
-                            style: sfProText600(17.sp, Colors.black),
-                          ),
                   ),
                 ),
               ),
@@ -479,7 +499,10 @@ class _StreamStreakSetupBottomSheetState
     }
   }
 
-  Widget _buildDayToggles(BuildContext context, StreamStreaksController controller) {
+  Widget _buildDayToggles(
+    BuildContext context,
+    StreamStreaksController controller,
+  ) {
     final days = controller.selectedDays.keys.toList();
     return Column(
       children: [

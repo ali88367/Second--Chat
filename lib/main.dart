@@ -22,10 +22,12 @@ import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/notifications.dart';
 import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
+import 'package:second_chat/features/Invite/Invite_screen.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
 import 'core/constants/constants.dart';
+import 'core/bootstrap/app_prefetch.dart';
 import 'core/utils/debug_tokens.dart';
 
 void main() {
@@ -63,6 +65,7 @@ void main() {
     Get.put(EdgeGlowNotificationController(), permanent: true);
     Get.put(StreamStreaksController());
     Get.put(AuthController(), permanent: true);
+    Get.put(InviteController(), permanent: true);
     Get.put(
       ChatController(
         liveStreamService: LiveStreamService(
@@ -415,38 +418,7 @@ class _SplashScreenState extends State<_SplashScreen>
   }
 
   Future<bool> _prefetchEssentialData() async {
-    if (!Get.isRegistered<AuthController>()) return false;
-    final auth = Get.find<AuthController>();
-    if (!auth.isAuthenticated.value) return false;
-
-    final futures = <Future<void>>[];
-    if (Get.isRegistered<SettingsController>()) {
-      futures.add(Get.find<SettingsController>().loadSettings(force: true));
-    }
-    if (Get.isRegistered<StreamStreaksController>()) {
-      futures.add(
-        Get.find<StreamStreaksController>()
-            .fetchCurrentStreak(force: true, silent: true)
-            .then((_) {}),
-      );
-    }
-
-    // Keep the user on the splash animation while we warm up essentials.
-    try {
-      await Future.wait(futures).timeout(const Duration(seconds: 12));
-    } catch (_) {
-      return false;
-    }
-
-    if (Get.isRegistered<SettingsController>()) {
-      final settings = Get.find<SettingsController>();
-      if (settings.settingsPayload.value == null &&
-          settings.settingsError.value != null) {
-        return false;
-      }
-    }
-
-    return true;
+    return AppPrefetch.prefetchAfterAuth();
   }
 
   Future<void> _routeAfterSessionCheck() async {

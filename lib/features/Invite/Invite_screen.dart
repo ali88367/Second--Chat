@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 
 import '../../api/config/api_config.dart';
+import '../../controllers/auth_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/localization/l10n.dart';
 
@@ -395,6 +396,13 @@ class InviteController extends GetxController {
   }
 
   Future<String?> _readAccessToken() async {
+    try {
+      if (Get.isRegistered<AuthController>()) {
+        final session = await Get.find<AuthController>().api.tokenStore.read();
+        final token = session?.accessToken.trim();
+        if (token!.isNotEmpty) return token;
+      }
+    } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('second_chat.access_token')?.trim();
     if (token == null || token.isEmpty) return null;

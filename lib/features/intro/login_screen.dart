@@ -13,6 +13,7 @@ import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../core/bootstrap/app_prefetch.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -76,12 +77,29 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _routeAfterLoginSuccess() async {
+    final ok = await AppPrefetch.prefetchAfterAuth();
+    if (!ok) {
+      if (!mounted) return;
+      Get.snackbar(
+        'Sign in',
+        'Could not prepare your data. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF2C2C2E),
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12.w),
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+
     if (!Get.isRegistered<ChatController>()) {
       Get.offAll(() => const HomeScreen2());
       return;
     }
 
     final chat = Get.find<ChatController>();
+    // Realtime bootstrap is already warmed up by [AppPrefetch], but keep this
+    // call as a no-op fallback.
     try {
       await chat.ensureStreamRealtimeBootstrap();
     } catch (_) {}

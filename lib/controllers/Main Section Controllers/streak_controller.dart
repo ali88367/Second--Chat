@@ -360,6 +360,7 @@ class StreamStreaksController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxBool isHistoryLoading = false.obs;
   final RxBool isMutating = false.obs;
+  final RxnString mutationError = RxnString();
 
   List<int> get availableNumbers =>
       _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
@@ -513,12 +514,67 @@ class StreamStreaksController extends GetxController {
   }) async {
     if (isMutating.value) return false;
     isMutating.value = true;
+    mutationError.value = null;
     try {
-      debugPrint('STREAK CREATE SKIPPED: use overview-based streak flow.');
+      final accessToken = await _getAccessToken(showErrors: showErrors);
+      if (accessToken == null || accessToken.isEmpty) {
+        mutationError.value = 'Missing session';
+        return false;
+      }
+
+      final auth = Get.find<AuthController>();
+      final payload = <String, dynamic>{
+        'selectedDays': selectedDays,
+        'targetDaysPerWeek': targetDaysPerWeek,
+        // Back-compat with servers that only support weekly goal.
+        'weeklyGoal': targetDaysPerWeek,
+      };
+
+      try {
+        await auth.api.client.dio.post<dynamic>(
+          '/api/v1/streak',
+          data: payload,
+          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        );
+      } on DioException catch (e) {
+        // If already initialized, treat create as update.
+        if (e.response?.statusCode == 409) {
+          await auth.api.client.dio.patch<dynamic>(
+            '/api/v1/streak',
+            data: payload,
+            options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+          );
+        } else if (e.response?.statusCode == 404 ||
+            e.response?.statusCode == 405 ||
+            e.response?.statusCode == 501) {
+          // Fallback: "simple streaks" settings endpoint.
+          await auth.api.client.dio.patch<dynamic>(
+            '/api/v1/streaks/settings',
+            data: <String, dynamic>{'weeklyGoal': targetDaysPerWeek},
+            options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+          );
+        } else {
+          rethrow;
+        }
+      }
+
+      await fetchCurrentStreak(force: true, silent: true);
+      return true;
+    } on DioException catch (e) {
+      mutationError.value = _extractMutationError(e);
+      if (showErrors) {
+        _showConnectionIssue(message: mutationError.value);
+      }
+      return false;
+    } catch (e) {
+      mutationError.value = 'Failed to create streak';
+      if (showErrors) {
+        _showConnectionIssue(message: mutationError.value);
+      }
+      return false;
     } finally {
       isMutating.value = false;
     }
-    return false;
   }
 
   Future<bool> updateStreak({
@@ -527,12 +583,81 @@ class StreamStreaksController extends GetxController {
   }) async {
     if (isMutating.value) return false;
     isMutating.value = true;
+    mutationError.value = null;
     try {
-      debugPrint('STREAK UPDATE SKIPPED: use overview-based streak flow.');
+      final accessToken = await _getAccessToken(showErrors: showErrors);
+      if (accessToken == null || accessToken.isEmpty) {
+        mutationError.value = 'Missing session';
+        return false;
+      }
+
+      final auth = Get.find<AuthController>();
+      final payload = <String, dynamic>{
+        'selectedDays': selectedDays,
+        'targetDaysPerWeek': selectedDays.length,
+        'weeklyGoal': selectedDays.length,
+      };
+
+      try {
+        await auth.api.client.dio.patch<dynamic>(
+          '/api/v1/streak',
+          data: payload,
+          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        );
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404 ||
+            e.response?.statusCode == 405 ||
+            e.response?.statusCode == 501) {
+          await auth.api.client.dio.patch<dynamic>(
+            '/api/v1/streaks/settings',
+            data: <String, dynamic>{'weeklyGoal': selectedDays.length},
+            options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+          );
+        } else {
+          rethrow;
+        }
+      }
+
+      await fetchCurrentStreak(force: true, silent: true);
+      return true;
+    } on DioException catch (e) {
+      mutationError.value = _extractMutationError(e);
+      if (showErrors) {
+        _showConnectionIssue(message: mutationError.value);
+      }
+      return false;
+    } catch (e) {
+      mutationError.value = 'Failed to update streak';
+      if (showErrors) {
+        _showConnectionIssue(message: mutationError.value);
+      }
+      return false;
     } finally {
       isMutating.value = false;
     }
-    return false;
+  }
+
+  String _extractMutationError(DioException e) {
+    final data = e.response?.data;
+    final fromData = _extractMessageFromPayload(data);
+    if (fromData != null && fromData.isNotEmpty) return fromData;
+    final code = e.response?.statusCode;
+    if (code != null) return 'Request failed ($code)';
+    return e.message ?? 'Request failed';
+  }
+
+  String? _extractMessageFromPayload(dynamic data) {
+    if (data is String) return data.trim();
+    if (data is Map) {
+      final msg = data['message'] ?? data['error'] ?? data['detail'];
+      if (msg is String && msg.trim().isNotEmpty) return msg.trim();
+      final error = data['error'];
+      if (error is Map) {
+        final m = error['message'] ?? error['detail'];
+        if (m is String && m.trim().isNotEmpty) return m.trim();
+      }
+    }
+    return null;
   }
 
   Future<StreakCompleteResult> markStreakComplete({
@@ -1096,11 +1221,13 @@ class StreamStreaksController extends GetxController {
     );
   }
 
-  void _showConnectionIssue() {
+  void _showConnectionIssue({String? message}) {
     final l10n = getAppL10n();
     _showSnack(
       l10n?.connectionIssue ?? 'Connection issue',
-      l10n?.pleaseTryAgain ?? 'Please try again.',
+      (message != null && message.trim().isNotEmpty)
+          ? message.trim()
+          : (l10n?.pleaseTryAgain ?? 'Please try again.'),
     );
   }
 
