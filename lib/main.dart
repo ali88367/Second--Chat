@@ -350,10 +350,18 @@ class _SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<_SplashScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  bool _startupInProgress = false;
+  String? _startupError;
+
   late final AnimationController _anim = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
+  );
+  late final TickerFuture _animForward;
+  late final AnimationController _loaderAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
   );
   late final Animation<double> _fadeIn = CurvedAnimation(
     parent: _anim,
@@ -392,7 +400,8 @@ class _SplashScreenState extends State<_SplashScreen>
   @override
   void initState() {
     super.initState();
-    _anim.forward();
+    _animForward = _anim.forward();
+    _loaderAnim.repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _routeAfterSessionCheck();
     });
@@ -401,45 +410,106 @@ class _SplashScreenState extends State<_SplashScreen>
   @override
   void dispose() {
     _anim.dispose();
+    _loaderAnim.dispose();
     super.dispose();
   }
 
-  Future<void> _routeAfterSessionCheck() async {
-    if (!Get.isRegistered<AuthController>()) return;
+  Future<bool> _prefetchEssentialData() async {
+    if (!Get.isRegistered<AuthController>()) return false;
     final auth = Get.find<AuthController>();
+    if (!auth.isAuthenticated.value) return false;
 
-    while (!auth.isReady.value) {
-      await Future.delayed(const Duration(milliseconds: 60));
-      if (!mounted) return;
+    final futures = <Future<void>>[];
+    if (Get.isRegistered<SettingsController>()) {
+      futures.add(Get.find<SettingsController>().loadSettings(force: true));
+    }
+    if (Get.isRegistered<StreamStreaksController>()) {
+      futures.add(
+        Get.find<StreamStreaksController>()
+            .fetchCurrentStreak(force: true, silent: true)
+            .then((_) {}),
+      );
     }
 
-    if (!auth.isAuthenticated.value) {
-      if (!mounted) return;
-      Get.offAll(() => const LoginScreen());
-      return;
-    }
-
-    if (!Get.isRegistered<ChatController>()) {
-      if (!mounted) return;
-      Get.offAll(() => const HomeScreen2());
-      return;
-    }
-
-    final chat = Get.find<ChatController>();
+    // Keep the user on the splash animation while we warm up essentials.
     try {
-      await chat.ensureStreamRealtimeBootstrap();
-    } catch (_) {}
-    if (!mounted) return;
-
-    final anyLive =
-        chat.platformLive.values.any((v) => v == true) ||
-            (chat.overview.value?.live == true);
-    if (anyLive) {
-      Get.offAll(() => const Livestreaming());
-      return;
+      await Future.wait(futures).timeout(const Duration(seconds: 12));
+    } catch (_) {
+      return false;
     }
 
-    Get.offAll(() => const HomeScreen2());
+    if (Get.isRegistered<SettingsController>()) {
+      final settings = Get.find<SettingsController>();
+      if (settings.settingsPayload.value == null &&
+          settings.settingsError.value != null) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<void> _routeAfterSessionCheck() async {
+    if (_startupInProgress) return;
+    _startupInProgress = true;
+    if (mounted && _startupError != null) {
+      setState(() => _startupError = null);
+    }
+    try {
+      if (!Get.isRegistered<AuthController>()) return;
+      final auth = Get.find<AuthController>();
+
+      while (!auth.isReady.value) {
+        await Future.delayed(const Duration(milliseconds: 60));
+        if (!mounted) return;
+      }
+
+      // Let the splash animation finish (no explicit timer).
+      try {
+        await _animForward.orCancel;
+      } catch (_) {}
+      if (!mounted) return;
+
+      if (!auth.isAuthenticated.value) {
+        if (!mounted) return;
+        Get.offAll(() => const LoginScreen());
+        return;
+      }
+
+      final prefetchOk = await _prefetchEssentialData();
+      if (!prefetchOk) {
+        if (!mounted) return;
+        setState(() {
+          _startupError =
+              'Could not prepare your data. Check your connection and try again.';
+        });
+        return;
+      }
+
+      if (!Get.isRegistered<ChatController>()) {
+        if (!mounted) return;
+        Get.offAll(() => const HomeScreen2());
+        return;
+      }
+
+      final chat = Get.find<ChatController>();
+      try {
+        await chat.ensureStreamRealtimeBootstrap();
+      } catch (_) {}
+      if (!mounted) return;
+
+      final anyLive =
+          chat.platformLive.values.any((v) => v == true) ||
+              (chat.overview.value?.live == true);
+      if (anyLive) {
+        Get.offAll(() => const Livestreaming());
+        return;
+      }
+
+      Get.offAll(() => const HomeScreen2());
+    } finally {
+      _startupInProgress = false;
+    }
   }
 
   @override
@@ -457,63 +527,232 @@ class _SplashScreenState extends State<_SplashScreen>
             ],
           ),
         ),
-        child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FadeTransition(
-                  opacity: _fadeIn,
-                  child: AnimatedBuilder(
-                    animation: _anim,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _popScale.value,
+        child: Stack(
+          children: [
+            // Soft ambient blobs (no spinners/loader; splash doubles as warm-up).
+            AnimatedBuilder(
+              animation: _anim,
+              builder: (context, child) {
+                final t = _glow.value;
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: -120.h,
+                      left: -90.w,
+                      child: Opacity(
+                        opacity: 0.30 * t,
                         child: Container(
-                          decoration: BoxDecoration(
+                          width: 320.w,
+                          height: 320.w,
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFFE6A7)
-                                    .withOpacity(0.18 * _glow.value),
-                                blurRadius: 28 * _glow.value,
-                                spreadRadius: 6 * _glow.value,
-                              ),
-                            ],
+                            gradient: RadialGradient(
+                              colors: [
+                                Color(0xFF8A5CFF),
+                                Colors.transparent,
+                              ],
+                            ),
                           ),
-                          child: child,
                         ),
-                      );
-                    },
-                    child: Image.asset(
-                      'assets/images/bunnyGlow.png',
-                      width: 260.w,
-                      height: 260.w,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 18.h),
-                FadeTransition(
-                  opacity: _fadeIn,
-                  child: SlideTransition(
-                    position: _logoSlide,
-                    child: ScaleTransition(
-                      scale: _logoScale,
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 110.w,
-                        height: 110.w,
-                        fit: BoxFit.contain,
                       ),
                     ),
-                  ),
-                ),
-              ],
+                    Positioned(
+                      bottom: -160.h,
+                      right: -120.w,
+                      child: Opacity(
+                        opacity: 0.26 * t,
+                        child: Container(
+                          width: 380.w,
+                          height: 380.w,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                Color(0xFFFFE6A7),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 120.h,
+                      left: -140.w,
+                      child: Opacity(
+                        opacity: 0.18 * t,
+                        child: Container(
+                          width: 420.w,
+                          height: 420.w,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                Color(0xFF00E5FF),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
-          ),
+            SafeArea(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FadeTransition(
+                      opacity: _fadeIn,
+                      child: AnimatedBuilder(
+                        animation: _anim,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _popScale.value,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFE6A7)
+                                        .withOpacity(0.18 * _glow.value),
+                                    blurRadius: 28 * _glow.value,
+                                    spreadRadius: 6 * _glow.value,
+                                  ),
+                                ],
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Image.asset(
+                          'assets/images/bunnyGlow.png',
+                          width: 260.w,
+                          height: 260.w,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 18.h),
+                    FadeTransition(
+                      opacity: _fadeIn,
+                      child: SlideTransition(
+                        position: _logoSlide,
+                        child: ScaleTransition(
+                          scale: _logoScale,
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            width: 110.w,
+                            height: 110.w,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10.h),
+                    if (_startupError == null)
+                      FadeTransition(
+                        opacity: _fadeIn,
+                        child: _SplashDotsLoader(animation: _loaderAnim),
+                      ),
+                    if (_startupError != null) ...[
+                      SizedBox(height: 14.h),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 22.w),
+                        child: Text(
+                          _startupError!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: const Color.fromRGBO(235, 235, 245, 0.86),
+                            height: 1.25,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      TextButton(
+                        onPressed: _routeAfterSessionCheck,
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFFFE6A7),
+                        ),
+                        child: Text(
+                          'Retry',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _SplashDotsLoader extends StatelessWidget {
+  const _SplashDotsLoader({required this.animation});
+
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final t = animation.value;
+        Widget dot(int index, Color color) {
+          final phase = ((t + (index * 0.18)) % 1.0);
+          final pulse = Curves.easeInOut.transform(
+            (phase < 0.5) ? (phase / 0.5) : ((1.0 - phase) / 0.5),
+          );
+          final scale = 0.78 + (0.42 * pulse);
+          final opacity = 0.35 + (0.55 * pulse);
+          return Opacity(
+            opacity: opacity,
+            child: Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 8.w,
+                height: 8.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.35 * opacity),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(top: 6.h),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              dot(0, const Color(0xFFFFE6A7)),
+              SizedBox(width: 10.w),
+              dot(1, const Color(0xFF00E5FF)),
+              SizedBox(width: 10.w),
+              dot(2, const Color(0xFF8A5CFF)),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
@@ -15,12 +19,15 @@ class InviteBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(InviteController());
+    final ctrl =
+        Get.isRegistered<InviteController>()
+            ? Get.find<InviteController>()
+            : Get.put(InviteController());
     ctrl.loadInvitesIfNeeded();
 
     return Container(
       height: Get.height * 0.85,
-      decoration:  BoxDecoration(
+      decoration: BoxDecoration(
         color: bottomSheetGrey,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -33,7 +40,9 @@ class InviteBottomSheet extends StatelessWidget {
             children: [
               // 1. Background Image (The "smoke" effect)
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 child: Image.asset(
                   "assets/images/Invite image.png",
                   width: double.infinity,
@@ -96,7 +105,11 @@ class InviteBottomSheet extends StatelessWidget {
                       color: Colors.white10,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -114,11 +127,14 @@ class InviteBottomSheet extends StatelessWidget {
                   SizedBox(height: 10.h),
                   Obx(() {
                     final data = ctrl.invitePayload.value ?? {};
-                    final invitesLeft = data['invitesLeft'] ?? data['invites_left'];
-                    final maxInvites = data['maxInvites'] ?? data['max_invites'];
-                    final leftText = invitesLeft != null && maxInvites != null
-                        ? context.l10n.invitesLeft(invitesLeft)
-                        : context.l10n.invites;
+                    final invitesLeft =
+                        data['invitesLeft'] ?? data['invites_left'];
+                    final maxInvites =
+                        data['maxInvites'] ?? data['max_invites'];
+                    final leftText =
+                        invitesLeft != null && maxInvites != null
+                            ? context.l10n.invitesLeft(invitesLeft)
+                            : context.l10n.invites;
                     return Text(
                       leftText,
                       style: TextStyle(
@@ -132,7 +148,8 @@ class InviteBottomSheet extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 40.w),
                     child: Obx(() {
-                      final text = ctrl.invitePayload.value?['rewardTitle']
+                      final text =
+                          ctrl.invitePayload.value?['rewardTitle']
                               ?.toString() ??
                           context.l10n.shareInviteCodesReward;
                       return Text(
@@ -146,12 +163,16 @@ class InviteBottomSheet extends StatelessWidget {
 
                   // --- Premium Badge with Linear Gradient ---
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 8.h,
+                    ),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [
                           Color.fromRGBO(255, 230, 167, 0.7),
-                          Color.fromRGBO(242, 178, 105, 1),                        ],
+                          Color.fromRGBO(242, 178, 105, 1),
+                        ],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
@@ -168,7 +189,7 @@ class InviteBottomSheet extends StatelessWidget {
                     child: Obx(() {
                       final reward =
                           ctrl.invitePayload.value?['reward']?.toString() ??
-                              context.l10n.oneMonthFreePremium;
+                          context.l10n.oneMonthFreePremium;
                       return Text(
                         reward,
                         style: sfProDisplay400(15.sp, Colors.white),
@@ -180,25 +201,22 @@ class InviteBottomSheet extends StatelessWidget {
                   // --- Invite Codes List ---
                   // Use ShrinkWrap to work inside SingleChildScrollView
                   Obx(() {
+                    // No loaders in this sheet; cached/prefetched data should render instantly.
                     if (ctrl.isLoading.value &&
                         ctrl.invitePayload.value == null) {
-                      return Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24.h),
-                        child: const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      );
+                      return const SizedBox.shrink();
                     }
 
                     final data = ctrl.invitePayload.value ?? {};
                     final invites = data['invites'];
-                    final inviteList = invites is List
-                        ? invites.whereType<Map>().map((e) {
-                            final code = e['code']?.toString() ?? '';
-                            final claimed = e['claimed'] == true;
-                            return {'code': code, 'claimed': claimed};
-                          }).toList()
-                        : <Map<String, dynamic>>[];
+                    final inviteList =
+                        invites is List
+                            ? invites.whereType<Map>().map((e) {
+                              final code = e['code']?.toString() ?? '';
+                              final claimed = e['claimed'] == true;
+                              return {'code': code, 'claimed': claimed};
+                            }).toList()
+                            : <Map<String, dynamic>>[];
 
                     if (inviteList.isEmpty) {
                       return Padding(
@@ -215,8 +233,9 @@ class InviteBottomSheet extends StatelessWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       padding: EdgeInsets.symmetric(horizontal: 24.w),
                       itemCount: inviteList.length,
-                      separatorBuilder: (context, index) =>
-                          const Divider(color: Colors.white10, height: 1),
+                      separatorBuilder:
+                          (context, index) =>
+                              const Divider(color: Colors.white10, height: 1),
                       itemBuilder: (context, index) {
                         final item = inviteList[index];
                         final bool isClaimed = item['claimed'] == true;
@@ -234,36 +253,41 @@ class InviteBottomSheet extends StatelessWidget {
                                   fontSize: 17.sp,
                                   fontFamily: 'SFProText',
                                   fontWeight: FontWeight.w600,
-                                  decoration: isClaimed
-                                      ? TextDecoration.lineThrough
-                                      : null,
+                                  decoration:
+                                      isClaimed
+                                          ? TextDecoration.lineThrough
+                                          : null,
                                   decorationColor:
-                                      Colors.white24, // 🔴 underline / line color
+                                      Colors
+                                          .white24, // 🔴 underline / line color
                                 ),
                               ),
 
                               isClaimed
                                   ? Text(
-                                      context.l10n.claimed,
-                                      style: TextStyle(
-                                        color: Colors.white24,
-                                        fontSize: 14.sp,
-                                      ),
-                                    )
-                                  : IconButton(
-                                      onPressed: () {
-                                        Clipboard.setData(
-                                            ClipboardData(text: item['code']));
-                                        Get.snackbar(
-                                          context.l10n.copied,
-                                          context.l10n.codeCopiedToClipboard,
-                                          snackPosition: SnackPosition.BOTTOM,
-                                          backgroundColor: Colors.white10,
-                                          colorText: Colors.white,
-                                        );
-                                      },
-                                      icon: Image.asset("assets/images/Group.png"),
+                                    context.l10n.claimed,
+                                    style: TextStyle(
+                                      color: Colors.white24,
+                                      fontSize: 14.sp,
                                     ),
+                                  )
+                                  : IconButton(
+                                    onPressed: () {
+                                      Clipboard.setData(
+                                        ClipboardData(text: item['code']),
+                                      );
+                                      Get.snackbar(
+                                        context.l10n.copied,
+                                        context.l10n.codeCopiedToClipboard,
+                                        snackPosition: SnackPosition.BOTTOM,
+                                        backgroundColor: Colors.white10,
+                                        colorText: Colors.white,
+                                      );
+                                    },
+                                    icon: Image.asset(
+                                      "assets/images/Group.png",
+                                    ),
+                                  ),
                             ],
                           ),
                         );
@@ -282,15 +306,38 @@ class InviteBottomSheet extends StatelessWidget {
 }
 
 class InviteController extends GetxController {
+  static const String _kInviteCacheKey = 'second_chat.invites_cache';
+
   final Rxn<Map<String, dynamic>> invitePayload = Rxn<Map<String, dynamic>>();
   final RxBool isLoading = false.obs;
   final RxnString error = RxnString();
   bool _requested = false;
 
+  @override
+  void onInit() {
+    super.onInit();
+    unawaited(_hydrateFromCache());
+  }
+
   void loadInvitesIfNeeded() {
     if (_requested) return;
     _requested = true;
     loadInvites();
+  }
+
+  Future<void> _hydrateFromCache() async {
+    if (invitePayload.value != null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kInviteCacheKey);
+      if (raw == null || raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        invitePayload.value = Map<String, dynamic>.from(decoded);
+      }
+    } catch (e) {
+      // Cache is best-effort; ignore failures.
+    }
   }
 
   Future<void> loadInvites() async {
@@ -306,16 +353,14 @@ class InviteController extends GetxController {
       final dio = _buildDio();
       final res = await dio.get<dynamic>(
         '/api/v1/subscriptions/referral/invites',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       final data = res.data;
       print('INVITES RESPONSE RAW: $data');
       if (data is Map && data['data'] is Map) {
-        invitePayload.value = Map<String, dynamic>.from(data['data'] as Map);
+        final payload = Map<String, dynamic>.from(data['data'] as Map);
+        invitePayload.value = payload;
+        unawaited(_persistCache(payload));
       } else {
         error.value = 'Unexpected response format';
       }
@@ -328,6 +373,13 @@ class InviteController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> _persistCache(Map<String, dynamic> payload) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kInviteCacheKey, jsonEncode(payload));
+    } catch (_) {}
   }
 
   Dio _buildDio() {

@@ -18,14 +18,16 @@ class ChatController extends GetxController {
     PlatformTokenProvider? tokenProvider,
     LiveStreamService? liveStreamService,
   }) : _tokenProvider = tokenProvider ?? PlatformTokenProvider(),
-        _live =
-            liveStreamService ??
-                LiveStreamService(tokenProvider: tokenProvider ?? PlatformTokenProvider());
+       _live =
+           liveStreamService ??
+           LiveStreamService(
+             tokenProvider: tokenProvider ?? PlatformTokenProvider(),
+           );
 
   final PlatformTokenProvider _tokenProvider;
   final SettingsController _settings = Get.find<SettingsController>();
   final EdgeGlowNotificationController _edgeGlow =
-  Get.find<EdgeGlowNotificationController>();
+      Get.find<EdgeGlowNotificationController>();
   final LiveStreamService _live;
 
   final RxString platform = 'twitch'.obs;
@@ -36,6 +38,7 @@ class ChatController extends GetxController {
   final RxMap<String, int> platformViewerCounts = <String, int>{}.obs;
   final RxMap<String, bool> platformLive = <String, bool>{}.obs;
   final RxMap<String, String?> platformEmbedUrls = <String, String?>{}.obs;
+
   /// Linked channel login from streaming overview `platforms[]` (optimistic send label).
   final RxMap<String, String> platformChatUsernames = <String, String>{}.obs;
   final RxMap<String, String?> streamTitleByPlatform = <String, String?>{}.obs;
@@ -59,11 +62,11 @@ class ChatController extends GetxController {
 
   /// Merges overlapping refreshes for the same platform (avoids duplicate HTTP).
   final Map<String, Future<void>> _overviewRefreshCoalesce =
-  <String, Future<void>>{};
+      <String, Future<void>>{};
 
   /// One in-flight `GET /chat/history` per platform (callers await the same [Future]).
   final Map<String, Future<void>> _historyRefreshCoalesce =
-  <String, Future<void>>{};
+      <String, Future<void>>{};
 
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
@@ -165,7 +168,8 @@ class ChatController extends GetxController {
       if (appJwt != null && appJwt.isNotEmpty) return appJwt;
     } catch (_) {}
 
-    final platformToken = await _live.ensureFreshPlatformAccessToken(platform: p) ??
+    final platformToken =
+        await _live.ensureFreshPlatformAccessToken(platform: p) ??
         await _tokenProvider.getAccessToken(p);
     if (platformToken != null && platformToken.trim().isNotEmpty) {
       return platformToken.trim();
@@ -269,12 +273,16 @@ class ChatController extends GetxController {
 
       // Debounce socket connect attempts to avoid spam when multiple watchers fire.
       final now = DateTime.now();
-      if (now.difference(_lastSocketConnectAttempt) < const Duration(seconds: 3)) {
+      if (now.difference(_lastSocketConnectAttempt) <
+          const Duration(seconds: 3)) {
         return;
       }
       _lastSocketConnectAttempt = now;
 
-      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      final selected = _normalizedApiPlatform(
+        platform.value,
+        fallback: 'twitch',
+      );
       final token = await _resolveChatAuthToken(selected);
       if (token == null || token.trim().isEmpty) return;
       _socketAuthToken = token.trim();
@@ -283,7 +291,8 @@ class ChatController extends GetxController {
       var socketUrl = _socketBaseUrl;
       var socketPath = _socketPath;
 
-      final hasSocketFields = socketUrl != null &&
+      final hasSocketFields =
+          socketUrl != null &&
           socketUrl.trim().isNotEmpty &&
           socketPath != null &&
           socketPath.trim().isNotEmpty;
@@ -386,11 +395,11 @@ class ChatController extends GetxController {
       for (final p in normalized) {
         final pToken = await _resolveStreamingRestToken(p);
         final effectiveToken =
-        (pToken != null && pToken.trim().isNotEmpty) ? pToken.trim() : null;
+            (pToken != null && pToken.trim().isNotEmpty) ? pToken.trim() : null;
         if (kDebugMode) {
           debugPrint(
             '[ChatController] overview token platform=$p present=${pToken != null && pToken.trim().isNotEmpty} '
-                'token=${_maskToken(effectiveToken)}',
+            'token=${_maskToken(effectiveToken)}',
           );
         }
         if (effectiveToken == null || effectiveToken.isEmpty) continue;
@@ -451,11 +460,7 @@ class ChatController extends GetxController {
       if (mergedViewer.isNotEmpty) platformViewerCounts.assignAll(mergedViewer);
       if (mergedLive.isNotEmpty) {
         for (final e in mergedLive.entries) {
-          _setPlatformLiveStable(
-            e.key,
-            e.value,
-            source: 'rest:overview_multi',
-          );
+          _setPlatformLiveStable(e.key, e.value, source: 'rest:overview_multi');
         }
       }
       if (mergedEmbed.isNotEmpty) platformEmbedUrls.assignAll(mergedEmbed);
@@ -494,15 +499,15 @@ class ChatController extends GetxController {
     debugPrint('======== SC_STREAM_DETAILS ($reason) ========');
     debugPrint(
       'selected=${platform.value} isLive=${isLive.value} '
-          'viewerCount=${viewerCount.value} socketConnected=${isConnected.value}',
+      'viewerCount=${viewerCount.value} socketConnected=${isConnected.value}',
     );
     debugPrint('watchUrl=${su(watchUrl.value)}');
     final ov = overview.value;
     if (ov != null) {
       debugPrint(
         'overview: platform=${ov.platform} live=${ov.live} '
-            'viewerCount=${ov.viewerCount} watchUrl=${su(ov.watchUrl)} '
-            'hasSocketUrl=${ov.chatSocketUrl != null && ov.chatSocketUrl!.trim().isNotEmpty}',
+        'viewerCount=${ov.viewerCount} watchUrl=${su(ov.watchUrl)} '
+        'hasSocketUrl=${ov.chatSocketUrl != null && ov.chatSocketUrl!.trim().isNotEmpty}',
       );
     } else {
       debugPrint('overview: (null)');
@@ -513,7 +518,8 @@ class ChatController extends GetxController {
       final embed = platformEmbedUrls[key];
       final title = streamTitleByPlatform[key];
       final cat = streamCategoryByPlatform[key];
-      final hasAny = live != null ||
+      final hasAny =
+          live != null ||
           vc != null ||
           (embed != null && embed.trim().isNotEmpty) ||
           (title != null && title.trim().isNotEmpty) ||
@@ -521,22 +527,25 @@ class ChatController extends GetxController {
       if (!hasAny) continue;
       debugPrint(
         '  [$key] live=$live viewers=$vc title="${title ?? ''}" '
-            'category="${cat ?? ''}" embed=${su(embed)}',
+        'category="${cat ?? ''}" embed=${su(embed)}',
       );
     }
     debugPrint('================================================');
   }
 
   Future<void> refreshOverviewForPlatform(
-      String p, {
-        bool forceChatHistory = false,
-      }) {
+    String p, {
+    bool forceChatHistory = false,
+  }) {
     final key = _normalizedApiPlatform(p, fallback: 'twitch');
     if (!forceChatHistory) {
       final pending = _overviewRefreshCoalesce[key];
       if (pending != null) return pending;
     }
-    final run = _refreshOverviewForPlatformBody(key, forceChatHistory: forceChatHistory);
+    final run = _refreshOverviewForPlatformBody(
+      key,
+      forceChatHistory: forceChatHistory,
+    );
     if (!forceChatHistory) {
       _overviewRefreshCoalesce[key] = run;
       run.whenComplete(() {
@@ -549,9 +558,9 @@ class ChatController extends GetxController {
   }
 
   Future<void> _refreshOverviewForPlatformBody(
-      String p, {
-        bool forceChatHistory = false,
-      }) async {
+    String p, {
+    bool forceChatHistory = false,
+  }) async {
     try {
       final token = await _resolveStreamingRestToken(p);
       if (token == null || token.isEmpty) return;
@@ -571,7 +580,9 @@ class ChatController extends GetxController {
         isLive.value = platformLive[key] ?? isLive.value;
         watchUrl.value = platformEmbedUrls[key] ?? watchUrl.value;
         if (isLive.value == true) {
-          unawaited(_ensureChatForLivePlatform(key, forceHistory: forceChatHistory));
+          unawaited(
+            _ensureChatForLivePlatform(key, forceHistory: forceChatHistory),
+          );
         } else {
           platformMessages[key] = const <ChatMessage>[];
           if (platform.value.toLowerCase().trim() == key) {
@@ -583,10 +594,7 @@ class ChatController extends GetxController {
         return;
       }
 
-      final ov = await _live.fetchOverview(
-        platform: p,
-        accessToken: token,
-      );
+      final ov = await _live.fetchOverview(platform: p, accessToken: token);
       if (ov == null) return;
       overview.value = ov;
       for (final e in ov.usernamesByPlatform.entries) {
@@ -628,7 +636,10 @@ class ChatController extends GetxController {
       isLive.value = platformLive[p.toLowerCase()] == true;
       if (platformLive[p.toLowerCase()] == true) {
         unawaited(
-          _ensureChatForLivePlatform(p.toLowerCase(), forceHistory: forceChatHistory),
+          _ensureChatForLivePlatform(
+            p.toLowerCase(),
+            forceHistory: forceChatHistory,
+          ),
         );
       } else {
         final key = p.toLowerCase().trim();
@@ -701,7 +712,8 @@ class ChatController extends GetxController {
     }
 
     final recentLive = _lastConfirmedLiveAt[platformKey];
-    if (recentLive != null && now.difference(recentLive) < _minLiveHoldAfterTrue) {
+    if (recentLive != null &&
+        now.difference(recentLive) < _minLiveHoldAfterTrue) {
       if (kDebugMode) {
         debugPrint(
           '[ChatController] live-off ignored (hold) platform=$platformKey source=$source',
@@ -719,14 +731,18 @@ class ChatController extends GetxController {
     _pendingOfflineTimers.remove(platformKey)?.cancel();
     _pendingOfflineTimers[platformKey] = Timer(_offlineConfirmationDelay, () {
       _pendingOfflineTimers.remove(platformKey);
-      final selectedNow = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      final selectedNow = _normalizedApiPlatform(
+        platform.value,
+        fallback: 'twitch',
+      );
       final lastPlayerUpdate = _lastPlayerUrlUpdateAt[platformKey];
       final now2 = DateTime.now().toUtc();
       if (lastPlayerUpdate != null &&
           now2.difference(lastPlayerUpdate) < const Duration(seconds: 4)) {
         return;
       }
-      if ((_pendingOfflineVotes[platformKey] ?? 0) < _offlineConfirmationVotes) {
+      if ((_pendingOfflineVotes[platformKey] ?? 0) <
+          _offlineConfirmationVotes) {
         return;
       }
       _pendingOfflineVotes[platformKey] = 0;
@@ -846,7 +862,10 @@ class ChatController extends GetxController {
   }
 
   /// When the sender matches the linked channel login from overview, show that exact name.
-  ChatMessage _chatMessageWithOverviewUsername(ChatMessage msg, String platformKey) {
+  ChatMessage _chatMessageWithOverviewUsername(
+    ChatMessage msg,
+    String platformKey,
+  ) {
     final key = _normalizePlatformKey(platformKey);
     if (key.isEmpty) return msg;
     final linked = platformChatUsernames[key];
@@ -905,8 +924,7 @@ class ChatController extends GetxController {
     }
   }
 
-  bool _isLocalEchoId(String? id) =>
-      id != null && id.startsWith('local:');
+  bool _isLocalEchoId(String? id) => id != null && id.startsWith('local:');
 
   /// Same line twice in a short window (socket echo + optimistic, or double socket).
   bool _isNearbyDuplicateContent(ChatMessage a, ChatMessage b) {
@@ -942,9 +960,9 @@ class ChatController extends GetxController {
   }
 
   bool _shouldSuppressSocketNearDuplicate(
-      List<ChatMessage> existing,
-      ChatMessage incoming,
-      ) {
+    List<ChatMessage> existing,
+    ChatMessage incoming,
+  ) {
     final incTs = incoming.timestamp.toUtc();
     for (final m in existing.reversed.take(30)) {
       if (m.platform.toLowerCase().trim() !=
@@ -960,9 +978,7 @@ class ChatController extends GetxController {
       // Different users may send the same text; never treat our optimistic row as blocking them.
       if (u1 != u2) continue;
 
-      if (m.id != null &&
-          incoming.id != null &&
-          m.id == incoming.id) {
+      if (m.id != null && incoming.id != null && m.id == incoming.id) {
         return true;
       }
       if (_isLocalEchoId(m.id) || _isLocalEchoId(incoming.id)) {
@@ -1052,24 +1068,24 @@ class ChatController extends GetxController {
   }
 
   String _edgeGlowDedupeKeyForActivity(
-      Map<String, dynamic> event, {
-        required String platformKey,
-      }) {
+    Map<String, dynamic> event, {
+    required String platformKey,
+  }) {
     final id = event['id']?.toString().trim();
     final metadata = event['metadata'];
     String messageId = '';
     if (metadata is Map) {
-      messageId = (metadata['messageId'] ??
-          metadata['message_id'] ??
-          metadata['id'] ??
-          '')
-          .toString()
-          .trim();
+      messageId =
+          (metadata['messageId'] ??
+                  metadata['message_id'] ??
+                  metadata['id'] ??
+                  '')
+              .toString()
+              .trim();
     }
     final type = _normalizeActivityType(event['type']?.toString());
-    final ts = (event['timestamp'] ?? event['created_at'] ?? '')
-        .toString()
-        .trim();
+    final ts =
+        (event['timestamp'] ?? event['created_at'] ?? '').toString().trim();
 
     if (id != null && id.isNotEmpty) return '$platformKey|id:$id';
     if (messageId.isNotEmpty) return '$platformKey|mid:$messageId|$type';
@@ -1080,13 +1096,14 @@ class ChatController extends GetxController {
   bool _seenEdgeGlowRecently(String key) {
     final now = DateTime.now().toUtc();
     _edgeGlowEventSeenAt.removeWhere(
-          (_, ts) => now.difference(ts) > const Duration(seconds: 12),
+      (_, ts) => now.difference(ts) > const Duration(seconds: 12),
     );
     if (_edgeGlowEventSeenAt.containsKey(key)) return true;
     _edgeGlowEventSeenAt[key] = now;
     if (_edgeGlowEventSeenAt.length > 600) {
-      final oldestKeys = _edgeGlowEventSeenAt.entries.toList()
-        ..sort((a, b) => a.value.compareTo(b.value));
+      final oldestKeys =
+          _edgeGlowEventSeenAt.entries.toList()
+            ..sort((a, b) => a.value.compareTo(b.value));
       for (final entry in oldestKeys.take(100)) {
         _edgeGlowEventSeenAt.remove(entry.key);
       }
@@ -1100,11 +1117,16 @@ class ChatController extends GetxController {
     }
     if (!_isActivityPayload(event)) return;
 
+    final currentUserId = _currentUserId();
+    if (currentUserId.isNotEmpty && _activityUserId(event) == currentUserId) {
+      return;
+    }
+
     final selectedPlatform = _normalizePlatformKey(platform.value);
     final eventPlatform = _normalizePlatformKey(event['platform']?.toString());
 
     final glowPlatform =
-    eventPlatform.isNotEmpty ? eventPlatform : selectedPlatform;
+        eventPlatform.isNotEmpty ? eventPlatform : selectedPlatform;
     if (glowPlatform.isEmpty) return;
 
     final dedupeKey = _edgeGlowDedupeKeyForActivity(
@@ -1114,9 +1136,57 @@ class ChatController extends GetxController {
     if (_seenEdgeGlowRecently(dedupeKey)) return;
 
     if (kDebugMode) {
-      debugPrint('[ACTIVITY_EVENT][EDGE_GLOW_TRIGGER] platform=$glowPlatform event=$event');
+      debugPrint(
+        '[ACTIVITY_EVENT][EDGE_GLOW_TRIGGER] platform=$glowPlatform event=$event',
+      );
     }
     _edgeGlow.triggerForPlatform(glowPlatform);
+  }
+
+  String _currentUserId() {
+    try {
+      final me = Get.find<AuthController>().me.value;
+      if (me == null) return '';
+      final raw =
+          me['id'] ?? me['uid'] ?? me['userId'] ?? me['user_id'] ?? me['sub'];
+      return raw?.toString().trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _activityUserId(Map<String, dynamic> event) {
+    dynamic raw =
+        event['userId'] ??
+        event['user_id'] ??
+        event['uid'] ??
+        event['senderId'] ??
+        event['sender_id'];
+
+    final user = event['user'];
+    if (raw == null && user is Map) {
+      raw = user['id'] ?? user['uid'] ?? user['userId'] ?? user['user_id'];
+    }
+
+    final metadata = event['metadata'];
+    if (raw == null && metadata is Map) {
+      raw =
+          metadata['userId'] ??
+          metadata['user_id'] ??
+          metadata['uid'] ??
+          metadata['senderId'] ??
+          metadata['sender_id'];
+      final metaUser = metadata['user'];
+      if (raw == null && metaUser is Map) {
+        raw =
+            metaUser['id'] ??
+            metaUser['uid'] ??
+            metaUser['userId'] ??
+            metaUser['user_id'];
+      }
+    }
+
+    return raw?.toString().trim() ?? '';
   }
 
   /// Appends one realtime activity row (from `activity:event`, `activity:follow`, `activity:join`, …).
@@ -1130,13 +1200,14 @@ class ChatController extends GetxController {
   }
 
   void _appendActivityFromChatMessage(
-      ChatMessage msg, {
-        bool triggerEdgeGlow = true,
-      }) {
+    ChatMessage msg, {
+    bool triggerEdgeGlow = true,
+  }) {
     final id = msg.id?.trim();
-    final dedupe = id != null && id.isNotEmpty
-        ? 'id:$id'
-        : 'h:${msg.platform}|${msg.timestamp.toUtc().millisecondsSinceEpoch}|${msg.message.hashCode}|${_chatMessagePayloadType(msg)}';
+    final dedupe =
+        id != null && id.isNotEmpty
+            ? 'id:$id'
+            : 'h:${msg.platform}|${msg.timestamp.toUtc().millisecondsSinceEpoch}|${msg.message.hashCode}|${_chatMessagePayloadType(msg)}';
     if (_activityChatSourceDedupeIds.contains(dedupe)) return;
     if (_activityChatSourceDedupeIds.length > 2500) {
       _activityChatSourceDedupeIds.clear();
@@ -1171,22 +1242,23 @@ class ChatController extends GetxController {
 
     final p = _normalizePlatformKey(msg.platform);
     if (p.isEmpty) return;
-    var normalizedMsg = msg.platform == p
-        ? msg
-        : ChatMessage(
-            platform: p,
-            userName: msg.userName,
-            message: msg.message,
-            timestamp: msg.timestamp,
-            id: msg.id,
-            raw: msg.raw,
-          );
+    var normalizedMsg =
+        msg.platform == p
+            ? msg
+            : ChatMessage(
+              platform: p,
+              userName: msg.userName,
+              message: msg.message,
+              timestamp: msg.timestamp,
+              id: msg.id,
+              raw: msg.raw,
+            );
     normalizedMsg = _chatMessageWithOverviewUsername(normalizedMsg, p);
     _purgeStalePendingEchoes();
 
     final norm = msg.message.trim().toLowerCase();
     final pendingIdx = _pendingLocalChatEchoes.indexWhere(
-          (e) => e.platform == p && e.normalizedText == norm,
+      (e) => e.platform == p && e.normalizedText == norm,
     );
 
     if (pendingIdx != -1) {
@@ -1208,7 +1280,9 @@ class ChatController extends GetxController {
       return;
     }
 
-    final merged = _mergeUniqueByDedupeKey(existing, <ChatMessage>[normalizedMsg]);
+    final merged = _mergeUniqueByDedupeKey(existing, <ChatMessage>[
+      normalizedMsg,
+    ]);
     merged.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     platformMessages[p] = _collapseNearDuplicates(merged);
     platformMessages.refresh();
@@ -1217,10 +1291,10 @@ class ChatController extends GetxController {
   }
 
   Future<void> _swapToPlatformAndRefresh(
-      String p, {
-        bool forceHistory = false,
-        bool fetchHistory = true,
-      }) async {
+    String p, {
+    bool forceHistory = false,
+    bool fetchHistory = true,
+  }) async {
     final key = _normalizePlatformKey(p);
     if (key.isEmpty) return;
 
@@ -1271,9 +1345,9 @@ class ChatController extends GetxController {
 
   /// Merges `activities` from GET `/chat/history` into [activityEvents] (deduped by `id`).
   void _mergeHistoryActivitiesFromApi(
-      List<Map<String, dynamic>> raw, {
-        required String platformKey,
-      }) {
+    List<Map<String, dynamic>> raw, {
+    required String platformKey,
+  }) {
     if (raw.isEmpty) return;
 
     final existingIds = <String>{
@@ -1295,12 +1369,13 @@ class ChatController extends GetxController {
       final meta = copy['metadata'];
       if (meta is Map) {
         final mm = Map<String, dynamic>.from(meta.cast<String, dynamic>());
-        final login = (mm['user_login'] ??
-            mm['user_name'] ??
-            mm['username'] ??
-            mm['user'])
-            ?.toString()
-            .trim();
+        final login =
+            (mm['user_login'] ??
+                    mm['user_name'] ??
+                    mm['username'] ??
+                    mm['user'])
+                ?.toString()
+                .trim();
         if (login != null && login.isNotEmpty) {
           mm.putIfAbsent('user', () => login);
           mm.putIfAbsent('username', () => login);
@@ -1315,7 +1390,7 @@ class ChatController extends GetxController {
     if (toAdd.isEmpty) return;
 
     toAdd.sort(
-          (a, b) => _activityEventTimeUtc(a).compareTo(_activityEventTimeUtc(b)),
+      (a, b) => _activityEventTimeUtc(a).compareTo(_activityEventTimeUtc(b)),
     );
     for (final m in toAdd) {
       activityEvents.add(m);
@@ -1323,7 +1398,10 @@ class ChatController extends GetxController {
     activityEvents.refresh();
   }
 
-  Future<void> _refreshHistoryForPlatform(String platformKey, {bool force = false}) {
+  Future<void> _refreshHistoryForPlatform(
+    String platformKey, {
+    bool force = false,
+  }) {
     final key = _normalizedApiPlatform(platformKey, fallback: 'twitch');
     if (key.isEmpty) return Future.value();
 
@@ -1340,7 +1418,10 @@ class ChatController extends GetxController {
     return run;
   }
 
-  Future<void> _refreshHistoryForPlatformImpl(String key, {bool force = false}) async {
+  Future<void> _refreshHistoryForPlatformImpl(
+    String key, {
+    bool force = false,
+  }) async {
     final now = DateTime.now().toUtc();
     final last = _historyLastFetchAt[key];
     if (!force &&
@@ -1396,9 +1477,9 @@ class ChatController extends GetxController {
   }
 
   List<ChatMessage> _mergeUniqueByDedupeKey(
-      List<ChatMessage> a,
-      List<ChatMessage> b,
-      ) {
+    List<ChatMessage> a,
+    List<ChatMessage> b,
+  ) {
     final out = <ChatMessage>[];
     final seen = <String>{};
     void addAll(List<ChatMessage> list) {
@@ -1415,9 +1496,9 @@ class ChatController extends GetxController {
   }
 
   Future<void> _ensureChatForLivePlatform(
-      String p, {
-        bool forceHistory = false,
-      }) async {
+    String p, {
+    bool forceHistory = false,
+  }) async {
     final key = p.toLowerCase();
     // 1) Socket ensure connect (no-op if already connected)
     if (isConnected.value != true) {
@@ -1480,7 +1561,10 @@ class ChatController extends GetxController {
     _live.onSocketInbound = _appendSocketInboundLog;
     _live.onSocketConnected = () {
       isConnected.value = true;
-      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      final selected = _normalizedApiPlatform(
+        platform.value,
+        fallback: 'twitch',
+      );
       if (selected.isNotEmpty) {
         // Overview’s `_ensureChatForLivePlatform` usually loads history; avoid a second immediate GET.
         unawaited(_refreshHistoryForPlatform(selected, force: false));
@@ -1507,8 +1591,7 @@ class ChatController extends GetxController {
       if (key.isEmpty) return;
       platformViewerCounts[key] = vc;
       platformViewerCounts.refresh();
-      if (key ==
-          _normalizedApiPlatform(platform.value, fallback: 'twitch')) {
+      if (key == _normalizedApiPlatform(platform.value, fallback: 'twitch')) {
         viewerCount.value = vc;
       }
       if (kDebugMode) {
@@ -1521,7 +1604,10 @@ class ChatController extends GetxController {
       final key = _normalizedApiPlatform(p);
       if (key.isEmpty) return;
       _setPlatformLiveStable(key, live, source: 'socket:live_update');
-      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+      final selected = _normalizedApiPlatform(
+        platform.value,
+        fallback: 'twitch',
+      );
       if (key != selected) return;
 
       if (platformLive[selected] == true) {
@@ -1540,8 +1626,13 @@ class ChatController extends GetxController {
       }
       platformEmbedUrls[key] = url;
       platformEmbedUrls.refresh();
-      final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
-      if (key == selected && (url?.trim().isNotEmpty == true) && isPlatformLive(selected)) {
+      final selected = _normalizedApiPlatform(
+        platform.value,
+        fallback: 'twitch',
+      );
+      if (key == selected &&
+          (url?.trim().isNotEmpty == true) &&
+          isPlatformLive(selected)) {
         watchUrl.value = url;
         isLive.value = true;
       }
@@ -1564,10 +1655,10 @@ class ChatController extends GetxController {
       event['platform'] = (event['platform'] ?? platform.value).toString();
       event['type'] =
           (event['type'] ??
-              event['eventType'] ??
-              event['kind'] ??
-              event['event'] ??
-              'notification')
+                  event['eventType'] ??
+                  event['kind'] ??
+                  event['event'] ??
+                  'notification')
               .toString();
       _maybeTriggerEdgeGlowForActivity(event);
     };
@@ -1580,11 +1671,13 @@ class ChatController extends GetxController {
       final title = (meta?['title'] ?? m['title'])?.toString().trim();
       final category = (meta?['category'] ?? m['category'])?.toString().trim();
       if (title != null && title.isNotEmpty) streamTitleByPlatform[p] = title;
-      if (category != null && category.isNotEmpty) streamCategoryByPlatform[p] = category;
+      if (category != null && category.isNotEmpty)
+        streamCategoryByPlatform[p] = category;
       streamTitleByPlatform.refresh();
       streamCategoryByPlatform.refresh();
       _logStreamSnapshot('socket:stream_meta');
     }
+
     _live.onStreamStatus = applyMeta;
     _live.onStreamInfoUpdate = applyMeta;
     _live.onChatMessage = _handleIncomingChatMessage;
@@ -1594,8 +1687,10 @@ class ChatController extends GetxController {
   /// Socket messages are still appended in realtime, but this ensures you don't
   /// miss messages after reconnect or backgrounding.
   Future<void> refreshChatHistory({String? forPlatform, bool force = true}) {
-    final key =
-    _normalizedApiPlatform(forPlatform ?? platform.value, fallback: 'twitch');
+    final key = _normalizedApiPlatform(
+      forPlatform ?? platform.value,
+      fallback: 'twitch',
+    );
     return _refreshHistoryForPlatform(key, force: force);
   }
 
@@ -1609,17 +1704,15 @@ class ChatController extends GetxController {
       final cachedUrl = platformEmbedUrls[key];
       if (cachedLive == true) {
         isLive.value = true;
-        watchUrl.value = (cachedUrl != null && cachedUrl.trim().isNotEmpty)
-            ? cachedUrl
-            : '';
+        watchUrl.value =
+            (cachedUrl != null && cachedUrl.trim().isNotEmpty) ? cachedUrl : '';
       } else if (cachedLive == false) {
         isLive.value = false;
         watchUrl.value = '';
       } else {
         isLive.value = false;
-        watchUrl.value = (cachedUrl != null && cachedUrl.trim().isNotEmpty)
-            ? cachedUrl
-            : '';
+        watchUrl.value =
+            (cachedUrl != null && cachedUrl.trim().isNotEmpty) ? cachedUrl : '';
       }
 
       messages.assignAll(platformMessages[key] ?? const <ChatMessage>[]);

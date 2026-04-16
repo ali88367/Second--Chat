@@ -51,24 +51,25 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _googleBusy = true);
     try {
       final auth = Get.find<AuthController>();
-      await auth.loginWithGoogle();
+      final ok = await auth.loginWithGoogle();
+      if (!ok) return;
       if (!mounted) return;
       await _routeAfterLoginSuccess();
     } catch (_) {
       if (!mounted) return;
       final auth = Get.find<AuthController>();
       final msg = auth.lastError.value;
-      if (msg != null && msg.isNotEmpty) {
-        Get.snackbar(
-          'Sign in',
-          msg,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF2C2C2E),
-          colorText: Colors.white,
-          margin: EdgeInsets.all(12.w),
-          duration: const Duration(seconds: 4),
-        );
-      }
+      Get.snackbar(
+        'Sign in',
+        (msg != null && msg.isNotEmpty)
+            ? msg
+            : 'Could not sign in. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF2C2C2E),
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12.w),
+        duration: const Duration(seconds: 4),
+      );
     } finally {
       if (mounted) setState(() => _googleBusy = false);
     }
