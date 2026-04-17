@@ -461,8 +461,9 @@ class _SplashScreenState extends State<_SplashScreen>
         prefetchFuture = _prefetchEssentialData().catchError((_) => false);
         if (Get.isRegistered<ChatController>()) {
           final chat = Get.find<ChatController>();
-          chatBootstrapFuture =
-              chat.ensureStreamRealtimeBootstrap().catchError((_) {});
+          chatBootstrapFuture = chat.ensureStreamRealtimeBootstrap().catchError(
+            (_) {},
+          );
         }
       }
 
@@ -547,10 +548,10 @@ class _SplashScreenState extends State<_SplashScreen>
                         child: Container(
                           width: 320.w,
                           height: 320.w,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
-                              colors: [Color(0xFF8A5CFF), Colors.transparent],
+                              colors: [twitchPurple, Colors.transparent],
                             ),
                           ),
                         ),
@@ -564,10 +565,10 @@ class _SplashScreenState extends State<_SplashScreen>
                         child: Container(
                           width: 380.w,
                           height: 380.w,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
-                              colors: [Color(0xFFFFE6A7), Colors.transparent],
+                              colors: [youtubeRed, Colors.transparent],
                             ),
                           ),
                         ),
@@ -581,10 +582,10 @@ class _SplashScreenState extends State<_SplashScreen>
                         child: Container(
                           width: 420.w,
                           height: 420.w,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
-                              colors: [Color(0xFF00E5FF), Colors.transparent],
+                              colors: [kickGreen, Colors.transparent],
                             ),
                           ),
                         ),
@@ -611,6 +612,7 @@ class _SplashScreenState extends State<_SplashScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
+                                    // Keep the original warm glow behind the splash image.
                                     color: const Color(
                                       0xFFFFE6A7,
                                     ).withOpacity(0.18 * _glow.value),
@@ -671,7 +673,7 @@ class _SplashScreenState extends State<_SplashScreen>
                       TextButton(
                         onPressed: _routeAfterSessionCheck,
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFFFE6A7),
+                          foregroundColor: twitchPurple,
                         ),
                         child: Text(
                           'Retry',
@@ -739,11 +741,11 @@ class _SplashDotsLoader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              dot(0, const Color(0xFFFFE6A7)),
+              dot(0, twitchPurple),
               SizedBox(width: 10.w),
-              dot(1, const Color(0xFF00E5FF)),
+              dot(1, kickGreen),
               SizedBox(width: 10.w),
-              dot(2, const Color(0xFF8A5CFF)),
+              dot(2, youtubeRed),
             ],
           ),
         );

@@ -815,7 +815,6 @@ class SettingsBottomsheetColumn extends StatelessWidget {
 
               if (tile["title"] == "LED Notifications" ||
                   openAsBottomSheet != null) {
-                if (openAsBottomSheet != null) Get.back();
                 Get.bottomSheet(
                   Padding(
                     padding: EdgeInsets.only(
@@ -1132,6 +1131,11 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      final selectedPlatform = widget.controller.selectedPlatform.value;
+      final platformAccent =
+          selectedPlatform.toLowerCase() == 'all'
+              ? beige
+              : widget.controller.getPlatformColor(selectedPlatform);
       final account =
           widget.controller.settingsPayload.value?['account'] as Map?;
       final plan = (account?['yourPlan'] ?? 'Free').toString();
@@ -1209,7 +1213,7 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                                 padding: EdgeInsets.symmetric(vertical: 12.h),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: [beige, beige],
+                                    colors: [platformAccent, platformAccent],
                                   ),
                                   borderRadius: BorderRadius.circular(14.r),
                                 ),

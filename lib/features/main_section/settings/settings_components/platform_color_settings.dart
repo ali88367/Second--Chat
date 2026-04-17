@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:ios_color_picker/show_ios_color_picker.dart';
+import 'package:ios_color_picker/custom_picker/color_observer.dart';
+import 'package:ios_color_picker/custom_picker/ios_color_picker.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/localization/l10n.dart';
@@ -23,16 +24,13 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
   Color _selectedColor = const Color(0xFF9146FF); // Twitch purple default
   double _opacity = 1.0;
 
-  // Controller for the color picker
-  final IOSColorPickerController _colorPickerController =
-      IOSColorPickerController();
-
   // PageController for platform buttons scroll
   final PageController _pageController = PageController(viewportFraction: 0.7);
   int _currentPage = 0;
 
   // Selected bottom button (0 for wifi, 1 for settings)
   int _selectedBottomButton = 1; // Initially settings is selected
+  bool _openingPicker = false;
 
   @override
   void initState() {
@@ -40,58 +38,55 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
     // Initialize with Twitch color
     _selectedColor = _controller.twitchColor.value ?? twitchPurple;
 
-    // Listen to page changes
-    _pageController.addListener(() {
-      final page = _pageController.page?.round() ?? 0;
-      if (page != _currentPage) {
-        setState(() {
-          _currentPage = page;
-          // Update selected platform based on page
-          switch (page) {
-            case 0:
-              _selectedPlatform = 'Twitch';
-              _selectedColor = _controller.twitchColor.value ?? twitchPurple;
-              break;
-            case 1:
-              _selectedPlatform = 'Kick';
-              _selectedColor = _controller.kickColor.value ?? kickGreen;
-              break;
-            case 2:
-              _selectedPlatform = 'YouTube';
-              _selectedColor = _controller.youtubeColor.value ?? youtubeRed;
-              break;
-          }
-        });
-      }
+    // Don't mutate reactive state during the initial build of the bottom sheet.
+    // Doing so can cause "setState()/markNeedsBuild called during build" from
+    // Obx listeners higher in the tree.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.setPlatform(_selectedPlatform);
     });
   }
 
   @override
   void dispose() {
-    _colorPickerController.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
   // Function to open the full iOS color picker
-  void _openColorPicker() {
-    _colorPickerController.showIOSCustomColorPicker(
-      context: context,
-      startingColor: _selectedColor.withOpacity(_opacity),
-      onColorChanged: (color) {
-        setState(() {
-          _selectedColor = color.withAlpha(255); // Base color without opacity
-          _opacity = color.opacity; // Extract opacity separately
-          // Save the color for the selected platform
-          _controller.setPlatformColor(_selectedPlatform, _selectedColor);
-        });
-      },
-    );
+  Future<void> _openColorPicker() async {
+    if (_openingPicker) return;
+    _openingPicker = true;
+
+    // Ensure the picker opens on the root navigator (faster + avoids nested-sheet jank).
+    colorController = ColorController(_selectedColor.withOpacity(_opacity));
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black26,
+        isScrollControlled: true,
+        builder: (context) {
+          return IosColorPicker(
+            onColorSelected: (color) {
+              setState(() {
+                _selectedColor = color.withAlpha(255);
+                _opacity = color.opacity;
+              });
+              _controller.setPlatformColor(_selectedPlatform, _selectedColor);
+            },
+          );
+        },
+      );
+    } finally {
+      _openingPicker = false;
+    }
   }
 
   void _selectPlatform(String platform) {
     setState(() {
       _selectedPlatform = platform;
+      _controller.setPlatform(_selectedPlatform);
       // Update color based on selected platform
       switch (platform.toLowerCase()) {
         case 'twitch':
@@ -159,6 +154,30 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
                   child: PageView.builder(
                     controller: _pageController,
                     itemCount: 3,
+                    onPageChanged: (page) {
+                      if (page == _currentPage) return;
+                      setState(() {
+                        _currentPage = page;
+                        switch (page) {
+                          case 0:
+                            _selectedPlatform = 'Twitch';
+                            _selectedColor =
+                                _controller.twitchColor.value ?? twitchPurple;
+                            break;
+                          case 1:
+                            _selectedPlatform = 'Kick';
+                            _selectedColor =
+                                _controller.kickColor.value ?? kickGreen;
+                            break;
+                          case 2:
+                            _selectedPlatform = 'YouTube';
+                            _selectedColor =
+                                _controller.youtubeColor.value ?? youtubeRed;
+                            break;
+                        }
+                        _controller.setPlatform(_selectedPlatform);
+                      });
+                    },
                     itemBuilder: (context, index) {
                       return Padding(
                         padding: EdgeInsets.symmetric(horizontal: 6.w),
@@ -240,6 +259,7 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
 
           // Color Preview + Tap to Open Picker
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: _openColorPicker,
             child: Container(
               margin: EdgeInsets.symmetric(horizontal: 24.w),
@@ -306,18 +326,20 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
                     height: 51.h,
                     margin: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: _selectedBottomButton == 0
-                          ? Color(0xFF2C2C2E)
-                          : Colors.transparent,
+                      color:
+                          _selectedBottomButton == 0
+                              ? Color(0xFF2C2C2E)
+                              : Colors.transparent,
                       borderRadius: BorderRadius.circular(33),
                     ),
                     child: Center(
                       child: Image.asset(
                         wifi_icon,
                         height: 26.h,
-                        color: _selectedBottomButton == 0
-                            ? Color(0xFFFFE6A7) // Gold color when selected
-                            : Colors.white, // White when unselected
+                        color:
+                            _selectedBottomButton == 0
+                                ? Color(0xFFFFE6A7) // Gold color when selected
+                                : Colors.white, // White when unselected
                       ),
                     ),
                   ),
@@ -333,18 +355,20 @@ class _PlatformColorSettingsState extends State<PlatformColorSettings> {
                     height: 51.h,
                     margin: EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: _selectedBottomButton == 1
-                          ? Color(0xFF2C2C2E)
-                          : Colors.transparent,
+                      color:
+                          _selectedBottomButton == 1
+                              ? Color(0xFF2C2C2E)
+                              : Colors.transparent,
                       borderRadius: BorderRadius.circular(33),
                     ),
                     child: Center(
                       child: Image.asset(
                         setting_icon,
                         height: 26.h,
-                        color: _selectedBottomButton == 1
-                            ? Color(0xFFFFE6A7) // Gold color when selected
-                            : Colors.white, // White when unselected
+                        color:
+                            _selectedBottomButton == 1
+                                ? Color(0xFFFFE6A7) // Gold color when selected
+                                : Colors.white, // White when unselected
                       ),
                     ),
                   ),
