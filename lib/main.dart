@@ -16,6 +16,7 @@ import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/core/utils/platform_token_provider.dart';
 import 'package:second_chat/data/services/live_stream_service.dart';
+import 'package:second_chat/data/services/socket_firebase_mirror_service.dart';
 import 'package:second_chat/controllers/edge_glow_notification_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
@@ -31,98 +32,103 @@ import 'core/bootstrap/app_prefetch.dart';
 import 'core/utils/debug_tokens.dart';
 
 void main() {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    try {
-      await Firebase.initializeApp();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint(
-          'Firebase.initializeApp skipped (add Firebase config / flutterfire configure): $e',
-        );
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      try {
+        await Firebase.initializeApp();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint(
+            'Firebase.initializeApp skipped (add Firebase config / flutterfire configure): $e',
+          );
+        }
       }
-    }
-    VideoPlayerController? introVideoController;
+      VideoPlayerController? introVideoController;
 
-    // Lock orientation
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+      // Lock orientation
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
 
-    // System UI style
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-    );
-
-    // Global controllers
-    Get.put(SettingsController());
-    Get.put(EdgeGlowNotificationController(), permanent: true);
-    Get.put(StreamStreaksController());
-    Get.put(AuthController(), permanent: true);
-    Get.put(InviteController(), permanent: true);
-    Get.put(
-      ChatController(
-        liveStreamService: LiveStreamService(
-          api: Get.find<AuthController>().api,
-          tokenProvider: PlatformTokenProvider(),
+      // System UI style
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.white,
+          systemNavigationBarIconBrightness: Brightness.dark,
         ),
-      ),
-      permanent: true,
-    );
-    Get.put(PlatformConnectController(), permanent: true);
+      );
 
-    // Load persisted locale (if any) before building the app.
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final code = prefs.getString(AppConstants.keyLanguage)?.trim();
-      if (code != null && code.isNotEmpty) {
-        Get.updateLocale(Locale(code));
+      // Global controllers
+      Get.put(SettingsController());
+      Get.put(EdgeGlowNotificationController(), permanent: true);
+      Get.put(StreamStreaksController());
+      Get.put(AuthController(), permanent: true);
+      Get.put(InviteController(), permanent: true);
+      Get.put(SocketFirebaseMirrorService(), permanent: true);
+      Get.put(
+        ChatController(
+          liveStreamService: LiveStreamService(
+            api: Get.find<AuthController>().api,
+            tokenProvider: PlatformTokenProvider(),
+          ),
+        ),
+        permanent: true,
+      );
+      Get.put(PlatformConnectController(), permanent: true);
+
+      // Load persisted locale (if any) before building the app.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final code = prefs.getString(AppConstants.keyLanguage)?.trim();
+        if (code != null && code.isNotEmpty) {
+          Get.updateLocale(Locale(code));
+        }
+        final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
+        if (fs != null && fs.isNotEmpty) {
+          try {
+            Get.find<SettingsController>().fontSize.value = fs.toUpperCase();
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      await debugPrintTokensOnce();
+
+      // Pre-initialize intro video so first screen does not show a loader.
+      try {
+        introVideoController = VideoPlayerController.asset('assets/intro.mp4');
+        await introVideoController.initialize();
+        introVideoController
+          ..setLooping(true)
+          ..setVolume(0);
+      } catch (_) {
+        await introVideoController?.dispose();
+        introVideoController = null;
       }
-      final fs = prefs.getString(AppConstants.keyFontSize)?.trim();
-      if (fs != null && fs.isNotEmpty) {
-        try {
-          Get.find<SettingsController>().fontSize.value = fs.toUpperCase();
-        } catch (_) {}
+
+      runApp(MyApp(introVideoController: introVideoController));
+    },
+    (Object error, StackTrace stack) {
+      // Ignore known WebView teardown race:
+      // "Unable to establish connection on channel: PigeonInternalInstanceManager.removeStrongReference"
+      // and similar WKWebView plugin channel messages.
+      if (error is PlatformException &&
+          error.message != null &&
+          (error.message!.contains(
+                'PigeonInternalInstanceManager.removeStrongReference',
+              ) ||
+              error.message!.contains('PigeonInternalInstanceManager.clear') ||
+              error.message!.contains('WKWebViewConfiguration'))) {
+        return;
       }
-    } catch (_) {}
-
-    await debugPrintTokensOnce();
-
-    // Pre-initialize intro video so first screen does not show a loader.
-    try {
-      introVideoController = VideoPlayerController.asset('assets/intro.mp4');
-      await introVideoController.initialize();
-      introVideoController
-        ..setLooping(true)
-        ..setVolume(0);
-    } catch (_) {
-      await introVideoController?.dispose();
-      introVideoController = null;
-    }
-
-    runApp(MyApp(introVideoController: introVideoController));
-  }, (Object error, StackTrace stack) {
-    // Ignore known WebView teardown race:
-    // "Unable to establish connection on channel: PigeonInternalInstanceManager.removeStrongReference"
-    // and similar WKWebView plugin channel messages.
-    if (error is PlatformException &&
-        error.message != null &&
-        (error.message!.contains(
-                'PigeonInternalInstanceManager.removeStrongReference') ||
-            error.message!.contains('PigeonInternalInstanceManager.clear') ||
-            error.message!.contains('WKWebViewConfiguration'))) {
-      return;
-    }
-    FlutterError.reportError(
-      FlutterErrorDetails(exception: error, stack: stack),
-    );
-  });
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stack),
+      );
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -372,25 +378,33 @@ class _SplashScreenState extends State<_SplashScreen>
   );
   late final Animation<double> _popScale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween<double>(begin: 0.82, end: 1.08)
-          .chain(CurveTween(curve: Curves.easeOutBack)),
+      tween: Tween<double>(
+        begin: 0.82,
+        end: 1.08,
+      ).chain(CurveTween(curve: Curves.easeOutBack)),
       weight: 70,
     ),
     TweenSequenceItem(
-      tween: Tween<double>(begin: 1.08, end: 1.0)
-          .chain(CurveTween(curve: Curves.easeInOut)),
+      tween: Tween<double>(
+        begin: 1.08,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeInOut)),
       weight: 30,
     ),
   ]).animate(_anim);
   late final Animation<double> _logoScale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween<double>(begin: 0.9, end: 1.04)
-          .chain(CurveTween(curve: Curves.easeOutBack)),
+      tween: Tween<double>(
+        begin: 0.9,
+        end: 1.04,
+      ).chain(CurveTween(curve: Curves.easeOutBack)),
       weight: 70,
     ),
     TweenSequenceItem(
-      tween: Tween<double>(begin: 1.04, end: 1.0)
-          .chain(CurveTween(curve: Curves.easeInOut)),
+      tween: Tween<double>(
+        begin: 1.04,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeInOut)),
       weight: 30,
     ),
   ]).animate(CurvedAnimation(parent: _anim, curve: const Interval(0.15, 1.0)));
@@ -398,8 +412,10 @@ class _SplashScreenState extends State<_SplashScreen>
     begin: const Offset(0, 0.2),
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
-  late final Animation<double> _glow = Tween<double>(begin: 0.0, end: 1.0)
-      .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+  late final Animation<double> _glow = Tween<double>(
+    begin: 0.0,
+    end: 1.0,
+  ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
   @override
   void initState() {
     super.initState();
@@ -472,7 +488,7 @@ class _SplashScreenState extends State<_SplashScreen>
 
       final anyLive =
           chat.platformLive.values.any((v) => v == true) ||
-              (chat.overview.value?.live == true);
+          (chat.overview.value?.live == true);
       if (anyLive) {
         Get.offAll(() => const Livestreaming());
         return;
@@ -493,10 +509,7 @@ class _SplashScreenState extends State<_SplashScreen>
           gradient: RadialGradient(
             center: Alignment(0, -0.2),
             radius: 1.1,
-            colors: [
-              Color(0xFF1B1B25),
-              Color(0xFF0A0A0A),
-            ],
+            colors: [Color(0xFF1B1B25), Color(0xFF0A0A0A)],
           ),
         ),
         child: Stack(
@@ -519,10 +532,7 @@ class _SplashScreenState extends State<_SplashScreen>
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
-                              colors: [
-                                Color(0xFF8A5CFF),
-                                Colors.transparent,
-                              ],
+                              colors: [Color(0xFF8A5CFF), Colors.transparent],
                             ),
                           ),
                         ),
@@ -539,10 +549,7 @@ class _SplashScreenState extends State<_SplashScreen>
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
-                              colors: [
-                                Color(0xFFFFE6A7),
-                                Colors.transparent,
-                              ],
+                              colors: [Color(0xFFFFE6A7), Colors.transparent],
                             ),
                           ),
                         ),
@@ -559,10 +566,7 @@ class _SplashScreenState extends State<_SplashScreen>
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
-                              colors: [
-                                Color(0xFF00E5FF),
-                                Colors.transparent,
-                              ],
+                              colors: [Color(0xFF00E5FF), Colors.transparent],
                             ),
                           ),
                         ),
@@ -589,8 +593,9 @@ class _SplashScreenState extends State<_SplashScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFFFE6A7)
-                                        .withOpacity(0.18 * _glow.value),
+                                    color: const Color(
+                                      0xFFFFE6A7,
+                                    ).withOpacity(0.18 * _glow.value),
                                     blurRadius: 28 * _glow.value,
                                     spreadRadius: 6 * _glow.value,
                                   ),

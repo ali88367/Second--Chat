@@ -11,6 +11,7 @@ import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/streaming_overview.dart';
 import '../data/services/live_stream_service.dart';
+import '../data/services/socket_firebase_mirror_service.dart';
 import '../api/auth/google_sign_in_service.dart';
 
 class ChatController extends GetxController {
@@ -29,6 +30,7 @@ class ChatController extends GetxController {
   final EdgeGlowNotificationController _edgeGlow =
       Get.find<EdgeGlowNotificationController>();
   final LiveStreamService _live;
+  late final SocketFirebaseMirrorService _firebaseMirror;
 
   final RxString platform = 'twitch'.obs;
 
@@ -130,6 +132,7 @@ class ChatController extends GetxController {
     while (socketInboundLog.length > _socketInboundLogMax) {
       socketInboundLog.removeLast();
     }
+    _mirrorCurrentPlatformSnapshot(event: eventName);
   }
 
   /// Backend session JWT (same as [AuthInterceptor]) + platform tokens for overview/socket.
@@ -198,6 +201,11 @@ class ChatController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _firebaseMirror =
+        Get.isRegistered<SocketFirebaseMirrorService>()
+            ? Get.find<SocketFirebaseMirrorService>()
+            : Get.put(SocketFirebaseMirrorService(), permanent: true);
+    _mirrorCurrentPlatformSnapshot(event: 'app:init');
     _wireServiceCallbacks();
     _scheduleBootstrapAfterAuth();
     ever<String>(platform, (p) {
@@ -464,6 +472,8 @@ class ChatController extends GetxController {
         }
       }
       if (mergedEmbed.isNotEmpty) platformEmbedUrls.assignAll(mergedEmbed);
+      // Platforms disconnected from account must stop instantly (dispose player + no stream state).
+      await _enforceDisconnectedPlatformsOffline();
       if (mergedUsernames.isNotEmpty) {
         for (final e in mergedUsernames.entries) {
           final v = e.value?.trim() ?? '';
@@ -471,6 +481,7 @@ class ChatController extends GetxController {
         }
         platformChatUsernames.refresh();
       }
+      _mirrorCurrentPlatformSnapshot(event: 'rest:overview_multi');
 
       // Update currently selected stream URL.
       final currentUrl = mergedEmbed[current] ?? primary.watchUrl;
@@ -590,6 +601,7 @@ class ChatController extends GetxController {
             _bumpScroll();
           }
         }
+        await _enforceDisconnectedPlatformsOffline();
         _logStreamSnapshot('rest:overview_platform_multi_preview');
         return;
       }
@@ -649,6 +661,8 @@ class ChatController extends GetxController {
           _bumpScroll();
         }
       }
+      await _enforceDisconnectedPlatformsOffline();
+      _mirrorCurrentPlatformSnapshot(event: 'rest:overview_single');
       _logStreamSnapshot('rest:overview_platform');
     } catch (_) {}
   }
@@ -683,6 +697,7 @@ class ChatController extends GetxController {
     String key,
     bool nextLive, {
     required String source,
+    bool forceOffline = false,
   }) {
     final platformKey = _normalizedApiPlatform(key);
     if (platformKey.isEmpty) return;
@@ -704,6 +719,20 @@ class ChatController extends GetxController {
     }
 
     final wasLive = platformLive[platformKey] == true;
+    if (forceOffline) {
+      _pendingOfflineTimers.remove(platformKey)?.cancel();
+      _pendingOfflineVotes[platformKey] = 0;
+      platformLive[platformKey] = false;
+      platformLive.refresh();
+      if (selected == platformKey) {
+        isLive.value = false;
+        watchUrl.value = '';
+        platformMessages[platformKey] = const <ChatMessage>[];
+        messages.clear();
+        _bumpScroll();
+      }
+      return;
+    }
     if (!wasLive) {
       platformLive[platformKey] = false;
       platformLive.refresh();
@@ -763,6 +792,44 @@ class ChatController extends GetxController {
     });
   }
 
+  Future<void> _enforceDisconnectedPlatformsOffline() async {
+    final connectedRaw = await _tokenProvider.getConnectedPlatforms();
+    final connected =
+        connectedRaw
+            .map((e) => _normalizedApiPlatform(e, fallback: ''))
+            .where((e) => e.isNotEmpty)
+            .toSet();
+
+    for (final pKey in const <String>['twitch', 'kick', 'youtube']) {
+      if (connected.contains(pKey)) continue;
+      platformViewerCounts.remove(pKey);
+      platformEmbedUrls.remove(pKey);
+      platformMessages[pKey] = const <ChatMessage>[];
+      _setPlatformLiveStable(
+        pKey,
+        false,
+        source: 'token_store:platform_disconnected',
+        forceOffline: true,
+      );
+    }
+  }
+
+  /// Immediate UI/runtime hard-stop when a platform is explicitly disconnected by user action.
+  /// This mirrors "live ended" behavior but applies instantly on disconnect confirmation.
+  void forcePlatformDisconnected(String platformKey) {
+    final key = _normalizedApiPlatform(platformKey, fallback: '');
+    if (key.isEmpty) return;
+    platformViewerCounts.remove(key);
+    platformEmbedUrls.remove(key);
+    platformMessages[key] = const <ChatMessage>[];
+    _setPlatformLiveStable(
+      key,
+      false,
+      source: 'manual:settings_disconnect',
+      forceOffline: true,
+    );
+  }
+
   String? urlForPlatform(String p) {
     final key = _normalizedApiPlatform(p);
     if (key.isEmpty) return null;
@@ -799,29 +866,43 @@ class ChatController extends GetxController {
     _socketAuthToken = token.trim();
 
     _purgeStalePendingEchoes();
+    final localIds = <String>[];
+    final nowUtc = DateTime.now().toUtc();
+    final optimisticTargets = <String>[];
+    if (isAllTarget) {
+      for (final p in const <String>['twitch', 'kick', 'youtube']) {
+        if (platformLive[p] == true) {
+          optimisticTargets.add(p);
+        }
+      }
+      if (optimisticTargets.isEmpty) {
+        optimisticTargets.add(tokenPlatform);
+      }
+    } else {
+      optimisticTargets.add(apiPlatform);
+    }
 
-    final localId = 'local:${DateTime.now().microsecondsSinceEpoch}';
-    _pendingLocalChatEchoes.add(
-      _PendingLocalChatEcho(
-        platform: isAllTarget ? tokenPlatform : apiPlatform,
-        normalizedText: msg.toLowerCase(),
-        localMessageId: localId,
-        createdAt: DateTime.now().toUtc(),
-      ),
-    );
-
-    final optimistic = ChatMessage(
-      platform: isAllTarget ? tokenPlatform : apiPlatform,
-      userName: _outgoingChatDisplayName(),
-      message: msg,
-      timestamp: DateTime.now().toUtc(),
-      id: localId,
-      raw: const <String, dynamic>{},
-    );
-    _appendAndSortPlatformMessages(
-      isAllTarget ? tokenPlatform : apiPlatform,
-      optimistic,
-    );
+    for (final p in optimisticTargets) {
+      final localId = 'local:$p:${DateTime.now().microsecondsSinceEpoch}';
+      localIds.add(localId);
+      _pendingLocalChatEchoes.add(
+        _PendingLocalChatEcho(
+          platform: p,
+          normalizedText: msg.toLowerCase(),
+          localMessageId: localId,
+          createdAt: nowUtc,
+        ),
+      );
+      final optimistic = ChatMessage(
+        platform: p,
+        userName: _outgoingChatDisplayNameForPlatform(p),
+        message: msg,
+        timestamp: nowUtc,
+        id: localId,
+        raw: const <String, dynamic>{},
+      );
+      _appendAndSortPlatformMessages(p, optimistic);
+    }
 
     try {
       await _live.sendMessage(
@@ -831,14 +912,20 @@ class ChatController extends GetxController {
       );
     } catch (_) {
       // Drop optimistic row if send fails.
-      _pendingLocalChatEchoes.removeWhere((e) => e.localMessageId == localId);
-      _removeMessageById(isAllTarget ? tokenPlatform : apiPlatform, localId);
+      _pendingLocalChatEchoes.removeWhere(
+        (e) => localIds.contains(e.localMessageId),
+      );
+      for (var i = 0; i < optimisticTargets.length; i++) {
+        final p = optimisticTargets[i];
+        if (i >= localIds.length) break;
+        _removeMessageById(p, localIds[i]);
+      }
     }
     _bumpScroll();
   }
 
-  String _outgoingChatDisplayName() {
-    final p = _normalizedApiPlatform(platform.value, fallback: 'twitch');
+  String _outgoingChatDisplayNameForPlatform(String platformKey) {
+    final p = _normalizedApiPlatform(platformKey, fallback: 'twitch');
     final fromOverview = platformChatUsernames[p];
     if (fromOverview != null && fromOverview.trim().isNotEmpty) {
       return fromOverview.trim();
@@ -1639,6 +1726,7 @@ class ChatController extends GetxController {
     _live.onSocketInbound = _appendSocketInboundLog;
     _live.onSocketConnected = () {
       isConnected.value = true;
+      _mirrorCurrentPlatformSnapshot(event: 'socket:connect');
       final selected = _normalizedApiPlatform(
         platform.value,
         fallback: 'twitch',
@@ -1650,6 +1738,7 @@ class ChatController extends GetxController {
     };
     _live.onSocketDisconnected = (_) {
       isConnected.value = false;
+      _mirrorCurrentPlatformSnapshot(event: 'socket:disconnect');
     };
     _live.onSocketError = (m) async {
       final msg = (m['message'] ?? '').toString();
@@ -1677,6 +1766,13 @@ class ChatController extends GetxController {
           '[SC_STREAM_DETAILS] viewer_count:update platform=$key count=$vc',
         );
       }
+      _firebaseMirror.updatePlatformSnapshot(
+        platform: key,
+        viewerCount: vc,
+        socketConnectedInApp: isConnected.value,
+        accountConnected: _isAccountConnected(key),
+        latestEvent: 'viewer_count:update',
+      );
     };
     _live.onLiveUpdate = (p, live) {
       final key = _normalizedApiPlatform(p);
@@ -1694,6 +1790,13 @@ class ChatController extends GetxController {
         if (u != null && u.trim().isNotEmpty) watchUrl.value = u;
         unawaited(_ensureChatForLivePlatform(selected));
       }
+      _firebaseMirror.updatePlatformSnapshot(
+        platform: key,
+        live: platformLive[key] == true,
+        socketConnectedInApp: isConnected.value,
+        accountConnected: _isAccountConnected(key),
+        latestEvent: 'live:update',
+      );
       _logStreamSnapshot('socket:live_state');
     };
     _live.onPlayerUrlUpdate = (p, url) {
@@ -1714,6 +1817,12 @@ class ChatController extends GetxController {
         watchUrl.value = url;
         isLive.value = true;
       }
+      _firebaseMirror.updatePlatformSnapshot(
+        platform: key,
+        socketConnectedInApp: isConnected.value,
+        accountConnected: _isAccountConnected(key),
+        latestEvent: 'player_url:update',
+      );
       _logStreamSnapshot('socket:player_url');
     };
     _live.onActivitySync = (events) {
@@ -1749,10 +1858,21 @@ class ChatController extends GetxController {
       final title = (meta?['title'] ?? m['title'])?.toString().trim();
       final category = (meta?['category'] ?? m['category'])?.toString().trim();
       if (title != null && title.isNotEmpty) streamTitleByPlatform[p] = title;
-      if (category != null && category.isNotEmpty)
+      if (category != null && category.isNotEmpty) {
         streamCategoryByPlatform[p] = category;
+      }
       streamTitleByPlatform.refresh();
       streamCategoryByPlatform.refresh();
+      _firebaseMirror.updatePlatformSnapshot(
+        platform: p,
+        live: platformLive[p] == true,
+        viewerCount: platformViewerCounts[p],
+        title: streamTitleByPlatform[p] ?? '',
+        category: streamCategoryByPlatform[p] ?? '',
+        socketConnectedInApp: isConnected.value,
+        accountConnected: _isAccountConnected(p),
+        latestEvent: 'stream_meta:update',
+      );
       _logStreamSnapshot('socket:stream_meta');
     }
 
@@ -1806,6 +1926,27 @@ class ChatController extends GetxController {
       if (kDebugMode) {
         debugPrint('[ChatController] selectPlatformInstant failed: $e');
       }
+    }
+  }
+
+  bool _isAccountConnected(String platformKey) {
+    final key = _normalizedApiPlatform(platformKey, fallback: '');
+    if (key.isEmpty) return false;
+    return platformChatUsernames[key]?.trim().isNotEmpty == true;
+  }
+
+  void _mirrorCurrentPlatformSnapshot({required String event}) {
+    for (final p in const <String>['twitch', 'kick', 'youtube']) {
+      _firebaseMirror.updatePlatformSnapshot(
+        platform: p,
+        live: platformLive[p] == true,
+        viewerCount: platformViewerCounts[p],
+        title: streamTitleByPlatform[p] ?? '',
+        category: streamCategoryByPlatform[p] ?? '',
+        socketConnectedInApp: isConnected.value,
+        accountConnected: _isAccountConnected(p),
+        latestEvent: event,
+      );
     }
   }
 

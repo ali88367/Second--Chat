@@ -1076,7 +1076,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                             final filteredList = _getFilteredComments(filter);
                             return ListView.builder(
                               key: ValueKey(
-                                'expanded_chat_${filteredList.length}_${filter ?? 'all'}',
+                                'expanded_chat_${filter ?? 'all'}',
                               ),
                               controller: _expandedScrollController,
                               padding: EdgeInsets.only(bottom: 16.h + 20.h),
@@ -1355,7 +1355,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                             duration: const Duration(milliseconds: 100),
                             child: ListView.builder(
                               key: ValueKey(
-                                'main_chat_${filteredList.length}_${filter ?? 'all'}',
+                                'main_chat_${filter ?? 'all'}',
                               ),
                               controller: _mainScrollController,
                               padding: EdgeInsets.only(

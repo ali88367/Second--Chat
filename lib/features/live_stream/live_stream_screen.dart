@@ -1119,6 +1119,8 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                       ? LiveStreamMultiEmbedGrid(
                                                                         streamPreviewHeight:
                                                                             streamPreviewHeight,
+                                                                        globalMuted:
+                                                                            showCard || showActivity,
                                                                         onStreamReady: (
                                                                           platformKey,
                                                                           runningUrl,
@@ -1137,6 +1139,8 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                       : LiveStreamSingleEmbedStack(
                                                                         streamPreviewHeight:
                                                                             streamPreviewHeight,
+                                                                        globalMuted:
+                                                                            showCard || showActivity,
                                                                         onStreamReady: (
                                                                           platformKey,
                                                                           runningUrl,

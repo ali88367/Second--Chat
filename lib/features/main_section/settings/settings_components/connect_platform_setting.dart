@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/core/constants/app_images/app_images.dart';
 import 'package:second_chat/core/localization/l10n.dart';
@@ -280,6 +281,11 @@ Future<void> _handlePlatformTap(
 
   final ok = await ctrl.disconnect(provider);
   if (ok) {
+    try {
+      if (Get.isRegistered<ChatController>()) {
+        Get.find<ChatController>().forcePlatformDisconnected(provider.name);
+      }
+    } catch (_) {}
     await _refreshSettingsPayload();
     Get.snackbar(
       context.l10n.disconnected,

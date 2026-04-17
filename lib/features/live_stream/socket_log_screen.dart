@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -18,6 +20,76 @@ bool _isChatMessageLog(String line) {
   return ev == 'chat:message';
 }
 
+String? _parseSocketLogPayloadText(String line) {
+  final first = line.indexOf(' | ');
+  if (first == -1) return null;
+  final second = line.indexOf(' | ', first + 1);
+  if (second == -1) return null;
+  final payload = line.substring(second + 3).trim();
+  return payload.isEmpty ? null : payload;
+}
+
+Map<String, dynamic>? _parseSocketLogPayloadMap(String line) {
+  final payloadText = _parseSocketLogPayloadText(line);
+  if (payloadText == null || payloadText.isEmpty) return null;
+  try {
+    final decoded = jsonDecode(payloadText);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return decoded.cast<String, dynamic>();
+  } catch (_) {}
+  return null;
+}
+
+String? _normalizedPlatformFromPayload(Map<String, dynamic>? payload) {
+  if (payload == null) return null;
+  final raw = (payload['platform'] ?? '').toString().toLowerCase().trim();
+  if (raw.isEmpty) return null;
+  if (raw.contains('twitch')) return 'twitch';
+  if (raw.contains('kick')) return 'kick';
+  if (raw.contains('youtube') || raw == 'yt' || raw.contains('google')) {
+    return 'youtube';
+  }
+  return raw;
+}
+
+class _SocketLiveHitStats {
+  const _SocketLiveHitStats({
+    required this.total,
+    required this.byPlatform,
+  });
+
+  final int total;
+  final Map<String, int> byPlatform;
+}
+
+_SocketLiveHitStats _computeSocketLiveHitStats(List<String> lines) {
+  var total = 0;
+  final byPlatform = <String, int>{
+    'twitch': 0,
+    'kick': 0,
+    'youtube': 0,
+  };
+
+  for (final line in lines) {
+    final ev = _parseSocketLogEventName(line)?.toLowerCase().trim() ?? '';
+    if (ev.isEmpty) continue;
+    if (ev != 'stream:status' && ev != 'stream:live' && ev != 'stream:info:update') {
+      continue;
+    }
+    final payload = _parseSocketLogPayloadMap(line);
+    final hasLiveFlag = payload?['live'] is bool;
+    if (!hasLiveFlag && ev != 'stream:live') continue;
+
+    total++;
+    final p = _normalizedPlatformFromPayload(payload);
+    if (p != null && byPlatform.containsKey(p)) {
+      byPlatform[p] = (byPlatform[p] ?? 0) + 1;
+    }
+  }
+
+  return _SocketLiveHitStats(total: total, byPlatform: byPlatform);
+}
+
 /// Live debug log: **chat:message socket** connection status at top; list shows only
 /// inbound `chat:message` lines ([ChatController.socketInboundLog]).
 class SocketLogScreen extends StatefulWidget {
@@ -30,6 +102,7 @@ class SocketLogScreen extends StatefulWidget {
 class _SocketLogScreenState extends State<SocketLogScreen> {
   final TextEditingController _search = TextEditingController();
   final RxString _searchRx = ''.obs;
+  static const List<String> _platforms = <String>['twitch', 'kick', 'youtube'];
 
   @override
   void initState() {
@@ -71,6 +144,30 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _platformStateChip({
+    required String text,
+    required bool positive,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: positive ? const Color(0x2222C55E) : const Color(0x22EF4444),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: positive ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: positive ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -212,6 +309,148 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
                             fontSize: 10.sp,
                             height: 1.35,
                           ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 8.h),
+            child: Obx(() {
+              chat.isConnected.value;
+              chat.platformLive.length;
+              chat.platformViewerCounts.length;
+              chat.platformEmbedUrls.length;
+
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF15161A),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: const Color(0xFF2F3240)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Platform Socket Status',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.sp,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      DataTable(
+                        headingRowHeight: 28.h,
+                        dataRowMinHeight: 34.h,
+                        dataRowMaxHeight: 38.h,
+                        columnSpacing: 14.w,
+                        columns: const [
+                          DataColumn(label: Text('Platform')),
+                          DataColumn(label: Text('Connection')),
+                          DataColumn(label: Text('Live')),
+                          DataColumn(label: Text('Viewers')),
+                        ],
+                        rows: [
+                          for (final p in _platforms)
+                            () {
+                              final key = p.toLowerCase();
+                              final hasSignal = chat.platformLive.containsKey(key) ||
+                                  chat.platformViewerCounts.containsKey(key) ||
+                                  ((chat.platformEmbedUrls[key] ?? '').trim().isNotEmpty);
+                              final connected = chat.isConnected.value && hasSignal;
+                              final live = chat.platformLive[key] == true;
+                              final viewers = chat.platformViewerCounts[key];
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    Text(
+                                      key[0].toUpperCase() + key.substring(1),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12.sp,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    _platformStateChip(
+                                      text: connected ? 'Connected' : 'Idle',
+                                      positive: connected,
+                                    ),
+                                  ),
+                                  DataCell(
+                                    _platformStateChip(
+                                      text: live ? 'True' : 'False',
+                                      positive: live,
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      viewers?.toString() ?? '—',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12.sp,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }(),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 8.h),
+            child: Obx(() {
+              final stats = _computeSocketLiveHitStats(chat.socketInboundLog);
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF12131A),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: const Color(0xFF2B3152)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Live Status Socket Hit Count',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.sp,
+                        ),
+                      ),
+                      SizedBox(height: 6.h),
+                      Text(
+                        'Total hits: ${stats.total}',
+                        style: TextStyle(
+                          color: const Color(0xFF93C5FD),
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Twitch: ${stats.byPlatform['twitch'] ?? 0}  ·  '
+                        'Kick: ${stats.byPlatform['kick'] ?? 0}  ·  '
+                        'YouTube: ${stats.byPlatform['youtube'] ?? 0}',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12.sp,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ],

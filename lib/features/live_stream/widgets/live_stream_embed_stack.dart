@@ -14,6 +14,7 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
     required this.platformKey,
     required this.height,
     required this.muted,
+    required this.globalMuted,
     required this.streamViewKey,
     this.onStreamReady,
   });
@@ -21,6 +22,7 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
   final String platformKey;
   final double height;
   final bool muted;
+  final bool globalMuted;
   final Key streamViewKey;
   final void Function(String platformKey, String runningUrl)? onStreamReady;
 
@@ -30,6 +32,25 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
 
 class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
   String _latchedEmbedUrl = '';
+  int _sessionNonce = 0;
+
+  Widget _buildNoStreamState() {
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.videocam_off, color: Colors.white38, size: 42),
+          SizedBox(height: 8),
+          Text(
+            'No stream at the moment',
+            style: TextStyle(color: Colors.white54),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,18 +69,27 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
         _latchedEmbedUrl = '';
       }
 
-      // Keep last good URL latched to avoid Kick disconnect churn on brief status races.
+      if (!liveExpected) {
+        // Explicit offline state: dispose active webview session immediately.
+        if (_latchedEmbedUrl.isNotEmpty) {
+          _latchedEmbedUrl = '';
+          _sessionNonce++;
+        }
+        return RepaintBoundary(child: _buildNoStreamState());
+      }
+
+      // Live state: keep last good URL latched; initialize webview once per live session.
       final webUrl = _latchedEmbedUrl;
       return RepaintBoundary(
         child: StreamWebView(
-          key: widget.streamViewKey,
+          key: ValueKey('${widget.streamViewKey}_$_sessionNonce'),
           url: webUrl,
           height: widget.height,
           cacheKey: widget.platformKey,
           onStreamReady: (runningUrl) {
             widget.onStreamReady?.call(widget.platformKey, runningUrl);
           },
-          muted: widget.muted,
+          muted: widget.muted || widget.globalMuted,
           streamExpectedLive: liveExpected,
         ),
       );
@@ -73,10 +103,12 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
   const LiveStreamSingleEmbedStack({
     super.key,
     required this.streamPreviewHeight,
+    this.globalMuted = false,
     this.onStreamReady,
   });
 
   final double streamPreviewHeight;
+  final bool globalMuted;
   final void Function(String platformKey, String runningUrl)? onStreamReady;
 
   static const _platforms = <String>['twitch', 'kick', 'youtube'];
@@ -104,6 +136,7 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
                 platformKey: _platforms[i],
                 height: streamPreviewHeight,
                 muted: i != index,
+                globalMuted: globalMuted,
                 streamViewKey: ValueKey('stream_single_${_platforms[i]}'),
                 onStreamReady: onStreamReady,
               ),
@@ -119,10 +152,12 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
   const LiveStreamMultiEmbedGrid({
     super.key,
     required this.streamPreviewHeight,
+    this.globalMuted = false,
     this.onStreamReady,
   });
 
   final double streamPreviewHeight;
+  final bool globalMuted;
   final void Function(String platformKey, String runningUrl)? onStreamReady;
 
   static const _platforms = <String>['twitch', 'kick', 'youtube'];
@@ -144,6 +179,7 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
           platformKey: platform,
           height: height,
           muted: false,
+          globalMuted: globalMuted,
           streamViewKey: ValueKey('stream_$platform'),
           onStreamReady: onStreamReady,
         ),
