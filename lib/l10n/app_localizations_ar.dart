@@ -604,4 +604,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String profileWeekProgress(int completed, int target) {
     return '$completed من $target أيام';
   }
+
+  @override
+  String get ledMilestoneInterval => 'فاصل المعالم';
+
+  @override
+  String ledMilestoneIntervalValue(Object count) {
+    return 'كل $count مشتركين';
+  }
+
+  @override
+  String get ledMilestoneCustom => 'عدد مشتركين مخصص';
+
+  @override
+  String get ledCustomMilestoneTitle => 'معلم مخصص';
+
+  @override
+  String get ledCustomMilestoneSubtitle =>
+      'اختر عدد المشتركين بين كل إشعار LED (0–1000).';
 }

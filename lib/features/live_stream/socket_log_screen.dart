@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -17,81 +15,14 @@ String? _parseSocketLogEventName(String line) {
 
 bool _isChatMessageLog(String line) {
   final ev = _parseSocketLogEventName(line);
-  return ev == 'chat:message';
+  if (ev == null || ev.isEmpty) return false;
+  // Inbound `chat:message` payloads, parse failures, and connection snapshot for this socket.
+  return ev == 'chat:message' ||
+      ev == 'CHAT_MESSAGE_SOCKET' ||
+      ev.startsWith('chat:message:');
 }
 
-String? _parseSocketLogPayloadText(String line) {
-  final first = line.indexOf(' | ');
-  if (first == -1) return null;
-  final second = line.indexOf(' | ', first + 1);
-  if (second == -1) return null;
-  final payload = line.substring(second + 3).trim();
-  return payload.isEmpty ? null : payload;
-}
-
-Map<String, dynamic>? _parseSocketLogPayloadMap(String line) {
-  final payloadText = _parseSocketLogPayloadText(line);
-  if (payloadText == null || payloadText.isEmpty) return null;
-  try {
-    final decoded = jsonDecode(payloadText);
-    if (decoded is Map<String, dynamic>) return decoded;
-    if (decoded is Map) return decoded.cast<String, dynamic>();
-  } catch (_) {}
-  return null;
-}
-
-String? _normalizedPlatformFromPayload(Map<String, dynamic>? payload) {
-  if (payload == null) return null;
-  final raw = (payload['platform'] ?? '').toString().toLowerCase().trim();
-  if (raw.isEmpty) return null;
-  if (raw.contains('twitch')) return 'twitch';
-  if (raw.contains('kick')) return 'kick';
-  if (raw.contains('youtube') || raw == 'yt' || raw.contains('google')) {
-    return 'youtube';
-  }
-  return raw;
-}
-
-class _SocketLiveHitStats {
-  const _SocketLiveHitStats({
-    required this.total,
-    required this.byPlatform,
-  });
-
-  final int total;
-  final Map<String, int> byPlatform;
-}
-
-_SocketLiveHitStats _computeSocketLiveHitStats(List<String> lines) {
-  var total = 0;
-  final byPlatform = <String, int>{
-    'twitch': 0,
-    'kick': 0,
-    'youtube': 0,
-  };
-
-  for (final line in lines) {
-    final ev = _parseSocketLogEventName(line)?.toLowerCase().trim() ?? '';
-    if (ev.isEmpty) continue;
-    if (ev != 'stream:status' && ev != 'stream:live' && ev != 'stream:info:update') {
-      continue;
-    }
-    final payload = _parseSocketLogPayloadMap(line);
-    final hasLiveFlag = payload?['live'] is bool;
-    if (!hasLiveFlag && ev != 'stream:live') continue;
-
-    total++;
-    final p = _normalizedPlatformFromPayload(payload);
-    if (p != null && byPlatform.containsKey(p)) {
-      byPlatform[p] = (byPlatform[p] ?? 0) + 1;
-    }
-  }
-
-  return _SocketLiveHitStats(total: total, byPlatform: byPlatform);
-}
-
-/// Live debug log: **chat:message socket** connection status at top; list shows only
-/// inbound `chat:message` lines ([ChatController.socketInboundLog]).
+/// Live debug log showing only inbound `chat:message` lines.
 class SocketLogScreen extends StatefulWidget {
   const SocketLogScreen({super.key});
 
@@ -100,10 +31,6 @@ class SocketLogScreen extends StatefulWidget {
 }
 
 class _SocketLogScreenState extends State<SocketLogScreen> {
-  final TextEditingController _search = TextEditingController();
-  final RxString _searchRx = ''.obs;
-  static const List<String> _platforms = <String>['twitch', 'kick', 'youtube'];
-
   @override
   void initState() {
     super.initState();
@@ -111,65 +38,6 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
       if (!mounted) return;
       Get.find<ChatController>().appendChatMessageSocketConnectionToLog();
     });
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  Widget _socketDetailRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 6.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 112.w,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.white54, fontSize: 11.sp),
-            ),
-          ),
-          Expanded(
-            child: SelectableText(
-              value,
-              style: TextStyle(
-                color: const Color(0xFF9AE6B4),
-                fontSize: 11.sp,
-                fontFamily: 'monospace',
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _platformStateChip({
-    required String text,
-    required bool positive,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: positive ? const Color(0x2222C55E) : const Color(0x22EF4444),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: positive ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
-        ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: positive ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
-          fontSize: 11.sp,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 
   @override
@@ -181,7 +49,7 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1C1C1E),
         foregroundColor: Colors.white,
-        title: Text('Chat & activity log', style: TextStyle(fontSize: 17.sp)),
+        title: Text('Socket chat logs', style: TextStyle(fontSize: 17.sp)),
         actions: [
           TextButton(
             onPressed: () {
@@ -197,340 +65,40 @@ class _SocketLogScreenState extends State<SocketLogScreen> {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(12.w, 8.h, 12.w, 6.h),
-            child: Obx(() {
-              chat.isConnected.value;
-              chat.platform.value;
-              final d = chat.chatMessageSocketConnectionDetails;
-              final connected = d['transport_connected'] == true;
-              return DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF121A14),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: const Color(0xFF2D5A3D)),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.forum_outlined,
-                            color: const Color(0xFF68D391),
-                            size: 20.sp,
-                          ),
-                          SizedBox(width: 8.w),
-                          Expanded(
-                            child: Text(
-                              'chat:message socket (Socket.IO)',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13.sp,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () =>
-                                chat.appendChatMessageSocketConnectionToLog(),
-                            child: Text(
-                              'Log line',
-                              style: TextStyle(fontSize: 12.sp),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 6.h),
-                      Text(
-                        '${d['api_doc_reference']}',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10.sp,
-                          height: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 10.h),
-                      _socketDetailRow(
-                        '§5 Connection',
-                        'transports: ${d['transports']}',
-                      ),
-                      _socketDetailRow(
-                        'Auth (handshake)',
-                        '${d['handshake_auth']}\n${d['handshake_header']}',
-                      ),
-                      _socketDetailRow(
-                        'Token fingerprint',
-                        '${d['access_token_fingerprint']}',
-                      ),
-                      _socketDetailRow('Base URL', '${d['base_url']}'),
-                      _socketDetailRow(
-                        'Socket.IO path',
-                        '${d['socket_io_path']}',
-                      ),
-                      _socketDetailRow(
-                        'Transport',
-                        connected ? 'connected' : 'disconnected',
-                      ),
-                      _socketDetailRow(
-                        'Session id',
-                        '${d['socket_io_session_id']}',
-                      ),
-                      _socketDetailRow(
-                        'UI platform',
-                        chat.platform.value,
-                      ),
-                      _socketDetailRow(
-                        'After connect',
-                        '${d['client_emits_after_connect']}',
-                      ),
-                      SizedBox(height: 8.h),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8.w,
-                          vertical: 8.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          borderRadius: BorderRadius.circular(6.r),
-                        ),
-                        child: Text(
-                          'Matches doc: ${d['implements_transports_per_doc'] == true ? '✓' : '✗'} websocket+polling  ·  '
-                          '${d['implements_auth_per_doc'] == true ? '✓' : '✗'} auth.token + Bearer  ·  '
-                          '${d['listens_for_chat_message'] == true ? '✓' : '✗'} listens chat:message',
-                          style: TextStyle(
-                            color: const Color(0xFFC6F6D5),
-                            fontSize: 10.sp,
-                            height: 1.35,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 8.h),
-            child: Obx(() {
-              chat.isConnected.value;
-              chat.platformLive.length;
-              chat.platformViewerCounts.length;
-              chat.platformEmbedUrls.length;
+      body: Obx(() {
+        final filtered = chat.socketInboundLog
+            .where(_isChatMessageLog)
+            .toList(growable: false);
 
-              return DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF15161A),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: const Color(0xFF2F3240)),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Platform Socket Status',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13.sp,
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      DataTable(
-                        headingRowHeight: 28.h,
-                        dataRowMinHeight: 34.h,
-                        dataRowMaxHeight: 38.h,
-                        columnSpacing: 14.w,
-                        columns: const [
-                          DataColumn(label: Text('Platform')),
-                          DataColumn(label: Text('Connection')),
-                          DataColumn(label: Text('Live')),
-                          DataColumn(label: Text('Viewers')),
-                        ],
-                        rows: [
-                          for (final p in _platforms)
-                            () {
-                              final key = p.toLowerCase();
-                              final hasSignal = chat.platformLive.containsKey(key) ||
-                                  chat.platformViewerCounts.containsKey(key) ||
-                                  ((chat.platformEmbedUrls[key] ?? '').trim().isNotEmpty);
-                              final connected = chat.isConnected.value && hasSignal;
-                              final live = chat.platformLive[key] == true;
-                              final viewers = chat.platformViewerCounts[key];
-                              return DataRow(
-                                cells: [
-                                  DataCell(
-                                    Text(
-                                      key[0].toUpperCase() + key.substring(1),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12.sp,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    _platformStateChip(
-                                      text: connected ? 'Connected' : 'Idle',
-                                      positive: connected,
-                                    ),
-                                  ),
-                                  DataCell(
-                                    _platformStateChip(
-                                      text: live ? 'True' : 'False',
-                                      positive: live,
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      viewers?.toString() ?? '—',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12.sp,
-                                        fontFamily: 'monospace',
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }(),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 8.h),
-            child: Obx(() {
-              final stats = _computeSocketLiveHitStats(chat.socketInboundLog);
-              return DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF12131A),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: const Color(0xFF2B3152)),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Live Status Socket Hit Count',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13.sp,
-                        ),
-                      ),
-                      SizedBox(height: 6.h),
-                      Text(
-                        'Total hits: ${stats.total}',
-                        style: TextStyle(
-                          color: const Color(0xFF93C5FD),
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        'Twitch: ${stats.byPlatform['twitch'] ?? 0}  ·  '
-                        'Kick: ${stats.byPlatform['kick'] ?? 0}  ·  '
-                        'YouTube: ${stats.byPlatform['youtube'] ?? 0}',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12.sp,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 8.h),
-            child: TextField(
-              controller: _search,
-              onChanged: (v) => _searchRx.value = v,
-              style: TextStyle(color: Colors.white, fontSize: 14.sp),
-              decoration: InputDecoration(
-                hintText: 'Search chat:message & activity:event…',
-                hintStyle: TextStyle(color: Colors.white38, fontSize: 13.sp),
-                filled: true,
-                fillColor: const Color(0xFF2C2C2E),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.r),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 14.w,
-                  vertical: 12.h,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: Colors.white54,
-                  size: 22.sp,
+        if (filtered.isEmpty) {
+          return Center(
+            child: Text(
+              'No chat:message lines yet.\n'
+              '(Includes CHAT_MESSAGE_SOCKET and chat:message:* debug lines.)',
+              style: TextStyle(color: Colors.white54, fontSize: 14.sp),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 16.h),
+          itemCount: filtered.length,
+          itemBuilder: (context, i) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: 10.h),
+              child: SelectableText(
+                filtered[i],
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  color: const Color(0xFF9AE6B4),
+                  fontFamily: 'monospace',
+                  height: 1.35,
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Obx(() {
-              final q = _searchRx.value.trim().toLowerCase();
-              final base = chat.socketInboundLog
-                  .where(_isChatMessageLog)
-                  .toList(growable: false);
-              final filtered = q.isEmpty
-                  ? base
-                  : base
-                      .where((e) => e.toLowerCase().contains(q))
-                      .toList(growable: false);
-
-              if (filtered.isEmpty) {
-                return Center(
-                  child: Text(
-                    q.isEmpty
-                        ? 'No chat:message lines yet.'
-                        : 'No matches.',
-                    style: TextStyle(color: Colors.white54, fontSize: 14.sp),
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 16.h),
-                itemCount: filtered.length,
-                itemBuilder: (context, i) {
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 10.h),
-                    child: SelectableText(
-                      filtered[i],
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: const Color(0xFF9AE6B4),
-                        fontFamily: 'monospace',
-                        height: 1.35,
-                      ),
-                    ),
-                  );
-                },
-              );
-            }),
-          ),
-        ],
-      ),
+            );
+          },
+        );
+      }),
     );
   }
 }

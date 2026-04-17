@@ -390,6 +390,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
         'name': hideNames ? '' : m.userName,
         'message': m.message,
         'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
+        'socketEmoteOverrides': EmoteParser.socketEmoteNameOverrides(m.raw),
         '_ts': m.timestamp,
       });
     }
@@ -811,6 +812,22 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     );
   }
 
+  EmoteParser? _emoteParserForRow({
+    required List<Map<String, Object>>? embeddedEmotes,
+    required Map<String, String>? socketEmoteOverrides,
+  }) {
+    if (_emoteParser == null) return null;
+    final emb = embeddedEmotes;
+    if (emb != null && emb.isNotEmpty) return _emoteParser;
+    final o = socketEmoteOverrides;
+    if (o == null || o.isEmpty) return _emoteParser;
+    return EmoteParser(
+      emoteUrlMap: {..._emoteService.emoteUrlMap, ...o},
+      textStyle: sfProText400(12.sp, Colors.white),
+      emoteSize: 28,
+    );
+  }
+
   /// Build chat message with emote parsing
   Widget _chatItem(
       String platform,
@@ -819,15 +836,23 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       Color nameColor, {
         Key? key,
         List<Map<String, Object>>? embeddedEmotes,
+        Map<String, String>? socketEmoteOverrides,
       }) {
     final emb = embeddedEmotes;
+    final parser = _emoteParserForRow(
+      embeddedEmotes: emb,
+      socketEmoteOverrides: socketEmoteOverrides,
+    );
     final List<InlineSpan> messageSpans =
-    emb != null &&
-        emb.isNotEmpty &&
-        _emoteParser != null
-        ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
-        : _emoteParser?.parse(message) ??
-        [TextSpan(text: message, style: sfProText400(12.sp, Colors.white))];
+        emb != null && emb.isNotEmpty && _emoteParser != null
+            ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
+            : parser?.parse(message) ??
+                [
+                  TextSpan(
+                    text: message,
+                    style: sfProText400(12.sp, Colors.white),
+                  ),
+                ];
 
     return TweenAnimationBuilder<double>(
       key: key,
@@ -1098,6 +1123,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   embeddedEmotes:
                                   item['embeddedEmotes']
                                   as List<Map<String, Object>>?,
+                                  socketEmoteOverrides:
+                                      item['socketEmoteOverrides']
+                                          as Map<String, String>?,
                                   key: ValueKey(
                                     'expanded_${item['name']}_${index}_${item['message']}',
                                   ),
@@ -1382,6 +1410,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   embeddedEmotes:
                                   item['embeddedEmotes']
                                   as List<Map<String, Object>>?,
+                                  socketEmoteOverrides:
+                                      item['socketEmoteOverrides']
+                                          as Map<String, String>?,
                                   key: ValueKey(
                                     'main_${item['name']}_${index}_${item['message']}',
                                   ),

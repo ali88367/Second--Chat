@@ -224,5 +224,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ledMilestoneInterval": "Intervalo de marco",
+  "ledMilestoneIntervalValue": "A cada {count} assinantes",
+  "@ledMilestoneIntervalValue": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "ledMilestoneCustom": "Quantidade personalizada",
+  "ledCustomMilestoneTitle": "Marco personalizado",
+  "ledCustomMilestoneSubtitle": "Escolha quantos assinantes entre cada notificação LED (0–1000)."
 }

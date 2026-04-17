@@ -31,10 +31,37 @@ import 'core/constants/constants.dart';
 import 'core/bootstrap/app_prefetch.dart';
 import 'core/utils/debug_tokens.dart';
 
+bool _isIgnorableKnownWebViewRace(Object error) {
+  final msg = error.toString();
+  if (error is PlatformException && error.message != null) {
+    final em = error.message!;
+    if (em.contains('PigeonInternalInstanceManager.removeStrongReference') ||
+        em.contains('PigeonInternalInstanceManager.clear') ||
+        em.contains('WKWebViewConfiguration')) {
+      return true;
+    }
+  }
+  // Android WebView plugin teardown race:
+  // "Argument for ... WebViewClient.onLoadResource was null, expected non-null WebViewClient."
+  if (msg.contains('WebViewClient.onLoadResource was null') &&
+      msg.contains('expected non-null WebViewClient')) {
+    return true;
+  }
+  if (msg.contains("arg_pigeon_instance != null") &&
+      msg.contains('android_webkit.g.dart')) {
+    return true;
+  }
+  return false;
+}
+
 void main() {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      FlutterError.onError = (FlutterErrorDetails details) {
+        if (_isIgnorableKnownWebViewRace(details.exception)) return;
+        FlutterError.presentError(details);
+      };
       try {
         await Firebase.initializeApp();
       } catch (e) {
@@ -115,13 +142,7 @@ void main() {
       // Ignore known WebView teardown race:
       // "Unable to establish connection on channel: PigeonInternalInstanceManager.removeStrongReference"
       // and similar WKWebView plugin channel messages.
-      if (error is PlatformException &&
-          error.message != null &&
-          (error.message!.contains(
-                'PigeonInternalInstanceManager.removeStrongReference',
-              ) ||
-              error.message!.contains('PigeonInternalInstanceManager.clear') ||
-              error.message!.contains('WKWebViewConfiguration'))) {
+      if (_isIgnorableKnownWebViewRace(error)) {
         return;
       }
       FlutterError.reportError(

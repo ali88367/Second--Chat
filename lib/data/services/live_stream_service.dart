@@ -713,6 +713,8 @@ class LiveStreamService {
     return out.trim().isEmpty ? null : out;
   }
 
+  /// Parses `chat:message` JSON per API (incl. Kick: `username`, `message`, `emotes`, `segments`,
+  /// `streamId`, nested `metadata`).
   ChatMessage? _parseChatMessage(dynamic payload) {
     try {
       Map<String, dynamic>? map;
@@ -733,7 +735,7 @@ class LiveStreamService {
                 'twitch')
             .toString(),
       );
-      // Prefer canonical login (Twitch: user_login) over display_name, which may omit digits.
+      // `chat:message` canonical sender: top-level `username` (Kick/Twitch/…). Other keys are legacy fallbacks.
       final metaUser = metadata is Map
           ? _nonEmptyString(metadata['login']) ??
               _nonEmptyString(metadata['user_login']) ??
@@ -747,12 +749,12 @@ class LiveStreamService {
               _nonEmptyString(metadata['display_name'])
           : null;
 
-      var user = _nonEmptyString(map['sender_username']) ??
+      var user = _nonEmptyString(map['username']) ??
+          _nonEmptyString(map['sender_username']) ??
           _nonEmptyString(map['senderUsername']) ??
           _nonEmptyString(map['login']) ??
           _nonEmptyString(map['user_login']) ??
           _nonEmptyString(map['userLogin']) ??
-          _nonEmptyString(map['username']) ??
           _nonEmptyString(map['user']) ??
           _nonEmptyString(map['name']) ??
           _nonEmptyString(map['displayName']) ??

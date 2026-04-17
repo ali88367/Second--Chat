@@ -224,5 +224,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ledMilestoneInterval": "فاصل المعالم",
+  "ledMilestoneIntervalValue": "كل {count} مشتركين",
+  "@ledMilestoneIntervalValue": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "ledMilestoneCustom": "عدد مشتركين مخصص",
+  "ledCustomMilestoneTitle": "معلم مخصص",
+  "ledCustomMilestoneSubtitle": "اختر عدد المشتركين بين كل إشعار LED (0–1000)."
 }

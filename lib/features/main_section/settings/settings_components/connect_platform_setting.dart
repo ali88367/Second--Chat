@@ -326,11 +326,6 @@ Future<void> _rebootstrapChatAfterPlatformConnect(
   final chat = Get.find<ChatController>();
   final key = provider.name.toLowerCase().trim();
   try {
-    // Match startup path: bootstrap sockets + overviews, then force-refresh the newly linked platform.
-    await chat.ensureStreamRealtimeBootstrap();
-    await chat.refreshOverviewForPlatform(key, forceChatHistory: true);
-    // Backend OAuth linkage can take a short moment to propagate.
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    await chat.refreshOverviewForPlatform(key, forceChatHistory: true);
+    await chat.onPlatformConnectedSuccessfully(key);
   } catch (_) {}
 }

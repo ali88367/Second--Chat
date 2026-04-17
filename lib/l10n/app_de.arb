@@ -224,5 +224,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ledMilestoneInterval": "Meilenstein-Intervall",
+  "ledMilestoneIntervalValue": "Alle {count} Abonnenten",
+  "@ledMilestoneIntervalValue": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "ledMilestoneCustom": "Eigene Abonnentenzahl",
+  "ledCustomMilestoneTitle": "Benutzerdefinierter Meilenstein",
+  "ledCustomMilestoneSubtitle": "Wählen Sie die Abonnentenzahl zwischen jeder LED-Benachrichtigung (0–1000)."
 }

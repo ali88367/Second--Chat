@@ -436,12 +436,12 @@ class ChatSocketService extends GetxService {
               ?.toString()
           : null;
 
-      String user = (map['sender_username'] ??
+      String user = (map['username'] ??
+              map['sender_username'] ??
               map['senderUsername'] ??
               map['login'] ??
               map['user_login'] ??
               map['userLogin'] ??
-              map['username'] ??
               map['user'] ??
               map['name'] ??
               map['displayName'] ??

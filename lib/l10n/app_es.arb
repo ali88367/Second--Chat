@@ -224,5 +224,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ledMilestoneInterval": "Intervalo de hito",
+  "ledMilestoneIntervalValue": "Cada {count} suscriptores",
+  "@ledMilestoneIntervalValue": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "ledMilestoneCustom": "Cantidad personalizada",
+  "ledCustomMilestoneTitle": "Hito personalizado",
+  "ledCustomMilestoneSubtitle": "Elige cuántos suscriptores entre cada notificación LED (0–1000)."
 }

@@ -1245,6 +1245,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{completed} of {target} days'**
   String profileWeekProgress(int completed, int target);
+
+  /// No description provided for @ledMilestoneInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestone interval'**
+  String get ledMilestoneInterval;
+
+  /// No description provided for @ledMilestoneIntervalValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {count} subscribers'**
+  String ledMilestoneIntervalValue(Object count);
+
+  /// No description provided for @ledMilestoneCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom subscriber count'**
+  String get ledMilestoneCustom;
+
+  /// No description provided for @ledCustomMilestoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom milestone'**
+  String get ledCustomMilestoneTitle;
+
+  /// No description provided for @ledCustomMilestoneSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how many subscribers between each LED notification (0–1000).'**
+  String get ledCustomMilestoneSubtitle;
 }
 
 class _AppLocalizationsDelegate

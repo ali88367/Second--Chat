@@ -615,4 +615,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String profileWeekProgress(int completed, int target) {
     return '$completed von $target Tagen';
   }
+
+  @override
+  String get ledMilestoneInterval => 'Meilenstein-Intervall';
+
+  @override
+  String ledMilestoneIntervalValue(Object count) {
+    return 'Alle $count Abonnenten';
+  }
+
+  @override
+  String get ledMilestoneCustom => 'Eigene Abonnentenzahl';
+
+  @override
+  String get ledCustomMilestoneTitle => 'Benutzerdefinierter Meilenstein';
+
+  @override
+  String get ledCustomMilestoneSubtitle =>
+      'Wählen Sie die Abonnentenzahl zwischen jeder LED-Benachrichtigung (0–1000).';
 }

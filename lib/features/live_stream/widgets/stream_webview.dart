@@ -264,6 +264,17 @@ class _StreamWebViewState extends State<StreamWebView>
       final sanitized = _sanitizeUrl(trimmed);
       final nextId = canonicalStreamEmbedIdentity(sanitized);
       if (nextId.isNotEmpty && nextId == _lastCanonicalEmbedId) {
+        // Same logical stream, but URL may still need a hard reload
+        // (example: Twitch parent param repaired from localhost).
+        if (_lastCommittedNavigation != sanitized) {
+          _lastCommittedNavigation = sanitized;
+          _initialUrl = sanitized;
+          _initialUri = Uri.tryParse(sanitized);
+          _controller
+              .loadRequest(Uri.parse(sanitized))
+              .catchError(_logWebNavError);
+          _persistSnapshot();
+        }
         _applyMuteState();
         return;
       }

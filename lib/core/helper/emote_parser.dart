@@ -74,6 +74,61 @@ class EmoteParser {
     return out;
   }
 
+  /// Kick (and similar) `chat:message` rows: `emotes[]` / `segments[]` use **name + url** only
+  /// (no Twitch-style `start`/`end`). Merge into the global emote map so token parsing can resolve
+  /// e.g. `emojiAngel` → `https://files.kick.com/emotes/...`.
+  static Map<String, String>? socketEmoteNameOverrides(Map<String, dynamic>? raw) {
+    if (raw == null) return null;
+    final out = <String, String>{};
+
+    void addFromEmoteList(List<dynamic>? list) {
+      if (list == null || list.isEmpty) return;
+      for (final item in list) {
+        if (item is! Map) continue;
+        final m = item.cast<String, dynamic>();
+        final name = (m['name'] ?? m['code'])?.toString().trim();
+        final url = (m['url'] ?? m['imageUrl'] ?? m['image_url'])
+            ?.toString()
+            .trim();
+        if (name == null || name.isEmpty || url == null || url.isEmpty) {
+          continue;
+        }
+        out[name] = url;
+      }
+    }
+
+    void addFromSegments(List<dynamic>? list) {
+      if (list == null || list.isEmpty) return;
+      for (final item in list) {
+        if (item is! Map) continue;
+        final m = item.cast<String, dynamic>();
+        final t = (m['type'] ?? '').toString().toLowerCase().trim();
+        if (t.isNotEmpty && t != 'emote') continue;
+        final name = (m['name'] ?? m['code'])?.toString().trim();
+        final url = (m['url'] ?? m['imageUrl'] ?? m['image_url'])
+            ?.toString()
+            .trim();
+        if (name == null || name.isEmpty || url == null || url.isEmpty) {
+          continue;
+        }
+        out[name] = url;
+      }
+    }
+
+    addFromEmoteList(raw['emotes'] is List ? raw['emotes'] as List : null);
+    addFromSegments(raw['segments'] is List ? raw['segments'] as List : null);
+
+    final meta = raw['metadata'];
+    if (meta is Map) {
+      final mm = meta.cast<String, dynamic>();
+      addFromEmoteList(mm['emotes'] is List ? mm['emotes'] as List : null);
+      addFromSegments(mm['segments'] is List ? mm['segments'] as List : null);
+    }
+
+    if (out.isEmpty) return null;
+    return out;
+  }
+
   /// Parse a message and return list of InlineSpan for RichText
   ///
   /// Example:

@@ -224,5 +224,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ledMilestoneInterval": "Palier d'abonnés",
+  "ledMilestoneIntervalValue": "Tous les {count} abonnés",
+  "@ledMilestoneIntervalValue": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "ledMilestoneCustom": "Nombre d'abonnés personnalisé",
+  "ledCustomMilestoneTitle": "Palier personnalisé",
+  "ledCustomMilestoneSubtitle": "Choisissez le nombre d'abonnés entre chaque notification LED (0–1000)."
 }

@@ -92,10 +92,7 @@ class _IntroScreen2State extends State<IntroScreen2> {
     final chat = Get.find<ChatController>();
     final key = provider.name.toLowerCase().trim();
     try {
-      await chat.ensureStreamRealtimeBootstrap();
-      await chat.refreshOverviewForPlatform(key, forceChatHistory: true);
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-      await chat.refreshOverviewForPlatform(key, forceChatHistory: true);
+      await chat.onPlatformConnectedSuccessfully(key);
     } catch (_) {}
   }
 

@@ -167,23 +167,50 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
     final tileGap = 8.w;
     const topFlex = 56;
     const bottomFlex = 44;
+    final chatCtrl = Get.find<ChatController>();
 
     Widget tile({
       required String platform,
       required BorderRadius radius,
       required double height,
     }) {
-      return ClipRRect(
-        borderRadius: radius,
-        child: _LiveStreamPlatformSlot(
-          platformKey: platform,
-          height: height,
-          muted: false,
-          globalMuted: globalMuted,
-          streamViewKey: ValueKey('stream_$platform'),
-          onStreamReady: onStreamReady,
-        ),
-      );
+      return Obx(() {
+        final runningUrl = chatCtrl.urlForPlatform(platform)?.trim() ?? '';
+        final canOpenFullscreen =
+            chatCtrl.isPlatformLive(platform) && runningUrl.isNotEmpty;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: canOpenFullscreen
+              ? () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => _FullScreenStreamWebViewPage(
+                        platformKey: platform,
+                        url: runningUrl,
+                        onStreamReady: onStreamReady,
+                      ),
+                    ),
+                  );
+                }
+              : null,
+          child: ClipRRect(
+            borderRadius: radius,
+            child: AbsorbPointer(
+              // Multi-preview tiles should not consume web gestures directly.
+              absorbing: true,
+              child: _LiveStreamPlatformSlot(
+                platformKey: platform,
+                height: height,
+                muted: false,
+                globalMuted: globalMuted,
+                streamViewKey: ValueKey('stream_$platform'),
+                onStreamReady: onStreamReady,
+              ),
+            ),
+          ),
+        );
+      });
     }
 
     return Column(
@@ -227,6 +254,62 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FullScreenStreamWebViewPage extends StatelessWidget {
+  const _FullScreenStreamWebViewPage({
+    required this.platformKey,
+    required this.url,
+    this.onStreamReady,
+  });
+
+  final String platformKey;
+  final String url;
+  final void Function(String platformKey, String runningUrl)? onStreamReady;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return StreamWebView(
+                  url: url,
+                  height: constraints.maxHeight,
+                  cacheKey: 'fullscreen_$platformKey',
+                  muted: false,
+                  streamExpectedLive: true,
+                  onStreamReady: (runningUrl) {
+                    onStreamReady?.call(platformKey, runningUrl);
+                  },
+                );
+              },
+            ),
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(24),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () => Navigator.of(context).maybePop(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Icon(Icons.arrow_back, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
