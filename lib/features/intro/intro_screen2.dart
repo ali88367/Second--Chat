@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
@@ -62,6 +63,7 @@ class _IntroScreen2State extends State<IntroScreen2> {
     final ok = await ctrl.connect(provider);
     if (!mounted) return;
     if (ok) {
+      await _rebootstrapChatAfterPlatformConnect(provider);
       final prefs = await SharedPreferences.getInstance();
       final introDone =
           prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
@@ -81,6 +83,20 @@ class _IntroScreen2State extends State<IntroScreen2> {
         curve: Curves.fastOutSlowIn,
       );
     }
+  }
+
+  Future<void> _rebootstrapChatAfterPlatformConnect(
+    OAuthProvider provider,
+  ) async {
+    if (!Get.isRegistered<ChatController>()) return;
+    final chat = Get.find<ChatController>();
+    final key = provider.name.toLowerCase().trim();
+    try {
+      await chat.ensureStreamRealtimeBootstrap();
+      await chat.refreshOverviewForPlatform(key, forceChatHistory: true);
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await chat.refreshOverviewForPlatform(key, forceChatHistory: true);
+    } catch (_) {}
   }
 
   @override
