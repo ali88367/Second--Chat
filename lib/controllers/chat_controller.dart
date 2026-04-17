@@ -1124,11 +1124,6 @@ class ChatController extends GetxController {
     if (currentUserId.isNotEmpty && _activityUserId(event) == currentUserId) {
       return;
     }
-    final currentUsername = _currentUsername();
-    if (currentUsername.isNotEmpty &&
-        _activityUsername(event) == currentUsername) {
-      return;
-    }
 
     final selectedPlatform = _normalizePlatformKey(platform.value);
     final eventPlatform = _normalizePlatformKey(event['platform']?.toString());
@@ -1158,24 +1153,6 @@ class ChatController extends GetxController {
       final raw =
           me['id'] ?? me['uid'] ?? me['userId'] ?? me['user_id'] ?? me['sub'];
       return raw?.toString().trim() ?? '';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  String _currentUsername() {
-    try {
-      final me = Get.find<AuthController>().me.value;
-      if (me == null) return '';
-      final raw =
-          me['username'] ??
-          me['userName'] ??
-          me['user_name'] ??
-          me['handle'] ??
-          me['displayName'] ??
-          me['display_name'] ??
-          me['name'];
-      return _normalizeUsername(raw?.toString());
     } catch (_) {
       return '';
     }
@@ -1213,58 +1190,6 @@ class ChatController extends GetxController {
     }
 
     return raw?.toString().trim() ?? '';
-  }
-
-  String _activityUsername(Map<String, dynamic> event) {
-    dynamic raw =
-        event['username'] ??
-        event['userName'] ??
-        event['user_name'] ??
-        event['handle'] ??
-        event['displayName'] ??
-        event['display_name'] ??
-        event['name'];
-
-    final user = event['user'];
-    if (raw == null && user is Map) {
-      raw =
-          user['username'] ??
-          user['userName'] ??
-          user['user_name'] ??
-          user['handle'] ??
-          user['displayName'] ??
-          user['display_name'] ??
-          user['name'];
-    }
-
-    final metadata = event['metadata'];
-    if (raw == null && metadata is Map) {
-      raw =
-          metadata['username'] ??
-          metadata['userName'] ??
-          metadata['user_name'] ??
-          metadata['handle'] ??
-          metadata['displayName'] ??
-          metadata['display_name'] ??
-          metadata['name'];
-      final metaUser = metadata['user'];
-      if (raw == null && metaUser is Map) {
-        raw =
-            metaUser['username'] ??
-            metaUser['userName'] ??
-            metaUser['user_name'] ??
-            metaUser['handle'] ??
-            metaUser['displayName'] ??
-            metaUser['display_name'] ??
-            metaUser['name'];
-      }
-    }
-
-    return _normalizeUsername(raw?.toString());
-  }
-
-  String _normalizeUsername(String? raw) {
-    return (raw ?? '').trim().toLowerCase();
   }
 
   /// Appends one realtime activity row (from `activity:event`, `activity:follow`, `activity:join`, …).
