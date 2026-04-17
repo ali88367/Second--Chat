@@ -396,15 +396,25 @@ class InviteController extends GetxController {
   }
 
   Future<String?> _readAccessToken() async {
+    String? token;
     try {
       if (Get.isRegistered<AuthController>()) {
-        final session = await Get.find<AuthController>().api.tokenStore.read();
-        final token = session?.accessToken.trim();
-        if (token!.isNotEmpty) return token;
+        final auth = Get.find<AuthController>();
+        final session = await auth.api.tokenStore.read();
+        token = session?.accessToken.trim();
+        if (token != null && token.isNotEmpty) return token;
+
+        if (auth.isAuthenticated.value) {
+          await Future.delayed(const Duration(milliseconds: 150));
+          final retry = await auth.api.tokenStore.read();
+          token = retry?.accessToken.trim();
+          if (token != null && token.isNotEmpty) return token;
+        }
       }
     } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('second_chat.access_token')?.trim();
+    token = prefs.getString('second_chat.access_token')?.trim();
     if (token == null || token.isEmpty) return null;
     return token;
   }

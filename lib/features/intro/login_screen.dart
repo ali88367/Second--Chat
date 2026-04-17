@@ -98,8 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final chat = Get.find<ChatController>();
-    // Realtime bootstrap is already warmed up by [AppPrefetch], but keep this
-    // call as a no-op fallback.
+    // Warm up realtime before routing, so live routing is accurate.
     try {
       await chat.ensureStreamRealtimeBootstrap();
     } catch (_) {}

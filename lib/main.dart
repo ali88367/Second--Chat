@@ -452,6 +452,20 @@ class _SplashScreenState extends State<_SplashScreen>
         if (!mounted) return;
       }
 
+      // Start warm-up work as early as possible so it overlaps with the splash
+      // animation. This reduces time-to-home on slower networks/devices.
+      final startAuthenticated = auth.isAuthenticated.value;
+      Future<bool>? prefetchFuture;
+      Future<void>? chatBootstrapFuture;
+      if (startAuthenticated) {
+        prefetchFuture = _prefetchEssentialData().catchError((_) => false);
+        if (Get.isRegistered<ChatController>()) {
+          final chat = Get.find<ChatController>();
+          chatBootstrapFuture =
+              chat.ensureStreamRealtimeBootstrap().catchError((_) {});
+        }
+      }
+
       // Let the splash animation finish (no explicit timer).
       try {
         await _animForward.orCancel;
@@ -464,7 +478,7 @@ class _SplashScreenState extends State<_SplashScreen>
         return;
       }
 
-      final prefetchOk = await _prefetchEssentialData();
+      final prefetchOk = await (prefetchFuture ?? _prefetchEssentialData());
       if (!prefetchOk) {
         if (!mounted) return;
         setState(() {
@@ -481,9 +495,13 @@ class _SplashScreenState extends State<_SplashScreen>
       }
 
       final chat = Get.find<ChatController>();
-      try {
-        await chat.ensureStreamRealtimeBootstrap();
-      } catch (_) {}
+      if (chatBootstrapFuture != null) {
+        await chatBootstrapFuture;
+      } else {
+        try {
+          await chat.ensureStreamRealtimeBootstrap();
+        } catch (_) {}
+      }
       if (!mounted) return;
 
       final anyLive =
