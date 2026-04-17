@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import '../../core/constants/constants.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 
 class SettingsController extends GetxController {
+  static const String _kSettingsCacheKey = 'second_chat.settings_cache';
   static const Map<String, String> _languageNameToCode = {
     'english': 'en',
     'spanish': 'es',
@@ -129,6 +131,7 @@ class SettingsController extends GetxController {
     settingsPayload.value = null;
     settingsError.value = null;
     _settingsRequested = false;
+    unawaited(_clearCache());
   }
 
   Future<void> loadSettings({bool force = false}) async {
@@ -159,6 +162,7 @@ class SettingsController extends GetxController {
       if (data is Map && data['data'] is Map) {
         settingsPayload.value = Map<String, dynamic>.from(data['data'] as Map);
         _applySettingsFromApi(settingsPayload.value!);
+        unawaited(_persistCache(settingsPayload.value!));
       } else {
         settingsError.value = 'unexpectedResponseFormat';
       }
@@ -394,17 +398,80 @@ class SettingsController extends GetxController {
   }
 
   Future<String?> _readAccessToken() async {
+    String? token;
     try {
       if (Get.isRegistered<AuthController>()) {
-        final session = await Get.find<AuthController>().api.tokenStore.read();
-        final token = session?.accessToken.trim();
-        if (token!.isNotEmpty) return token;
+        final auth = Get.find<AuthController>();
+        final session = await auth.api.tokenStore.read();
+        token = session?.accessToken.trim();
+        if (token != null && token.isNotEmpty) return token;
+
+        // Token store can lag slightly behind auth readiness on cold starts.
+        if (auth.isAuthenticated.value) {
+          await Future.delayed(const Duration(milliseconds: 150));
+          final retry = await auth.api.tokenStore.read();
+          token = retry?.accessToken.trim();
+          if (token != null && token.isNotEmpty) return token;
+        }
       }
     } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('second_chat.access_token')?.trim();
+    token = prefs.getString('second_chat.access_token')?.trim();
     if (token == null || token.isEmpty) return null;
     return token;
+  }
+
+  String _cacheKey() {
+    try {
+      if (Get.isRegistered<AuthController>()) {
+        final me = Get.find<AuthController>().me.value;
+        if (me == null) return _kSettingsCacheKey;
+        final id = me['id'] ?? me['_id'] ?? me['userId'];
+        if (id is String && id.trim().isNotEmpty) {
+          return '$_kSettingsCacheKey.${id.trim()}';
+        }
+        if (id is int) {
+          return '$_kSettingsCacheKey.$id';
+        }
+      }
+    } catch (_) {}
+    return _kSettingsCacheKey;
+  }
+
+  Future<void> _hydrateFromCache() async {
+    if (settingsPayload.value != null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey());
+      if (raw == null || raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        settingsPayload.value = Map<String, dynamic>.from(decoded);
+        settingsError.value = null;
+        _applySettingsFromApi(settingsPayload.value!);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistCache(Map<String, dynamic> payload) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey(), jsonEncode(payload));
+    } catch (_) {}
+  }
+
+  Future<void> _clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      for (final key in keys) {
+        if (key == _kSettingsCacheKey ||
+            key.startsWith('$_kSettingsCacheKey.')) {
+          await prefs.remove(key);
+        }
+      }
+    } catch (_) {}
   }
 
   void _applySettingsFromApi(Map<String, dynamic> payload) {
@@ -846,6 +913,7 @@ class SettingsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    unawaited(_hydrateFromCache());
     unawaited(_loadUiPrefsFromPrefs());
     unawaited(_loadPlatformColorsFromPrefs());
   }
