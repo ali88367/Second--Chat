@@ -41,6 +41,8 @@ class SettingsController extends GetxController {
   RxBool ledNewFollowers = true.obs;
   RxBool ledAllSubscribers = true.obs;
   RxBool ledMilestoneSubscribers = true.obs;
+  /// Preset ladder (5 / 10 / 20 / …) vs custom count only; persisted as `milestonePresetInterval`.
+  RxBool ledMilestonePresetInterval = true.obs;
   RxInt ledMilestoneValue = 5.obs;
   RxBool lowPowerMode = false.obs;
   RxBool timeZoneDetection = true.obs;
@@ -377,12 +379,25 @@ class SettingsController extends GetxController {
       case 'milestoneSubscribers':
         target = ledMilestoneSubscribers;
         break;
+      case 'milestonePresetInterval':
+        target = ledMilestonePresetInterval;
+        break;
     }
     if (target == null) return;
     final prev = target.value;
+    final prevMilestone = ledMilestoneValue.value;
     target.value = value;
+    if (key == 'milestonePresetInterval' && value) {
+      const presets = <int>{5, 10, 20, 50, 100};
+      if (!presets.contains(ledMilestoneValue.value)) {
+        ledMilestoneValue.value = 5;
+      }
+    }
     final ok = await _patchSettings(_buildFullSettingsPatch());
-    if (!ok) target.value = prev;
+    if (!ok) {
+      target.value = prev;
+      ledMilestoneValue.value = prevMilestone;
+    }
   }
 
   Future<void> updateLedMilestoneValue(int value) async {
@@ -512,6 +527,10 @@ class SettingsController extends GetxController {
         ledMilestoneSubscribers.value = _asBool(
           ledSettings['milestoneSubscribers'],
           ledMilestoneSubscribers.value,
+        );
+        ledMilestonePresetInterval.value = _asBool(
+          ledSettings['milestonePresetInterval'],
+          ledMilestonePresetInterval.value,
         );
         ledMilestoneValue.value = _asInt(
           ledSettings['milestoneValue'],
@@ -668,6 +687,7 @@ class SettingsController extends GetxController {
     ledSettingsMap['newFollowers'] = ledNewFollowers.value;
     ledSettingsMap['allSubscribers'] = ledAllSubscribers.value;
     ledSettingsMap['milestoneSubscribers'] = ledMilestoneSubscribers.value;
+    ledSettingsMap['milestonePresetInterval'] = ledMilestonePresetInterval.value;
     ledSettingsMap['milestoneValue'] = ledMilestoneValue.value;
     notificationsMap['ledSettings'] = ledSettingsMap;
     settingsMap['notifications'] = notificationsMap;

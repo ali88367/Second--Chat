@@ -718,26 +718,31 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             child: InkWell(
               onTap: () => openMenu(context, filter),
               borderRadius: BorderRadius.circular(10.r),
-              // Padding around label+icon only (wider tap than glyph, no layout width change).
+              // Fills row height (parent Row uses crossAxisAlignment: stretch) so the
+              // whole vertical band is hit-testable; horizontal padding includes the
+              // former trailing gap so taps there open the menu instead of the bar
+              // behind (e.g. main view GestureDetector that opens expanded chat).
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 8.w),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      context.l10n.all,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.sp,
+                padding: EdgeInsets.fromLTRB(8.w, 0, 8.w, 0),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        context.l10n.all,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16.sp,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 4.w),
-                    Icon(
-                      Icons.unfold_more,
-                      color: Colors.white.withOpacity(0.6),
-                      size: 16.sp,
-                    ),
-                  ],
+                      SizedBox(width: 4.w),
+                      Icon(
+                        Icons.unfold_more,
+                        color: Colors.white.withOpacity(0.6),
+                        size: 16.sp,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -764,24 +769,26 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
               onTap: () => openMenu(context, filter),
               borderRadius: BorderRadius.circular(10.r),
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 8.w),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: labelColor,
-                        fontSize: 16.sp,
+                padding: EdgeInsets.fromLTRB(8.w, 0, 8.w, 0),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: labelColor,
+                          fontSize: 16.sp,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 4.w),
-                    Icon(
-                      Icons.unfold_more,
-                      color: Colors.white.withOpacity(0.6),
-                      size: 16.sp,
-                    ),
-                  ],
+                      SizedBox(width: 4.w),
+                      Icon(
+                        Icons.unfold_more,
+                        color: Colors.white.withOpacity(0.6),
+                        size: 16.sp,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1157,6 +1164,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                           ],
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Expanded(
                               child: TextField(
@@ -1187,19 +1195,20 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               ),
                             ),
                             // Emoji icon - shows emoji picker when tapped
-                            GestureDetector(
-                              onTap: () {
-                                _showEmojiEmotePicker(context, setSheetState);
-                              },
-                              child: SizedBox(
-                                height: 20.h,
-                                width: 20.w,
-                                child: Image.asset('assets/images/smile.png'),
+                            Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  _showEmojiEmotePicker(context, setSheetState);
+                                },
+                                child: SizedBox(
+                                  height: 20.h,
+                                  width: 20.w,
+                                  child: Image.asset('assets/images/smile.png'),
+                                ),
                               ),
                             ),
                             SizedBox(width: 9.w),
                             _buildPlatformSelector(setSheetState),
-                            SizedBox(width: 8.w),
                           ],
                         ),
                       ),
@@ -1439,31 +1448,37 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 ],
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Expanded(
-                                    child: Text(
-                                      'Text',
-                                      style: TextStyle(
-                                        color: const Color.fromRGBO(
-                                          235,
-                                          235,
-                                          245,
-                                          0.3,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'Text',
+                                        style: TextStyle(
+                                          color: const Color.fromRGBO(
+                                            235,
+                                            235,
+                                            245,
+                                            0.3,
+                                          ),
+                                          fontSize: 17.sp,
                                         ),
-                                        fontSize: 17.sp,
                                       ),
                                     ),
                                   ),
                                   // Emoji icon - opens expanded chat WITH emoji picker
-                                  GestureDetector(
-                                    onTap: () {
-                                      _openExpandedChatWithEmoji(context);
-                                    },
-                                    child: SizedBox(
-                                      height: 20.h,
-                                      width: 20.w,
-                                      child: Image.asset(
-                                        'assets/images/smile.png',
+                                  Center(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        _openExpandedChatWithEmoji(context);
+                                      },
+                                      child: SizedBox(
+                                        height: 20.h,
+                                        width: 20.w,
+                                        child: Image.asset(
+                                          'assets/images/smile.png',
+                                        ),
                                       ),
                                     ),
                                   ),
