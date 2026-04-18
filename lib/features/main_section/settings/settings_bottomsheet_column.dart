@@ -824,16 +824,16 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                     ),
                     child: Align(
                       alignment: Alignment.bottomCenter,
-                      child: Container(
-                        width: 361.w,
-                        height:
-                            tile["title"] == "LED Notifications"
-                                ? 386.h
+                        child: Container(
+                          width: 361.w,
+                          height:
+                              tile["title"] == "LED Notifications"
+                                ? 420.h
                                 : 730.h,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2C2C2E),
-                          borderRadius: BorderRadius.circular(36.r),
-                        ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2E),
+                            borderRadius: BorderRadius.circular(36.r),
+                          ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(36.r),
                           child:

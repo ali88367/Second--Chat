@@ -43,6 +43,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
           ),
           Expanded(
             child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.only(
                 left: 16.w,
                 right: 16.w,

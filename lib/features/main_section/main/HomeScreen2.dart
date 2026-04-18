@@ -80,6 +80,9 @@ class _HomeScreen2State extends State<HomeScreen2> {
       );
     } finally {
       _streakSheetOpening = false;
+      if (mounted) {
+        unawaited(_streakCtrl.fetchCurrentStreak(force: true, silent: true));
+      }
     }
   }
 
