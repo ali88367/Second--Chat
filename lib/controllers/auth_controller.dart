@@ -96,8 +96,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   Future<void> _syncIntroOnboardingFlagAfterLogin() async {
     final rememberedForUser =
         await _isIntroOnboardingRememberedForCurrentUser();
-    final skipFromServer = await _shouldSkipIntroOnboardingFromServerState();
-    final shouldSkip = rememberedForUser || skipFromServer;
+    // Do not use server premium/trial state here: that skips the notification
+    // intro entirely. Trial branching uses [shouldSkipFreeTrialIntro] after
+    // the notification step instead.
+    final shouldSkip = rememberedForUser;
 
     await _setIntroOnboardingComplete(shouldSkip);
     if (shouldSkip) {
@@ -106,9 +108,19 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     if (kDebugMode) {
       debugPrint(
         'INTRO ONBOARDING FLAG AFTER LOGIN: '
-        '${shouldSkip ? 'complete (skip trial screens)' : 'pending (show trial screens)'}',
+        '${shouldSkip ? 'complete (device remembered)' : 'pending (show notification intro)'}',
       );
     }
+  }
+
+  /// Server / profile snapshot: skip the free-trial UI (Intro 3) only.
+  Future<bool> shouldSkipFreeTrialIntro() async {
+    return _shouldSkipIntroOnboardingFromServerState();
+  }
+
+  Future<bool> isIntroOnboardingPreferenceComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
   }
 
   Future<bool> _shouldSkipIntroOnboardingFromServerState() async {
@@ -711,6 +723,9 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     }
 
     await _api.tokenStore.clear();
+    try {
+      await _secureStorage.delete(key: _kIntroDoneUsers);
+    } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     isAuthenticated.value = false;

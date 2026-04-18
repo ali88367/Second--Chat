@@ -79,6 +79,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   StateSetter? _expandedSheetStateSetter;
   final filterController = Get.put(FilterController());
   Worker? _scrollWorker;
+  Worker? _embedReadyWorker;
 
   // Emote service - initialized lazily
   late final EmoteService _emoteService;
@@ -207,6 +208,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       _scheduleReliableScrollToBottom(animate: true);
     });
 
+    _embedReadyWorker = ever<Map<String, bool>>(
+      _chatCtrl.platformStreamEmbedReady,
+      (_) {
+        if (mounted) {
+          _scheduleReliableScrollToBottom(animate: false);
+        }
+      },
+    );
+
     _focusNode.addListener(_onFocusChanged);
     widget.chatFilter.addListener(_syncFilterLabelFromChatFilter);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -277,6 +287,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     _focusNode.removeListener(_onFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
     _scrollWorker?.dispose();
+    _embedReadyWorker?.dispose();
     _messageController.dispose();
     _mainScrollController.dispose();
     _expandedScrollController.dispose();
@@ -368,6 +379,14 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       if (!mounted) return;
       applyBoth();
     });
+    Future<void>.delayed(const Duration(milliseconds: 280), () {
+      if (!mounted) return;
+      applyBoth();
+    });
+    Future<void>.delayed(const Duration(milliseconds: 420), () {
+      if (!mounted) return;
+      applyBoth();
+    });
   }
 
   String _getPlatformAsset(String? platformName) {
@@ -397,6 +416,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     // Obx callers depend on reading these reactives here.
     final hideNames = _settingsController.hideViewerNames.value;
     _settingsController.multiChatMergedMode.value;
+    _chatCtrl.platformStreamEmbedReady;
 
     final normalizedFilter = filter?.toLowerCase().trim();
     final rows = <Map<String, dynamic>>[];
@@ -418,6 +438,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       // "All" should always merge all platform histories + live socket lines.
       for (final entry in _chatCtrl.platformMessages.entries) {
         for (final m in entry.value.where(ChatController.isMainChatFeedLine)) {
+          if (!_chatCtrl.isPlatformStreamEmbedReadyForChat(m.platform)) {
+            continue;
+          }
           addRow(m);
         }
       }
@@ -425,18 +448,24 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       final list = _chatCtrl.platformMessages[normalizedFilter];
       if (list != null && list.isNotEmpty) {
         for (final m in list.where(ChatController.isMainChatFeedLine)) {
+          if (!_chatCtrl.isPlatformStreamEmbedReadyForChat(m.platform)) {
+            continue;
+          }
           addRow(m);
         }
       } else {
         // Safe fallback while platform cache warms.
         for (final m in _chatCtrl.messages.where(ChatController.isMainChatFeedLine)) {
+          if (!_chatCtrl.isPlatformStreamEmbedReadyForChat(m.platform)) {
+            continue;
+          }
           addRow(m);
         }
       }
     }
 
     if (rows.isEmpty) {
-      return _commentsWithNamePrivacy(hideNames);
+      return const [];
     }
 
     rows.sort((a, b) => (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime));
@@ -455,12 +484,22 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       if (_chatCtrl.platformLive.isNotEmpty) {
         return rows
             .where(
-              (item) =>
-                  _chatCtrl.isPlatformLive((item['platformKey'] ?? '').toString()),
+              (item) {
+                final pk = (item['platformKey'] ?? '').toString();
+                return _chatCtrl.isPlatformLive(pk) &&
+                    _chatCtrl.isPlatformStreamEmbedReadyForChat(pk);
+              },
             )
             .toList(growable: false);
       }
       return rows;
+    }
+
+    // Live platform: wait for embed WebView before showing chat.
+    if (_chatCtrl.platformLive.isNotEmpty &&
+        _chatCtrl.isPlatformLive(normalizedFilter) &&
+        !_chatCtrl.isPlatformStreamEmbedReadyForChat(normalizedFilter)) {
+      return const [];
     }
 
     // If selected platform is offline, hide messages.
@@ -621,58 +660,52 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                   28.w,
               child: Material(
                 color: Colors.transparent,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: buttonSize.width + 40.w,
-                    maxWidth: 200.w,
-                  ),
-                  child: CustomBlackGlassWidget(
-                    items: [
-                      context.l10n.all,
-                      'Twitch',
-                      'Kick',
-                      'YouTube',
-                    ],
-                    isWeek: false,
-                    initialSelectedItem: (() {
-                      final f = currentFilter?.toLowerCase().trim();
-                      if (f == null || f.isEmpty) return context.l10n.all;
-                      if (f == 'twitch') return 'Twitch';
-                      if (f == 'kick') return 'Kick';
-                      if (f == 'youtube') return 'YouTube';
-                      return filterController.currentFilter.value;
-                    })(),
-                    onItemSelected: (selected) {
-                      // Convert selection to filter value
-                      String? filterValue;
-                      final allLabel = context.l10n.all.toLowerCase();
-                      final selectedKey = selected.toLowerCase();
+                child: CustomBlackGlassWidget(
+                  items: [
+                    context.l10n.all,
+                    'Twitch',
+                    'Kick',
+                    'YouTube',
+                  ],
+                  isWeek: false,
+                  initialSelectedItem: (() {
+                    final f = currentFilter?.toLowerCase().trim();
+                    if (f == null || f.isEmpty) return context.l10n.all;
+                    if (f == 'twitch') return 'Twitch';
+                    if (f == 'kick') return 'Kick';
+                    if (f == 'youtube') return 'YouTube';
+                    return filterController.currentFilter.value;
+                  })(),
+                  onItemSelected: (selected) {
+                    // Convert selection to filter value
+                    String? filterValue;
+                    final allLabel = context.l10n.all.toLowerCase();
+                    final selectedKey = selected.toLowerCase();
 
-                      if (selectedKey == 'all' || selectedKey == allLabel) {
-                        filterValue = null; // null means show all
-                      } else {
-                        filterValue =
-                            selected
-                                .toLowerCase(); // 'twitch', 'kick', 'youtube'
-                      }
+                    if (selectedKey == 'all' || selectedKey == allLabel) {
+                      filterValue = null; // null means show all
+                    } else {
+                      filterValue =
+                          selected
+                              .toLowerCase(); // 'twitch', 'kick', 'youtube'
+                    }
 
-                      // Update the ValueNotifier's value
-                      widget.chatFilter.value = filterValue;
+                    // Update the ValueNotifier's value
+                    widget.chatFilter.value = filterValue;
 
-                      // Update filter controller if needed
-                      filterController.setFilter(selected);
+                    // Update filter controller if needed
+                    filterController.setFilter(selected);
 
-                      // Trigger rebuild if sheet is open
-                      if (setSheetState != null) {
-                        setSheetState(() {});
-                      }
+                    // Trigger rebuild if sheet is open
+                    if (setSheetState != null) {
+                      setSheetState(() {});
+                    }
 
-                      // Also rebuild main widget
-                      if (mounted) {
-                        setState(() {});
-                      }
-                    },
-                  ),
+                    // Also rebuild main widget
+                    if (mounted) {
+                      setState(() {});
+                    }
+                  },
                 ),
               ),
             ),

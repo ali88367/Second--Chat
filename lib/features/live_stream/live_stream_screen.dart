@@ -149,10 +149,7 @@ class _LivestreamingState extends State<Livestreaming> {
     _streakCompletionChecked = true;
 
     try {
-      final result = await _streakCtrl.markStreakComplete(
-        date: DateTime.now(),
-        showErrors: false,
-      );
+      final result = await _streakCtrl.tryAutoCheckInTodayForAppOpen();
 
       // Never auto-open streak UI on app restart; user can open it explicitly via
       // the streak button.

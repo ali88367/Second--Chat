@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
@@ -43,11 +42,12 @@ class _StreakSheetRouterState extends State<StreakSheetRouter> {
         }
         return const StreamStreakSetupBottomSheet();
       }
-      final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
       final isInDanger =
-          widget.forceFreezePreview || (streak?.isInDanger ?? false);
+          widget.forceFreezePreview || streak.isInDanger;
 
-      if (!hasCreatedStreak) {
+      // Use [StreakData.isConfigured], not [hasCreatedStreak]: new accounts can
+      // have a server-side streak with count 0 before any check-ins.
+      if (!streak.isConfigured) {
         return const StreamStreakSetupBottomSheet();
       }
       if (isInDanger) {

@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:second_chat/l10n/app_localizations.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
+import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/features/intro/intro_screen1.dart';
 import 'package:second_chat/features/intro/login_screen.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
@@ -437,6 +438,7 @@ class _SplashScreenState extends State<_SplashScreen>
     begin: 0.0,
     end: 1.0,
   ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+
   @override
   void initState() {
     super.initState();
@@ -488,7 +490,6 @@ class _SplashScreenState extends State<_SplashScreen>
         }
       }
 
-      // Let the splash animation finish (no explicit timer).
       try {
         await _animForward.orCancel;
       } catch (_) {}
@@ -512,6 +513,12 @@ class _SplashScreenState extends State<_SplashScreen>
 
       if (!Get.isRegistered<ChatController>()) {
         if (!mounted) return;
+        try {
+          if (!await auth.isIntroOnboardingPreferenceComplete()) {
+            Get.offAll(() => const NotficationScreens());
+            return;
+          }
+        } catch (_) {}
         Get.offAll(() => const HomeScreen2());
         return;
       }
@@ -525,6 +532,13 @@ class _SplashScreenState extends State<_SplashScreen>
         } catch (_) {}
       }
       if (!mounted) return;
+
+      try {
+        if (!await auth.isIntroOnboardingPreferenceComplete()) {
+          Get.offAll(() => const NotficationScreens());
+          return;
+        }
+      } catch (_) {}
 
       final anyLive =
           chat.platformLive.values.any((v) => v == true) ||
@@ -552,164 +566,97 @@ class _SplashScreenState extends State<_SplashScreen>
             colors: [Color(0xFF1B1B25), Color(0xFF0A0A0A)],
           ),
         ),
-        child: Stack(
-          children: [
-            // Soft ambient blobs (no spinners/loader; splash doubles as warm-up).
-            AnimatedBuilder(
-              animation: _anim,
-              builder: (context, child) {
-                final t = _glow.value;
-                return Stack(
-                  children: [
-                    Positioned(
-                      top: -120.h,
-                      left: -90.w,
-                      child: Opacity(
-                        opacity: 0.30 * t,
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FadeTransition(
+                  opacity: _fadeIn,
+                  child: AnimatedBuilder(
+                    animation: _anim,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _popScale.value,
                         child: Container(
-                          width: 320.w,
-                          height: 320.w,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [twitchPurple, Colors.transparent],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -160.h,
-                      right: -120.w,
-                      child: Opacity(
-                        opacity: 0.26 * t,
-                        child: Container(
-                          width: 380.w,
-                          height: 380.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [youtubeRed, Colors.transparent],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 120.h,
-                      left: -140.w,
-                      child: Opacity(
-                        opacity: 0.18 * t,
-                        child: Container(
-                          width: 420.w,
-                          height: 420.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [kickGreen, Colors.transparent],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            SafeArea(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: AnimatedBuilder(
-                        animation: _anim,
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _popScale.value,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    // Keep the original warm glow behind the splash image.
-                                    color: const Color(
-                                      0xFFFFE6A7,
-                                    ).withOpacity(0.18 * _glow.value),
-                                    blurRadius: 28 * _glow.value,
-                                    spreadRadius: 6 * _glow.value,
-                                  ),
-                                ],
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFFFFE6A7,
+                                ).withOpacity(0.18 * _glow.value),
+                                blurRadius: 28 * _glow.value,
+                                spreadRadius: 6 * _glow.value,
                               ),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: Image.asset(
-                          'assets/images/bunnyGlow.png',
-                          width: 260.w,
-                          height: 260.w,
-                          fit: BoxFit.contain,
+                            ],
+                          ),
+                          child: child,
                         ),
-                      ),
+                      );
+                    },
+                    child: Image.asset(
+                      'assets/images/bunnyGlow.png',
+                      width: 260.w,
+                      height: 260.w,
+                      fit: BoxFit.contain,
                     ),
-                    SizedBox(height: 18.h),
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: SlideTransition(
-                        position: _logoSlide,
-                        child: ScaleTransition(
-                          scale: _logoScale,
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            width: 110.w,
-                            height: 110.w,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 10.h),
-                    if (_startupError == null)
-                      FadeTransition(
-                        opacity: _fadeIn,
-                        child: _SplashDotsLoader(animation: _loaderAnim),
-                      ),
-                    if (_startupError != null) ...[
-                      SizedBox(height: 14.h),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 22.w),
-                        child: Text(
-                          _startupError!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: const Color.fromRGBO(235, 235, 245, 0.86),
-                            height: 1.25,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                      TextButton(
-                        onPressed: _routeAfterSessionCheck,
-                        style: TextButton.styleFrom(
-                          foregroundColor: twitchPurple,
-                        ),
-                        child: Text(
-                          'Retry',
-                          style: TextStyle(
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                SizedBox(height: 18.h),
+                FadeTransition(
+                  opacity: _fadeIn,
+                  child: SlideTransition(
+                    position: _logoSlide,
+                    child: ScaleTransition(
+                      scale: _logoScale,
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 110.w,
+                        height: 110.w,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10.h),
+                if (_startupError == null)
+                  FadeTransition(
+                    opacity: _fadeIn,
+                    child: _SplashDotsLoader(animation: _loaderAnim),
+                  ),
+                if (_startupError != null) ...[
+                  SizedBox(height: 14.h),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 22.w),
+                    child: Text(
+                      _startupError!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: const Color.fromRGBO(235, 235, 245, 0.86),
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  TextButton(
+                    onPressed: _routeAfterSessionCheck,
+                    style: TextButton.styleFrom(
+                      foregroundColor: twitchPurple,
+                    ),
+                    child: Text(
+                      'Retry',
+                      style: TextStyle(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

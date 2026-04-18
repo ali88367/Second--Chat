@@ -24,28 +24,26 @@ class AppPrefetch {
       settingsFuture = settings.loadSettings(force: false);
     }
 
-    final optionalFutures = <Future<void>>[];
-
+    // Load streak overview first so header counts and sheets match server state
+    // (including auto-created zero-count streaks) before other background work.
     if (Get.isRegistered<StreamStreaksController>()) {
-      optionalFutures.add(
-        Get.find<StreamStreaksController>()
+      final streakCtrl = Get.find<StreamStreaksController>();
+      try {
+        await streakCtrl
             .fetchCurrentStreak(force: false, silent: true)
-            .then((_) {}),
+            .timeout(timeout);
+      } catch (_) {}
+      unawaited(
+        (() async {
+          try {
+            await streakCtrl.tryAutoCheckInTodayForAppOpen();
+          } catch (_) {}
+        })(),
       );
-    }
-    if (Get.isRegistered<InviteController>()) {
-      optionalFutures.add(Get.find<InviteController>().loadInvites());
     }
 
-    // Fire optional prefetches in the background; they should not block app
-    // startup or cause "Check your connection" errors on partial failures.
-    if (optionalFutures.isNotEmpty) {
-      unawaited(
-        Future.wait(
-          optionalFutures.map((f) => f.catchError((_) {})),
-          eagerError: false,
-        ),
-      );
+    if (Get.isRegistered<InviteController>()) {
+      unawaited(Get.find<InviteController>().loadInvites().catchError((_) {}));
     }
 
     if (settingsFuture != null) {

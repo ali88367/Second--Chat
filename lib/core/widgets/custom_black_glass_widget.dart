@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:gradient_borders/gradient_borders.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
@@ -9,6 +8,11 @@ import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 
 class CustomBlackGlassWidget extends StatelessWidget {
+  /// Fixed slot heights so [Stack] hit layers align with the visual column.
+  static const double _kHeaderSlotH = 38;
+  static const double _kDividerSlotH = 17;
+  static const double _kItemRowH = 46;
+
   final List<String> items;
   final bool isWeek;
   final Function(String)? onItemSelected;
@@ -40,22 +44,17 @@ class CustomBlackGlassWidget extends StatelessWidget {
       controller.selectedIndex.value = wanted;
     }
     
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Calculate responsive radius based on estimated height
-        final radiusValue = _calculateResponsiveRadius();
-        final radius = BorderRadius.circular(radiusValue);
+    final radiusValue = _calculateResponsiveRadius();
+    final radius = BorderRadius.circular(radiusValue);
 
-        return ClipRRect(
-          borderRadius: radius,
-          child: isWeek
-              ? BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: _content(radiusValue),
-          )
-              : _content(radiusValue),
-        );
-      },
+    return ClipRRect(
+      borderRadius: radius,
+      child: isWeek
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: _content(radiusValue),
+            )
+          : _content(radiusValue),
     );
   }
 
@@ -76,16 +75,12 @@ class CustomBlackGlassWidget extends StatelessWidget {
     // Calculate estimated height based on content
     final itemCount = items.length;
 
-    // Base heights (approximate)
-    const double headerHeight = 21.0; // checkmark + text
-    const double dividerHeight = 17.0; // divider with padding
-    const double itemHeight = 31.0; // text + padding (16 top padding + ~15 text height)
     const double verticalPadding = 40.0; // top + bottom padding (20 each)
 
-    // Calculate total estimated height
-    final estimatedHeight = headerHeight +
-        dividerHeight +
-        (itemHeight * (itemCount - 1)) + // -1 because selected item is hidden
+    // Match slot heights in [_content].
+    final estimatedHeight = _kHeaderSlotH +
+        _kDividerSlotH +
+        (_kItemRowH * (itemCount - 1)) +
         verticalPadding;
 
     // Calculate radius as a percentage of height
@@ -115,83 +110,144 @@ class CustomBlackGlassWidget extends StatelessWidget {
 
   Widget _content(double radiusValue) {
     return Container(
-      width: isWeek ? 90.w : null,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
       decoration: _decoration(radiusValue),
       child: Obx(() {
         // Clamp selected index to valid range
         final selected = controller.selectedIndex.value.clamp(0, items.length - 1);
 
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _header(selected),
-            _divider(),
-            ..._items(selected),
-          ],
+        return IntrinsicWidth(
+          child: Stack(
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.hardEdge,
+            children: [
+              IgnorePointer(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: _kHeaderSlotH,
+                      child: Center(child: _headerVisual(selected)),
+                    ),
+                    SizedBox(
+                      height: _kDividerSlotH,
+                      child: _dividerVisual(),
+                    ),
+                    ..._itemVisualRows(selected),
+                  ],
+                ),
+              ),
+              ..._platformHitStack(selected),
+            ],
+          ),
         );
       }),
     );
   }
 
-  // ---------------- UI Parts ----------------
+  // ---------------- Visual (non-interactive; taps handled by stack layers) ----------------
 
-  Widget _header(int selected) {
-    // Ensure selected index is within valid range
+  Widget _headerVisual(int selected) {
     final safeIndex = selected.clamp(0, items.length - 1);
-    
-    return GestureDetector(
-      onTap: () => _select(0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(CupertinoIcons.checkmark,
-              color: Colors.white, size: 15),
-          const SizedBox(width: 6),
-          Text(
-            items[safeIndex],
-            style: sfProText600(
-              15,
-              safeIndex == 0
-                  ? Colors.white
-                  : _color(items[safeIndex]),
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(CupertinoIcons.checkmark, color: Colors.white, size: 15),
+        const SizedBox(width: 6),
+        Text(
+          items[safeIndex],
+          style: sfProText600(
+            15,
+            safeIndex == 0 ? Colors.white : _color(items[safeIndex]),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _divider() => Padding(
-    padding: const EdgeInsets.only(top: 16),
-    child: Container(
-      height: 1,
-      width: 40,
-      color: Colors.white.withOpacity(0.15),
-    ),
-  );
+  Widget _dividerVisual() => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Center(
+          child: Container(
+            height: 1,
+            width: 40,
+            color: Colors.white.withOpacity(0.15),
+          ),
+        ),
+      );
 
-  List<Widget> _items(int selected) {
+  List<Widget> _itemVisualRows(int selected) {
     return List.generate(items.length, (i) {
       if (i == selected) return const SizedBox.shrink();
-
-      return GestureDetector(
-        onTap: () => _select(i),
-        child: Padding(
-          padding: EdgeInsets.only(top: isWeek ? 16 : 16),
-          child: Text(
-            items[i],
-            textAlign: TextAlign.center,
-            style: sfProText400(
-              15,
-              items[i].toLowerCase().trim() == 'all'
-                  ? Colors.white
-                  : _color(items[i]),
+      return SizedBox(
+        height: _kItemRowH,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: EdgeInsets.only(top: isWeek ? 16 : 16),
+            child: Text(
+              items[i],
+              textAlign: TextAlign.center,
+              style: sfProText400(
+                15,
+                items[i].toLowerCase().trim() == 'all'
+                    ? Colors.white
+                    : _color(items[i]),
+              ),
             ),
           ),
         ),
       );
     });
+  }
+
+  /// Full-width hit targets per row, stacked by [top] from fixed slot heights.
+  List<Widget> _platformHitStack(int selected) {
+    final layers = <Widget>[
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        height: _kHeaderSlotH,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _select(0),
+          child: const SizedBox.expand(),
+        ),
+      ),
+      Positioned(
+        top: _kHeaderSlotH,
+        left: 0,
+        right: 0,
+        height: _kDividerSlotH,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {},
+          child: const SizedBox.expand(),
+        ),
+      ),
+    ];
+
+    var y = _kHeaderSlotH + _kDividerSlotH;
+    for (var i = 0; i < items.length; i++) {
+      if (i == selected) continue;
+      final index = i;
+      layers.add(
+        Positioned(
+          top: y,
+          left: 0,
+          right: 0,
+          height: _kItemRowH,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _select(index),
+            child: const SizedBox.expand(),
+          ),
+        ),
+      );
+      y += _kItemRowH;
+    }
+    return layers;
   }
 
   // ---------------- Helpers ----------------

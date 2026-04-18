@@ -57,6 +57,15 @@ class StreakData {
     if (completedDates.isNotEmpty || frozenDates.isNotEmpty) return true;
     if (weekGrid.isNotEmpty) return true;
     if (status.isNotEmpty && status.toLowerCase() != 'inactive') return true;
+    // Backend may auto-create a streak row before any check-ins (all zeros).
+    // Treat a non-empty overview `streak` / `weeklyGoal` blob as "has streak".
+    final r = raw;
+    if (r != null && r.isNotEmpty) {
+      final s = r['streak'];
+      if (s is Map && s.isNotEmpty) return true;
+      final wg = r['weeklyGoal'] ?? r['weekly_goal'];
+      if (wg is Map && wg.isNotEmpty) return true;
+    }
     return false;
   }
 
@@ -362,6 +371,9 @@ class StreamStreaksController extends GetxController {
   final RxBool isMutating = false.obs;
   final RxnString mutationError = RxnString();
 
+  /// Coalesces overlapping app-open check-ins (prefetch + home + live).
+  Future<StreakCompleteResult>? _autoCheckInTodayInFlight;
+
   List<int> get availableNumbers =>
       _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
   int get selectedCount => selectedMenuNumbers.length;
@@ -373,7 +385,8 @@ class StreamStreaksController extends GetxController {
           selectedDaysCount == selectedTimesPerWeek.value);
 
   StreakData? get streak => current.value;
-  bool get hasStreak => current.value?.hasCreatedStreak ?? false;
+  /// True when the server has streak data (including auto-created, zero-count streaks).
+  bool get hasStreak => current.value?.isConfigured ?? false;
   bool get supportsDayEditing => false;
 
   @override
@@ -661,10 +674,48 @@ class StreamStreaksController extends GetxController {
     return null;
   }
 
+  /// After [fetchCurrentStreak], attempts a silent check-in for today when the
+  /// server already has a streak. Safe to call multiple times per day.
+  Future<StreakCompleteResult> tryAutoCheckInTodayForAppOpen() {
+    final existing = _autoCheckInTodayInFlight;
+    if (existing != null) return existing;
+    final run = _runTryAutoCheckInTodayForAppOpen();
+    _autoCheckInTodayInFlight = run;
+    unawaited(
+      run.whenComplete(() {
+        if (identical(_autoCheckInTodayInFlight, run)) {
+          _autoCheckInTodayInFlight = null;
+        }
+      }),
+    );
+    return run;
+  }
+
+  Future<StreakCompleteResult> _runTryAutoCheckInTodayForAppOpen() async {
+    var streak = current.value;
+    if (streak == null) {
+      streak = await fetchCurrentStreak(force: false, silent: true);
+    }
+    if (streak == null || !streak.isConfigured) {
+      return const StreakCompleteResult(
+        success: false,
+        alreadyCompleted: false,
+        skipped: true,
+        message: 'no_streak',
+      );
+    }
+    return markStreakComplete(
+      date: DateTime.now(),
+      showErrors: false,
+      skipStreakPreflightFetch: true,
+    );
+  }
+
   Future<StreakCompleteResult> markStreakComplete({
     required DateTime date,
     bool showErrors = false,
     bool bypassFreezeGate = false,
+    bool skipStreakPreflightFetch = false,
   }) async {
     final accessToken = await _getAccessToken(showErrors: showErrors);
     if (accessToken == null || accessToken.isEmpty) {
@@ -676,7 +727,14 @@ class StreamStreaksController extends GetxController {
       );
     }
 
-    final currentStreak = await fetchCurrentStreak(force: true, silent: true);
+    final StreakData? currentStreak;
+    if (skipStreakPreflightFetch) {
+      currentStreak =
+          current.value ??
+          await fetchCurrentStreak(force: true, silent: true);
+    } else {
+      currentStreak = await fetchCurrentStreak(force: true, silent: true);
+    }
     if (currentStreak == null) {
       return const StreakCompleteResult(
         success: false,
