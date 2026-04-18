@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../controllers/chat_controller.dart';
+import '../../../core/localization/l10n.dart';
 import 'stream_embed_url_utils.dart';
 import 'stream_webview.dart';
 
@@ -34,18 +35,26 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
   String _latchedEmbedUrl = '';
   int _sessionNonce = 0;
 
-  Widget _buildNoStreamState() {
+  Widget _buildNoStreamState(BuildContext context) {
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.videocam_off, color: Colors.white38, size: 42),
-          SizedBox(height: 8),
+        children: [
+          Icon(
+            Icons.videocam_off,
+            color: Colors.white38,
+            size: 28.sp,
+          ),
+          SizedBox(height: 5.h),
           Text(
-            'No stream at the moment',
-            style: TextStyle(color: Colors.white54),
+            context.l10n.noStreamAtTheMoment,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 13.sp,
+            ),
           ),
         ],
       ),
@@ -75,7 +84,7 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
           _latchedEmbedUrl = '';
           _sessionNonce++;
         }
-        return RepaintBoundary(child: _buildNoStreamState());
+        return RepaintBoundary(child: _buildNoStreamState(context));
       }
 
       // Live state: keep last good URL latched; initialize webview once per live session.

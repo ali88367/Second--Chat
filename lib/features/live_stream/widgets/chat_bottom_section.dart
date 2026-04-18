@@ -199,14 +199,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
     // Auto-scroll to bottom on initial load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom(_mainScrollController, animate: false);
-      _scrollToBottom(_expandedScrollController, animate: false);
+      _scheduleReliableScrollToBottom(animate: false);
     });
 
     // Scroll trigger driven by controller updates (no UI layout change).
     _scrollWorker = ever<int>(_chatCtrl.scrollTick, (_) {
-      _scrollToBottom(_mainScrollController, animate: true);
-      _scrollToBottom(_expandedScrollController, animate: true);
+      _scheduleReliableScrollToBottom(animate: true);
     });
 
     _focusNode.addListener(_onFocusChanged);
@@ -323,31 +321,52 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
-  void _scrollToBottom(ScrollController controller, {bool animate = true}) {
-    if (!controller.hasClients) {
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (controller.hasClients) {
-          _scrollToBottom(controller, animate: animate);
-        }
-      });
-      return;
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!controller.hasClients) return;
-
-      final maxScroll = controller.position.maxScrollExtent;
-      if (maxScroll > 0) {
+  /// ListView [maxScrollExtent] often updates one or two frames after data changes — a single
+  /// [jumpTo]/[animateTo] can run too early and leave the list mid-scroll.
+  /// Expanded chat may not be built yet; each controller is scrolled only if [hasClients].
+  void _scheduleReliableScrollToBottom({required bool animate}) {
+    void apply(ScrollController c) {
+      if (!c.hasClients) return;
+      try {
+        final maxScroll = c.position.maxScrollExtent;
+        if (!maxScroll.isFinite) return;
         if (animate) {
-          controller.animateTo(
+          c.animateTo(
             maxScroll,
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
           );
         } else {
-          controller.jumpTo(maxScroll);
+          c.jumpTo(maxScroll);
         }
-      }
+      } catch (_) {}
+    }
+
+    void applyBoth() {
+      apply(_mainScrollController);
+      apply(_expandedScrollController);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      applyBoth();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        applyBoth();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          applyBoth();
+        });
+      });
+    });
+
+    Future<void>.delayed(const Duration(milliseconds: 48), () {
+      if (!mounted) return;
+      applyBoth();
+    });
+    Future<void>.delayed(const Duration(milliseconds: 160), () {
+      if (!mounted) return;
+      applyBoth();
     });
   }
 
@@ -482,20 +501,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     _focusNode.requestFocus();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.microtask(() {
-        _scrollToBottomImmediate(_mainScrollController);
-        _scrollToBottomImmediate(_expandedScrollController);
-      });
-
-      Future.delayed(const Duration(milliseconds: 100), () {
-        _scrollToBottomImmediate(_mainScrollController);
-        _scrollToBottomImmediate(_expandedScrollController);
-      });
-
-      Future.delayed(const Duration(milliseconds: 300), () {
-        _scrollToBottomImmediate(_mainScrollController);
-        _scrollToBottomImmediate(_expandedScrollController);
-      });
+      _scheduleReliableScrollToBottom(animate: false);
     });
   }
 
@@ -523,41 +529,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     // Track recently used
     _emoteService.addToRecentlyUsed(emoteName);
 
-    // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.microtask(() {
-        _scrollToBottomImmediate(_mainScrollController);
-        _scrollToBottomImmediate(_expandedScrollController);
-      });
-
-      Future.delayed(const Duration(milliseconds: 100), () {
-        _scrollToBottomImmediate(_mainScrollController);
-        _scrollToBottomImmediate(_expandedScrollController);
-      });
+      _scheduleReliableScrollToBottom(animate: false);
     });
-  }
-
-  void _scrollToBottomImmediate(ScrollController controller) {
-    if (!controller.hasClients) return;
-
-    try {
-      final maxScroll = controller.position.maxScrollExtent;
-      if (maxScroll > 0) {
-        controller.jumpTo(maxScroll);
-        Future.delayed(const Duration(milliseconds: 50), () {
-          if (controller.hasClients &&
-              controller.position.maxScrollExtent > 0) {
-            controller.animateTo(
-              controller.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    } catch (e) {
-      // Silent fail if scroll position is invalid
-    }
   }
 
   /// Show the tabbed emoji/emote picker
@@ -722,50 +696,58 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   Widget _buildPlatformSelector(StateSetter? setSheetState) {
     final bool isExpanded = setSheetState != null;
 
+    void openMenu(BuildContext context, String? filter) {
+      if (isExpanded) {
+        FocusScope.of(context).unfocus();
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (context.mounted) {
+            _showGlassmorphicPopupMenu(context, filter, setSheetState);
+          }
+        });
+      } else {
+        _showGlassmorphicPopupMenu(context, filter, null);
+      }
+    }
+
     return ValueListenableBuilder<String?>(
       valueListenable: widget.chatFilter,
       builder: (context, filter, _) {
-        // If no filter is selected, show "All" without color
         if (filter == null) {
-          return GestureDetector(
-            onTap: () {
-              if (isExpanded) {
-                FocusScope.of(context).unfocus();
-                Future.delayed(const Duration(milliseconds: 300), () {
-                  if (context.mounted) {
-                    _showGlassmorphicPopupMenu(context, filter, setSheetState);
-                  }
-                });
-              } else {
-                _showGlassmorphicPopupMenu(context, filter, null);
-              }
-            },
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4.h),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    context.l10n.all,
-                    style: TextStyle(color: Colors.white, fontSize: 16.sp),
-                  ),
-                  Icon(
-                    Icons.unfold_more,
-                    color: Colors.white.withOpacity(0.6),
-                    size: 16.sp,
-                  ),
-                ],
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => openMenu(context, filter),
+              borderRadius: BorderRadius.circular(10.r),
+              // Padding around label+icon only (wider tap than glyph, no layout width change).
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 8.w),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      context.l10n.all,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.sp,
+                      ),
+                    ),
+                    SizedBox(width: 4.w),
+                    Icon(
+                      Icons.unfold_more,
+                      color: Colors.white.withOpacity(0.6),
+                      size: 16.sp,
+                    ),
+                  ],
+                ),
               ),
             ),
           );
         }
 
-        // When filter is selected, use Obx to track platform color changes
         return Obx(() {
-          String label = "${filter[0].toUpperCase()}${filter.substring(1)}";
+          final label =
+              '${filter[0].toUpperCase()}${filter.substring(1)}';
           Color labelColor;
-
-          // Directly access observables for GetX to track them
           if (filter == 'twitch') {
             labelColor = _settingsController.twitchColor.value ?? twitchPurple;
           } else if (filter == 'kick') {
@@ -776,34 +758,31 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             labelColor = Colors.white;
           }
 
-          return GestureDetector(
-            onTap: () {
-              if (isExpanded) {
-                FocusScope.of(context).unfocus();
-                Future.delayed(const Duration(milliseconds: 300), () {
-                  if (context.mounted) {
-                    _showGlassmorphicPopupMenu(context, filter, setSheetState);
-                  }
-                });
-              } else {
-                _showGlassmorphicPopupMenu(context, filter, null);
-              }
-            },
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4.h),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(color: labelColor, fontSize: 16.sp),
-                  ),
-                  Icon(
-                    Icons.unfold_more,
-                    color: Colors.white.withOpacity(0.6),
-                    size: 16.sp,
-                  ),
-                ],
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => openMenu(context, filter),
+              borderRadius: BorderRadius.circular(10.r),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 8.w),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: labelColor,
+                        fontSize: 16.sp,
+                      ),
+                    ),
+                    SizedBox(width: 4.w),
+                    Icon(
+                      Icons.unfold_more,
+                      color: Colors.white.withOpacity(0.6),
+                      size: 16.sp,
+                    ),
+                  ],
+                ),
               ),
             ),
           );

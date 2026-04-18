@@ -702,6 +702,10 @@ class ChatController extends GetxController {
       _pendingOfflineVotes[platformKey] = 0;
       platformLive[platformKey] = false;
       platformLive.refresh();
+      _setEmbedUrlIfChanged(platformKey, null);
+      platformEmbedUrls.refresh();
+      platformMessages[platformKey] = const <ChatMessage>[];
+      platformMessages.refresh();
       if (wasLive) {
         _recordStreamStopReason(
           platformKey,
@@ -712,7 +716,6 @@ class ChatController extends GetxController {
       if (selected == platformKey) {
         isLive.value = false;
         watchUrl.value = '';
-        platformMessages[platformKey] = const <ChatMessage>[];
         messages.clear();
         _bumpScroll();
       }
@@ -762,6 +765,10 @@ class ChatController extends GetxController {
       _pendingOfflineVotes[platformKey] = 0;
       platformLive[platformKey] = false;
       platformLive.refresh();
+      _setEmbedUrlIfChanged(platformKey, null);
+      platformEmbedUrls.refresh();
+      platformMessages[platformKey] = const <ChatMessage>[];
+      platformMessages.refresh();
       _recordStreamStopReason(
         platformKey,
         source: source,
@@ -770,7 +777,6 @@ class ChatController extends GetxController {
       if (selectedNow == platformKey) {
         isLive.value = false;
         watchUrl.value = '';
-        platformMessages[platformKey] = const <ChatMessage>[];
         messages.clear();
         _bumpScroll();
       }
@@ -1312,6 +1318,10 @@ class ChatController extends GetxController {
 
     final p = _normalizePlatformKey(msg.platform);
     if (p.isEmpty) return;
+    final routeKey = _normalizedApiPlatform(p, fallback: '');
+    if (routeKey.isNotEmpty && platformLive[routeKey] == false) {
+      return;
+    }
     var normalizedMsg =
         msg.platform == p
             ? msg
@@ -1703,7 +1713,14 @@ class ChatController extends GetxController {
 
       final liveRaw = m['live'];
       if (liveRaw is bool) {
-        _setPlatformLiveStable(p, liveRaw, source: 'socket:stream_status');
+        // Authoritative socket snapshot: offline is immediate (no vote/hold debounce).
+        // Stale `player` URLs in the same payload must not resurrect the embed (see below).
+        _setPlatformLiveStable(
+          p,
+          liveRaw,
+          source: 'socket:stream_status',
+          forceOffline: !liveRaw,
+        );
       }
 
       final vcAny = m['viewerCount'] ?? m['viewer_count'] ?? m['viewers'];
@@ -1737,7 +1754,11 @@ class ChatController extends GetxController {
           preferredUrl = watch;
         }
       }
-      if (preferredUrl != null && preferredUrl.isNotEmpty) {
+      // Only attach player URLs while that platform is live — payloads often still
+      // include embed/watch URLs after `live: false`, which would keep WebView/chat warm.
+      if (platformLive[p] == true &&
+          preferredUrl != null &&
+          preferredUrl.isNotEmpty) {
         _lastPlayerUrlUpdateAt[p] = DateTime.now().toUtc();
         if (_setEmbedUrlIfChanged(p, preferredUrl)) {
           platformEmbedUrls.refresh();

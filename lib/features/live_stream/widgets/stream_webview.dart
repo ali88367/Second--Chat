@@ -14,6 +14,9 @@ import 'stream_embed_url_utils.dart';
 /// Renders the live stream in the same container as the stream images.
 /// When [url] is null or empty, shows a black placeholder.
 ///
+/// If [streamExpectedLive] is false, always shows the "no stream" state and loads the idle
+/// shell — even when [url] is still non-empty (stale embed URL).
+///
 /// If [streamExpectedLive] is true (platform is live but embed URL not ready yet),
 /// shows an animated loading indicator instead of the delayed "no stream" message.
 class StreamWebView extends StatefulWidget {
@@ -155,6 +158,20 @@ class _StreamWebViewState extends State<StreamWebView>
   }
 
   void _syncOverlays() {
+    // Platform offline: always show "no stream" and unload the embed, even if [url] is still
+    // non-empty (stale props or race with socket `stream:status`).
+    if (!widget.streamExpectedLive) {
+      _noStreamOverlayTimer?.cancel();
+      _noStreamOverlayTimer = null;
+      _setDotsAnimating(false);
+      _loadUrlIntoController('');
+      setState(() {
+        _showLiveLoadingOverlay = false;
+        _showNoStreamOverlay = true;
+      });
+      return;
+    }
+
     final empty = widget.url.trim().isEmpty;
     if (!empty) {
       _noStreamOverlayTimer?.cancel();
@@ -473,12 +490,19 @@ class _StreamWebViewState extends State<StreamWebView>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.videocam_off, color: Colors.white38, size: 43.sp),
-                    SizedBox(height: 7.h),
+                    Icon(
+                      Icons.videocam_off,
+                      color: Colors.white38,
+                      size: 28.sp,
+                    ),
+                    SizedBox(height: 5.h),
                     Text(
                       l10n.noStreamAtTheMoment,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white54),
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13.sp,
+                      ),
                     ),
                   ],
                 ),

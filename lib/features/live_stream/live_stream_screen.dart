@@ -21,7 +21,7 @@ import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
 import 'widgets/live_stream_embed_stack.dart';
-import 'socket_log_screen.dart';
+// import 'socket_log_screen.dart';
 
 class Livestreaming extends StatefulWidget {
   const Livestreaming({super.key});
@@ -868,26 +868,27 @@ class _LivestreamingState extends State<Livestreaming> {
                       }),
                       Row(
                         children: [
-                          GestureDetector(
-                            onTap: () {
-                              Get.to(() => const SocketLogScreen());
-                            },
-                            child: Container(
-                              width: 36.w,
-                              height: 36.w,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2C2C2E),
-                                borderRadius: BorderRadius.circular(10.r),
-                              ),
-                              child: Icon(
-                                Icons.terminal_rounded,
-                                size: 20.sp,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 6.w),
+                          // Socket log screen (temporarily disabled)
+                          // GestureDetector(
+                          //   onTap: () {
+                          //     Get.to(() => const SocketLogScreen());
+                          //   },
+                          //   child: Container(
+                          //     width: 36.w,
+                          //     height: 36.w,
+                          //     alignment: Alignment.center,
+                          //     decoration: BoxDecoration(
+                          //       color: const Color(0xFF2C2C2E),
+                          //       borderRadius: BorderRadius.circular(10.r),
+                          //     ),
+                          //     child: Icon(
+                          //       Icons.terminal_rounded,
+                          //       size: 20.sp,
+                          //       color: Colors.white70,
+                          //     ),
+                          //   ),
+                          // ),
+                          // SizedBox(width: 6.w),
                           GestureDetector(
                             onTap: () {
                               Get.bottomSheet(
