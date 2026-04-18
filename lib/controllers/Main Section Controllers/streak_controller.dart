@@ -438,6 +438,7 @@ class StreamStreaksController extends GetxController {
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
 
+      _logStreakResponse('GET /api/v1/streaks/overview', res.data);
       unawaited(_persistCache(res.data));
       final snapshot = StreakData.fromPayload(res.data);
       current.value = snapshot;

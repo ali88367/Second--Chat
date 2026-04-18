@@ -93,9 +93,15 @@ class SettingsController extends GetxController {
     }
   }
 
-  /// Active switch color in LED settings: uses [selectedPlatform] and colours from Platform Colour sheet.
-  Color get ledSwitchAccentColor {
-    switch (selectedPlatform.value.toLowerCase().trim()) {
+  /// Active switch color in LED settings: uses [selectedPlatform] and colours
+  /// from Platform Colour sheet.
+  ///
+  /// When `All` is selected we return `null` so the switch uses its default
+  /// color (platform/app default).
+  Color? get ledSwitchAccentColor {
+    final platform = selectedPlatform.value.toLowerCase().trim();
+    if (platform.isEmpty || platform == 'all') return null;
+    switch (platform) {
       case 'kick':
         return kickColor.value ?? kickGreen;
       case 'youtube':
@@ -103,7 +109,7 @@ class SettingsController extends GetxController {
       case 'twitch':
         return twitchColor.value ?? twitchPurple;
       default:
-        return twitchColor.value ?? twitchPurple;
+        return null;
     }
   }
 
