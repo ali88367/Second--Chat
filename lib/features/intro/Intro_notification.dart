@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 
 import 'intro_screen3.dart';
+import 'intro_screen4.dart';
 
 class NotficationScreens extends StatefulWidget {
   const NotficationScreens({super.key});
@@ -18,13 +21,28 @@ class NotficationScreens extends StatefulWidget {
 class _NotficationScreensState extends State<NotficationScreens> {
   bool _isRequesting = false;
 
-  void _goToIntroScreen3() {
-    Get.to(
-      () => const IntroScreen3(),
-      transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.fastOutSlowIn,
-    );
+  Future<void> _continueAfterNotification() async {
+    if (!mounted) return;
+    var skipTrial = false;
+    try {
+      skipTrial = await Get.find<AuthController>().shouldSkipFreeTrialIntro();
+    } catch (_) {}
+    if (!mounted) return;
+    if (skipTrial) {
+      Get.offAll(
+        () => const IntroScreen4(),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
+    } else {
+      Get.to(
+        () => const IntroScreen3(),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
+    }
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -37,7 +55,7 @@ class _NotficationScreensState extends State<NotficationScreens> {
     setState(() => _isRequesting = false);
 
     if (status.isGranted) {
-      _goToIntroScreen3();
+      await _continueAfterNotification();
       return;
     }
 
@@ -136,7 +154,11 @@ class _NotficationScreensState extends State<NotficationScreens> {
                 left: 0,
                 right: 0,
                 child: GestureDetector(
-                  onTap: _isRequesting ? null : _goToIntroScreen3,
+                  onTap: _isRequesting
+                      ? null
+                      : () {
+                          unawaited(_continueAfterNotification());
+                        },
                   child: Text(
                     context.l10n.notificationScreenAnotherTime,
                     textAlign: TextAlign.center,

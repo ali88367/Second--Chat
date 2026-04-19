@@ -56,6 +56,7 @@ dependencies:
   video_player:
   socket_io_client:
   webview_flutter:
+  pointer_interceptor: ^0.10.1+2
   permission_handler:
   google_sign_in: ^7.2.0
   firebase_core: ^4.6.0

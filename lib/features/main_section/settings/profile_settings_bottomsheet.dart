@@ -86,7 +86,6 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
       final me = auth.me.value;
       final username = _pickString(me, const ['username', 'userName']);
       final email = _pickString(me, const ['email']);
-      final role = _pickString(me, const ['role']);
       final created = _parseDate(
         me?['created_at'] ?? me?['createdAt'],
       );
@@ -225,10 +224,6 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
                           context.l10n.yourPlan,
                           premiumLabel,
                         ),
-                        if (role != null && role.isNotEmpty) ...[
-                          SizedBox(height: 10.h),
-                          _kvRow(context.l10n.profileRole, role),
-                        ],
                         if (created != null) ...[
                           SizedBox(height: 10.h),
                           _kvRow(

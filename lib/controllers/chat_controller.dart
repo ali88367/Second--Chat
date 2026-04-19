@@ -41,6 +41,10 @@ class ChatController extends GetxController {
   final RxMap<String, bool> platformLive = <String, bool>{}.obs;
   final RxMap<String, String?> platformEmbedUrls = <String, String?>{}.obs;
 
+  /// Per-platform: embed [StreamWebView] finished first load (`onStreamReady`).
+  /// Chat UI hides lines for live platforms until true.
+  final RxMap<String, bool> platformStreamEmbedReady = <String, bool>{}.obs;
+
   /// Linked channel login from streaming overview `platforms[]` (optimistic send label).
   final RxMap<String, String> platformChatUsernames = <String, String>{}.obs;
   final RxMap<String, String?> streamTitleByPlatform = <String, String?>{}.obs;
@@ -505,6 +509,10 @@ class ChatController extends GetxController {
     if (selected == key && platformLive[key] == true) {
       watchUrl.value = normalizedNext ?? '';
     }
+    if (platformLive[key] == true) {
+      platformStreamEmbedReady[key] = false;
+      platformStreamEmbedReady.refresh();
+    }
     return true;
   }
 
@@ -630,10 +638,12 @@ class ChatController extends GetxController {
         }
       }
       isLive.value = platformLive[p.toLowerCase()] == true;
-      if (platformLive[p.toLowerCase()] == true) {
+      final pk = p.toLowerCase();
+      if (platformLive[pk] == true &&
+          platformStreamEmbedReady[pk] == true) {
         unawaited(
           _ensureChatForLivePlatform(
-            p.toLowerCase(),
+            pk,
             forceHistory: forceChatHistory,
           ),
         );
@@ -652,23 +662,56 @@ class ChatController extends GetxController {
     final url = runningUrl.trim();
     if (key.isEmpty || url.isEmpty) return;
     final onceKey = '$key|$url';
-    if (_historyTriggeredForRunningStream.contains(onceKey)) return;
+    if (_historyTriggeredForRunningStream.contains(onceKey)) {
+      // Same embed already completed this pipeline; still show chat + scroll.
+      platformStreamEmbedReady[key] = true;
+      platformStreamEmbedReady.refresh();
+      platformMessages.refresh();
+      _bumpScroll();
+      return;
+    }
 
     _historyTriggeredForRunningStream.add(onceKey);
     if (_historyTriggeredForRunningStream.length > 400) {
       _historyTriggeredForRunningStream.clear();
       _historyTriggeredForRunningStream.add(onceKey);
     }
-    // Attempt socket first, but do not block history while socket reconnects.
-    await _tryConnectIfPossible();
-    // Avoid repeated forced REST calls if multiple webviews report ready in bursts.
-    await _refreshHistoryForPlatform(key, force: false);
+
+    // Wait for REST history merge before lifting the embed gate so the list is
+    // populated on first paint (prefetch from `stream:status` reduces wait time).
+    try {
+      await _tryConnectIfPossible();
+      await _refreshHistoryForPlatform(key, force: true);
+    } catch (_) {
+      // History/socket errors: still reveal chat so realtime lines are not blocked.
+    } finally {
+      platformStreamEmbedReady[key] = true;
+      platformStreamEmbedReady.refresh();
+      platformMessages.refresh();
+      messages.refresh();
+      _bumpScroll();
+    }
   }
 
   bool isPlatformLive(String p) {
     final key = _normalizedApiPlatform(p);
     if (key.isEmpty) return false;
     return platformLive[key] == true;
+  }
+
+  /// Chat may be shown for this platform only when offline, or live and embed ready.
+  ///
+  /// When [platformLive] has no entry yet, we return false so REST/socket history
+  /// does not flash before the first authoritative `stream:status` + WebView ready.
+  bool isPlatformStreamEmbedReadyForChat(String rawPlatform) {
+    final key = _normalizedApiPlatform(rawPlatform, fallback: '');
+    if (key.isEmpty) return true;
+    final live = platformLive[key];
+    if (live == false) return true;
+    if (live == true) {
+      return platformStreamEmbedReady[key] == true;
+    }
+    return false;
   }
 
   void _setPlatformLiveStable(
@@ -683,11 +726,18 @@ class ChatController extends GetxController {
     final selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
 
     if (nextLive) {
+      final wasAlreadyLive = platformLive[platformKey] == true;
       _pendingOfflineTimers.remove(platformKey)?.cancel();
       _pendingOfflineVotes[platformKey] = 0;
       _lastConfirmedLiveAt[platformKey] = now;
       platformLive[platformKey] = true;
       platformLive.refresh();
+      // Repeated `stream:status` with live:true must not reset embed readiness or chat
+      // vanishes until the WebView fires `onPageFinished` again.
+      if (!wasAlreadyLive) {
+        platformStreamEmbedReady[platformKey] = false;
+        platformStreamEmbedReady.refresh();
+      }
       if (selected == platformKey) {
         isLive.value = true;
         final u = platformEmbedUrls[platformKey];
@@ -704,6 +754,8 @@ class ChatController extends GetxController {
       platformLive.refresh();
       _setEmbedUrlIfChanged(platformKey, null);
       platformEmbedUrls.refresh();
+      platformStreamEmbedReady.remove(platformKey);
+      platformStreamEmbedReady.refresh();
       platformMessages[platformKey] = const <ChatMessage>[];
       platformMessages.refresh();
       if (wasLive) {
@@ -724,6 +776,8 @@ class ChatController extends GetxController {
     if (!wasLive) {
       platformLive[platformKey] = false;
       platformLive.refresh();
+      platformStreamEmbedReady.remove(platformKey);
+      platformStreamEmbedReady.refresh();
       if (selected == platformKey) isLive.value = false;
       return;
     }
@@ -767,6 +821,8 @@ class ChatController extends GetxController {
       platformLive.refresh();
       _setEmbedUrlIfChanged(platformKey, null);
       platformEmbedUrls.refresh();
+      platformStreamEmbedReady.remove(platformKey);
+      platformStreamEmbedReady.refresh();
       platformMessages[platformKey] = const <ChatMessage>[];
       platformMessages.refresh();
       _recordStreamStopReason(
@@ -826,6 +882,7 @@ class ChatController extends GetxController {
       platformViewerCounts.remove(pKey);
       platformEmbedUrls.remove(pKey);
       platformLive.remove(pKey);
+      platformStreamEmbedReady.remove(pKey);
       platformMessages[pKey] = const <ChatMessage>[];
       if (platform.value.toLowerCase().trim() == pKey) {
         isLive.value = false;
@@ -834,6 +891,7 @@ class ChatController extends GetxController {
         _bumpScroll();
       }
     }
+    platformStreamEmbedReady.refresh();
   }
 
   /// Immediate UI/runtime hard-stop when a platform is explicitly disconnected by user action.
@@ -844,6 +902,8 @@ class ChatController extends GetxController {
     platformViewerCounts.remove(key);
     platformEmbedUrls.remove(key);
     platformLive.remove(key);
+    platformStreamEmbedReady.remove(key);
+    platformStreamEmbedReady.refresh();
     platformMessages[key] = const <ChatMessage>[];
     if (platform.value.toLowerCase().trim() == key) {
       isLive.value = false;
@@ -1534,7 +1594,6 @@ class ChatController extends GetxController {
         final normalOnly = <ChatMessage>[];
         for (final m in history) {
           if (_isNormalChatMessage(m)) {
-            final pk = _normalizePlatformKey(m.platform);
             normalOnly.add(m);
           } else {
             _appendActivityFromChatMessage(m, triggerEdgeGlow: false);
@@ -1549,8 +1608,9 @@ class ChatController extends GetxController {
         platformMessages[key] = collapsed;
         if (platform.value.toLowerCase() == key) {
           messages.assignAll(collapsed);
-          _bumpScroll();
         }
+        platformMessages.refresh();
+        _bumpScroll();
       }
       _historyLastFetchAt[key] = now;
     } catch (_) {
@@ -1657,8 +1717,8 @@ class ChatController extends GetxController {
         platform.value,
         fallback: 'twitch',
       );
-      if (selected.isNotEmpty) {
-        // Overview’s `_ensureChatForLivePlatform` usually loads history; avoid a second immediate GET.
+      if (selected.isNotEmpty &&
+          platformStreamEmbedReady[selected] == true) {
         unawaited(_refreshHistoryForPlatform(selected, force: false));
       }
     };
@@ -1763,6 +1823,11 @@ class ChatController extends GetxController {
         if (_setEmbedUrlIfChanged(p, preferredUrl)) {
           platformEmbedUrls.refresh();
         }
+        // History loads in [onPlatformStreamWebViewReady] once the embed has finished
+        // its first load, so the list does not populate (then appear to clear) early.
+        if (platformStreamEmbedReady[p] == true) {
+          unawaited(_ensureChatForLivePlatform(p, forceHistory: false));
+        }
       }
 
       Map<String, dynamic>? meta;
@@ -1801,7 +1866,6 @@ class ChatController extends GetxController {
               (selectedUrl != null && selectedUrl.trim().isNotEmpty)
                   ? selectedUrl
                   : watchUrl.value;
-          unawaited(_ensureChatForLivePlatform(selected));
         } else {
           watchUrl.value = '';
         }

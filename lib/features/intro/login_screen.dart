@@ -8,6 +8,7 @@ import 'package:second_chat/core/constants/constants.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -103,6 +104,14 @@ class _LoginScreenState extends State<LoginScreen> {
       await chat.ensureStreamRealtimeBootstrap();
     } catch (_) {}
     if (!mounted) return;
+
+    try {
+      final auth = Get.find<AuthController>();
+      if (!await auth.isIntroOnboardingPreferenceComplete()) {
+        Get.offAll(() => const NotficationScreens());
+        return;
+      }
+    } catch (_) {}
 
     final anyLive =
         chat.platformLive.values.any((v) => v == true) ||

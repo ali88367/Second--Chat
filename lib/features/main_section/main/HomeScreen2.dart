@@ -64,6 +64,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
     final hasSession = await _streakCtrl.ensureSession(showErrors: false);
     if (!hasSession) return;
     await _streakCtrl.fetchCurrentStreak(force: false, silent: true);
+    unawaited(_streakCtrl.tryAutoCheckInTodayForAppOpen());
   }
 
   Future<void> _openStreakSheet() async {

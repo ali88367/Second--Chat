@@ -88,7 +88,7 @@ class LedSettingsBottomSheet extends StatelessWidget {
                       val,
                     ),
                   ),
-                  _buildMilestoneIntervalRow(context),
+                  _buildMilestoneIntervalSwitchTile(context),
                   Obx(
                     () => _buildActionTile(
                       context.l10n.ledMilestoneCustom,
@@ -228,52 +228,68 @@ class LedSettingsBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildMilestoneIntervalRow(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showPresetStepPicker(context),
-        child: Container(
-          height: 56.h,
-          padding: EdgeInsets.symmetric(horizontal: 20.w),
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withOpacity(0.1),
-                width: 0.5,
+  /// Same pattern as other LED rows: title + [CustomSwitch]. Tap the label/subtitle to
+  /// pick a preset step when preset mode is on.
+  Widget _buildMilestoneIntervalSwitchTile(BuildContext context) {
+    return Container(
+      height: 58.h,
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withOpacity(0.1),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  if (!controller.ledMilestonePresetInterval.value) return;
+                  _showPresetStepPicker(context);
+                },
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Obx(
+                    () => Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          context.l10n.ledMilestoneInterval,
+                          style: sfProText400(17.sp, Colors.white),
+                        ),
+                        SizedBox(height: 2.h),
+                        Text(
+                          context.l10n.ledMilestoneIntervalValue(
+                            controller.ledMilestoneValue.value.toString(),
+                          ),
+                          style: sfProText400(13.sp, Colors.white54),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.ledMilestoneInterval,
-                      style: sfProText400(17.sp, Colors.white),
-                    ),
-                    Obx(
-                      () => Text(
-                        context.l10n.ledMilestoneIntervalValue(
-                          controller.ledMilestoneValue.value.toString(),
-                        ),
-                        style: sfProText400(13.sp, Colors.white54),
-                      ),
-                    ),
-                  ],
-                ),
+          Obx(
+            () => CustomSwitch(
+              activeColor: controller.ledSwitchAccentColor,
+              inactiveColor: _inactiveSwitch,
+              value: controller.ledMilestonePresetInterval.value,
+              onChanged: (v) => controller.updateLedSetting(
+                'milestonePresetInterval',
+                v,
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withOpacity(0.35),
-                size: 24.sp,
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../../controllers/chat_controller.dart';
 import '../../../core/localization/l10n.dart';
@@ -18,6 +20,9 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
     required this.globalMuted,
     required this.streamViewKey,
     this.onStreamReady,
+    /// When true, sizes the embed from [LayoutBuilder] max width/height (fills tile/stack).
+    this.fillConstraints = false,
+    this.useEagerGestureArena = true,
   });
 
   final String platformKey;
@@ -26,6 +31,8 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
   final bool globalMuted;
   final Key streamViewKey;
   final void Function(String platformKey, String runningUrl)? onStreamReady;
+  final bool fillConstraints;
+  final bool useEagerGestureArena;
 
   @override
   State<_LiveStreamPlatformSlot> createState() => _LiveStreamPlatformSlotState();
@@ -89,17 +96,47 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
 
       // Live state: keep last good URL latched; initialize webview once per live session.
       final webUrl = _latchedEmbedUrl;
-      return RepaintBoundary(
-        child: StreamWebView(
+
+      Widget embed(double w, double h) {
+        return StreamWebView(
           key: ValueKey('${widget.streamViewKey}_$_sessionNonce'),
           url: webUrl,
-          height: widget.height,
+          width: w,
+          height: h,
           cacheKey: widget.platformKey,
           onStreamReady: (runningUrl) {
             widget.onStreamReady?.call(widget.platformKey, runningUrl);
           },
           muted: widget.muted || widget.globalMuted,
           streamExpectedLive: liveExpected,
+          useEagerGestureArena: widget.useEagerGestureArena,
+        );
+      }
+
+      if (widget.fillConstraints) {
+        return RepaintBoundary(
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth;
+              final h = c.maxHeight;
+              if (w <= 0 || h <= 0) {
+                return const ColoredBox(color: Colors.black);
+              }
+              return embed(w, h);
+            },
+          ),
+        );
+      }
+
+      return RepaintBoundary(
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w =
+                c.maxWidth.isFinite && c.maxWidth > 0
+                    ? c.maxWidth
+                    : MediaQuery.sizeOf(context).width;
+            return embed(w, widget.height);
+          },
         ),
       );
     });
@@ -148,6 +185,8 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
                 globalMuted: globalMuted,
                 streamViewKey: ValueKey('stream_single_${_platforms[i]}'),
                 onStreamReady: onStreamReady,
+                fillConstraints: true,
+                useEagerGestureArena: true,
               ),
             ),
         ],
@@ -156,7 +195,9 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
   }
 }
 
-/// Multi-preview tiles; each tile has its own narrow [Obx].
+/// Multi-preview tiles; each slot’s [_LiveStreamPlatformSlot] uses [Obx] for live/url.
+/// Twitch only: bottom-right in-app fullscreen (embed controls remain available).
+/// Kick/YouTube: fullscreen only via the embed’s own UI.
 class LiveStreamMultiEmbedGrid extends StatelessWidget {
   const LiveStreamMultiEmbedGrid({
     super.key,
@@ -171,55 +212,93 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
 
   static const _platforms = <String>['twitch', 'kick', 'youtube'];
 
+  void _openTwitchFullscreenRoute(BuildContext context, String runningUrl) {
+    if (!context.mounted) return;
+    final url = runningUrl.trim();
+    if (url.isEmpty) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _FullScreenStreamWebViewPage(
+          platformKey: 'twitch',
+          url: url,
+          onStreamReady: onStreamReady,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tileGap = 8.w;
     const topFlex = 56;
     const bottomFlex = 44;
-    final chatCtrl = Get.find<ChatController>();
 
     Widget tile({
       required String platform,
       required BorderRadius radius,
-      required double height,
     }) {
-      return Obx(() {
-        final runningUrl = chatCtrl.urlForPlatform(platform)?.trim() ?? '';
-        final canOpenFullscreen =
-            chatCtrl.isPlatformLive(platform) && runningUrl.isNotEmpty;
+      final slot = ClipRect(
+        child: _LiveStreamPlatformSlot(
+          platformKey: platform,
+          height: 1,
+          muted: false,
+          globalMuted: globalMuted,
+          streamViewKey: ValueKey('stream_$platform'),
+          onStreamReady: onStreamReady,
+          fillConstraints: true,
+          useEagerGestureArena: false,
+        ),
+      );
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: canOpenFullscreen
-              ? () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => _FullScreenStreamWebViewPage(
-                        platformKey: platform,
-                        url: runningUrl,
-                        onStreamReady: onStreamReady,
+      if (platform != 'twitch') {
+        return ClipRRect(
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: slot,
+        );
+      }
+
+      return ClipRRect(
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: Obx(() {
+          final chatCtrl = Get.find<ChatController>();
+          final url = chatCtrl.urlForPlatform('twitch')?.trim() ?? '';
+          final canOpen = chatCtrl.isPlatformLive('twitch') &&
+              url.isNotEmpty &&
+              chatCtrl.isPlatformStreamEmbedReadyForChat('twitch');
+          return Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.hardEdge,
+            children: [
+              slot,
+              if (canOpen)
+                Positioned(
+                  bottom: 8.h,
+                  right: 8.w,
+                  child: PointerInterceptor(
+                    child: Material(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20.r),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _openTwitchFullscreenRoute(context, url),
+                        child: Padding(
+                          padding: EdgeInsets.all(8.w),
+                          child: Icon(
+                            Icons.fullscreen,
+                            color: Colors.white,
+                            size: 22.sp,
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                }
-              : null,
-          child: ClipRRect(
-            borderRadius: radius,
-            child: AbsorbPointer(
-              // Multi-preview tiles should not consume web gestures directly.
-              absorbing: true,
-              child: _LiveStreamPlatformSlot(
-                platformKey: platform,
-                height: height,
-                muted: false,
-                globalMuted: globalMuted,
-                streamViewKey: ValueKey('stream_$platform'),
-                onStreamReady: onStreamReady,
-              ),
-            ),
-          ),
-        );
-      });
+                  ),
+                ),
+            ],
+          );
+        }),
+      );
     }
 
     return Column(
@@ -234,7 +313,6 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
                   radius: BorderRadius.only(
                     topLeft: Radius.circular(16.r),
                   ),
-                  height: streamPreviewHeight,
                 ),
               ),
               SizedBox(width: tileGap),
@@ -244,7 +322,6 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
                   radius: BorderRadius.only(
                     topRight: Radius.circular(16.r),
                   ),
-                  height: streamPreviewHeight,
                 ),
               ),
             ],
@@ -259,7 +336,6 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
               bottomLeft: Radius.circular(16.r),
               bottomRight: Radius.circular(16.r),
             ),
-            height: streamPreviewHeight,
           ),
         ),
       ],
@@ -267,7 +343,7 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
   }
 }
 
-class _FullScreenStreamWebViewPage extends StatelessWidget {
+class _FullScreenStreamWebViewPage extends StatefulWidget {
   const _FullScreenStreamWebViewPage({
     required this.platformKey,
     required this.url,
@@ -279,39 +355,76 @@ class _FullScreenStreamWebViewPage extends StatelessWidget {
   final void Function(String platformKey, String runningUrl)? onStreamReady;
 
   @override
+  State<_FullScreenStreamWebViewPage> createState() =>
+      _FullScreenStreamWebViewPageState();
+}
+
+class _FullScreenStreamWebViewPageState extends State<_FullScreenStreamWebViewPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    });
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
           fit: StackFit.expand,
           children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return StreamWebView(
-                  url: url,
-                  height: constraints.maxHeight,
-                  cacheKey: 'fullscreen_$platformKey',
-                  muted: false,
-                  streamExpectedLive: true,
-                  onStreamReady: (runningUrl) {
-                    onStreamReady?.call(platformKey, runningUrl);
-                  },
-                );
-              },
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return StreamWebView(
+                    url: widget.url,
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    cacheKey: 'fullscreen_${widget.platformKey}',
+                    muted: false,
+                    streamExpectedLive: true,
+                    suppressNativeFullscreen: true,
+                    onStreamReady: (runningUrl) {
+                      widget.onStreamReady?.call(
+                        widget.platformKey,
+                        runningUrl,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
             Positioned(
-              top: 12,
-              left: 12,
-              child: Material(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(24),
-                child: InkWell(
+              top: 0,
+              left: 0,
+              child: SafeArea(
+                minimum: const EdgeInsets.all(8),
+                child: Material(
+                  color: Colors.black54,
                   borderRadius: BorderRadius.circular(24),
-                  onTap: () => Navigator.of(context).maybePop(),
-                  child: const Padding(
-                    padding: EdgeInsets.all(10),
-                    child: Icon(Icons.arrow_back, color: Colors.white),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(Icons.arrow_back, color: Colors.white),
+                    ),
                   ),
                 ),
               ),

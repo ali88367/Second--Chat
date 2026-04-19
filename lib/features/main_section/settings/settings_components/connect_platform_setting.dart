@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -10,8 +12,38 @@ import 'package:second_chat/core/localization/l10n.dart';
 import '../../../../core/constants/app_colors/app_colors.dart';
 import '../../../../core/themes/textstyles.dart';
 
-class ConnectPlatformSetting extends StatelessWidget {
+class ConnectPlatformSetting extends StatefulWidget {
   const ConnectPlatformSetting({super.key});
+
+  @override
+  State<ConnectPlatformSetting> createState() => _ConnectPlatformSettingState();
+}
+
+class _ConnectPlatformSettingState extends State<ConnectPlatformSetting> {
+  Worker? _connectingWorker;
+  Worker? _disconnectingWorker;
+  Worker? _connectedMapWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = Get.find<PlatformConnectController>();
+    void bump() {
+      if (mounted) setState(() {});
+    }
+
+    _connectingWorker = ever(c.connectingProvider, (_) => bump());
+    _disconnectingWorker = ever(c.disconnectingProvider, (_) => bump());
+    _connectedMapWorker = ever(c.isConnected, (_) => bump());
+  }
+
+  @override
+  void dispose() {
+    _connectingWorker?.dispose();
+    _disconnectingWorker?.dispose();
+    _connectedMapWorker?.dispose();
+    super.dispose();
+  }
 
   // Reusable platform card widget
   Widget _buildPlatformCard({
@@ -114,110 +146,106 @@ class ConnectPlatformSetting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ctrl = Get.find<PlatformConnectController>();
+    final twitchConnected = ctrl.isConnected[OAuthProvider.twitch] ?? false;
+    final kickConnected = ctrl.isConnected[OAuthProvider.kick] ?? false;
+    final youtubeConnected = ctrl.isConnected[OAuthProvider.youtube] ?? false;
+    final connecting = ctrl.connectingProvider.value;
+    final disconnecting = ctrl.disconnectingProvider.value;
+
     return Container(
       color: const Color.fromRGBO(20, 18, 18, 1),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w),
-        child: Obx(() {
-          final twitchConnected =
-              ctrl.isConnected[OAuthProvider.twitch] ?? false;
-          final kickConnected = ctrl.isConnected[OAuthProvider.kick] ?? false;
-          final youtubeConnected =
-              ctrl.isConnected[OAuthProvider.youtube] ?? false;
-          final connecting = ctrl.connectingProvider.value;
-          final disconnecting = ctrl.disconnectingProvider.value;
+        child: Column(
+          children: [
+            SizedBox(height: 10.h),
 
-          return Column(
-            children: [
-              SizedBox(height: 10.h),
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Get.back();
+                  },
+                  child: Image.asset(back_arrow_icon, height: 44.h),
+                ),
+                Text(
+                  context.l10n.connectPlatform,
+                  style: sfProDisplay600(17.sp, onDark),
+                ),
+                SizedBox(width: 44.w),
+              ],
+            ),
 
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Get.back();
-                    },
-                    child: Image.asset(back_arrow_icon, height: 44.h),
+            SizedBox(height: 40.h),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildPlatformCard(
+                    context: context,
+                    title: 'Twitch',
+                    largeLogoAsset: twitch_logo,
+                    smallLogoAsset: twitch_icon,
+                    buttonColor: twitchPurple,
+                    isConnected: twitchConnected,
+                    isConnecting: connecting == OAuthProvider.twitch,
+                    isDisconnecting: disconnecting == OAuthProvider.twitch,
+                    onPressed:
+                        () => _handlePlatformTap(
+                          context,
+                          ctrl,
+                          OAuthProvider.twitch,
+                          twitchConnected,
+                        ),
                   ),
-                  Text(
-                    context.l10n.connectPlatform,
-                    style: sfProDisplay600(17.sp, onDark),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: _buildPlatformCard(
+                    context: context,
+                    title: 'Kick',
+                    largeLogoAsset: kick,
+                    smallLogoAsset: kick_icon,
+                    buttonColor: kickGreen,
+                    isConnected: kickConnected,
+                    isConnecting: connecting == OAuthProvider.kick,
+                    isDisconnecting: disconnecting == OAuthProvider.kick,
+                    onPressed:
+                        () => _handlePlatformTap(
+                          context,
+                          ctrl,
+                          OAuthProvider.kick,
+                          kickConnected,
+                        ),
                   ),
-                  SizedBox(width: 44.w),
-                ],
-              ),
-
-              SizedBox(height: 40.h),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildPlatformCard(
-                      context: context,
-                      title: 'Twitch',
-                      largeLogoAsset: twitch_logo,
-                      smallLogoAsset: twitch_icon,
-                      buttonColor: twitchPurple,
-                      isConnected: twitchConnected,
-                      isConnecting: connecting == OAuthProvider.twitch,
-                      isDisconnecting: disconnecting == OAuthProvider.twitch,
-                      onPressed:
-                          () => _handlePlatformTap(
-                            context,
-                            ctrl,
-                            OAuthProvider.twitch,
-                            twitchConnected,
-                          ),
-                    ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12.w),
+            _buildPlatformCard(
+              context: context,
+              title: 'YouTube',
+              largeLogoAsset: youtube_logo,
+              smallLogoAsset: youtube_icon,
+              buttonColor: youtubeRed,
+              isConnected: youtubeConnected,
+              isConnecting: connecting == OAuthProvider.youtube,
+              isDisconnecting: disconnecting == OAuthProvider.youtube,
+              onPressed:
+                  () => _handlePlatformTap(
+                    context,
+                    ctrl,
+                    OAuthProvider.youtube,
+                    youtubeConnected,
                   ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: _buildPlatformCard(
-                      context: context,
-                      title: 'Kick',
-                      largeLogoAsset: kick,
-                      smallLogoAsset: kick_icon,
-                      buttonColor: kickGreen,
-                      isConnected: kickConnected,
-                      isConnecting: connecting == OAuthProvider.kick,
-                      isDisconnecting: disconnecting == OAuthProvider.kick,
-                      onPressed:
-                          () => _handlePlatformTap(
-                            context,
-                            ctrl,
-                            OAuthProvider.kick,
-                            kickConnected,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12.w),
-              _buildPlatformCard(
-                context: context,
-                title: 'YouTube',
-                largeLogoAsset: youtube_logo,
-                smallLogoAsset: youtube_icon,
-                buttonColor: youtubeRed,
-                isConnected: youtubeConnected,
-                isConnecting: connecting == OAuthProvider.youtube,
-                isDisconnecting: disconnecting == OAuthProvider.youtube,
-                onPressed:
-                    () => _handlePlatformTap(
-                      context,
-                      ctrl,
-                      OAuthProvider.youtube,
-                      youtubeConnected,
-                    ),
-              ),
+            ),
 
-              SizedBox(height: 20.h),
-            ],
-          );
-        }),
+            SizedBox(height: 20.h),
+          ],
+        ),
       ),
     );
   }
@@ -232,8 +260,7 @@ Future<void> _handlePlatformTap(
   if (!isConnected) {
     final ok = await ctrl.connect(provider);
     if (ok) {
-      await _refreshSettingsPayload();
-      await _rebootstrapChatAfterPlatformConnect(provider);
+      unawaited(_postConnectMaintenance(provider));
     }
     return;
   }
@@ -327,5 +354,17 @@ Future<void> _rebootstrapChatAfterPlatformConnect(
   final key = provider.name.toLowerCase().trim();
   try {
     await chat.onPlatformConnectedSuccessfully(key);
+  } catch (_) {}
+}
+
+/// Runs after OAuth link succeeds so closing the bottom sheet early does not
+/// cancel this work or trip [Obx] rebuilds on a disposed widget.
+Future<void> _postConnectMaintenance(OAuthProvider provider) async {
+  await Future<void>.delayed(Duration.zero);
+  try {
+    await _refreshSettingsPayload();
+  } catch (_) {}
+  try {
+    await _rebootstrapChatAfterPlatformConnect(provider);
   } catch (_) {}
 }

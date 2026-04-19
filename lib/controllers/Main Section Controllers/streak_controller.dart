@@ -483,6 +483,19 @@ class StreamStreaksController extends GetxController {
     }
   }
 
+  Future<void> tryAutoCheckInTodayForAppOpen({bool showErrors = false}) async {
+    final hasSession = await ensureSession(showErrors: showErrors);
+    if (!hasSession) return;
+
+    await markStreakComplete(
+      date: DateTime.now(),
+      showErrors: showErrors,
+      allowWhenNoStreak: true,
+    );
+
+    await fetchCurrentStreak(force: true, silent: true);
+  }
+
   Future<void> _hydrateFromCache() async {
     if (current.value != null) return;
     try {

@@ -28,20 +28,34 @@ class StreamWebView extends StatefulWidget {
     this.onStreamReady,
     this.muted = false,
     this.streamExpectedLive = false,
+    /// When true (e.g. in-app fullscreen opened from multi-preview), blocks
+    /// document/iframe fullscreen APIs so the embed's fullscreen control
+    /// cannot crash against the host route.
+    this.suppressNativeFullscreen = false,
+    /// When set (e.g. fullscreen route), constrains width so the WebView fills
+    /// the entire viewport for correct aspect / layout.
+    this.width,
+    /// When true (default), uses [EagerGestureRecognizer] so the embed wins
+    /// drags against outer [ScrollView]s. Set false for small preview tiles
+    /// where a parent [GestureDetector] or overlay must receive taps.
+    this.useEagerGestureArena = true,
   });
 
   final String url;
   final double height;
+  final double? width;
   final String cacheKey;
   final void Function(String runningUrl)? onStreamReady;
   final bool muted;
   final bool streamExpectedLive;
+  final bool suppressNativeFullscreen;
+  final bool useEagerGestureArena;
 
   @override
-  State<StreamWebView> createState() => _StreamWebViewState();
+  State<StreamWebView> createState() => StreamWebViewState();
 }
 
-class _StreamWebViewState extends State<StreamWebView>
+class StreamWebViewState extends State<StreamWebView>
     with SingleTickerProviderStateMixin {
   static final Map<String, _StreamWebViewControllerSnapshot> _controllerCache =
       <String, _StreamWebViewControllerSnapshot>{};
@@ -227,10 +241,274 @@ class _StreamWebViewState extends State<StreamWebView>
       if (parent == null || parent.isEmpty || parent == 'localhost') {
         qp['parent'] = 'cafe7bygasco.com';
       }
+      if (widget.suppressNativeFullscreen) {
+        qp['allowfullscreen'] = 'false';
+      }
+      return uri.replace(queryParameters: qp).toString();
+    }
+
+    final host = uri.host.toLowerCase();
+    if (widget.suppressNativeFullscreen &&
+        (host.contains('youtube.com') || host.contains('youtube-nocookie.com'))) {
+      final qp = Map<String, String>.from(uri.queryParameters);
+      qp['fs'] = '0';
       return uri.replace(queryParameters: qp).toString();
     }
 
     return trimmed;
+  }
+
+  Future<void> _suppressEmbeddedFullscreenChrome() async {
+    if (!widget.suppressNativeFullscreen) return;
+    try {
+      await _controller.runJavaScript(r'''
+(() => {
+  const noop = function() { return Promise.resolve(); };
+  const patch = () => {
+    try {
+      Element.prototype.requestFullscreen = noop;
+      Element.prototype.webkitRequestFullscreen = noop;
+      Element.prototype.mozRequestFullScreen = noop;
+      Element.prototype.msRequestFullscreen = noop;
+    } catch (_) {}
+    document.querySelectorAll('iframe').forEach((f) => {
+      try {
+        f.removeAttribute('allowfullscreen');
+      } catch (_) {}
+    });
+  };
+  patch();
+  try {
+    const mo = new MutationObserver(() => patch());
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+  } catch (_) {}
+})();
+''');
+    } catch (_) {}
+  }
+
+  /// Kick multi-preview: fill the tile without clipping the player’s own overlay UI
+  /// (`overflow:hidden` + absolutely positioned iframes broke controls). Re-apply
+  /// briefly as the embed mounts subtrees (debounced MutationObserver).
+  Future<void> _injectKickEmbedContainmentLayout() async {
+    if (widget.cacheKey != 'kick') return;
+    if (widget.suppressNativeFullscreen) return;
+    if (_shellIsIdle) return;
+    try {
+      await _controller.runJavaScript(r'''
+(() => {
+  try {
+    if (window.__secondChatKickLayoutMo) {
+      window.__secondChatKickLayoutMo.disconnect();
+      window.__secondChatKickLayoutMo = null;
+    }
+    if (window.__secondChatKickLayoutTimer) {
+      clearTimeout(window.__secondChatKickLayoutTimer);
+      window.__secondChatKickLayoutTimer = null;
+    }
+  } catch (e0) {}
+  var kickLayoutTimer = null;
+  var kickLayoutObserver = null;
+  function applyKickTileLayout() {
+    try {
+      var root = document.documentElement;
+      var b = document.body;
+      if (root) {
+        root.style.margin = '0';
+        root.style.padding = '0';
+        root.style.width = '100%';
+        root.style.height = '100%';
+        root.style.minHeight = '100%';
+        root.style.backgroundColor = '#000';
+        root.style.overflow = 'hidden';
+      }
+      if (b) {
+        b.style.margin = '0';
+        b.style.padding = '0';
+        b.style.width = '100%';
+        b.style.minHeight = '100%';
+        b.style.height = 'auto';
+        b.style.backgroundColor = '#000';
+        b.style.boxSizing = 'border-box';
+        // Let Kick draw player chrome above the video (was broken with overflow:hidden).
+        b.style.overflow = 'visible';
+        b.style.position = 'relative';
+      }
+      document.querySelectorAll('iframe').forEach(function (f) {
+        f.style.boxSizing = 'border-box';
+        f.style.width = '100%';
+        f.style.height = '100%';
+        f.style.minHeight = '100%';
+        f.style.border = '0';
+        f.style.display = 'block';
+        f.style.margin = '0';
+        f.style.padding = '0';
+        f.style.position = 'relative';
+        f.style.flex = '1 1 auto';
+      });
+      var v = document.querySelector('video');
+      if (v) {
+        v.style.maxWidth = '100%';
+        v.style.maxHeight = '100%';
+        v.style.width = '100%';
+        v.style.height = '100%';
+        v.style.objectFit = 'contain';
+      }
+    } catch (e) {}
+  }
+  function scheduleApply() {
+    if (window.__secondChatKickLayoutTimer) {
+      clearTimeout(window.__secondChatKickLayoutTimer);
+      window.__secondChatKickLayoutTimer = null;
+    }
+    kickLayoutTimer = setTimeout(function () {
+      kickLayoutTimer = null;
+      window.__secondChatKickLayoutTimer = null;
+      applyKickTileLayout();
+    }, 80);
+    window.__secondChatKickLayoutTimer = kickLayoutTimer;
+  }
+  applyKickTileLayout();
+  try {
+    kickLayoutObserver = new MutationObserver(function () {
+      scheduleApply();
+    });
+    window.__secondChatKickLayoutMo = kickLayoutObserver;
+    kickLayoutObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+    setTimeout(function () {
+      try {
+        if (kickLayoutObserver) kickLayoutObserver.disconnect();
+        kickLayoutObserver = null;
+        window.__secondChatKickLayoutMo = null;
+      } catch (e2) {}
+    }, 10000);
+  } catch (e1) {}
+})();
+''');
+    } catch (_) {}
+  }
+
+  /// Same intent as the embed’s own fullscreen control: [video.requestFullscreen],
+  /// same-origin iframe controls, or a labeled fullscreen button.
+  /// No-op when [suppressNativeFullscreen] is true or the shell is idle.
+  Future<void> requestEmbedNativeFullscreenFromTap() async {
+    if (!mounted || _shellIsIdle) return;
+    if (widget.suppressNativeFullscreen) return;
+    try {
+      await _controller.runJavaScript(r'''
+(function () {
+  function tryFs(el) {
+    if (!el) return false;
+    var fn = el.requestFullscreen ||
+        el.webkitRequestFullscreen ||
+        el.mozRequestFullScreen ||
+        el.msRequestFullscreen;
+    if (!fn) return false;
+    try {
+      fn.call(el);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function labelText(el) {
+    if (!el || !el.getAttribute) return '';
+    return (
+      (el.getAttribute('aria-label') || '') +
+      ' ' +
+      (el.getAttribute('title') || '') +
+      ' ' +
+      (el.getAttribute('data-testid') || '') +
+      ' ' +
+      (el.textContent || '')
+    );
+  }
+  function clickFullscreenControlIn(root) {
+    if (!root || !root.querySelectorAll) return false;
+    var candidates = [];
+    try {
+      candidates = candidates.concat(
+        Array.from(root.querySelectorAll('[data-testid*="fullscreen"]')),
+      );
+    } catch (e0) {}
+    try {
+      candidates = candidates.concat(
+        Array.from(root.querySelectorAll('button,[role="button"],a[href]')),
+      );
+    } catch (e1) {}
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      var t = labelText(el);
+      if (
+        /fullscreen|full-screen|enter full screen|wide screen|widescreen/i.test(
+          t,
+        )
+      ) {
+        try {
+          el.click();
+          return true;
+        } catch (e2) {}
+      }
+    }
+    return false;
+  }
+  /** Nudge the player so controls / video exist for requestFullscreen (Kick etc.). */
+  function wakePlayerSurface() {
+    try {
+      var w = window.innerWidth || 320;
+      var h = window.innerHeight || 180;
+      var cx = Math.max(4, Math.floor(w / 2));
+      var cy = Math.max(4, Math.floor(h / 2));
+      var target = document.elementFromPoint(cx, cy);
+      if (target && target !== document.documentElement) {
+        ['pointerdown', 'pointerup', 'click'].forEach(function (t) {
+          try {
+            var e = new MouseEvent(t, {
+              bubbles: true,
+              cancelable: true,
+              clientX: cx,
+              clientY: cy,
+              view: window,
+            });
+            target.dispatchEvent(e);
+          } catch (x) {}
+        });
+      }
+      var v0 = document.querySelector('video');
+      if (v0) {
+        try {
+          v0.click();
+        } catch (x) {}
+        try {
+          if (v0.play) v0.play();
+        } catch (x) {}
+      }
+    } catch (e) {}
+  }
+
+  wakePlayerSurface();
+  var v = document.querySelector('video');
+  if (tryFs(v)) return;
+  var ifr = document.querySelector('iframe');
+  if (ifr) {
+    try {
+      var doc =
+        ifr.contentDocument ||
+        (ifr.contentWindow && ifr.contentWindow.document);
+      if (doc) {
+        var iv = doc.querySelector('video');
+        if (tryFs(iv)) return;
+        if (clickFullscreenControlIn(doc)) return;
+      }
+    } catch (e) {}
+  }
+  if (clickFullscreenControlIn(document)) return;
+})();
+''');
+    } catch (_) {}
   }
 
   void _ensureNavigationDelegate() {
@@ -244,6 +522,24 @@ class _StreamWebViewState extends State<StreamWebView>
         },
         onPageFinished: (_) {
           _applyMuteState();
+          unawaited(_suppressEmbeddedFullscreenChrome());
+          unawaited(_injectKickEmbedContainmentLayout());
+          if (widget.cacheKey == 'kick' &&
+              !widget.suppressNativeFullscreen &&
+              !_shellIsIdle) {
+            unawaited(
+              Future<void>.delayed(const Duration(milliseconds: 350), () async {
+                if (!mounted) return;
+                await _injectKickEmbedContainmentLayout();
+              }),
+            );
+            unawaited(
+              Future<void>.delayed(const Duration(milliseconds: 1100), () async {
+                if (!mounted) return;
+                await _injectKickEmbedContainmentLayout();
+              }),
+            );
+          }
           _maybeReportStreamReady();
         },
         onNavigationRequest: (req) {
@@ -432,84 +728,101 @@ class _StreamWebViewState extends State<StreamWebView>
     if (oldWidget.muted != widget.muted) {
       _applyMuteState();
     }
+    if (oldWidget.suppressNativeFullscreen != widget.suppressNativeFullscreen) {
+      unawaited(_suppressEmbeddedFullscreenChrome());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final eagerGestures = <Factory<OneSequenceGestureRecognizer>>{
-      Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
-    };
-    return SizedBox(
-      height: widget.height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          WebViewWidget(
-            controller: _controller,
-            gestureRecognizers: eagerGestures,
-          ),
-          if (_showLiveLoadingOverlay)
-            ColoredBox(
-              color: Colors.black,
-              child: Center(
-                child: AnimatedBuilder(
-                  animation: _dotsController,
-                  builder: (context, _) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(3, (i) {
-                        final base =
-                            _dotsController.value * 2 * math.pi + i * 0.9;
-                        final opacity =
-                            0.35 + 0.65 * (0.5 + 0.5 * math.sin(base));
-                        return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 3.w),
-                          child: Opacity(
-                            opacity: opacity.clamp(0.2, 1.0),
-                            child: Text(
-                              '•',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 32.sp,
-                                height: 1,
-                              ),
+    final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers =
+        widget.useEagerGestureArena
+            ? <Factory<OneSequenceGestureRecognizer>>{
+                Factory<OneSequenceGestureRecognizer>(
+                  () => EagerGestureRecognizer(),
+                ),
+              }
+            : const <Factory<OneSequenceGestureRecognizer>>{};
+    final Widget frame = Stack(
+      fit: StackFit.expand,
+      children: [
+        WebViewWidget(
+          controller: _controller,
+          gestureRecognizers: gestureRecognizers,
+        ),
+        if (_showLiveLoadingOverlay)
+          ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _dotsController,
+                builder: (context, _) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(3, (i) {
+                      final base =
+                          _dotsController.value * 2 * math.pi + i * 0.9;
+                      final opacity =
+                          0.35 + 0.65 * (0.5 + 0.5 * math.sin(base));
+                      return Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 3.w),
+                        child: Opacity(
+                          opacity: opacity.clamp(0.2, 1.0),
+                          child: Text(
+                            '•',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 32.sp,
+                              height: 1,
                             ),
                           ),
-                        );
-                      }),
-                    );
-                  },
-                ),
+                        ),
+                      );
+                    }),
+                  );
+                },
               ),
             ),
-          if (_showNoStreamOverlay)
-            ColoredBox(
-              color: Colors.black,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.videocam_off,
-                      color: Colors.white38,
-                      size: 28.sp,
+          ),
+        if (_showNoStreamOverlay)
+          ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.videocam_off,
+                    color: Colors.white38,
+                    size: 28.sp,
+                  ),
+                  SizedBox(height: 5.h),
+                  Text(
+                    l10n.noStreamAtTheMoment,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13.sp,
                     ),
-                    SizedBox(height: 5.h),
-                    Text(
-                      l10n.noStreamAtTheMoment,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 13.sp,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-        ],
-      ),
+          ),
+      ],
+    );
+
+    if (widget.width != null) {
+      return SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: frame,
+      );
+    }
+    return SizedBox(
+      height: widget.height,
+      child: frame,
     );
   }
 }
