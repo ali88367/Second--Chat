@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -35,15 +36,18 @@ class _HomeScreen2State extends State<HomeScreen2> {
       90; // Fire3 frames used in StreamStreakSetupBottomSheet
   late final StreamStreaksController _streakCtrl;
   bool _streakSheetOpening = false;
+  bool _streakCompletionChecked = false;
 
   @override
   void initState() {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
+    unawaited(_refreshStreakOnEntry());
     // Splash warms up streak/settings; avoid refetching on first paint.
     if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
       unawaited(_loadStreakOnLaunch());
     }
+    _maybeCompleteStreakForToday();
     final invites =
         Get.isRegistered<InviteController>()
             ? Get.find<InviteController>()
@@ -68,6 +72,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
     try {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
+      await _streakCtrl.ensureInitialStreakForNewUser(showErrors: false);
 
       await Get.bottomSheet(
         const StreakSheetRouter(),
@@ -83,6 +88,34 @@ class _HomeScreen2State extends State<HomeScreen2> {
       if (mounted) {
         unawaited(_streakCtrl.fetchCurrentStreak(force: true, silent: true));
       }
+    }
+  }
+
+  Future<void> _refreshStreakOnEntry() async {
+    final hasSession = await _streakCtrl.ensureSession(showErrors: false);
+    if (!hasSession) return;
+    await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
+  }
+
+  Future<void> _maybeCompleteStreakForToday() async {
+    if (_streakCompletionChecked) return;
+    _streakCompletionChecked = true;
+
+    try {
+      final result = await _streakCtrl.markStreakComplete(
+        date: DateTime.now(),
+        showErrors: false,
+        allowWhenNoStreak: true,
+      );
+
+      if (result.skipped && result.message == 'needs_freeze' && kDebugMode) {
+        debugPrint(
+          '[STREAK][HomeScreen2] check-in gated: needs freeze (not auto-opening sheet)',
+        );
+      }
+      await _refreshStreakOnEntry();
+    } catch (e) {
+      debugPrint('HOME STREAK COMPLETE ERROR: $e');
     }
   }
 
@@ -482,6 +515,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     if (_streakLoading) return;
     final hasSession = await _streakCtrl.ensureSession(showErrors: true);
     if (!hasSession || !mounted) return;
+    await _streakCtrl.ensureInitialStreakForNewUser(showErrors: false);
 
     // Open instantly using cached snapshot; refresh in the background.
     unawaited(_streakCtrl.fetchCurrentStreak(force: true, silent: true));

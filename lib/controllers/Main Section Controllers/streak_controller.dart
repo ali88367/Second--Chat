@@ -465,6 +465,24 @@ class StreamStreaksController extends GetxController {
     return current.value;
   }
 
+  Future<void> ensureInitialStreakForNewUser({bool showErrors = false}) async {
+    final snapshot = await fetchCurrentStreak(force: true, silent: !showErrors);
+    if (snapshot != null && snapshot.hasCreatedStreak) {
+      return;
+    }
+
+    final completion = await markStreakComplete(
+      date: DateTime.now(),
+      showErrors: showErrors,
+      bypassFreezeGate: true,
+      allowWhenNoStreak: true,
+    );
+
+    if (completion.didUpdate) {
+      await fetchCurrentStreak(force: true, silent: true);
+    }
+  }
+
   Future<void> _hydrateFromCache() async {
     if (current.value != null) return;
     try {
@@ -665,6 +683,7 @@ class StreamStreaksController extends GetxController {
     required DateTime date,
     bool showErrors = false,
     bool bypassFreezeGate = false,
+    bool allowWhenNoStreak = false,
   }) async {
     final accessToken = await _getAccessToken(showErrors: showErrors);
     if (accessToken == null || accessToken.isEmpty) {
@@ -678,6 +697,13 @@ class StreamStreaksController extends GetxController {
 
     final currentStreak = await fetchCurrentStreak(force: true, silent: true);
     if (currentStreak == null) {
+      if (allowWhenNoStreak) {
+        return _postStreakCheckIn(
+          date: date,
+          accessToken: accessToken,
+          showErrors: showErrors,
+        );
+      }
       return const StreakCompleteResult(
         success: false,
         alreadyCompleted: false,
@@ -710,6 +736,18 @@ class StreamStreaksController extends GetxController {
       );
     }
 
+    return _postStreakCheckIn(
+      date: date,
+      accessToken: accessToken,
+      showErrors: showErrors,
+    );
+  }
+
+  Future<StreakCompleteResult> _postStreakCheckIn({
+    required DateTime date,
+    required String accessToken,
+    required bool showErrors,
+  }) async {
     try {
       final auth = Get.find<AuthController>();
       final res = await auth.api.client.dio.post<dynamic>(

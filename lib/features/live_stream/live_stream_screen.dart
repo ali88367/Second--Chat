@@ -72,6 +72,7 @@ class _LivestreamingState extends State<Livestreaming> {
     super.initState();
     _settingsCtrl = Get.find<SettingsController>();
     _streakCtrl = Get.find<StreamStreaksController>();
+    unawaited(_refreshStreakOnEntry());
     _chatFilter.addListener(_updateImageBasedOnFilter);
     _chatFilter.addListener(_syncSelectedPlatformFromFilter);
     _showActivity.addListener(_onShowActivityOpened);
@@ -84,7 +85,7 @@ class _LivestreamingState extends State<Livestreaming> {
   }
 
   void _warmPrefetchBottomSheets() {
-    unawaited(_warmStreakData());
+    unawaited(_refreshStreakOnEntry());
     final invites =
         Get.isRegistered<InviteController>()
             ? Get.find<InviteController>()
@@ -92,12 +93,10 @@ class _LivestreamingState extends State<Livestreaming> {
     invites.loadInvitesIfNeeded();
   }
 
-  Future<void> _warmStreakData() async {
-    if (_streakCtrl.current.value != null) return;
-    if (_streakCtrl.isLoading.value) return;
+  Future<void> _refreshStreakOnEntry() async {
     final hasSession = await _streakCtrl.ensureSession(showErrors: false);
     if (!hasSession) return;
-    await _streakCtrl.fetchCurrentStreak(force: false, silent: true);
+    await _streakCtrl.fetchCurrentStreak(force: true, silent: true);
   }
 
   void _onShowActivityOpened() {
@@ -152,6 +151,7 @@ class _LivestreamingState extends State<Livestreaming> {
       final result = await _streakCtrl.markStreakComplete(
         date: DateTime.now(),
         showErrors: false,
+        allowWhenNoStreak: true,
       );
 
       // Never auto-open streak UI on app restart; user can open it explicitly via
@@ -163,6 +163,7 @@ class _LivestreamingState extends State<Livestreaming> {
           );
         }
       }
+      await _refreshStreakOnEntry();
     } catch (e) {
       debugPrint('STREAK COMPLETE ERROR: $e');
     }
@@ -174,6 +175,7 @@ class _LivestreamingState extends State<Livestreaming> {
     try {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
+      await _streakCtrl.ensureInitialStreakForNewUser(showErrors: false);
 
       await Get.bottomSheet(
         StreakSheetRouter(forceFreezePreview: forceFreezePreview),
