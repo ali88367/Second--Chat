@@ -7,32 +7,47 @@ import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
 
 class AppPrefetch {
+  static Future<bool>? _inFlight;
+
   static Future<bool> prefetchAfterAuth({
     Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (_inFlight != null) return _inFlight!;
+    _inFlight = _prefetchAfterAuthInternal(timeout: timeout).whenComplete(() {
+      _inFlight = null;
+    });
+    return _inFlight!;
+  }
+
+  static Future<bool> _prefetchAfterAuthInternal({
+    required Duration timeout,
   }) async {
     if (!Get.isRegistered<AuthController>()) return false;
     final auth = Get.find<AuthController>();
     if (!auth.isAuthenticated.value) return false;
 
     SettingsController? settings;
-    Future<void>? settingsFuture;
 
     if (Get.isRegistered<SettingsController>()) {
       settings = Get.find<SettingsController>();
-      // Avoid forcing a network refresh on splash/login. If cached settings are
-      // already hydrated, this becomes a fast no-op.
-      settingsFuture = settings.loadSettings(force: false);
     }
 
-    // Load streak overview first so header counts and sheets match server state
-    // (including auto-created zero-count streaks) before other background work.
+    final blockingTasks = <Future<void>>[];
+
+    // Run blocking warmups in parallel.
+    if (settings != null) {
+      // Avoid forcing a network refresh on splash/login. If cached settings are
+      // already hydrated, this becomes a fast no-op.
+      blockingTasks.add(
+        settings.loadSettings(force: false).catchError((_) {}),
+      );
+    }
+
     if (Get.isRegistered<StreamStreaksController>()) {
       final streakCtrl = Get.find<StreamStreaksController>();
-      try {
-        await streakCtrl
-            .fetchCurrentStreak(force: false, silent: true)
-            .timeout(timeout);
-      } catch (_) {}
+      blockingTasks.add(
+        streakCtrl.fetchCurrentStreak(force: false, silent: true).then((_) {}),
+      );
       unawaited(
         (() async {
           try {
@@ -46,15 +61,14 @@ class AppPrefetch {
       unawaited(Get.find<InviteController>().loadInvites().catchError((_) {}));
     }
 
-    if (settingsFuture != null) {
-      // Only block on settings briefly if we don't already have cached settings.
-      final alreadyHydrated = settings?.settingsPayload.value != null;
-      if (!alreadyHydrated) {
-        try {
-          await settingsFuture.timeout(timeout);
-        } catch (_) {
-          // Treat as a soft timeout; settings may still finish in background.
-        }
+    if (blockingTasks.isNotEmpty) {
+      try {
+        await Future.wait(
+          blockingTasks.map((f) => f.timeout(timeout, onTimeout: () {})),
+          eagerError: false,
+        );
+      } catch (_) {
+        // Soft-fail: individual tasks already handle errors/timeouts.
       }
     }
 

@@ -369,6 +369,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get streamStreak => 'Sequência de stream';
 
   @override
+  String get streakHistoryTitle => 'Histórico de sequência';
+
+  @override
+  String get noStreakHistoryYet => 'Ainda não há histórico de sequência';
+
+  @override
   String get subscribe => 'Assinar';
 
   @override

@@ -116,6 +116,8 @@
   "streakInDangerHitFreezeButton": "Série en danger ?\\nAppuyez sur le bouton de gel !",
   "streamStreaks": "Séries de stream",
   "streamStreak": "Série de stream",
+  "streakHistoryTitle": "Historique de série",
+  "noStreakHistoryYet": "Pas encore d’historique de série",
   "subscribe": "S’abonner",
   "subscribed": "Abonné",
   "superFanSentYouAMessage": "SuperFan vous a envoyé un message",

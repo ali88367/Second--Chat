@@ -116,6 +116,8 @@
   "streakInDangerHitFreezeButton": "السلسلة في خطر؟\\nاضغط زر التجميد!",
   "streamStreaks": "سلاسل البث",
   "streamStreak": "سلسلة البث",
+  "streakHistoryTitle": "سجل السلسلة",
+  "noStreakHistoryYet": "لا يوجد سجل سلسلة بعد",
   "subscribe": "اشترك",
   "subscribed": "مشترك",
   "superFanSentYouAMessage": "أرسل لك SuperFan رسالة",

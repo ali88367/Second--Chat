@@ -116,6 +116,8 @@
   "streakInDangerHitFreezeButton": "Sequência em perigo?\\nToque no botão de congelar!",
   "streamStreaks": "Sequências de stream",
   "streamStreak": "Sequência de stream",
+  "streakHistoryTitle": "Histórico de sequência",
+  "noStreakHistoryYet": "Ainda não há histórico de sequência",
   "subscribe": "Assinar",
   "subscribed": "Inscrito",
   "superFanSentYouAMessage": "SuperFan enviou uma mensagem",

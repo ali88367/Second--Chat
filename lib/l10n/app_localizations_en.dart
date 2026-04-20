@@ -362,6 +362,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get streamStreak => 'Stream Streak';
 
   @override
+  String get streakHistoryTitle => 'Streak History';
+
+  @override
+  String get noStreakHistoryYet => 'No streak history yet';
+
+  @override
   String get subscribe => 'Subscribe';
 
   @override
