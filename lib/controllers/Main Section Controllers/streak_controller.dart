@@ -532,7 +532,47 @@ class StreamStreaksController extends GetxController {
     if (isHistoryLoading.value && !force) return historyRows;
     isHistoryLoading.value = true;
     try {
-      await fetchCurrentStreak(force: force, silent: silent);
+      final accessToken = await _getAccessToken(showErrors: !silent);
+      if (accessToken == null || accessToken.isEmpty) {
+        return historyRows;
+      }
+
+      // Keep current snapshot hydrated for parsing fallbacks/selected days.
+      if (current.value == null || force) {
+        await fetchCurrentStreak(force: force, silent: true);
+      }
+
+      final auth = Get.find<AuthController>();
+      final res = await auth.api.client.dio.get<dynamic>(
+        '/api/v1/streak/history',
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      _logStreakResponse('GET /api/v1/streak/history', res.data);
+
+      final parsedRows = _parseHistoryRows(res.data);
+      if (parsedRows.isNotEmpty) {
+        historyRows.assignAll(parsedRows);
+      } else if (current.value != null) {
+        historyRows.assignAll(_buildHistoryRowsFromDates(current.value!));
+      }
+      return historyRows;
+    } on DioException catch (e) {
+      debugPrint('STREAK HISTORY LOAD ERROR: ${e.response?.data ?? e.message}');
+      if (!silent) {
+        _showConnectionIssue();
+      }
+      if (current.value != null) {
+        historyRows.assignAll(_buildHistoryRowsFromDates(current.value!));
+      }
+      return historyRows;
+    } catch (e) {
+      debugPrint('STREAK HISTORY LOAD ERROR: $e');
+      if (!silent) {
+        _showConnectionIssue();
+      }
+      if (current.value != null) {
+        historyRows.assignAll(_buildHistoryRowsFromDates(current.value!));
+      }
       return historyRows;
     } finally {
       isHistoryLoading.value = false;
@@ -821,13 +861,18 @@ class StreamStreaksController extends GetxController {
     // `bypassFreezeGate: true`.
     if (!_isSameDay(localNowDay, localCheckInDay)) return false;
 
+    final dangerFromRaw = _extractDangerDateFromRaw(
+      streak.raw,
+      today: localNowDay,
+      streak: streak,
+    );
+    // Only fall back to local inference when backend already marks the streak
+    // as in danger. This avoids false "needs_freeze" gating on normal days.
     final dangerDate =
-        _extractDangerDateFromRaw(
-          streak.raw,
-          today: localNowDay,
-          streak: streak,
-        ) ??
-        _inferDangerDateFromStreak(streak, today: localNowDay);
+        dangerFromRaw ??
+        (streak.isInDanger
+            ? _inferDangerDateFromStreak(streak, today: localNowDay)
+            : null);
 
     if (dangerDate == null) return false;
 

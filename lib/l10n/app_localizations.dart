@@ -436,6 +436,18 @@ abstract class AppLocalizations {
   /// **'Login timed out. Please try again.'**
   String get loginTimedOutPleaseTryAgain;
 
+  /// No description provided for @signInWithApple.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Apple'**
+  String get signInWithApple;
+
+  /// No description provided for @signInWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Google'**
+  String get signInWithGoogle;
+
   /// No description provided for @authenticationCancelled.
   ///
   /// In en, this message translates to:

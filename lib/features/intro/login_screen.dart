@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final auth = Get.find<AuthController>();
-      if (!await auth.isIntroOnboardingPreferenceComplete()) {
+      if (await _shouldShowNotificationIntro(auth)) {
         Get.offAll(() => const NotficationScreens());
         return;
       }
@@ -121,6 +121,16 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     Get.offAll(() => const HomeScreen2());
+  }
+
+  Future<bool> _shouldShowNotificationIntro(AuthController auth) async {
+    final introComplete = await auth.isIntroOnboardingPreferenceComplete();
+    if (introComplete) return false;
+    final enabled = await auth.isNotificationEnabledOnServer(
+      refresh: true,
+      defaultValue: false,
+    );
+    return !enabled;
   }
 
   void _showAppleComingSoon() {
@@ -141,6 +151,40 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString(AppConstants.keyLanguage, lang.code);
     } catch (_) {}
     Get.updateLocale(Locale(lang.code));
+  }
+
+  String _signInWithAppleLabel(BuildContext context) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'es':
+        return 'Iniciar sesión con Apple';
+      case 'ar':
+        return 'تسجيل الدخول باستخدام Apple';
+      case 'pt':
+        return 'Iniciar sessão com Apple';
+      case 'de':
+        return 'Mit Apple anmelden';
+      case 'fr':
+        return 'Se connecter avec Apple';
+      default:
+        return 'Sign in with Apple';
+    }
+  }
+
+  String _signInWithGoogleLabel(BuildContext context) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'es':
+        return 'Iniciar sesión con Google';
+      case 'ar':
+        return 'تسجيل الدخول باستخدام Google';
+      case 'pt':
+        return 'Iniciar sessão com Google';
+      case 'de':
+        return 'Mit Google anmelden';
+      case 'fr':
+        return 'Se connecter avec Google';
+      default:
+        return 'Sign in with Google';
+    }
   }
 
   @override
@@ -316,7 +360,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       SizedBox(height: 14.h),
                       _LoginActionButton(
-                        label: 'Sign In with Apple',
+                        label: _signInWithAppleLabel(context),
                         backgroundColor: const Color(0xFF1A1C22),
                         textColor: Colors.white,
                         leading: Icon(
@@ -328,7 +372,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       SizedBox(height: 10.h),
                       _LoginActionButton(
-                        label: 'Sign in with Google',
+                        label: _signInWithGoogleLabel(context),
                         backgroundColor: Colors.white,
                         textColor: const Color(0xFF1E1D20),
                         leading: Image.asset(

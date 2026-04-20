@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
@@ -24,8 +22,6 @@ class _StreakSheetRouterState extends State<StreakSheetRouter> {
   void initState() {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
-    // Refresh in the background; this widget must never block sheet opening.
-    unawaited(_streakCtrl.fetchCurrentStreak(force: true, silent: true));
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
@@ -67,6 +68,8 @@ class _IntroScreen2State extends State<IntroScreen2> {
       final prefs = await SharedPreferences.getInstance();
       final introDone =
           prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
+      final shouldShowNotificationIntro =
+          !introDone && await _isNotificationsDisabledFromServer();
       if (introDone) {
         Get.offAll(
           () => const HomeScreen2(),
@@ -76,13 +79,32 @@ class _IntroScreen2State extends State<IntroScreen2> {
         );
         return;
       }
-      Get.to(
-        () => NotficationScreens(),
+      if (shouldShowNotificationIntro) {
+        Get.to(
+          () => NotficationScreens(),
+          transition: Transition.cupertino,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.fastOutSlowIn,
+        );
+        return;
+      }
+      Get.offAll(
+        () => const HomeScreen2(),
         transition: Transition.cupertino,
         duration: const Duration(milliseconds: 250),
         curve: Curves.fastOutSlowIn,
       );
     }
+  }
+
+  Future<bool> _isNotificationsDisabledFromServer() async {
+    if (!Get.isRegistered<AuthController>()) return true;
+    final auth = Get.find<AuthController>();
+    final enabled = await auth.isNotificationEnabledOnServer(
+      refresh: true,
+      defaultValue: false,
+    );
+    return !enabled;
   }
 
   Future<void> _rebootstrapChatAfterPlatformConnect(

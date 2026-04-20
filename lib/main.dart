@@ -460,6 +460,16 @@ class _SplashScreenState extends State<_SplashScreen>
     return AppPrefetch.prefetchAfterAuth();
   }
 
+  Future<bool> _shouldShowNotificationIntro(AuthController auth) async {
+    final introComplete = await auth.isIntroOnboardingPreferenceComplete();
+    if (introComplete) return false;
+    final enabled = await auth.isNotificationEnabledOnServer(
+      refresh: true,
+      defaultValue: false,
+    );
+    return !enabled;
+  }
+
   Future<void> _routeAfterSessionCheck() async {
     if (_startupInProgress) return;
     _startupInProgress = true;
@@ -514,7 +524,7 @@ class _SplashScreenState extends State<_SplashScreen>
       if (!Get.isRegistered<ChatController>()) {
         if (!mounted) return;
         try {
-          if (!await auth.isIntroOnboardingPreferenceComplete()) {
+          if (await _shouldShowNotificationIntro(auth)) {
             Get.offAll(() => const NotficationScreens());
             return;
           }
@@ -534,7 +544,7 @@ class _SplashScreenState extends State<_SplashScreen>
       if (!mounted) return;
 
       try {
-        if (!await auth.isIntroOnboardingPreferenceComplete()) {
+        if (await _shouldShowNotificationIntro(auth)) {
           Get.offAll(() => const NotficationScreens());
           return;
         }
@@ -674,6 +684,7 @@ class _SplashDotsLoader extends StatelessWidget {
       animation: animation,
       builder: (context, child) {
         final t = animation.value;
+        const Color splashDotGold = Color(0xFFE6C571);
         Widget dot(int index, Color color) {
           final phase = ((t + (index * 0.18)) % 1.0);
           final pulse = Curves.easeInOut.transform(
@@ -709,11 +720,11 @@ class _SplashDotsLoader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              dot(0, twitchPurple),
+              dot(0, splashDotGold),
               SizedBox(width: 10.w),
-              dot(1, kickGreen),
+              dot(1, splashDotGold),
               SizedBox(width: 10.w),
-              dot(2, youtubeRed),
+              dot(2, splashDotGold),
             ],
           ),
         );

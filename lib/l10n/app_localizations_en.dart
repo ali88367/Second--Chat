@@ -182,6 +182,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Login timed out. Please try again.';
 
   @override
+  String get signInWithApple => 'Sign in with Apple';
+
+  @override
+  String get signInWithGoogle => 'Sign in with Google';
+
+  @override
   String get authenticationCancelled => 'Authentication cancelled.';
 
   @override

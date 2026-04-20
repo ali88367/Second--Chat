@@ -175,7 +175,6 @@ class _LivestreamingState extends State<Livestreaming> {
     try {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
-      await _streakCtrl.ensureInitialStreakForNewUser(showErrors: false);
 
       await Get.bottomSheet(
         StreakSheetRouter(forceFreezePreview: forceFreezePreview),
@@ -940,12 +939,8 @@ class _LivestreamingState extends State<Livestreaming> {
                                 isDismissible: true,
                                 isScrollControlled: true,
                                 enableDrag: true,
-                                enterBottomSheetDuration: const Duration(
-                                  milliseconds: 300,
-                                ),
-                                exitBottomSheetDuration: const Duration(
-                                  milliseconds: 250,
-                                ),
+                                enterBottomSheetDuration: Duration.zero,
+                                exitBottomSheetDuration: Duration.zero,
                               );
                             },
                             child: buildImageButton(

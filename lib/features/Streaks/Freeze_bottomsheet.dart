@@ -9,6 +9,7 @@ import 'package:second_chat/core/localization/l10n.dart';
 import '../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../controllers/Main Section Controllers/streak_controller.dart';
 import 'Last_streak.dart';
+import 'streak_history_bottomsheet.dart';
 
 class StreakFreezePreviewBottomSheet extends StatefulWidget {
   const StreakFreezePreviewBottomSheet({
@@ -596,6 +597,33 @@ class _StreakFreezePreviewBottomSheetState
                               ],
                             );
                           },
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      SizedBox(
+                        width: 361.w,
+                        height: 46.h,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Get.bottomSheet(
+                              const StreakHistoryBottomSheet(),
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              enableDrag: true,
+                              backgroundColor: Colors.transparent,
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF6B6B6F)),
+                            backgroundColor: const Color(0xFF1E1D20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18.r),
+                            ),
+                          ),
+                          child: Text(
+                            'Streak History',
+                            style: sfProText600(15.sp, Colors.white),
+                          ),
                         ),
                       ),
                     ],
