@@ -60,6 +60,8 @@
   "couldntConnectPleaseTryAgain": "We couldn't connect. Please try again.",
   "couldntOpenLoginPagePleaseTryAgain": "We couldn't open the login page. Please try again.",
   "loginTimedOutPleaseTryAgain": "Login timed out. Please try again.",
+  "signInWithApple": "Sign in with Apple",
+  "signInWithGoogle": "Sign in with Google",
   "authenticationCancelled": "Authentication cancelled.",
   "missingAccessToken": "Missing access token",
   "monthly": "Monthly",

@@ -577,6 +577,86 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// Uses `/api/v1/users/me` as source-of-truth for notification preference.
+  /// Returns [defaultValue] when the flag can't be inferred.
+  Future<bool> isNotificationEnabledOnServer({
+    bool refresh = true,
+    bool defaultValue = false,
+  }) async {
+    try {
+      if (refresh || me.value == null) {
+        await refreshMe(silent: true);
+      }
+      final inferred = _extractNotificationEnabledFromProfile(me.value);
+      return inferred ?? defaultValue;
+    } catch (_) {
+      return defaultValue;
+    }
+  }
+
+  bool? _extractNotificationEnabledFromProfile(Map<String, dynamic>? profile) {
+    if (profile == null || profile.isEmpty) return null;
+
+    bool? readToggle(dynamic node) {
+      final parsed = _toBool(node);
+      if (parsed != null) return parsed;
+      if (node is Map) {
+        final map = Map<String, dynamic>.from(node);
+        for (final key in const [
+          'enabled',
+          'isEnabled',
+          'is_enabled',
+          'pushEnabled',
+          'push_enabled',
+          'allow',
+          'allowed',
+          'value',
+        ]) {
+          final v = _toBool(map[key]);
+          if (v != null) return v;
+        }
+      }
+      return null;
+    }
+
+    final roots = <Map<String, dynamic>>[
+      profile,
+      _toMap(profile['data']) ?? const <String, dynamic>{},
+      _toMap(profile['settings']) ?? const <String, dynamic>{},
+      _toMap(profile['preferences']) ?? const <String, dynamic>{},
+      _toMap(profile['userPreference']) ?? const <String, dynamic>{},
+      _toMap(profile['user_preference']) ?? const <String, dynamic>{},
+    ];
+
+    for (final root in roots) {
+      if (root.isEmpty) continue;
+
+      for (final key in const [
+        'notificationsEnabled',
+        'notifications_enabled',
+        'notificationEnabled',
+        'notification_enabled',
+        'isNotificationsEnabled',
+        'is_notifications_enabled',
+      ]) {
+        final v = _toBool(root[key]);
+        if (v != null) return v;
+      }
+
+      for (final key in const [
+        'notifications',
+        'notification',
+        'notification_settings',
+        'notificationSettings',
+      ]) {
+        final parsed = readToggle(root[key]);
+        if (parsed != null) return parsed;
+      }
+    }
+
+    return null;
+  }
+
   /// Runs the Google sign-in UI and returns id token, access token (if granted), and Google user id.
   Future<GoogleSignInCredentials> fetchGoogleAccountCredentials() {
     return GoogleSignInService.instance.signInAndFetchCredentials();

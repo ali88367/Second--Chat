@@ -174,17 +174,21 @@ class LedSettingsBottomSheet extends StatelessWidget {
                 ),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      controller.updateLedMilestoneValue(tempValue);
-                      Navigator.of(sheetContext).pop();
-                    },
-                    child: Text(
-                      sheetContext.l10n.done,
-                      style: TextStyle(
-                        color: const Color(0xFFE6C571),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.sp,
+                  child: Obx(
+                    () => TextButton(
+                      onPressed: () {
+                        controller.updateLedMilestoneValue(tempValue);
+                        Navigator.of(sheetContext).pop();
+                      },
+                      child: Text(
+                        sheetContext.l10n.done,
+                        style: TextStyle(
+                          color:
+                              controller.ledSwitchAccentColor ??
+                              const Color(0xFFE6C571),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16.sp,
+                        ),
                       ),
                     ),
                   ),

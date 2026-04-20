@@ -207,7 +207,10 @@ class _IntroScreen4State extends State<IntroScreen4> {
                   child: Align(
                     alignment: Alignment.topRight,
                     child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () {
+                        Get.to(
+                                () => const IntroScreen5());
+                      },
                       child: Container(
                         width: 40.w,
                         height: 40.w,

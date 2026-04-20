@@ -1128,6 +1128,38 @@ class FreePlanWidget extends StatefulWidget {
 class _FreePlanWidgetState extends State<FreePlanWidget> {
   bool _showSubscribe = false;
 
+  void _showPremiumUnlockSheet(BuildContext context) {
+    Get.bottomSheet(
+      Padding(
+        padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 25.h),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            constraints: BoxConstraints(maxHeight: 600.h),
+            child: GestureDetector(
+              onTap: () {
+                widget.controller.isPremiumUnlocked.value = true;
+                widget.controller.update(['premium_unlock']);
+                Get.back();
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(36.r),
+                child: Image.asset(
+                  "assets/images/premium.png",
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      isDismissible: true,
+      enableDrag: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -1142,7 +1174,9 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
       final price =
           (account?['premiumPerMonth'] ?? '£4.99 per month').toString();
       final isPremium = account?['isPremium'] == true;
-      final planLabel = isPremium ? 'Premium' : plan;
+      final isPremiumActive =
+          isPremium || widget.controller.isPremiumUnlocked.value;
+      final planLabel = isPremiumActive ? 'Premium' : plan;
 
       return GestureDetector(
         onTap: () {
@@ -1206,7 +1240,8 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                             SizedBox(height: 12.h),
                             GestureDetector(
                               onTap: () {
-                                // TODO: Navigate to subscription page
+                                if (isPremiumActive) return;
+                                _showPremiumUnlockSheet(context);
                               },
                               child: Container(
                                 width: double.infinity,
@@ -1219,8 +1254,13 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    context.l10n.subscribe,
-                                    style: sfProText600(15.sp, Colors.white),
+                                    isPremiumActive
+                                        ? context.l10n.subscribed
+                                        : context.l10n.subscribe,
+                                    style: sfProText600(
+                                      15.sp,
+                                      Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),

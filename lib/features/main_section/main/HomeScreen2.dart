@@ -15,6 +15,8 @@ import 'package:second_chat/features/Streaks/streak_sheet_router.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen.dart';
 import 'package:second_chat/features/main_section/settings/settings_components/connect_platform_setting.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
+import 'package:second_chat/controllers/platform_connect_controller.dart';
+import 'package:second_chat/api/auth/oauth_provider.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
@@ -73,7 +75,6 @@ class _HomeScreen2State extends State<HomeScreen2> {
     try {
       final hasSession = await _streakCtrl.ensureSession(showErrors: true);
       if (!hasSession || !mounted) return;
-      await _streakCtrl.ensureInitialStreakForNewUser(showErrors: false);
 
       await Get.bottomSheet(
         const StreakSheetRouter(),
@@ -419,12 +420,8 @@ class _HomeScreen2State extends State<HomeScreen2> {
                               isDismissible: true,
                               isScrollControlled: true,
                               enableDrag: true,
-                              enterBottomSheetDuration: const Duration(
-                                milliseconds: 300,
-                              ),
-                              exitBottomSheetDuration: const Duration(
-                                milliseconds: 250,
-                              ),
+                              enterBottomSheetDuration: Duration.zero,
+                              exitBottomSheetDuration: Duration.zero,
                             );
                           },
                           child: _buildImageButton(
@@ -480,11 +477,11 @@ class GettingStartedCard extends StatefulWidget {
 }
 
 class _GettingStartedCardState extends State<GettingStartedCard> {
-  bool _streamServiceAdded = false;
   bool _settingsOpened = false;
   bool _streakLoading = false;
   late final SettingsController _settingsCtrl;
   late final StreamStreaksController _streakCtrl;
+  late final PlatformConnectController _platformCtrl;
 
   @override
   void initState() {
@@ -494,7 +491,14 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
             ? Get.find<SettingsController>()
             : Get.put(SettingsController());
     _streakCtrl = Get.find<StreamStreaksController>();
+    _platformCtrl =
+        Get.isRegistered<PlatformConnectController>()
+            ? Get.find<PlatformConnectController>()
+            : Get.put(PlatformConnectController());
     _settingsCtrl.loadSettingsIfNeeded();
+    if (_platformCtrl.isConnected.isEmpty) {
+      unawaited(_platformCtrl.refreshConnections());
+    }
     if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
       _checkStreakExists();
     }
@@ -531,14 +535,99 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     );
   }
 
+  Future<void> _handleNotificationsTileTap(
+    BuildContext context,
+    bool notificationsEnabled,
+  ) async {
+    if (!notificationsEnabled) {
+      await _settingsCtrl.updateToggle('notifications', true);
+      return;
+    }
+
+    final disable = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: const Color(0xFF1E1D20),
+            title: Text(
+              'Disable notifications?',
+              style: sfProText600(18.sp, Colors.white),
+            ),
+            content: Text(
+              'You will stop receiving notification alerts.',
+              style: sfProText400(14.sp, Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(
+                  context.l10n.cancel,
+                  style: sfProText500(14.sp, Colors.white70),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(
+                  'Disable',
+                  style: sfProText600(14.sp, const Color(0xFFFF6B6B)),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (disable == true) {
+      await _settingsCtrl.updateToggle('notifications', false);
+    }
+  }
+
+  bool _allCorePlatformsConnected() {
+    final twitch = _platformCtrl.isConnected[OAuthProvider.twitch] == true;
+    final kick = _platformCtrl.isConnected[OAuthProvider.kick] == true;
+    final youtube = _platformCtrl.isConnected[OAuthProvider.youtube] == true;
+    if (twitch && kick && youtube) return true;
+
+    final raw = _settingsCtrl.settingsPayload.value?['connectPlatforms'];
+    if (raw is! List) return false;
+    final connected = <String>{};
+    for (final item in raw) {
+      if (item is String) {
+        connected.add(_normalizePlatformKey(item));
+        continue;
+      }
+      if (item is! Map) continue;
+      final row = Map<String, dynamic>.from(item);
+      final platform =
+          (row['platform'] ?? row['platformName'] ?? '').toString();
+      final isConnected =
+          row['connected'] == true ||
+          row['is_active'] == true ||
+          row['isConnected'] == true;
+      if (!isConnected) continue;
+      connected.add(_normalizePlatformKey(platform));
+    }
+    return connected.contains('twitch') &&
+        connected.contains('kick') &&
+        connected.contains('youtube');
+  }
+
+  String _normalizePlatformKey(String raw) {
+    final value = raw.toLowerCase().trim();
+    if (value.contains('youtube') || value.contains('google')) return 'youtube';
+    if (value.contains('twitch')) return 'twitch';
+    if (value.contains('kick')) return 'kick';
+    return value;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final notificationsEnabled = _settingsCtrl.notifications.value;
+      final allPlatformsConnected = _allCorePlatformsConnected();
       final streaksCustomized = _streakCtrl.hasStreak;
       final completedCount =
           (notificationsEnabled ? 1 : 0) +
-          (_streamServiceAdded ? 1 : 0) +
+          (allPlatformsConnected ? 1 : 0) +
           (_settingsOpened ? 1 : 0) +
           (streaksCustomized ? 1 : 0);
       final isAllCompleted = completedCount == 4;
@@ -626,9 +715,12 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                           hasArrow: true,
                           isChecked: notificationsEnabled,
                           onTap: () {
-                            if (!notificationsEnabled) {
-                              _settingsCtrl.updateToggle('notifications', true);
-                            }
+                            unawaited(
+                              _handleNotificationsTileTap(
+                                context,
+                                notificationsEnabled,
+                              ),
+                            );
                           },
                         ),
                         _buildDivider(),
@@ -670,16 +762,15 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                                 milliseconds: 250,
                               ),
                             ).then((_) {
-                              setState(() {
-                                _streamServiceAdded = true;
-                              });
+                              unawaited(_platformCtrl.refreshConnections());
+                              unawaited(_settingsCtrl.loadSettings(force: true));
                             });
                           },
                           child: _buildMenuItem(
                             imagePath: 'assets/images/signals.png',
                             title: context.l10n.addNewStreamService,
                             hasArrow: true,
-                            isChecked: _streamServiceAdded,
+                            isChecked: allPlatformsConnected,
                           ),
                         ),
                         _buildDivider(),
@@ -702,12 +793,8 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                               isDismissible: true,
                               isScrollControlled: true,
                               enableDrag: true,
-                              enterBottomSheetDuration: const Duration(
-                                milliseconds: 300,
-                              ),
-                              exitBottomSheetDuration: const Duration(
-                                milliseconds: 250,
-                              ),
+                              enterBottomSheetDuration: Duration.zero,
+                              exitBottomSheetDuration: Duration.zero,
                             ).then((_) {
                               setState(() {
                                 _settingsOpened = true;
