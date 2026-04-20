@@ -62,7 +62,6 @@ class ChatController extends GetxController {
   bool _realtimeObserversWired = false;
   bool _socketConnecting = false;
   Future<void>? _bootstrapInFlight;
-  bool _initialOverviewBootstrapDone = false;
   DateTime _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
   final Map<String, DateTime> _historyLastFetchAt = <String, DateTime>{};
   static const Duration _historyMinRefreshInterval = Duration(seconds: 25);
@@ -327,21 +326,21 @@ class ChatController extends GetxController {
       if (!auth.isAuthenticated.value) return;
 
       var selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
-      if (!_initialOverviewBootstrapDone) {
-        // 1) App start only: hit overview for connected platforms once.
-        final connectedPlatforms = await _tokenProvider.getConnectedPlatforms();
-        if (connectedPlatforms.isNotEmpty) {
-          // Keep default selection as-is unless it's not connected.
-          if (!connectedPlatforms.contains(selected)) {
-            platform.value = connectedPlatforms.first;
-            selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
-          }
-          await refreshOverviewsForPlatforms(connectedPlatforms);
-        } else {
-          // Keep startup parity for first session when only one platform gets linked later.
-          await refreshOverviewForPlatform(selected);
+      // Always refresh streaming overview on each bootstrap so cold start / Google
+      // login get a real GET after tokens exist (the old one-shot flag could skip
+      // forever after a failed or empty first pass).
+      final connectedPlatforms = await _tokenProvider.getConnectedPlatforms();
+      if (connectedPlatforms.isNotEmpty) {
+        // Keep default selection as-is unless it's not connected.
+        if (!connectedPlatforms.contains(selected)) {
+          platform.value = connectedPlatforms.first;
+          selected = _normalizedApiPlatform(platform.value, fallback: 'twitch');
         }
-        _initialOverviewBootstrapDone = true;
+        await refreshOverviewsForPlatforms(connectedPlatforms);
+      } else {
+        // No linked platforms yet: still hit overview for the selected platform
+        // (backend may return account-level socket URLs, etc.).
+        await refreshOverviewForPlatform(selected);
       }
 
       // Socket + chat: backend session JWT (same as REST [AuthInterceptor]).
@@ -1687,7 +1686,6 @@ class ChatController extends GetxController {
     _socketAuthToken = null;
     _socketBaseUrl = null;
     _socketPath = null;
-    _initialOverviewBootstrapDone = false;
     platformMessages.clear();
     messages.clear();
     activityEvents.clear();
