@@ -361,6 +361,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get streamStreak => 'سلسلة البث';
 
   @override
+  String get streakHistoryTitle => 'سجل السلسلة';
+
+  @override
+  String get noStreakHistoryYet => 'لا يوجد سجل سلسلة بعد';
+
+  @override
   String get subscribe => 'اشترك';
 
   @override

@@ -790,6 +790,18 @@ abstract class AppLocalizations {
   /// **'Stream Streak'**
   String get streamStreak;
 
+  /// No description provided for @streakHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak History'**
+  String get streakHistoryTitle;
+
+  /// No description provided for @noStreakHistoryYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No streak history yet'**
+  String get noStreakHistoryYet;
+
   /// No description provided for @subscribe.
   ///
   /// In en, this message translates to:

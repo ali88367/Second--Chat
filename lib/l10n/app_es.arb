@@ -116,6 +116,8 @@
   "streakInDangerHitFreezeButton": "¿Racha en peligro?\\n¡Pulsa el botón de congelar!",
   "streamStreaks": "Rachas de stream",
   "streamStreak": "Racha de stream",
+  "streakHistoryTitle": "Historial de racha",
+  "noStreakHistoryYet": "Aún no hay historial de racha",
   "subscribe": "Suscribirse",
   "subscribed": "Suscrito",
   "superFanSentYouAMessage": "SuperFan te envió un mensaje",
