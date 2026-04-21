@@ -71,7 +71,6 @@ class StreamWebViewState extends State<StreamWebView>
   late WebViewController _controller;
   String? _initialUrl;
   Uri? _initialUri;
-  bool _restoringInitial = false;
   bool _delegateAttached = false;
 
   /// Dedupes navigations: `''` = idle shell, else last sanitized embed URL.
@@ -306,6 +305,9 @@ class StreamWebViewState extends State<StreamWebView>
     if (widget.cacheKey != 'kick') return;
     if (widget.suppressNativeFullscreen) return;
     if (_shellIsIdle) return;
+    // Only force the tile containment CSS in small multi-preview slots.
+    // In larger/single previews this can fight the player's own fullscreen styles.
+    if (widget.height > 200) return;
     try {
       await _controller.runJavaScript(r'''
 (() => {
@@ -323,6 +325,7 @@ class StreamWebViewState extends State<StreamWebView>
   var kickLayoutObserver = null;
   function applyKickTileLayout() {
     try {
+      if (document.fullscreenElement) return;
       var root = document.documentElement;
       var b = document.body;
       if (root) {
@@ -347,6 +350,7 @@ class StreamWebViewState extends State<StreamWebView>
         b.style.position = 'relative';
       }
       document.querySelectorAll('iframe').forEach(function (f) {
+        if (document.fullscreenElement && document.fullscreenElement === f) return;
         f.style.boxSizing = 'border-box';
         f.style.width = '100%';
         f.style.height = '100%';
@@ -360,6 +364,7 @@ class StreamWebViewState extends State<StreamWebView>
       });
       var v = document.querySelector('video');
       if (v) {
+        if (document.fullscreenElement && document.fullscreenElement === v) return;
         v.style.maxWidth = '100%';
         v.style.maxHeight = '100%';
         v.style.width = '100%';
@@ -381,6 +386,22 @@ class StreamWebViewState extends State<StreamWebView>
     window.__secondChatKickLayoutTimer = kickLayoutTimer;
   }
   applyKickTileLayout();
+  document.addEventListener('fullscreenchange', function () {
+    if (document.fullscreenElement) {
+      try {
+        if (kickLayoutObserver) kickLayoutObserver.disconnect();
+        kickLayoutObserver = null;
+        window.__secondChatKickLayoutMo = null;
+      } catch (e3) {}
+      if (window.__secondChatKickLayoutTimer) {
+        clearTimeout(window.__secondChatKickLayoutTimer);
+        window.__secondChatKickLayoutTimer = null;
+      }
+      return;
+    }
+    // Player exited fullscreen; restore tile-fit styles.
+    applyKickTileLayout();
+  });
   try {
     kickLayoutObserver = new MutationObserver(function () {
       scheduleApply();
@@ -528,10 +549,7 @@ class StreamWebViewState extends State<StreamWebView>
     _delegateAttached = true;
     _controller.setNavigationDelegate(
       NavigationDelegate(
-        onPageStarted: (url) {
-          if (_isAllowedMainFrameNavigation(url)) return;
-          _restoreInitialUrl();
-        },
+        onPageStarted: (_) {},
         onPageFinished: (_) {
           _applyMuteState();
           unawaited(_suppressEmbeddedFullscreenChrome());
@@ -556,7 +574,6 @@ class StreamWebViewState extends State<StreamWebView>
         },
         onNavigationRequest: (req) {
           final allowed = _isAllowedMainFrameNavigation(req.url);
-          if (!allowed) _restoreInitialUrl();
           return allowed ? NavigationDecision.navigate : NavigationDecision.prevent;
         },
       ),
@@ -667,7 +684,14 @@ class StreamWebViewState extends State<StreamWebView>
 
     final uri = Uri.tryParse(rawUrl);
     if (uri == null) return false;
-    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme == 'about' ||
+        scheme == 'data' ||
+        scheme == 'blob' ||
+        scheme == 'javascript') {
+      return true;
+    }
+    if (scheme != 'http' && scheme != 'https') return false;
 
     // First load from idle shell → real embed.
     if (initUri.host == 'secondchat.idle' &&
@@ -675,35 +699,44 @@ class StreamWebViewState extends State<StreamWebView>
       return true;
     }
 
-    final sameHost = uri.host.toLowerCase() == initUri.host.toLowerCase();
-    if (!sameHost) return false;
-
-    final initPath = initUri.path.isEmpty ? '/' : initUri.path;
-    final path = uri.path.isEmpty ? '/' : uri.path;
-    if (path == initPath) return true;
-    return path.startsWith('$initPath/');
-  }
-
-  void _restoreInitialUrl() {
-    if (_restoringInitial) return;
-    final init = _initialUrl;
-    if (init == null || init.isEmpty) return;
-    _restoringInitial = true;
-    void done() {
-      _restoringInitial = false;
+    final host = uri.host.toLowerCase();
+    bool hostMatchesAny(List<String> suffixes) {
+      for (final s in suffixes) {
+        if (host == s || host.endsWith('.$s')) return true;
+      }
+      return false;
     }
 
-    if (_shellIsIdle) {
-      _controller
-          .loadHtmlString(_kIdleHtml, baseUrl: _kIdleBase)
-          .catchError(_logWebNavError)
-          .whenComplete(done);
-      return;
+    final key = widget.cacheKey.toLowerCase().trim();
+    if (key == 'kick') {
+      return hostMatchesAny(const <String>[
+        'kick.com',
+        'player.kick.com',
+        'amazonaws.com',
+        'cloudfront.net',
+      ]);
     }
-    _controller
-        .loadRequest(Uri.parse(init))
-        .catchError(_logWebNavError)
-        .whenComplete(done);
+    if (key == 'twitch') {
+      return hostMatchesAny(const <String>[
+        'twitch.tv',
+        'player.twitch.tv',
+        'twitchcdn.net',
+        'jtvnw.net',
+        'twitch.amazon.com',
+      ]);
+    }
+    if (key == 'youtube') {
+      return hostMatchesAny(const <String>[
+        'youtube.com',
+        'youtube-nocookie.com',
+        'google.com',
+        'googlevideo.com',
+        'googleapis.com',
+        'gstatic.com',
+      ]);
+    }
+
+    return host == initUri.host.toLowerCase();
   }
 
   @override
