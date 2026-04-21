@@ -210,7 +210,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
     _embedReadyWorker = ever<Map<String, bool>>(
       _chatCtrl.platformStreamEmbedReady,
-      (_) {
+          (_) {
         if (mounted) {
           _scheduleReliableScrollToBottom(animate: false);
         }
@@ -416,7 +416,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     // Obx callers depend on reading these reactives here.
     final hideNames = _settingsController.hideViewerNames.value;
     _settingsController.multiChatMergedMode.value;
-    _chatCtrl.platformStreamEmbedReady;
+    // Trigger reactive reads from RxMaps
+    _chatCtrl.platformMessages.keys;
+    _chatCtrl.platformLive.keys;
+    _chatCtrl.platformStreamEmbedReady.keys;
 
     final normalizedFilter = filter?.toLowerCase().trim();
     final rows = <Map<String, dynamic>>[];
@@ -485,11 +488,11 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
         return rows
             .where(
               (item) {
-                final pk = (item['platformKey'] ?? '').toString();
-                return _chatCtrl.isPlatformLive(pk) &&
-                    _chatCtrl.isPlatformStreamEmbedReadyForChat(pk);
-              },
-            )
+            final pk = (item['platformKey'] ?? '').toString();
+            return _chatCtrl.isPlatformLive(pk) &&
+                _chatCtrl.isPlatformStreamEmbedReadyForChat(pk);
+          },
+        )
             .toList(growable: false);
       }
       return rows;
@@ -863,15 +866,15 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       socketEmoteOverrides: socketEmoteOverrides,
     );
     final List<InlineSpan> messageSpans =
-        emb != null && emb.isNotEmpty && _emoteParser != null
-            ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
-            : parser?.parse(message) ??
-                [
-                  TextSpan(
-                    text: message,
-                    style: sfProText400(12.sp, Colors.white),
-                  ),
-                ];
+    emb != null && emb.isNotEmpty && _emoteParser != null
+        ? _emoteParser!.parseWithEmbeddedEmotes(message, emb)
+        : parser?.parse(message) ??
+        [
+          TextSpan(
+            text: message,
+            style: sfProText400(12.sp, Colors.white),
+          ),
+        ];
 
     return TweenAnimationBuilder<double>(
       key: key,
@@ -1021,58 +1024,104 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                   padding: EdgeInsets.symmetric(horizontal: 24.w),
                   child: Row(
                     children: [
-                      ValueListenableBuilder<bool>(
-                        valueListenable: widget.titleSelected,
-                        builder: (context, val, _) {
-                          return GestureDetector(
-                            onTap: () {
-                              widget.onOverlayViewChange?.call();
-                              final newVal = !val;
-                              widget.titleSelected.value = newVal;
-                              if (newVal) {
-                                widget.showActivity.value = false;
-                              }
-                              widget.showServiceCard.value =
-                                  newVal || widget.showActivity.value;
-                              setState(() {});
-                              setSheetState(() {});
-                            },
-                            child: pillButton(
-                              "Title",
-                              isActive: val,
-                              assetPath: 'assets/images/magic.png',
-                            ),
-                          );
-                        },
-                      ),
-                      SizedBox(width: 12.w),
-                      ValueListenableBuilder<bool>(
-                        valueListenable: widget.showActivity,
-                        builder: (context, active, _) {
-                          return GestureDetector(
-                            onTap: () {
-                              widget.onOverlayViewChange?.call();
-                              final newVal = !active;
-                              widget.showActivity.value = newVal;
-                              if (newVal) {
-                                widget.titleSelected.value = false;
-                                widget.selectedPlatform.value = null;
-                                widget.showServiceCard.value = true;
-                              } else {
+                      Obx(() {
+                        final chatCtrl = _chatCtrl;
+                        final filter = widget.chatFilter.value?.toLowerCase().trim();
+                        final isAllSelected = filter == null || filter.isEmpty;
+                        final currentPlatform = isAllSelected
+                            ? widget.selectedPlatform.value?.toLowerCase().trim() ?? ''
+                            : filter ?? '';
+
+                        // Access reactive maps to ensure GetX tracks dependencies
+                        // (even when not needed, to avoid "improper use of GetX" error)
+                        // Using .keys to trigger reactive read of RxMap
+                        chatCtrl.platformLive.keys;
+                        chatCtrl.platformStreamEmbedReady.keys;
+
+                        // Button is enabled only if platform is live AND embed is ready
+                        final bool isEnabled = currentPlatform.isEmpty ||
+                            (chatCtrl.isPlatformLive(currentPlatform) &&
+                             chatCtrl.isPlatformStreamEmbedReadyForChat(currentPlatform));
+
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: widget.titleSelected,
+                          builder: (context, val, _) {
+                            return GestureDetector(
+                              onTap: isEnabled ? () {
+                                widget.onOverlayViewChange?.call();
+                                final newVal = !val;
+                                widget.titleSelected.value = newVal;
+                                if (newVal) {
+                                  widget.showActivity.value = false;
+                                }
                                 widget.showServiceCard.value =
-                                    widget.titleSelected.value;
-                              }
-                              setState(() {});
-                              setSheetState(() {});
-                            },
-                            child: pillButton(
-                              context.l10n.activity,
-                              isActive: active,
-                              assetPath: 'assets/images/line.png',
-                            ),
-                          );
-                        },
-                      ),
+                                    newVal || widget.showActivity.value;
+                                setState(() {});
+                                setSheetState(() {});
+                              } : null,
+                              child: Opacity(
+                                opacity: isEnabled ? 1.0 : 0.4,
+                                child: pillButton(
+                                  "Title",
+                                  isActive: val,
+                                  assetPath: 'assets/images/magic.png',
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }),
+                      SizedBox(width: 12.w),
+                      Obx(() {
+                        final chatCtrl = _chatCtrl;
+                        final filter = widget.chatFilter.value?.toLowerCase().trim();
+                        final isAllSelected = filter == null || filter.isEmpty;
+                        final currentPlatform = isAllSelected
+                            ? widget.selectedPlatform.value?.toLowerCase().trim() ?? ''
+                            : filter ?? '';
+
+                        // Access reactive maps to ensure GetX tracks dependencies
+                        // (even when not needed, to avoid "improper use of GetX" error)
+                        // Using .keys to trigger reactive read of RxMap
+                        chatCtrl.platformLive.keys;
+                        chatCtrl.platformStreamEmbedReady.keys;
+
+                        // Button is enabled only if platform is live AND embed is ready
+                        final bool isEnabled = currentPlatform.isEmpty ||
+                            (chatCtrl.isPlatformLive(currentPlatform) &&
+                             chatCtrl.isPlatformStreamEmbedReadyForChat(currentPlatform));
+
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: widget.showActivity,
+                          builder: (context, active, _) {
+                            return GestureDetector(
+                              onTap: isEnabled ? () {
+                                widget.onOverlayViewChange?.call();
+                                final newVal = !active;
+                                widget.showActivity.value = newVal;
+                                if (newVal) {
+                                  widget.titleSelected.value = false;
+                                  widget.selectedPlatform.value = null;
+                                  widget.showServiceCard.value = true;
+                                } else {
+                                  widget.showServiceCard.value =
+                                      widget.titleSelected.value;
+                                }
+                                setState(() {});
+                                setSheetState(() {});
+                              } : null,
+                              child: Opacity(
+                                opacity: isEnabled ? 1.0 : 0.4,
+                                child: pillButton(
+                                  context.l10n.activity,
+                                  isActive: active,
+                                  assetPath: 'assets/images/line.png',
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }),
                       const Spacer(),
                       SizedBox(width: 12.w),
                       GestureDetector(
@@ -1143,8 +1192,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   item['embeddedEmotes']
                                   as List<Map<String, Object>>?,
                                   socketEmoteOverrides:
-                                      item['socketEmoteOverrides']
-                                          as Map<String, String>?,
+                                  item['socketEmoteOverrides']
+                                  as Map<String, String>?,
                                   key: ValueKey(
                                     'expanded_${item['name']}_${index}_${item['message']}',
                                   ),
@@ -1305,54 +1354,100 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
               padding: EdgeInsets.symmetric(horizontal: 24.w),
               child: Row(
                 children: [
-                  ValueListenableBuilder<bool>(
-                    valueListenable: widget.titleSelected,
-                    builder: (context, val, _) {
-                      return GestureDetector(
-                        onTap: () {
-                          widget.onOverlayViewChange?.call();
-                          final newVal = !val;
-                          widget.titleSelected.value = newVal;
-                          if (newVal) {
-                            widget.showActivity.value = false;
-                          }
-                          widget.showServiceCard.value =
-                              newVal || widget.showActivity.value;
-                        },
-                        child: pillButton(
-                          "Title",
-                          isActive: val,
-                          assetPath: 'assets/images/magic.png',
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(width: 12.w),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: widget.showActivity,
-                    builder: (context, active, _) {
-                      return GestureDetector(
-                        onTap: () {
-                          widget.onOverlayViewChange?.call();
-                          final newVal = !active;
-                          widget.showActivity.value = newVal;
-                          if (newVal) {
-                            widget.titleSelected.value = false;
-                            widget.selectedPlatform.value = null;
-                            widget.showServiceCard.value = true;
-                          } else {
+                  Obx(() {
+                    final chatCtrl = _chatCtrl;
+                    final filter = widget.chatFilter.value?.toLowerCase().trim();
+                    final isAllSelected = filter == null || filter.isEmpty;
+                    final currentPlatform = isAllSelected
+                        ? widget.selectedPlatform.value?.toLowerCase().trim() ?? ''
+                        : filter ?? '';
+
+                    // Access reactive maps to ensure GetX tracks dependencies
+                    // (even when not needed, to avoid "improper use of GetX" error)
+                    // Using .keys to trigger reactive read of RxMap
+                    chatCtrl.platformLive.keys;
+                    chatCtrl.platformStreamEmbedReady.keys;
+
+                    // Button is enabled only if platform is live AND embed is ready
+                    final bool isEnabled = currentPlatform.isEmpty ||
+                        (chatCtrl.isPlatformLive(currentPlatform) &&
+                         chatCtrl.isPlatformStreamEmbedReadyForChat(currentPlatform));
+
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: widget.titleSelected,
+                      builder: (context, val, _) {
+                        return GestureDetector(
+                          onTap: isEnabled ? () {
+                            widget.onOverlayViewChange?.call();
+                            final newVal = !val;
+                            widget.titleSelected.value = newVal;
+                            if (newVal) {
+                              widget.showActivity.value = false;
+                            }
                             widget.showServiceCard.value =
-                                widget.titleSelected.value;
-                          }
-                        },
-                        child: pillButton(
-                          context.l10n.activity,
-                          isActive: active,
-                          assetPath: 'assets/images/line.png',
-                        ),
-                      );
-                    },
-                  ),
+                                newVal || widget.showActivity.value;
+                          } : null,
+                          child: Opacity(
+                            opacity: isEnabled ? 1.0 : 0.4,
+                            child: pillButton(
+                              "Title",
+                              isActive: val,
+                              assetPath: 'assets/images/magic.png',
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }),
+                  SizedBox(width: 12.w),
+                  Obx(() {
+                    final chatCtrl = _chatCtrl;
+                    final filter = widget.chatFilter.value?.toLowerCase().trim();
+                    final isAllSelected = filter == null || filter.isEmpty;
+                    final currentPlatform = isAllSelected
+                        ? widget.selectedPlatform.value?.toLowerCase().trim() ?? ''
+                        : filter ?? '';
+
+                    // Access reactive maps to ensure GetX tracks dependencies
+                    // (even when not needed, to avoid "improper use of GetX" error)
+                    // Using .keys to trigger reactive read of RxMap
+                    chatCtrl.platformLive.keys;
+                    chatCtrl.platformStreamEmbedReady.keys;
+
+                    // Button is enabled only if platform is live AND embed is ready
+                    final bool isEnabled = currentPlatform.isEmpty ||
+                        (chatCtrl.isPlatformLive(currentPlatform) &&
+                         chatCtrl.isPlatformStreamEmbedReadyForChat(currentPlatform));
+
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: widget.showActivity,
+                      builder: (context, active, _) {
+                        return GestureDetector(
+                          onTap: isEnabled ? () {
+                            widget.onOverlayViewChange?.call();
+                            final newVal = !active;
+                            widget.showActivity.value = newVal;
+                            if (newVal) {
+                              widget.titleSelected.value = false;
+                              widget.selectedPlatform.value = null;
+                              widget.showServiceCard.value = true;
+                            } else {
+                              widget.showServiceCard.value =
+                                  widget.titleSelected.value;
+                            }
+                          } : null,
+                          child: Opacity(
+                            opacity: isEnabled ? 1.0 : 0.4,
+                            child: pillButton(
+                              context.l10n.activity,
+                              isActive: active,
+                              assetPath: 'assets/images/line.png',
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }),
                   const Spacer(),
                   SizedBox(width: 12.w),
                   GestureDetector(
@@ -1432,8 +1527,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   item['embeddedEmotes']
                                   as List<Map<String, Object>>?,
                                   socketEmoteOverrides:
-                                      item['socketEmoteOverrides']
-                                          as Map<String, String>?,
+                                  item['socketEmoteOverrides']
+                                  as Map<String, String>?,
                                   key: ValueKey(
                                     'main_${item['name']}_${index}_${item['message']}',
                                   ),

@@ -374,6 +374,7 @@ class LiveStreamService {
             'handshake auth.token + Authorization: Bearer <accessToken> (§5 Connection)',
         'perApiDoc': 'GET /streaming/overview → chatSocketUrl + chatSocketPath',
         'afterConnect': 'emit chat:start (starts session; server sends settings:update, activity:sync)',
+        'timestamp': DateTime.now().toIso8601String(),
       });
       onSocketConnected?.call();
       _emitStart();
@@ -405,13 +406,28 @@ class LiveStreamService {
     });
 
     socket.on('settings:update', (d) {
+      _recordInboundSocket('settings:update', d);
       final m = _asMap(d);
-      if (m != null) onSettingsUpdate?.call(m);
+      if (m == null) {
+        _recordInboundSocket('settings:update:parse_failed', <String, dynamic>{
+          'hint': 'Server sent settings:update but payload could not be mapped',
+          'raw': _payloadToInboundLogString(d),
+        });
+        return;
+      }
+      onSettingsUpdate?.call(m);
     });
 
     socket.on('activity:sync', (d) {
+      _recordInboundSocket('activity:sync', d);
       final m = _asMap(d);
-      if (m == null) return;
+      if (m == null) {
+        _recordInboundSocket('activity:sync:parse_failed', <String, dynamic>{
+          'hint': 'Server sent activity:sync but payload could not be mapped',
+          'raw': _payloadToInboundLogString(d),
+        });
+        return;
+      }
       final events = m['events'];
       if (events is! List) return;
       final list = <JsonMap>[];
@@ -497,8 +513,16 @@ class LiveStreamService {
     }
 
     socket.on('stream:status', (d) {
+      _recordInboundSocket('stream:status', d);
       final m = _asMap(d);
-      if (m != null) applyStreamPayload(m, onStreamStatus);
+      if (m == null) {
+        _recordInboundSocket('stream:status:parse_failed', <String, dynamic>{
+          'hint': 'Server sent stream:status but payload could not be mapped',
+          'raw': _payloadToInboundLogString(d),
+        });
+        return;
+      }
+      applyStreamPayload(m, onStreamStatus);
     });
 
     socket.on('stream:live', (d) {
@@ -593,6 +617,10 @@ class LiveStreamService {
     final now = DateTime.now();
     if (now.difference(_lastStartEmit) < const Duration(seconds: 2)) return;
     _lastStartEmit = now;
+    _recordInboundSocket('emit:chat:start', {
+      'timestamp': now.toIso8601String(),
+      'connected': _socket?.connected,
+    });
     _socket?.emit('chat:start');
   }
 

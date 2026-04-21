@@ -58,7 +58,7 @@ class StreamWebView extends StatefulWidget {
 class StreamWebViewState extends State<StreamWebView>
     with SingleTickerProviderStateMixin {
   static final Map<String, _StreamWebViewControllerSnapshot> _controllerCache =
-      <String, _StreamWebViewControllerSnapshot>{};
+  <String, _StreamWebViewControllerSnapshot>{};
 
   /// In-app idle document (avoids `about:blank` on Android, which can trigger
   /// pigeon/WebViewClient races with resource error callbacks).
@@ -252,6 +252,18 @@ class StreamWebViewState extends State<StreamWebView>
         (host.contains('youtube.com') || host.contains('youtube-nocookie.com'))) {
       final qp = Map<String, String>.from(uri.queryParameters);
       qp['fs'] = '0';
+      return uri.replace(queryParameters: qp).toString();
+    }
+
+    // Kick embed: ensure fullscreen is allowed when not suppressed
+    if (host.contains('kick.com') || host.contains('player.kick.com')) {
+      final qp = Map<String, String>.from(uri.queryParameters);
+      if (!qp.containsKey('allowfullscreen') && !widget.suppressNativeFullscreen) {
+        qp['allowfullscreen'] = 'true';
+      }
+      if (widget.suppressNativeFullscreen) {
+        qp['allowfullscreen'] = 'false';
+      }
       return uri.replace(queryParameters: qp).toString();
     }
 
@@ -715,7 +727,7 @@ class StreamWebViewState extends State<StreamWebView>
       _ensureNavigationDelegate();
     }
     final urlChanged =
-        !streamEmbedUrlsCanonicallyEqual(oldWidget.url, widget.url);
+    !streamEmbedUrlsCanonicallyEqual(oldWidget.url, widget.url);
     final liveFlagChanged =
         oldWidget.streamExpectedLive != widget.streamExpectedLive;
     if (urlChanged) {
@@ -737,13 +749,13 @@ class StreamWebViewState extends State<StreamWebView>
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers =
-        widget.useEagerGestureArena
-            ? <Factory<OneSequenceGestureRecognizer>>{
-                Factory<OneSequenceGestureRecognizer>(
-                  () => EagerGestureRecognizer(),
-                ),
-              }
-            : const <Factory<OneSequenceGestureRecognizer>>{};
+    widget.useEagerGestureArena
+        ? <Factory<OneSequenceGestureRecognizer>>{
+      Factory<OneSequenceGestureRecognizer>(
+            () => EagerGestureRecognizer(),
+      ),
+    }
+        : const <Factory<OneSequenceGestureRecognizer>>{};
     final Widget frame = Stack(
       fit: StackFit.expand,
       children: [

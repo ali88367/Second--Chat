@@ -111,9 +111,9 @@ class StreamingService {
     final map = data.cast<String, dynamic>();
 
     final socketUrl =
-        extractString(map, const ['chatSocketUrl', 'chat_socket_url']);
+    extractString(map, const ['chatSocketUrl', 'chat_socket_url']);
     final socketPath =
-        extractString(map, const ['chatSocketPath', 'chat_socket_path']);
+    extractString(map, const ['chatSocketPath', 'chat_socket_path']);
 
     final platformsList = map['platforms'];
     if (platformsList is List) {
@@ -157,13 +157,13 @@ class StreamingService {
         final playerAny = m['player'];
         if (playerAny is Map) {
           final embedUrl =
-              extractString(playerAny, const ['embedUrl', 'embed_url']);
+          extractString(playerAny, const ['embedUrl', 'embed_url']);
           final watchUrl =
-              extractString(playerAny, const ['watchUrl', 'watch_url', 'url']);
+          extractString(playerAny, const ['watchUrl', 'watch_url', 'url']);
           embedUrlByPlatform[pKey] =
-              (embedUrl != null && embedUrl.trim().isNotEmpty)
-                  ? embedUrl
-                  : watchUrl;
+          (embedUrl != null && embedUrl.trim().isNotEmpty)
+              ? embedUrl
+              : watchUrl;
         }
       }
 

@@ -9,7 +9,7 @@ import '../../../core/localization/l10n.dart';
 import 'stream_embed_url_utils.dart';
 import 'stream_webview.dart';
 
-/// One platform’s embed: keeps the last non-empty embed URL across tab switches and
+/// One platform's embed: keeps the last non-empty embed URL across tab switches and
 /// brief `platformLive` / map gaps so [StreamWebView] is not sent `''` (idle) unless
 /// the platform is **explicitly** offline (`platformLive[key] == false`).
 class _LiveStreamPlatformSlot extends StatefulWidget {
@@ -132,9 +132,9 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
         child: LayoutBuilder(
           builder: (context, c) {
             final w =
-                c.maxWidth.isFinite && c.maxWidth > 0
-                    ? c.maxWidth
-                    : MediaQuery.sizeOf(context).width;
+            c.maxWidth.isFinite && c.maxWidth > 0
+                ? c.maxWidth
+                : MediaQuery.sizeOf(context).width;
             return embed(w, widget.height);
           },
         ),
@@ -195,9 +195,9 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
   }
 }
 
-/// Multi-preview tiles; each slot’s [_LiveStreamPlatformSlot] uses [Obx] for live/url.
+/// Multi-preview tiles; each slot's [_LiveStreamPlatformSlot] uses [Obx] for live/url.
 /// Twitch only: bottom-right in-app fullscreen (embed controls remain available).
-/// Kick/YouTube: fullscreen only via the embed’s own UI.
+/// Kick/YouTube: fullscreen only via the embed's own UI.
 class LiveStreamMultiEmbedGrid extends StatelessWidget {
   const LiveStreamMultiEmbedGrid({
     super.key,
@@ -237,17 +237,15 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
       required String platform,
       required BorderRadius radius,
     }) {
-      final slot = ClipRect(
-        child: _LiveStreamPlatformSlot(
-          platformKey: platform,
-          height: 1,
-          muted: false,
-          globalMuted: globalMuted,
-          streamViewKey: ValueKey('stream_$platform'),
-          onStreamReady: onStreamReady,
-          fillConstraints: true,
-          useEagerGestureArena: false,
-        ),
+      final slot = _LiveStreamPlatformSlot(
+        platformKey: platform,
+        height: 1,
+        muted: false,
+        globalMuted: globalMuted,
+        streamViewKey: ValueKey('stream_$platform'),
+        onStreamReady: onStreamReady,
+        fillConstraints: true,
+        useEagerGestureArena: true,
       );
 
       if (platform != 'twitch') {
