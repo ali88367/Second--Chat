@@ -184,10 +184,30 @@ class AppLocalizationsFr extends AppLocalizations {
       'Délai de connexion dépassé. Veuillez réessayer.';
 
   @override
-  String get signInWithApple => 'Sign in with Apple';
+  String get signInWithApple => 'Se connecter avec Apple';
 
   @override
-  String get signInWithGoogle => 'Sign in with Google';
+  String get signInWithGoogle => 'Se connecter avec Google';
+
+  @override
+  String get signIn => 'Se connecter';
+
+  @override
+  String get logIn => 'Se connecter';
+
+  @override
+  String get loginSubtitle => 'Pour synchroniser et gérer les abonnements';
+
+  @override
+  String get comingSoon => 'Bientôt disponible';
+
+  @override
+  String get couldNotSignInPleaseTryAgain =>
+      'Connexion impossible. Veuillez réessayer.';
+
+  @override
+  String get couldNotPrepareDataPleaseTryAgain =>
+      'Impossible de préparer vos données. Veuillez réessayer.';
 
   @override
   String get authenticationCancelled => 'Authentification annulée.';

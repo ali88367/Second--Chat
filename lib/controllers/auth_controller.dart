@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -42,6 +44,8 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   final RxnString lastError = RxnString();
 
   static const String _kIntroDoneUsers = 'second_chat.intro_done_users';
+  static const String _kLastRegisteredPushToken =
+      'second_chat.push_token.last_registered';
 
   AuthApi get authApi => _api.auth;
   OAuthApi get oauthApi => _api.oauth;
@@ -63,6 +67,9 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       );
       if (hasSession) {
         await refreshMe(silent: true, clearSessionOnFailure: true);
+        if (isAuthenticated.value) {
+          unawaited(_registerPushTokenAfterAuth('bootstrap'));
+        }
       }
       await _migrateIntroOnboardingFlagIfNeeded();
     } catch (e) {
@@ -124,6 +131,12 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<bool> _shouldSkipIntroOnboardingFromServerState() async {
+    if (me.value == null || me.value!.isEmpty) {
+      try {
+        await refreshMe(silent: true);
+      } catch (_) {}
+    }
+
     if (_looksPremiumLike(me.value) || _looksTrialPreviouslyUsed(me.value)) {
       return true;
     }
@@ -727,6 +740,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
             debugPrint('INTRO ONBOARDING SYNC (Google login) failed: $e');
           }
         }
+        unawaited(_registerPushTokenAfterAuth('google_login'));
         return true;
       } on DioException catch (e) {
         lastError.value = _messageForGoogleLoginApiFailure(e);
@@ -778,6 +792,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
           debugPrint('INTRO ONBOARDING SYNC (email login) failed: $e');
         }
       }
+      unawaited(_registerPushTokenAfterAuth('email_login'));
     } catch (e) {
       lastError.value = 'Login failed: $e';
       if (kDebugMode) debugPrint('API ERROR(login): $e');
@@ -793,6 +808,18 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   Future<void> logoutAndClearAllStoredData() async {
     final tokens = await _api.tokenStore.read();
     final accessToken = tokens?.accessToken;
+
+    try {
+      await unregisterCurrentDevicePushToken();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PUSH TOKEN UNREGISTER ON LOGOUT failed: $e');
+      }
+    }
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } catch (_) {}
+    await _persistLastRegisteredPushToken(null);
 
     try {
       final res = await authApi.logout(accessToken: accessToken);
@@ -812,6 +839,153 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     me.value = null;
     lastError.value = null;
     await GoogleSignInService.instance.signOut();
+  }
+
+  Future<void> _registerPushTokenAfterAuth(String source) async {
+    try {
+      final ok = await registerCurrentDevicePushToken();
+      if (kDebugMode) {
+        debugPrint('PUSH TOKEN AUTO REGISTER [$source]: $ok');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PUSH TOKEN AUTO REGISTER [$source] failed: $e');
+      }
+    }
+  }
+
+  String _currentDevicePushPlatform() {
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    return 'android';
+  }
+
+  Future<String?> _readLastRegisteredPushToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_kLastRegisteredPushToken)?.trim();
+      if (token == null || token.isEmpty) return null;
+      return token;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _persistLastRegisteredPushToken(String? token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final trimmed = token?.trim();
+      if (trimmed == null || trimmed.isEmpty) {
+        await prefs.remove(_kLastRegisteredPushToken);
+      } else {
+        await prefs.setString(_kLastRegisteredPushToken, trimmed);
+      }
+    } catch (_) {}
+  }
+
+  Future<Map<String, String>?> _authJsonHeaders() async {
+    final tokens = await _api.tokenStore.read();
+    final accessToken = tokens?.accessToken.trim();
+    if (accessToken == null || accessToken.isEmpty) return null;
+    return <String, String>{
+      'Authorization': 'Bearer $accessToken',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  Future<bool> registerCurrentDevicePushToken() async {
+    try {
+      final headers = await _authJsonHeaders();
+      if (headers == null) return false;
+
+      final fcmToken = (await FirebaseMessaging.instance.getToken())?.trim();
+      if (fcmToken == null || fcmToken.isEmpty) {
+        if (kDebugMode) debugPrint('PUSH TOKEN REGISTER skipped: empty FCM token');
+        return false;
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+          'PUSH TOKEN API REQUEST: POST /api/v1/notifications/push-tokens '
+          'body={"token":"***","platform":"${_currentDevicePushPlatform()}"}',
+        );
+      }
+      final res = await _api.client.dio.post<dynamic>(
+        '/api/v1/notifications/push-tokens',
+        data: <String, dynamic>{
+          'token': fcmToken,
+          'platform': _currentDevicePushPlatform(),
+        },
+        options: Options(headers: headers),
+      );
+      if (kDebugMode) {
+        debugPrint(
+          'PUSH TOKEN API RESPONSE: POST /api/v1/notifications/push-tokens '
+          'status=${res.statusCode} data=${res.data}',
+        );
+      }
+      await _persistLastRegisteredPushToken(fcmToken);
+      if (kDebugMode) {
+        debugPrint(
+          'PUSH TOKEN REGISTERED: platform=${_currentDevicePushPlatform()} tokenLen=${fcmToken.length}',
+        );
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode && e is DioException) {
+        debugPrint(
+          'PUSH TOKEN API ERROR: POST /api/v1/notifications/push-tokens '
+          'status=${e.response?.statusCode} data=${e.response?.data}',
+        );
+      }
+      if (kDebugMode) debugPrint('PUSH TOKEN REGISTER failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unregisterCurrentDevicePushToken() async {
+    try {
+      final headers = await _authJsonHeaders();
+      if (headers == null) return false;
+
+      final tokenFromFcm = (await FirebaseMessaging.instance.getToken())?.trim();
+      final token = tokenFromFcm?.isNotEmpty == true
+          ? tokenFromFcm
+          : await _readLastRegisteredPushToken();
+      if (token == null || token.isEmpty) return false;
+
+      if (kDebugMode) {
+        debugPrint(
+          'PUSH TOKEN API REQUEST: DELETE /api/v1/notifications/push-tokens '
+          'body={"token":"***"}',
+        );
+      }
+      final res = await _api.client.dio.delete<dynamic>(
+        '/api/v1/notifications/push-tokens',
+        data: <String, dynamic>{'token': token},
+        options: Options(headers: headers),
+      );
+      if (kDebugMode) {
+        debugPrint(
+          'PUSH TOKEN API RESPONSE: DELETE /api/v1/notifications/push-tokens '
+          'status=${res.statusCode} data=${res.data}',
+        );
+      }
+      await _persistLastRegisteredPushToken(null);
+      if (kDebugMode) {
+        debugPrint('PUSH TOKEN UNREGISTERED: tokenLen=${token.length}');
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode && e is DioException) {
+        debugPrint(
+          'PUSH TOKEN API ERROR: DELETE /api/v1/notifications/push-tokens '
+          'status=${e.response?.statusCode} data=${e.response?.data}',
+        );
+      }
+      if (kDebugMode) debugPrint('PUSH TOKEN UNREGISTER failed: $e');
+      return false;
+    }
   }
 
   Future<bool> connectProvider(

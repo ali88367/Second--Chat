@@ -112,6 +112,11 @@ class LiveStreamService {
   String? _connectedBaseUrl;
   String? _connectedPath;
   String? _connectedAccessToken;
+  DateTime? _sessionConnectedAt;
+  int _sessionInboundCount = 0;
+  int _sessionChatMessageCount = 0;
+  int _sessionStreamStatusCount = 0;
+  bool _sessionSummaryLogged = false;
 
   // Prevent duplicate messages (bounded memory).
   final Map<String, DateTime> _seen = <String, DateTime>{};
@@ -223,10 +228,51 @@ class LiveStreamService {
   };
 
   void _recordInboundSocket(String eventName, dynamic payload) {
+    _sessionInboundCount++;
+    final normalized = eventName.toLowerCase().trim();
+    if (normalized == 'chat:message') _sessionChatMessageCount++;
+    if (normalized == 'stream:status') _sessionStreamStatusCount++;
+
     final cb = onSocketInbound;
+    final shouldForward = _shouldRecordInboundSocketEvent(eventName);
+    final payloadText = _payloadToInboundLogString(payload);
+
+    if (kDebugMode) {
+      debugPrint('[SOCKET_TRACE] $_label#$_connectSeq | $eventName | $payloadText');
+    }
+
     if (cb == null) return;
-    if (!_shouldRecordInboundSocketEvent(eventName)) return;
-    cb(eventName, _payloadToInboundLogString(payload));
+    if (!shouldForward) return;
+    cb(eventName, payloadText);
+  }
+
+  void _resetSessionTraceCounters() {
+    _sessionConnectedAt = null;
+    _sessionInboundCount = 0;
+    _sessionChatMessageCount = 0;
+    _sessionStreamStatusCount = 0;
+    _sessionSummaryLogged = false;
+  }
+
+  void _logSessionSummary({
+    required String reason,
+    required String source,
+  }) {
+    if (_sessionSummaryLogged) return;
+    _sessionSummaryLogged = true;
+
+    final connectedAt = _sessionConnectedAt;
+    final duration = connectedAt == null
+        ? null
+        : DateTime.now().difference(connectedAt).inSeconds;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[SOCKET_TRACE] $_label#$_connectSeq | summary | source=$source reason=$reason '
+        'connected_for_s=${duration ?? 'n/a'} inbound=$_sessionInboundCount '
+        'chat:message=$_sessionChatMessageCount stream:status=$_sessionStreamStatusCount',
+      );
+    }
   }
 
   String _normalizePlatform(String? raw) {
@@ -340,6 +386,7 @@ class LiveStreamService {
     _connectSeq++;
 
     await disconnect();
+    _resetSessionTraceCounters();
 
     final socket = io.io(
       normalizedBase,
@@ -366,6 +413,7 @@ class LiveStreamService {
       _connectedBaseUrl = normalizedBase;
       _connectedPath = normalizedPath;
       _connectedAccessToken = normalizedToken;
+      _sessionConnectedAt = DateTime.now();
       _recordInboundSocket('socket:connect', {
         'url': normalizedBase,
         'path': normalizedPath,
@@ -385,6 +433,10 @@ class LiveStreamService {
       _recordInboundSocket('socket:disconnect', {
         'reason': reason?.toString() ?? '',
       });
+      _logSessionSummary(
+        reason: reason?.toString() ?? 'unknown',
+        source: 'socket.on(disconnect)',
+      );
       onSocketDisconnected?.call(reason?.toString() ?? '');
       _stopHeartbeat();
       if (!_manuallyDisconnected) _scheduleReconnectGuard();
@@ -596,6 +648,10 @@ class LiveStreamService {
     _reconnectGuard = null;
     _stopHeartbeat();
     _manuallyDisconnected = true;
+    _recordInboundSocket('socket:manual_disconnect_called', {
+      'connected': _socket?.connected == true,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
     try {
       _emitStop();
     } catch (_) {}
@@ -607,6 +663,7 @@ class LiveStreamService {
       } catch (_) {}
     }
     _socket = null;
+    _logSessionSummary(reason: 'manual_disconnect', source: 'disconnect()');
     _connectedBaseUrl = null;
     _connectedPath = null;
     _connectedAccessToken = null;

@@ -309,21 +309,54 @@ class SettingsController extends GetxController {
       appLanguage.value = prev;
       return;
     }
-    await _persistAndApplyLocaleFromAppLanguage();
+    await _persistAndApplyLocaleFromAppLanguage(force: true);
   }
 
-  Future<void> _persistAndApplyLocaleFromAppLanguage() async {
+  Future<void> _persistAndApplyLocaleFromAppLanguage({
+    bool force = false,
+  }) async {
     final normalized = appLanguage.value.toLowerCase().trim();
-    final code = _languageNameToCode[normalized];
+    final serverCode = _languageNameToCode[normalized];
+
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+
+    final existingCode =
+        prefs?.getString(AppConstants.keyLanguage)?.trim().toLowerCase();
+    final hasExistingLocalChoice =
+        existingCode != null &&
+        existingCode.isNotEmpty &&
+        _languageCodeToName.containsKey(existingCode);
+
+    // During background settings hydration (e.g. right after login), keep the
+    // language the user already chose locally instead of letting server
+    // defaults (often English) override it.
+    if (!force && hasExistingLocalChoice) {
+      final preferredName = _languageCodeToName[existingCode]!;
+      if (appLanguage.value != preferredName) {
+        appLanguage.value = preferredName;
+      }
+      try {
+        if (Get.locale?.languageCode.toLowerCase() != existingCode) {
+          Get.updateLocale(Locale(existingCode));
+        }
+      } catch (_) {}
+      return;
+    }
+
+    final code = serverCode;
     if (code == null || code.isEmpty) return;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.keyLanguage, code);
+      await prefs?.setString(AppConstants.keyLanguage, code);
     } catch (_) {}
 
     try {
-      Get.updateLocale(Locale(code));
+      if (Get.locale?.languageCode.toLowerCase() != code) {
+        Get.updateLocale(Locale(code));
+      }
     } catch (_) {}
   }
 

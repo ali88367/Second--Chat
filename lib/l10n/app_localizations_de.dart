@@ -184,10 +184,31 @@ class AppLocalizationsDe extends AppLocalizations {
       'Anmeldung abgelaufen. Bitte versuche es erneut.';
 
   @override
-  String get signInWithApple => 'Sign in with Apple';
+  String get signInWithApple => 'Mit Apple anmelden';
 
   @override
-  String get signInWithGoogle => 'Sign in with Google';
+  String get signInWithGoogle => 'Mit Google anmelden';
+
+  @override
+  String get signIn => 'Anmelden';
+
+  @override
+  String get logIn => 'Anmelden';
+
+  @override
+  String get loginSubtitle =>
+      'Zum Synchronisieren und Verwalten von Abonnements';
+
+  @override
+  String get comingSoon => 'Demnächst verfügbar';
+
+  @override
+  String get couldNotSignInPleaseTryAgain =>
+      'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
+
+  @override
+  String get couldNotPrepareDataPleaseTryAgain =>
+      'Deine Daten konnten nicht vorbereitet werden. Bitte versuche es erneut.';
 
   @override
   String get authenticationCancelled => 'Authentifizierung abgebrochen.';

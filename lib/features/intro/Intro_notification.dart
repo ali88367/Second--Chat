@@ -1,15 +1,21 @@
 import 'dart:async';
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
+import 'package:second_chat/controllers/chat_controller.dart';
+import 'package:second_chat/core/constants/constants.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/features/live_stream/live_stream_screen.dart';
+import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'intro_screen3.dart';
-import 'intro_screen4.dart';
 
 class NotficationScreens extends StatefulWidget {
   const NotficationScreens({super.key});
@@ -21,6 +27,44 @@ class NotficationScreens extends StatefulWidget {
 class _NotficationScreensState extends State<NotficationScreens> {
   bool _isRequesting = false;
 
+  Future<void> _markIntroOnboardingComplete() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(AppConstants.keyIntroOnboardingComplete, true);
+      try {
+        await Get.find<AuthController>()
+            .rememberIntroOnboardingCompletedForCurrentUser();
+      } catch (_) {}
+    } catch (_) {}
+  }
+
+  void _routeToAppDestination() {
+    final chat = Get.isRegistered<ChatController>()
+        ? Get.find<ChatController>()
+        : null;
+    final anyLive =
+        chat != null &&
+        (chat.platformLive.values.any((v) => v == true) ||
+            (chat.overview.value?.live == true));
+
+    if (anyLive) {
+      Get.offAll(
+        () => const Livestreaming(),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
+      return;
+    }
+
+    Get.offAll(
+      () => const HomeScreen2(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
   Future<void> _continueAfterNotification() async {
     if (!mounted) return;
     var skipTrial = false;
@@ -29,12 +73,9 @@ class _NotficationScreensState extends State<NotficationScreens> {
     } catch (_) {}
     if (!mounted) return;
     if (skipTrial) {
-      Get.offAll(
-        () => const IntroScreen4(),
-        transition: Transition.cupertino,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.fastOutSlowIn,
-      );
+      await _markIntroOnboardingComplete();
+      if (!mounted) return;
+      _routeToAppDestination();
     } else {
       Get.to(
         () => const IntroScreen3(),
@@ -48,13 +89,27 @@ class _NotficationScreensState extends State<NotficationScreens> {
   Future<void> _requestNotificationPermission() async {
     if (_isRequesting) return;
     setState(() => _isRequesting = true);
-
-    final status = await Permission.notification.request();
+    final auth = Get.find<AuthController>();
+    var status = await Permission.notification.status;
+    if (Platform.isAndroid || Platform.isIOS) {
+      status = await Permission.notification.request();
+    }
+    final settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+    final firebaseGranted =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
+    final granted = status.isGranted || firebaseGranted;
 
     if (!mounted) return;
     setState(() => _isRequesting = false);
 
-    if (status.isGranted) {
+    if (granted) {
+      unawaited(auth.registerCurrentDevicePushToken());
       await _continueAfterNotification();
       return;
     }

@@ -75,7 +75,14 @@ class IntroScreen3 extends StatelessWidget {
                           child: Align(
                             alignment: Alignment.topRight,
                             child: GestureDetector(
-                              onTap: () => Navigator.pop(context),
+                              onTap: () {
+                                Get.to(
+                                  () => const IntroScreen4(),
+                                  transition: Transition.cupertino,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.fastOutSlowIn,
+                                );
+                              },
                               child: Container(
                                 width: 44.w,
                                 height: 44.w,

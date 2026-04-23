@@ -180,10 +180,30 @@ class AppLocalizationsAr extends AppLocalizations {
       'انتهت مهلة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
 
   @override
-  String get signInWithApple => 'Sign in with Apple';
+  String get signInWithApple => 'تسجيل الدخول باستخدام Apple';
 
   @override
-  String get signInWithGoogle => 'Sign in with Google';
+  String get signInWithGoogle => 'تسجيل الدخول باستخدام Google';
+
+  @override
+  String get signIn => 'تسجيل الدخول';
+
+  @override
+  String get logIn => 'تسجيل الدخول';
+
+  @override
+  String get loginSubtitle => 'لمزامنة الاشتراكات وإدارتها';
+
+  @override
+  String get comingSoon => 'قريبًا';
+
+  @override
+  String get couldNotSignInPleaseTryAgain =>
+      'تعذر تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String get couldNotPrepareDataPleaseTryAgain =>
+      'تعذر تجهيز بياناتك. يرجى المحاولة مرة أخرى.';
 
   @override
   String get authenticationCancelled => 'تم إلغاء المصادقة.';

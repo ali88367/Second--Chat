@@ -185,10 +185,30 @@ class AppLocalizationsPt extends AppLocalizations {
       'O tempo de login expirou. Tente novamente.';
 
   @override
-  String get signInWithApple => 'Sign in with Apple';
+  String get signInWithApple => 'Entrar com Apple';
 
   @override
-  String get signInWithGoogle => 'Sign in with Google';
+  String get signInWithGoogle => 'Entrar com Google';
+
+  @override
+  String get signIn => 'Entrar';
+
+  @override
+  String get logIn => 'Entrar';
+
+  @override
+  String get loginSubtitle => 'Para sincronizar e gerenciar assinaturas';
+
+  @override
+  String get comingSoon => 'Em breve';
+
+  @override
+  String get couldNotSignInPleaseTryAgain =>
+      'Não foi possível entrar. Tente novamente.';
+
+  @override
+  String get couldNotPrepareDataPleaseTryAgain =>
+      'Não foi possível preparar seus dados. Tente novamente.';
 
   @override
   String get authenticationCancelled => 'Autenticação cancelada.';
