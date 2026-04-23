@@ -508,10 +508,6 @@ class ChatController extends GetxController {
     if (selected == key && platformLive[key] == true) {
       watchUrl.value = normalizedNext ?? '';
     }
-    if (platformLive[key] == true) {
-      platformStreamEmbedReady[key] = false;
-      platformStreamEmbedReady.refresh();
-    }
     return true;
   }
 

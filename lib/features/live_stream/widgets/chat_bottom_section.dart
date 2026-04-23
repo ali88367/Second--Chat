@@ -403,6 +403,16 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
+  bool _isMessageFromCurrentUser(ChatMessage message) {
+    final platformKey = message.platform.toLowerCase().trim();
+    final ownPlatformUsername =
+        (_chatCtrl.platformChatUsernames[platformKey] ?? '').trim().toLowerCase();
+    final sender = message.userName.trim().toLowerCase();
+    if (sender.isEmpty) return false;
+    if (sender == 'you') return true;
+    return ownPlatformUsername.isNotEmpty && sender == ownPlatformUsername;
+  }
+
   List<Map<String, dynamic>> _commentsWithNamePrivacy(bool hideNames) {
     if (!hideNames) return List<Map<String, dynamic>>.from(_comments);
     return _comments
@@ -429,6 +439,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       rows.add({
         'platformKey': key,
         'platform': _getPlatformAsset(key),
+        'isCurrentUser': _isMessageFromCurrentUser(m),
         'name': hideNames ? '' : m.userName,
         'message': m.message,
         'embeddedEmotes': EmoteParser.embeddedEmotesFromRaw(m.raw),
@@ -857,6 +868,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       String message,
       Color nameColor, {
         Key? key,
+        bool isCurrentUser = false,
+        String? platformKey,
         List<Map<String, Object>>? embeddedEmotes,
         Map<String, String>? socketEmoteOverrides,
       }) {
@@ -894,15 +907,26 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                     // Platform icon
                     WidgetSpan(
                       alignment: PlaceholderAlignment.middle,
-                      child: Padding(
-                        padding: EdgeInsets.only(right: 6.w),
-                        child: Image.asset(
-                          platform,
-                          width: 14.sp,
-                          height: 14.sp,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                      child: isCurrentUser
+                          ? Padding(
+                              padding: EdgeInsets.only(right: 6.w),
+                              child: Icon(
+                                Icons.mic,
+                                size: 14.sp,
+                                color: _settingsController.getPlatformColor(
+                                  (platformKey ?? '').toLowerCase().trim(),
+                                ),
+                              ),
+                            )
+                          : Padding(
+                              padding: EdgeInsets.only(right: 6.w),
+                              child: Image.asset(
+                                platform,
+                                width: 14.sp,
+                                height: 14.sp,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
                     ),
                     if (name.isNotEmpty)
                       TextSpan(
@@ -1188,6 +1212,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   item['name'],
                                   item['message'],
                                   nameColor,
+                                  isCurrentUser: item['isCurrentUser'] == true,
+                                  platformKey: item['platformKey']?.toString(),
                                   embeddedEmotes:
                                   item['embeddedEmotes']
                                   as List<Map<String, Object>>?,
@@ -1523,6 +1549,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   item['name'],
                                   item['message'],
                                   nameColor,
+                                  isCurrentUser: item['isCurrentUser'] == true,
+                                  platformKey: item['platformKey']?.toString(),
                                   embeddedEmotes:
                                   item['embeddedEmotes']
                                   as List<Map<String, Object>>?,

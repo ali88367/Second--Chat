@@ -328,7 +328,7 @@ class _LivestreamingState extends State<Livestreaming> {
     final type = typeRaw.toLowerCase().trim();
     final u = user.trim();
     if (type == 'join' || type == 'viewer_join' || type == 'viewer join') {
-      return (u.isNotEmpty ? '$u joined' : 'Someone joined', '');
+      return (u.isNotEmpty ? '$u has joined chat' : 'Someone has joined chat', '');
     }
     if (type == 'follow' || type == 'new_follower' || type == 'new follow') {
       return (u.isNotEmpty ? '$u followed' : 'Someone followed', '');
@@ -434,6 +434,12 @@ class _LivestreamingState extends State<Livestreaming> {
       final twitchViews = chatCtrl.platformViewerCounts['twitch'];
       final kickViews = chatCtrl.platformViewerCounts['kick'];
       final youtubeViews = chatCtrl.platformViewerCounts['youtube'];
+      String viewerCountText(String platformKey, int? count) {
+        if (!showViewerCounts) return '-';
+        final embedReady = chatCtrl.isPlatformStreamEmbedReadyForChat(platformKey);
+        if (!embedReady) return '0';
+        return _formatViewerCount(count);
+      }
 
       return Container(
         width: 297.w,
@@ -451,8 +457,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('twitch');
                 return counterPill(
                   asset: 'assets/images/twitch.png',
-                  count:
-                  showViewerCounts ? _formatViewerCount(twitchViews) : '-',
+                  count: viewerCountText('twitch', twitchViews),
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -465,7 +470,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('kick');
                 return counterPill(
                   asset: 'assets/images/kick.png',
-                  count: showViewerCounts ? _formatViewerCount(kickViews) : '-',
+                  count: viewerCountText('kick', kickViews),
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
@@ -478,8 +483,7 @@ class _LivestreamingState extends State<Livestreaming> {
                 final color = _settingsCtrl.getPlatformColor('youtube');
                 return counterPill(
                   asset: 'assets/images/youtube.png',
-                  count:
-                  showViewerCounts ? _formatViewerCount(youtubeViews) : '-',
+                  count: viewerCountText('youtube', youtubeViews),
                   color: color,
                   bgColor: color.withOpacity(0.25),
                 );
