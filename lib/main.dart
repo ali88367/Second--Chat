@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,6 +26,8 @@ import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/notifications.dart';
 import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
+import 'package:second_chat/services/push_notification_service.dart';
+import 'package:second_chat/core/utils/notification_permission_gate.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
@@ -72,6 +75,7 @@ void main() {
           );
         }
       }
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       VideoPlayerController? introVideoController;
 
       // Lock orientation
@@ -107,6 +111,7 @@ void main() {
         permanent: true,
       );
       Get.put(PlatformConnectController(), permanent: true);
+      await PushNotificationService.initialize();
 
       // Load persisted locale (if any) before building the app.
       try {
@@ -463,6 +468,8 @@ class _SplashScreenState extends State<_SplashScreen>
   Future<bool> _shouldShowNotificationIntro(AuthController auth) async {
     final introComplete = await auth.isIntroOnboardingPreferenceComplete();
     if (introComplete) return false;
+    final permissionAllowed = await NotificationPermissionGate.isAllowed();
+    if (permissionAllowed) return false;
     final enabled = await auth.isNotificationEnabledOnServer(
       refresh: true,
       defaultValue: false,

@@ -1280,6 +1280,12 @@ class ChatController extends GetxController {
     eventPlatform.isNotEmpty ? eventPlatform : selectedPlatform;
     if (glowPlatform.isEmpty) return;
 
+    // Keep LED behavior aligned with chat visibility:
+    // only for the currently visible stream platform, and only after that
+    // platform webview/embed is fully ready in UI.
+    if (glowPlatform != selectedPlatform) return;
+    if (!isPlatformStreamEmbedReadyForChat(glowPlatform)) return;
+
     final dedupeKey = _edgeGlowDedupeKeyForActivity(
       event,
       platformKey: glowPlatform,

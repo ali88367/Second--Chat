@@ -9,6 +9,7 @@ import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
+import 'package:second_chat/core/utils/notification_permission_gate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/themes/textstyles.dart';
 import '../../core/constants/constants.dart';
@@ -98,6 +99,8 @@ class _IntroScreen2State extends State<IntroScreen2> {
   }
 
   Future<bool> _isNotificationsDisabledFromServer() async {
+    final permissionAllowed = await NotificationPermissionGate.isAllowed();
+    if (permissionAllowed) return false;
     if (!Get.isRegistered<AuthController>()) return true;
     final auth = Get.find<AuthController>();
     final enabled = await auth.isNotificationEnabledOnServer(

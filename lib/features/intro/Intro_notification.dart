@@ -11,6 +11,7 @@ import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/core/constants/constants.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/core/utils/notification_permission_gate.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +27,14 @@ class NotficationScreens extends StatefulWidget {
 
 class _NotficationScreensState extends State<NotficationScreens> {
   bool _isRequesting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_skipWhenPermissionAlreadyAllowed());
+    });
+  }
 
   Future<void> _markIntroOnboardingComplete() async {
     try {
@@ -84,6 +93,16 @@ class _NotficationScreensState extends State<NotficationScreens> {
         curve: Curves.fastOutSlowIn,
       );
     }
+  }
+
+  Future<void> _skipWhenPermissionAlreadyAllowed() async {
+    final allowed = await NotificationPermissionGate.isAllowed();
+    if (!allowed || !mounted) return;
+    try {
+      await Get.find<AuthController>().registerCurrentDevicePushToken();
+    } catch (_) {}
+    if (!mounted) return;
+    await _continueAfterNotification();
   }
 
   Future<void> _requestNotificationPermission() async {

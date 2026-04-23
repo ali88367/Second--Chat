@@ -8,6 +8,7 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 import 'package:second_chat/core/constants/constants.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/themes/textstyles.dart';
+import 'package:second_chat/core/utils/notification_permission_gate.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/features/intro/Intro_notification.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
@@ -130,6 +131,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<bool> _shouldShowNotificationIntro(AuthController auth) async {
     final introComplete = await auth.isIntroOnboardingPreferenceComplete();
     if (introComplete) return false;
+    final permissionAllowed = await NotificationPermissionGate.isAllowed();
+    if (permissionAllowed) return false;
     final enabled = await auth.isNotificationEnabledOnServer(
       refresh: true,
       defaultValue: false,
