@@ -1507,13 +1507,37 @@ class ChatController extends GetxController {
       }) {
     if (raw.isEmpty) return;
 
+    // UI renders `activityEvents.reversed` (newest-first on screen),
+    // so keep storage canonical as oldest -> newest.
+    var normalizedRaw = List<Map<String, dynamic>>.from(raw);
+    bool shouldReverse = true; // API history is typically newest -> oldest.
+    if (normalizedRaw.length >= 2) {
+      final firstTs = _activityEventTimeUtc(normalizedRaw.first);
+      final lastTs = _activityEventTimeUtc(normalizedRaw.last);
+      final firstValid =
+          firstTs.millisecondsSinceEpoch >
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)
+              .millisecondsSinceEpoch;
+      final lastValid =
+          lastTs.millisecondsSinceEpoch >
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)
+              .millisecondsSinceEpoch;
+      if (firstValid && lastValid) {
+        // If first is older than last, data is already oldest -> newest.
+        shouldReverse = firstTs.isAfter(lastTs);
+      }
+    }
+    if (shouldReverse) {
+      normalizedRaw = normalizedRaw.reversed.toList(growable: false);
+    }
+
     final existingIds = <String>{
       for (final e in activityEvents)
         if (e['id'] != null) e['id'].toString().trim(),
     }..removeWhere((s) => s.isEmpty);
 
     final toAdd = <Map<String, dynamic>>[];
-    for (final item in raw) {
+    for (final item in normalizedRaw) {
       if (!_isActivityPayload(item)) continue;
 
       final eventPlatform = _normalizePlatformKey(item['platform']?.toString());
@@ -1545,10 +1569,6 @@ class ChatController extends GetxController {
     }
 
     if (toAdd.isEmpty) return;
-
-    toAdd.sort(
-          (a, b) => _activityEventTimeUtc(a).compareTo(_activityEventTimeUtc(b)),
-    );
     for (final m in toAdd) {
       activityEvents.add(m);
     }

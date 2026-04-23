@@ -122,19 +122,6 @@ class LiveStreamService {
   final Map<String, DateTime> _seen = <String, DateTime>{};
   static const int _seenMax = 600;
   static const Duration _seenTtl = Duration(minutes: 10);
-  static const Set<String> _typedActivitySocketEvents = <String>{
-    'activity:join',
-    'activity:follow',
-    'activity:superchat',
-    'activity:subscription',
-    'activity:gifted_sub',
-    'activity:resub',
-    'activity:raid',
-    'activity:bits',
-    'activity:like',
-    'activity:gift',
-    'activity:share',
-  };
 
   // ---- Callbacks (wired by controller) ----
   void Function()? onSocketConnected;
@@ -506,17 +493,8 @@ class LiveStreamService {
       _handleActivitySocketEvent('activity:event', d);
     });
 
-    for (final eventName in _typedActivitySocketEvents) {
-      socket.on(eventName, (d) {
-        if (eventName.toLowerCase().trim() == 'activity:follow') {
-          _recordInboundSocket('activity:follow', d);
-        }
-        _handleActivitySocketEvent(eventName, d);
-      });
-    }
-
-    // Some backends emit typed activity channels (activity:join, activity:follow, ...).
-    // Handle all activity:* names using the same payload shape.
+    // Keep activity consumption strict: only `activity:event` is authoritative.
+    // Other `activity:*` channels are ignored for activity UI/LED behavior.
     socket.onAny((eventName, data) {
       final ev = eventName.toString();
       final name = ev.toLowerCase().trim();
@@ -534,10 +512,12 @@ class LiveStreamService {
           'payload_preview': _payloadToInboundLogString(_unwrapSocketIoData(data)),
         });
       }
-      if (!name.startsWith('activity:')) return;
-      if (name == 'activity:sync' || name == 'activity:event') return;
-      if (_typedActivitySocketEvents.contains(name)) return;
-      _handleActivitySocketEvent(name, data);
+      // Ignore non-authoritative typed activity events (e.g., activity:follow).
+      if (name.startsWith('activity:') &&
+          name != 'activity:sync' &&
+          name != 'activity:event') {
+        return;
+      }
     });
 
     void applyStreamPayload(JsonMap m, void Function(JsonMap payload)? cb) {
