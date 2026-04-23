@@ -620,9 +620,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       final Size iconSize = iconBox.size;
 
       List<String> options = [];
+      String? initialSelectedItem;
       switch (tile["title"]) {
         case "Font Size":
           options = ["S", "M", "L", "XL"];
+          initialSelectedItem = controller.fontSize.value;
           break;
         case "App Language":
           options = [
@@ -633,9 +635,11 @@ class SettingsBottomsheetColumn extends StatelessWidget {
             "German",
             "French",
           ];
+          initialSelectedItem = controller.appLanguage.value;
           break;
         case "Clock":
           options = ["12h", "24h"];
+          initialSelectedItem = controller.clockFormat.value;
           break;
         default:
           return;
@@ -661,6 +665,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                   child: CustomBlackGlassWidget(
                     isWeek: false,
                     items: options,
+                    initialSelectedItem: initialSelectedItem,
                     onItemSelected: (selected) {
                       switch (tile["title"]) {
                         case "Font Size":

@@ -448,6 +448,42 @@ abstract class AppLocalizations {
   /// **'Sign in with Google'**
   String get signInWithGoogle;
 
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signIn;
+
+  /// No description provided for @logIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in'**
+  String get logIn;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'For synchronising and managing subscriptions'**
+  String get loginSubtitle;
+
+  /// No description provided for @comingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get comingSoon;
+
+  /// No description provided for @couldNotSignInPleaseTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sign in. Please try again.'**
+  String get couldNotSignInPleaseTryAgain;
+
+  /// No description provided for @couldNotPrepareDataPleaseTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not prepare your data. Please try again.'**
+  String get couldNotPrepareDataPleaseTryAgain;
+
   /// No description provided for @authenticationCancelled.
   ///
   /// In en, this message translates to:

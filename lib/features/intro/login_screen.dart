@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -41,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _preloadImages(context);
+      unawaited(_restoreLanguageSelectionAndLocale());
     });
   }
 
@@ -56,16 +58,17 @@ class _LoginScreenState extends State<LoginScreen> {
       final ok = await auth.loginWithGoogle();
       if (!ok) return;
       if (!mounted) return;
+      await _restoreLanguageSelectionAndLocale();
       await _routeAfterLoginSuccess();
     } catch (_) {
       if (!mounted) return;
       final auth = Get.find<AuthController>();
       final msg = auth.lastError.value;
       Get.snackbar(
-        'Sign in',
+        context.l10n.signIn,
         (msg != null && msg.isNotEmpty)
             ? msg
-            : 'Could not sign in. Please try again.',
+            : context.l10n.couldNotSignInPleaseTryAgain,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF2C2C2E),
         colorText: Colors.white,
@@ -78,12 +81,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _routeAfterLoginSuccess() async {
+    await _restoreLanguageSelectionAndLocale();
     final ok = await AppPrefetch.prefetchAfterAuth();
     if (!ok) {
       if (!mounted) return;
       Get.snackbar(
-        'Sign in',
-        'Could not prepare your data. Please try again.',
+        context.l10n.signIn,
+        context.l10n.couldNotPrepareDataPleaseTryAgain,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF2C2C2E),
         colorText: Colors.white,
@@ -135,8 +139,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showAppleComingSoon() {
     Get.snackbar(
-      'Apple Sign In',
-      'Coming soon',
+      context.l10n.signInWithApple,
+      context.l10n.comingSoon,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: const Color(0xFF2C2C2E),
       colorText: Colors.white,
@@ -146,44 +150,35 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _persistLanguage(_LanguageItem lang) async {
+    if (mounted) {
+      setState(() => selectedLanguage = lang);
+    }
+    Get.updateLocale(Locale(lang.code));
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppConstants.keyLanguage, lang.code);
     } catch (_) {}
-    Get.updateLocale(Locale(lang.code));
   }
 
-  String _signInWithAppleLabel(BuildContext context) {
-    switch (Localizations.localeOf(context).languageCode) {
-      case 'es':
-        return 'Iniciar sesión con Apple';
-      case 'ar':
-        return 'تسجيل الدخول باستخدام Apple';
-      case 'pt':
-        return 'Iniciar sessão com Apple';
-      case 'de':
-        return 'Mit Apple anmelden';
-      case 'fr':
-        return 'Se connecter avec Apple';
-      default:
-        return 'Sign in with Apple';
+  Future<void> _restoreLanguageSelectionAndLocale() async {
+    String? code;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      code = prefs.getString(AppConstants.keyLanguage)?.trim().toLowerCase();
+    } catch (_) {}
+
+    code ??= Get.locale?.languageCode.toLowerCase();
+    if (code == null || code.isEmpty) return;
+
+    final selected = _languages.firstWhere(
+      (item) => item.code == code,
+      orElse: () => _languages[0],
+    );
+    if (mounted && selectedLanguage.code != selected.code) {
+      setState(() => selectedLanguage = selected);
     }
-  }
-
-  String _signInWithGoogleLabel(BuildContext context) {
-    switch (Localizations.localeOf(context).languageCode) {
-      case 'es':
-        return 'Iniciar sesión con Google';
-      case 'ar':
-        return 'تسجيل الدخول باستخدام Google';
-      case 'pt':
-        return 'Iniciar sessão com Google';
-      case 'de':
-        return 'Mit Google anmelden';
-      case 'fr':
-        return 'Se connecter avec Google';
-      default:
-        return 'Sign in with Google';
+    if (Get.locale?.languageCode.toLowerCase() != code) {
+      Get.updateLocale(Locale(code));
     }
   }
 
@@ -210,12 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  onSelected: (lang) {
-                    setState(() {
-                      selectedLanguage = lang;
-                    });
-                    _persistLanguage(lang);
-                  },
+                  onSelected: (lang) => unawaited(_persistLanguage(lang)),
                   itemBuilder: (context) {
                     return _languages.map((lang) {
                       return PopupMenuItem<_LanguageItem>(
@@ -351,16 +341,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Log in', style: sfProDisplay700(22.sp, Colors.white)),
+                      Text(
+                        context.l10n.logIn,
+                        style: sfProDisplay700(22.sp, Colors.white),
+                      ),
                       SizedBox(height: 4.h),
                       Text(
-                        'For synchronising and managing subscriptions',
+                        context.l10n.loginSubtitle,
                         textAlign: TextAlign.center,
                         style: sfProText400(15.sp, const Color(0xFF6E6E73)),
                       ),
                       SizedBox(height: 14.h),
                       _LoginActionButton(
-                        label: _signInWithAppleLabel(context),
+                        label: context.l10n.signInWithApple,
                         backgroundColor: const Color(0xFF1A1C22),
                         textColor: Colors.white,
                         leading: Icon(
@@ -372,7 +365,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       SizedBox(height: 10.h),
                       _LoginActionButton(
-                        label: _signInWithGoogleLabel(context),
+                        label: context.l10n.signInWithGoogle,
                         backgroundColor: Colors.white,
                         textColor: const Color(0xFF1E1D20),
                         leading: Image.asset(
@@ -521,3 +514,4 @@ class _ShimmerTextState extends State<_ShimmerText>
     );
   }
 }
+

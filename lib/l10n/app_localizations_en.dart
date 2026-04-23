@@ -188,6 +188,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signInWithGoogle => 'Sign in with Google';
 
   @override
+  String get signIn => 'Sign in';
+
+  @override
+  String get logIn => 'Log in';
+
+  @override
+  String get loginSubtitle => 'For synchronising and managing subscriptions';
+
+  @override
+  String get comingSoon => 'Coming soon';
+
+  @override
+  String get couldNotSignInPleaseTryAgain =>
+      'Could not sign in. Please try again.';
+
+  @override
+  String get couldNotPrepareDataPleaseTryAgain =>
+      'Could not prepare your data. Please try again.';
+
+  @override
   String get authenticationCancelled => 'Authentication cancelled.';
 
   @override

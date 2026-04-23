@@ -209,7 +209,11 @@ class _IntroScreen4State extends State<IntroScreen4> {
                     child: GestureDetector(
                       onTap: () {
                         Get.to(
-                                () => const IntroScreen5());
+                          () => const IntroScreen5(),
+                          transition: Transition.cupertino,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.fastOutSlowIn,
+                        );
                       },
                       child: Container(
                         width: 40.w,

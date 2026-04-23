@@ -68,7 +68,14 @@ class IntroScreen5 extends StatelessWidget {
                   child: Align(
                     alignment: Alignment.topRight,
                     child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () {
+                        Get.offAll(
+                          () => const HomeScreen2(),
+                          transition: Transition.cupertino,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.fastOutSlowIn,
+                        );
+                      },
                       child: Container(
                         width: 40.w,
                         height: 40.w,

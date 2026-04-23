@@ -183,10 +183,30 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se agotó el tiempo de inicio de sesión. Por favor, inténtalo de nuevo.';
 
   @override
-  String get signInWithApple => 'Sign in with Apple';
+  String get signInWithApple => 'Iniciar sesión con Apple';
 
   @override
-  String get signInWithGoogle => 'Sign in with Google';
+  String get signInWithGoogle => 'Iniciar sesión con Google';
+
+  @override
+  String get signIn => 'Iniciar sesión';
+
+  @override
+  String get logIn => 'Iniciar sesión';
+
+  @override
+  String get loginSubtitle => 'Para sincronizar y gestionar suscripciones';
+
+  @override
+  String get comingSoon => 'Próximamente';
+
+  @override
+  String get couldNotSignInPleaseTryAgain =>
+      'No se pudo iniciar sesión. Por favor, inténtalo de nuevo.';
+
+  @override
+  String get couldNotPrepareDataPleaseTryAgain =>
+      'No se pudieron preparar tus datos. Por favor, inténtalo de nuevo.';
 
   @override
   String get authenticationCancelled => 'Autenticación cancelada.';

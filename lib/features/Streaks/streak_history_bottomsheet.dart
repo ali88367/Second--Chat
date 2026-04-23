@@ -133,7 +133,7 @@ class _StreakHistoryBottomSheetState extends State<StreakHistoryBottomSheet>
               ),
             ),
             Positioned(
-              bottom: 22.h,
+              bottom: 18.h,
               child: Text(
                 '$totalHistoryStreak',
                 style: sfProDisplay600(44.sp, Colors.white),
@@ -466,10 +466,10 @@ class _StreakHistoryBottomSheetState extends State<StreakHistoryBottomSheet>
                   ),
                   SizedBox(height: 8.h),
                   _buildAnimatedFireHero(totalHistoryStreak),
-                  Text(
-                    '$totalHistoryStreak ${context.l10n.dayStreak}',
-                    style: sfProDisplay600(28.sp, Colors.white),
-                  ),
+                  // Text(
+                  //   '$totalHistoryStreak',
+                  //   style: sfProDisplay600(28.sp, Colors.white),
+                  // ),
                   SizedBox(height: 16.h),
                   Container(
                     width: double.infinity,
