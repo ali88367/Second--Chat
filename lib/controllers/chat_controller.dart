@@ -82,6 +82,11 @@ class ChatController extends GetxController {
   final Map<String, DateTime> _lastConfirmedLiveAt = <String, DateTime>{};
   final Map<String, DateTime> _lastPlayerUrlUpdateAt = <String, DateTime>{};
   final RxMap<String, String> platformLastStopReason = <String, String>{}.obs;
+
+  /// User disconnected this platform from the Connect sheet; keep UI/stream off
+  /// until OAuth reconnect clears it, even if the socket still sends `live: true`.
+  final Set<String> _oauthUserDisconnectedPlatforms = <String>{};
+
   static const int _offlineConfirmationVotes = 2;
   static const Duration _offlineConfirmationDelay = Duration(seconds: 6);
   static const Duration _minLiveHoldAfterTrue = Duration(seconds: 18);
@@ -910,18 +915,17 @@ class ChatController extends GetxController {
   void forcePlatformDisconnected(String platformKey) {
     final key = _normalizedApiPlatform(platformKey, fallback: '');
     if (key.isEmpty) return;
+    _oauthUserDisconnectedPlatforms.add(key);
+    _setPlatformLiveStable(
+      key,
+      false,
+      source: 'user:oauth_platform_disconnect',
+      forceOffline: true,
+    );
     platformViewerCounts.remove(key);
-    platformEmbedUrls.remove(key);
-    platformLive.remove(key);
-    platformStreamEmbedReady.remove(key);
-    platformStreamEmbedReady.refresh();
-    platformMessages[key] = const <ChatMessage>[];
-    if (platform.value.toLowerCase().trim() == key) {
-      isLive.value = false;
-      watchUrl.value = '';
-      messages.clear();
-      _bumpScroll();
-    }
+    platformViewerCounts.refresh();
+    platformChatUsernames.remove(key);
+    platformChatUsernames.refresh();
   }
 
   String? urlForPlatform(String p) {
@@ -1708,6 +1712,7 @@ class ChatController extends GetxController {
     platformLastStopReason.clear();
     streamTitleByPlatform.clear();
     streamCategoryByPlatform.clear();
+    _oauthUserDisconnectedPlatforms.clear();
     overview.value = null;
     watchUrl.value = null;
     isLive.value = false;
@@ -1782,6 +1787,17 @@ class ChatController extends GetxController {
       if (p.isEmpty) return;
 
       final liveRaw = m['live'];
+      if (liveRaw is bool &&
+          liveRaw &&
+          _oauthUserDisconnectedPlatforms.contains(p)) {
+        _setPlatformLiveStable(
+          p,
+          false,
+          source: 'socket:stream_status_blocked_oauth_disconnect',
+          forceOffline: true,
+        );
+        return;
+      }
       if (liveRaw is bool) {
         // Authoritative socket snapshot: offline is immediate (no vote/hold debounce).
         // Stale `player` URLs in the same payload must not resurrect the embed (see below).
@@ -1961,6 +1977,7 @@ class ChatController extends GetxController {
   Future<void> onPlatformConnectedSuccessfully(String platformKey) async {
     final key = _normalizedApiPlatform(platformKey, fallback: '');
     if (key.isEmpty) return;
+    _oauthUserDisconnectedPlatforms.remove(key);
     await refreshOverviewForPlatform(key, forceChatHistory: true);
     await _tryConnectIfPossible();
   }
