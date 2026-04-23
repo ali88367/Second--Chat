@@ -19,10 +19,13 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
     required this.muted,
     required this.globalMuted,
     required this.streamViewKey,
+    required this.cacheScope,
     this.onStreamReady,
+
     /// When true, sizes the embed from [LayoutBuilder] max width/height (fills tile/stack).
     this.fillConstraints = false,
     this.useEagerGestureArena = true,
+    this.suppressNativeFullscreen = false,
   });
 
   final String platformKey;
@@ -30,12 +33,15 @@ class _LiveStreamPlatformSlot extends StatefulWidget {
   final bool muted;
   final bool globalMuted;
   final Key streamViewKey;
+  final String cacheScope;
   final void Function(String platformKey, String runningUrl)? onStreamReady;
   final bool fillConstraints;
   final bool useEagerGestureArena;
+  final bool suppressNativeFullscreen;
 
   @override
-  State<_LiveStreamPlatformSlot> createState() => _LiveStreamPlatformSlotState();
+  State<_LiveStreamPlatformSlot> createState() =>
+      _LiveStreamPlatformSlotState();
 }
 
 class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
@@ -49,19 +55,12 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.videocam_off,
-            color: Colors.white38,
-            size: 28.sp,
-          ),
+          Icon(Icons.videocam_off, color: Colors.white38, size: 28.sp),
           SizedBox(height: 5.h),
           Text(
             context.l10n.noStreamAtTheMoment,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 13.sp,
-            ),
+            style: TextStyle(color: Colors.white54, fontSize: 13.sp),
           ),
         ],
       ),
@@ -98,18 +97,22 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
       final webUrl = _latchedEmbedUrl;
 
       Widget embed(double w, double h) {
+        final platform = widget.platformKey.toLowerCase().trim();
+        final cacheKey =
+            platform == 'kick' ? '${widget.cacheScope}_$platform' : platform;
         return StreamWebView(
           key: ValueKey('${widget.streamViewKey}_$_sessionNonce'),
           url: webUrl,
           width: w,
           height: h,
-          cacheKey: widget.platformKey,
+          cacheKey: cacheKey,
           onStreamReady: (runningUrl) {
             widget.onStreamReady?.call(widget.platformKey, runningUrl);
           },
           muted: widget.muted || widget.globalMuted,
           streamExpectedLive: liveExpected,
           useEagerGestureArena: widget.useEagerGestureArena,
+          suppressNativeFullscreen: widget.suppressNativeFullscreen,
         );
       }
 
@@ -132,9 +135,9 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
         child: LayoutBuilder(
           builder: (context, c) {
             final w =
-            c.maxWidth.isFinite && c.maxWidth > 0
-                ? c.maxWidth
-                : MediaQuery.sizeOf(context).width;
+                c.maxWidth.isFinite && c.maxWidth > 0
+                    ? c.maxWidth
+                    : MediaQuery.sizeOf(context).width;
             return embed(w, widget.height);
           },
         ),
@@ -165,6 +168,22 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
     return i >= 0 ? i : 0;
   }
 
+  void _openTwitchFullscreenRoute(BuildContext context, String runningUrl) {
+    if (!context.mounted) return;
+    final url = runningUrl.trim();
+    if (url.isEmpty) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => _FullScreenStreamWebViewPage(
+              platformKey: 'twitch',
+              url: url,
+              onStreamReady: onStreamReady,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatCtrl = Get.find<ChatController>();
@@ -176,18 +195,70 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
         sizing: StackFit.expand,
         children: [
           for (var i = 0; i < _platforms.length; i++)
-            IgnorePointer(
-              ignoring: i != index,
-              child: _LiveStreamPlatformSlot(
-                platformKey: _platforms[i],
-                height: streamPreviewHeight,
-                muted: i != index,
-                globalMuted: globalMuted,
-                streamViewKey: ValueKey('stream_single_${_platforms[i]}'),
-                onStreamReady: onStreamReady,
-                fillConstraints: true,
-                useEagerGestureArena: true,
-              ),
+            Builder(
+              builder: (context) {
+                final platform = _platforms[i];
+                final slot = _LiveStreamPlatformSlot(
+                  platformKey: platform,
+                  height: streamPreviewHeight,
+                  muted: i != index,
+                  globalMuted: globalMuted,
+                  streamViewKey: ValueKey('stream_single_$platform'),
+                  cacheScope: 'single',
+                  onStreamReady: onStreamReady,
+                  fillConstraints: true,
+                  useEagerGestureArena: true,
+                  suppressNativeFullscreen: platform == 'twitch',
+                );
+                final child =
+                    platform != 'twitch'
+                        ? slot
+                        : Obx(() {
+                          final url =
+                              chatCtrl.urlForPlatform('twitch')?.trim() ?? '';
+                          final canOpen =
+                              chatCtrl.isPlatformLive('twitch') &&
+                              url.isNotEmpty &&
+                              chatCtrl.isPlatformStreamEmbedReadyForChat(
+                                'twitch',
+                              );
+                          return Stack(
+                            fit: StackFit.expand,
+                            clipBehavior: Clip.hardEdge,
+                            children: [
+                              slot,
+                              if (canOpen && i == index)
+                                Positioned(
+                                  bottom: 8.h,
+                                  right: 8.w,
+                                  child: PointerInterceptor(
+                                    child: Material(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(20.r),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: InkWell(
+                                        onTap:
+                                            () => _openTwitchFullscreenRoute(
+                                              context,
+                                              url,
+                                            ),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(8.w),
+                                          child: Icon(
+                                            Icons.fullscreen,
+                                            color: Colors.white,
+                                            size: 22.sp,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        });
+                return IgnorePointer(ignoring: i != index, child: child);
+              },
             ),
         ],
       );
@@ -218,11 +289,12 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
     if (url.isEmpty) return;
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => _FullScreenStreamWebViewPage(
-          platformKey: 'twitch',
-          url: url,
-          onStreamReady: onStreamReady,
-        ),
+        builder:
+            (_) => _FullScreenStreamWebViewPage(
+              platformKey: 'twitch',
+              url: url,
+              onStreamReady: onStreamReady,
+            ),
       ),
     );
   }
@@ -233,19 +305,18 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
     const topFlex = 56;
     const bottomFlex = 44;
 
-    Widget tile({
-      required String platform,
-      required BorderRadius radius,
-    }) {
+    Widget tile({required String platform, required BorderRadius radius}) {
       final slot = _LiveStreamPlatformSlot(
         platformKey: platform,
         height: 1,
         muted: false,
         globalMuted: globalMuted,
         streamViewKey: ValueKey('stream_$platform'),
+        cacheScope: 'multi',
         onStreamReady: onStreamReady,
         fillConstraints: true,
         useEagerGestureArena: true,
+        suppressNativeFullscreen: platform == 'twitch',
       );
 
       if (platform != 'twitch') {
@@ -262,7 +333,8 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
         child: Obx(() {
           final chatCtrl = Get.find<ChatController>();
           final url = chatCtrl.urlForPlatform('twitch')?.trim() ?? '';
-          final canOpen = chatCtrl.isPlatformLive('twitch') &&
+          final canOpen =
+              chatCtrl.isPlatformLive('twitch') &&
               url.isNotEmpty &&
               chatCtrl.isPlatformStreamEmbedReadyForChat('twitch');
           return Stack(
@@ -308,18 +380,14 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
               Expanded(
                 child: tile(
                   platform: _platforms[0],
-                  radius: BorderRadius.only(
-                    topLeft: Radius.circular(16.r),
-                  ),
+                  radius: BorderRadius.only(topLeft: Radius.circular(16.r)),
                 ),
               ),
               SizedBox(width: tileGap),
               Expanded(
                 child: tile(
                   platform: _platforms[1],
-                  radius: BorderRadius.only(
-                    topRight: Radius.circular(16.r),
-                  ),
+                  radius: BorderRadius.only(topRight: Radius.circular(16.r)),
                 ),
               ),
             ],
@@ -357,7 +425,8 @@ class _FullScreenStreamWebViewPage extends StatefulWidget {
       _FullScreenStreamWebViewPageState();
 }
 
-class _FullScreenStreamWebViewPageState extends State<_FullScreenStreamWebViewPage> {
+class _FullScreenStreamWebViewPageState
+    extends State<_FullScreenStreamWebViewPage> {
   @override
   void initState() {
     super.initState();

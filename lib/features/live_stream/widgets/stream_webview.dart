@@ -28,13 +28,16 @@ class StreamWebView extends StatefulWidget {
     this.onStreamReady,
     this.muted = false,
     this.streamExpectedLive = false,
+
     /// When true (e.g. in-app fullscreen opened from multi-preview), blocks
     /// document/iframe fullscreen APIs so the embed's fullscreen control
     /// cannot crash against the host route.
     this.suppressNativeFullscreen = false,
+
     /// When set (e.g. fullscreen route), constrains width so the WebView fills
     /// the entire viewport for correct aspect / layout.
     this.width,
+
     /// When true (default), uses [EagerGestureRecognizer] so the embed wins
     /// drags against outer [ScrollView]s. Set false for small preview tiles
     /// where a parent [GestureDetector] or overlay must receive taps.
@@ -58,7 +61,8 @@ class StreamWebView extends StatefulWidget {
 class StreamWebViewState extends State<StreamWebView>
     with SingleTickerProviderStateMixin {
   static final Map<String, _StreamWebViewControllerSnapshot> _controllerCache =
-  <String, _StreamWebViewControllerSnapshot>{};
+      <String, _StreamWebViewControllerSnapshot>{};
+  static const int _maxCachedControllers = 4;
 
   /// In-app idle document (avoids `about:blank` on Android, which can trigger
   /// pigeon/WebViewClient races with resource error callbacks).
@@ -91,6 +95,47 @@ class StreamWebViewState extends State<StreamWebView>
   bool get _shellIsIdle =>
       _initialUri != null && _initialUri!.host == 'secondchat.idle';
 
+  static String _normalizedPlatformKeyFromCacheKey(String rawCacheKey) {
+    final key = rawCacheKey.toLowerCase().trim();
+    if (key.contains('kick')) return 'kick';
+    if (key.contains('twitch')) return 'twitch';
+    if (key.contains('youtube')) return 'youtube';
+    return key;
+  }
+
+  String get _normalizedPlatformKey {
+    return _normalizedPlatformKeyFromCacheKey(widget.cacheKey);
+  }
+
+  static bool _shouldReuseControllerCacheForKey(String rawCacheKey) {
+    final normalized = _normalizedPlatformKeyFromCacheKey(rawCacheKey);
+    if (normalized == 'kick') return false;
+    if (rawCacheKey.toLowerCase().startsWith('fullscreen_')) return false;
+    return true;
+  }
+
+  bool get _shouldReuseControllerCache {
+    // Kick is prone to stale native player/session state after mode toggles and
+    // embed fullscreen transitions. Fresh controller per mount is more stable.
+    return _shouldReuseControllerCacheForKey(widget.cacheKey);
+  }
+
+  void _trimControllerCache({String? keepKey}) {
+    while (_controllerCache.length > _maxCachedControllers) {
+      final oldestKey = _controllerCache.keys.first;
+      if (keepKey != null &&
+          oldestKey == keepKey &&
+          _controllerCache.length > 1) {
+        final snapshot = _controllerCache.remove(oldestKey);
+        if (snapshot != null) {
+          _controllerCache[oldestKey] = snapshot;
+        }
+        continue;
+      }
+      _controllerCache.remove(oldestKey);
+    }
+  }
+
   WebViewController _createController() {
     // Configure iOS autoplay/inline playback via WebKit params when available.
     // IMPORTANT: WKWebView params cause platform channel errors on Android, so
@@ -121,6 +166,7 @@ class StreamWebViewState extends State<StreamWebView>
       lastCommittedNavigation: _lastCommittedNavigation,
       lastCanonicalEmbedId: _lastCanonicalEmbedId,
     );
+    _trimControllerCache(keepKey: widget.cacheKey);
   }
 
   void _hydrateFromSnapshot(_StreamWebViewControllerSnapshot snapshot) {
@@ -139,9 +185,10 @@ class StreamWebViewState extends State<StreamWebView>
       duration: const Duration(milliseconds: 1200),
     );
     final cached = _controllerCache[widget.cacheKey];
-    if (cached != null) {
+    if (_shouldReuseControllerCache && cached != null) {
       _hydrateFromSnapshot(cached);
     } else {
+      _controllerCache.remove(widget.cacheKey);
       _controller = _createController();
     }
     _ensureNavigationDelegate();
@@ -154,7 +201,11 @@ class StreamWebViewState extends State<StreamWebView>
 
   @override
   void dispose() {
-    _persistSnapshot();
+    if (_shouldReuseControllerCache) {
+      _persistSnapshot();
+    } else {
+      _controllerCache.remove(widget.cacheKey);
+    }
     _noStreamOverlayTimer?.cancel();
     _dotsController.dispose();
     super.dispose();
@@ -248,7 +299,8 @@ class StreamWebViewState extends State<StreamWebView>
 
     final host = uri.host.toLowerCase();
     if (widget.suppressNativeFullscreen &&
-        (host.contains('youtube.com') || host.contains('youtube-nocookie.com'))) {
+        (host.contains('youtube.com') ||
+            host.contains('youtube-nocookie.com'))) {
       final qp = Map<String, String>.from(uri.queryParameters);
       qp['fs'] = '0';
       return uri.replace(queryParameters: qp).toString();
@@ -257,7 +309,8 @@ class StreamWebViewState extends State<StreamWebView>
     // Kick embed: ensure fullscreen is allowed when not suppressed
     if (host.contains('kick.com') || host.contains('player.kick.com')) {
       final qp = Map<String, String>.from(uri.queryParameters);
-      if (!qp.containsKey('allowfullscreen') && !widget.suppressNativeFullscreen) {
+      if (!qp.containsKey('allowfullscreen') &&
+          !widget.suppressNativeFullscreen) {
         qp['allowfullscreen'] = 'true';
       }
       if (widget.suppressNativeFullscreen) {
@@ -302,7 +355,7 @@ class StreamWebViewState extends State<StreamWebView>
   /// (`overflow:hidden` + absolutely positioned iframes broke controls). Re-apply
   /// briefly as the embed mounts subtrees (debounced MutationObserver).
   Future<void> _injectKickEmbedContainmentLayout() async {
-    if (widget.cacheKey != 'kick') return;
+    if (_normalizedPlatformKey != 'kick') return;
     if (widget.suppressNativeFullscreen) return;
     if (_shellIsIdle) return;
     // Only force the tile containment CSS in small multi-preview slots.
@@ -554,7 +607,7 @@ class StreamWebViewState extends State<StreamWebView>
           _applyMuteState();
           unawaited(_suppressEmbeddedFullscreenChrome());
           unawaited(_injectKickEmbedContainmentLayout());
-          if (widget.cacheKey == 'kick' &&
+          if (_normalizedPlatformKey == 'kick' &&
               !widget.suppressNativeFullscreen &&
               !_shellIsIdle) {
             unawaited(
@@ -564,17 +617,25 @@ class StreamWebViewState extends State<StreamWebView>
               }),
             );
             unawaited(
-              Future<void>.delayed(const Duration(milliseconds: 1100), () async {
-                if (!mounted) return;
-                await _injectKickEmbedContainmentLayout();
-              }),
+              Future<void>.delayed(
+                const Duration(milliseconds: 1100),
+                () async {
+                  if (!mounted) return;
+                  await _injectKickEmbedContainmentLayout();
+                },
+              ),
             );
           }
           _maybeReportStreamReady();
         },
         onNavigationRequest: (req) {
+          // Keep iframe/media/control navigations untouched.
+          // Blocking subframe requests can freeze some embeds (Kick play/pause path).
+          if (!req.isMainFrame) return NavigationDecision.navigate;
           final allowed = _isAllowedMainFrameNavigation(req.url);
-          return allowed ? NavigationDecision.navigate : NavigationDecision.prevent;
+          return allowed
+              ? NavigationDecision.navigate
+              : NavigationDecision.prevent;
         },
       ),
     );
@@ -624,9 +685,7 @@ class StreamWebViewState extends State<StreamWebView>
       _lastCanonicalEmbedId = nextId;
       _initialUrl = sanitized;
       _initialUri = Uri.tryParse(sanitized);
-      _controller
-          .loadRequest(Uri.parse(sanitized))
-          .catchError(_logWebNavError);
+      _controller.loadRequest(Uri.parse(sanitized)).catchError(_logWebNavError);
       _persistSnapshot();
       _applyMuteState();
     } catch (e) {
@@ -707,7 +766,7 @@ class StreamWebViewState extends State<StreamWebView>
       return false;
     }
 
-    final key = widget.cacheKey.toLowerCase().trim();
+    final key = _normalizedPlatformKey;
     if (key == 'kick') {
       return hostMatchesAny(const <String>[
         'kick.com',
@@ -743,24 +802,30 @@ class StreamWebViewState extends State<StreamWebView>
   void didUpdateWidget(StreamWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cacheKey != widget.cacheKey) {
-      _controllerCache[oldWidget.cacheKey] = _StreamWebViewControllerSnapshot(
-        controller: _controller,
-        initialUrl: _initialUrl,
-        initialUri: _initialUri,
-        lastCommittedNavigation: _lastCommittedNavigation,
-        lastCanonicalEmbedId: _lastCanonicalEmbedId,
-      );
+      if (_shouldReuseControllerCacheForKey(oldWidget.cacheKey)) {
+        _controllerCache[oldWidget.cacheKey] = _StreamWebViewControllerSnapshot(
+          controller: _controller,
+          initialUrl: _initialUrl,
+          initialUri: _initialUri,
+          lastCommittedNavigation: _lastCommittedNavigation,
+          lastCanonicalEmbedId: _lastCanonicalEmbedId,
+        );
+        _trimControllerCache(keepKey: oldWidget.cacheKey);
+      } else {
+        _controllerCache.remove(oldWidget.cacheKey);
+      }
       final cached = _controllerCache[widget.cacheKey];
-      if (cached != null) {
+      if (_shouldReuseControllerCache && cached != null) {
         _hydrateFromSnapshot(cached);
       } else {
+        _controllerCache.remove(widget.cacheKey);
         _controller = _createController();
       }
       _delegateAttached = false;
       _ensureNavigationDelegate();
     }
     final urlChanged =
-    !streamEmbedUrlsCanonicallyEqual(oldWidget.url, widget.url);
+        !streamEmbedUrlsCanonicallyEqual(oldWidget.url, widget.url);
     final liveFlagChanged =
         oldWidget.streamExpectedLive != widget.streamExpectedLive;
     if (urlChanged) {
@@ -782,13 +847,13 @@ class StreamWebViewState extends State<StreamWebView>
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers =
-    widget.useEagerGestureArena
-        ? <Factory<OneSequenceGestureRecognizer>>{
-      Factory<OneSequenceGestureRecognizer>(
-            () => EagerGestureRecognizer(),
-      ),
-    }
-        : const <Factory<OneSequenceGestureRecognizer>>{};
+        widget.useEagerGestureArena
+            ? <Factory<OneSequenceGestureRecognizer>>{
+              Factory<OneSequenceGestureRecognizer>(
+                () => EagerGestureRecognizer(),
+              ),
+            }
+            : const <Factory<OneSequenceGestureRecognizer>>{};
     final Widget frame = Stack(
       fit: StackFit.expand,
       children: [
@@ -837,19 +902,12 @@ class StreamWebViewState extends State<StreamWebView>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.videocam_off,
-                    color: Colors.white38,
-                    size: 28.sp,
-                  ),
+                  Icon(Icons.videocam_off, color: Colors.white38, size: 28.sp),
                   SizedBox(height: 5.h),
                   Text(
                     l10n.noStreamAtTheMoment,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 13.sp,
-                    ),
+                    style: TextStyle(color: Colors.white54, fontSize: 13.sp),
                   ),
                 ],
               ),
@@ -859,16 +917,9 @@ class StreamWebViewState extends State<StreamWebView>
     );
 
     if (widget.width != null) {
-      return SizedBox(
-        width: widget.width,
-        height: widget.height,
-        child: frame,
-      );
+      return SizedBox(width: widget.width, height: widget.height, child: frame);
     }
-    return SizedBox(
-      height: widget.height,
-      child: frame,
-    );
+    return SizedBox(height: widget.height, child: frame);
   }
 }
 
