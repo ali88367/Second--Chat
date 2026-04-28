@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -19,7 +20,7 @@ class SocketFirebaseMirrorService extends GetxService {
   bool _runtimeEnabled = _enabledByConfig;
   bool get enabled => _runtimeEnabled;
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore? _firestore;
   final Map<String, Map<String, dynamic>> _platformData =
       <String, Map<String, dynamic>>{
         'twitch': <String, dynamic>{},
@@ -98,6 +99,8 @@ class SocketFirebaseMirrorService extends GetxService {
     if (!enabled || _flushing) return;
     _flushing = true;
     try {
+      if (Firebase.apps.isEmpty) return;
+      _firestore ??= FirebaseFirestore.instance;
       final docId = _resolveGoogleUsernameDocId();
       if (docId == null) return;
       final now = DateTime.now().toLocal();
@@ -120,7 +123,7 @@ class SocketFirebaseMirrorService extends GetxService {
         ),
       };
       unawaited(
-        _firestore
+        _firestore!
             .collection('users')
             .doc(docId)
             .set(payload, SetOptions(merge: true)),

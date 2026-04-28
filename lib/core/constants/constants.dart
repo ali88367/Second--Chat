@@ -25,7 +25,8 @@ class AppConstants {
       '209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com';
 
   /// iOS-only OAuth client ID if you do not use `--dart-define=GOOGLE_IOS_CLIENT_ID`.
-  static const String googleIosClientId = '';
+  static const String googleIosClientId =
+      '209792077701-fql181lav8fpsj99njarbrhd27mue2qj.apps.googleusercontent.com';
   static const int connectionTimeout = 30000; // milliseconds
   static const int receiveTimeout = 30000; // milliseconds
 

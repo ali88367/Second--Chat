@@ -38,9 +38,21 @@ class GoogleSignInService {
       );
     }
 
+    final iosClientId = ApiConfig.googleIosClientId.trim();
     await GoogleSignIn.instance.initialize(
+      clientId: defaultTargetPlatform == TargetPlatform.iOS
+          ? (iosClientId.isNotEmpty ? iosClientId : null)
+          : null,
       serverClientId: serverId,
     );
+    if (defaultTargetPlatform == TargetPlatform.iOS && iosClientId.isEmpty) {
+      throw StateError(
+        'iOS Google Sign-In requires an iOS OAuth client id. '
+        'Set AppConstants.googleIosClientId or pass '
+        '--dart-define=GOOGLE_IOS_CLIENT_ID=... '
+        '(CLIENT_ID from iOS GoogleService-Info.plist).',
+      );
+    }
     _initialized = true;
   }
 

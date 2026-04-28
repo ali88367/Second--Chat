@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../controllers/auth_controller.dart';
+import '../firebase_options.dart';
 
 String _safeJson(Map<String, dynamic> map) {
   try {
@@ -18,7 +19,9 @@ String _safeJson(Map<String, dynamic> map) {
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   if (kDebugMode) {
     debugPrint(
       '[PUSH_BG] id=${message.messageId} '

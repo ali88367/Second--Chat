@@ -28,6 +28,7 @@ import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
 import 'package:second_chat/services/push_notification_service.dart';
 import 'package:second_chat/core/utils/notification_permission_gate.dart';
+import 'package:second_chat/firebase_options.dart';
 
 import 'controllers/Main Section Controllers/settings_controller.dart';
 import 'core/constants/app_colors/app_colors.dart';
@@ -67,7 +68,9 @@ void main() {
         FlutterError.presentError(details);
       };
       try {
-        await Firebase.initializeApp();
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       } catch (e) {
         if (kDebugMode) {
           debugPrint(

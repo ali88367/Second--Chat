@@ -34,7 +34,17 @@
 				<string>secondchat</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.209792077701-fql181lav8fpsj99njarbrhd27mue2qj</string>
+			</array>
+		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>209792077701-fql181lav8fpsj99njarbrhd27mue2qj.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
