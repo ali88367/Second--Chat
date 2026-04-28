@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:dio/dio.dart';
+import 'package:second_chat/api/config/api_config.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
@@ -20,6 +22,167 @@ import '../../../core/widgets/custom_switch.dart';
 
 class SettingsBottomsheetColumn extends StatelessWidget {
   SettingsBottomsheetColumn({super.key});
+
+  /// Same free-trial / premium marketing sheet as before; does not bypass API premium.
+  static Future<void> _startFreeTrialFromSettings(BuildContext context) async {
+    final auth = Get.find<AuthController>();
+    await auth.ensureValidSession(refreshIfExpired: true);
+    final tokens = await auth.api.tokenStore.read();
+    final token = tokens?.accessToken.trim();
+    if (token == null || token.isEmpty) {
+      Get.snackbar(
+        context.l10n.sessionMissing,
+        context.l10n.sessionMissingMessage,
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(20),
+        backgroundColor: Colors.black.withOpacity(0.7),
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: const {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+
+    final res = await dio.post<dynamic>(
+      '/api/v1/subscriptions/trial/start',
+      data: const {'planType': 'monthly'},
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    final data = res.data;
+    final isActive =
+        data is Map &&
+        data['success'] == true &&
+        data['data'] is Map &&
+        data['data']['status']?.toString() == 'active';
+    if (!isActive) {
+      throw StateError('Trial not active');
+    }
+
+    await auth.refreshMe(silent: true);
+    try {
+      await Get.find<SettingsController>().loadSettings(force: true);
+    } catch (_) {}
+  }
+
+  static void showFreeTrialPremiumBottomSheet(BuildContext context) {
+    final trialLoading = ValueNotifier<bool>(false);
+    Get.bottomSheet(
+      Padding(
+        padding: EdgeInsets.only(
+          left: 12.w,
+          right: 12.w,
+          bottom: 25.h,
+        ),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            constraints: BoxConstraints(maxHeight: 600.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(36.r),
+                      child: Image.asset(
+                        'assets/images/premium.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    Positioned(
+                    bottom: 25.h,
+                    right: 0,
+                    left: 0,
+                    child:
+                    ValueListenableBuilder<bool>(
+                      valueListenable: trialLoading,
+                      builder: (context, loading, _) {
+                        return GestureDetector(
+                          onTap: loading
+                              ? null
+                              : () async {
+                            trialLoading.value = true;
+                            try {
+                              await _startFreeTrialFromSettings(context);
+                              if (Get.isBottomSheetOpen == true) {
+                                Get.back();
+                              }
+                              Get.snackbar(
+                                context.l10n.success,
+                                context.l10n.subscribed,
+                                snackPosition: SnackPosition.BOTTOM,
+                                duration: const Duration(seconds: 2),
+                                margin: const EdgeInsets.all(20),
+                                backgroundColor: Colors.black.withOpacity(0.7),
+                                colorText: Colors.white,
+                              );
+                            } catch (_) {
+                              Get.snackbar(
+                                context.l10n.trialFailed,
+                                context.l10n.trialFailedMessage,
+                                snackPosition: SnackPosition.BOTTOM,
+                                duration: const Duration(seconds: 2),
+                                margin: const EdgeInsets.all(20),
+                                backgroundColor: Colors.black.withOpacity(0.7),
+                                colorText: Colors.white,
+                              );
+                            } finally {
+                              trialLoading.value = false;
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            height: 46.h,
+                            margin: EdgeInsets.symmetric(horizontal: 25.w),
+                            padding: EdgeInsets.symmetric(horizontal: 6.w),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(30.r),
+                            ),
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                loading
+                                    ? SizedBox(
+                                  width: 18.w,
+                                  height: 18.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                    : SizedBox(),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    )
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      isDismissible: true,
+      enableDrag: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
 
   String _sectionTitle(BuildContext context, String raw) {
     switch (raw) {
@@ -700,19 +863,17 @@ class SettingsBottomsheetColumn extends StatelessWidget {
       );
     }
 
-    // Build the tile - use GetBuilder for unlock state to avoid GetX tracking issues
-    return GetBuilder<SettingsController>(
-      id: 'premium_unlock',
-      builder: (controller) {
-        final bool isActuallyLocked =
-            isLocked && !controller.isPremiumUnlocked.value;
-        final double opacity = isActuallyLocked ? 0.4 : 1.0;
-        final bool shouldShowSwitch =
-            (isSwitch || (isLocked && switchKey != null)) &&
-            !isActuallyLocked &&
-            switchValue != null;
+    // Premium gates from `/api/v1/users/me` via [AuthController.isPremiumFromMe].
+    return Obx(() {
+      final hasPremium = Get.find<AuthController>().isPremiumFromMe;
+      final bool isActuallyLocked = isLocked && !hasPremium;
+      final double opacity = isActuallyLocked ? 0.4 : 1.0;
+      final bool shouldShowSwitch =
+          (isSwitch || (isLocked && switchKey != null)) &&
+          !isActuallyLocked &&
+          switchValue != null;
 
-        return Container(
+      return Container(
           height: 56.h,
           padding: EdgeInsets.symmetric(horizontal: isLogoutAction ? 0.w : 16.w),
           decoration: BoxDecoration(
@@ -740,41 +901,8 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                 return;
               }
               if (isActuallyLocked) {
-                Get.bottomSheet(
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: 12.w,
-                      right: 12.w,
-                      bottom: 25.h,
-                    ),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        constraints: BoxConstraints(maxHeight: 600.h),
-                        child: GestureDetector(
-                          onTap: () {
-                            // Unlock all premium features
-                            controller.isPremiumUnlocked.value = true;
-                            controller.update([
-                              'premium_unlock',
-                            ]); // Update GetBuilder
-                            Get.back(); // Close the unlock bottom sheet
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(36.r),
-                            child: Image.asset(
-                              "assets/images/premium.png",
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  isDismissible: true,
-                  enableDrag: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
+                SettingsBottomsheetColumn.showFreeTrialPremiumBottomSheet(
+                  context,
                 );
                 return;
               }
@@ -964,8 +1092,7 @@ class SettingsBottomsheetColumn extends StatelessWidget {
                   ),
           ),
         );
-      },
-    );
+    });
   }
 
   Widget _buildSuffixText(
@@ -1133,38 +1260,6 @@ class FreePlanWidget extends StatefulWidget {
 class _FreePlanWidgetState extends State<FreePlanWidget> {
   bool _showSubscribe = false;
 
-  void _showPremiumUnlockSheet(BuildContext context) {
-    Get.bottomSheet(
-      Padding(
-        padding: EdgeInsets.only(left: 12.w, right: 12.w, bottom: 25.h),
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            constraints: BoxConstraints(maxHeight: 600.h),
-            child: GestureDetector(
-              onTap: () {
-                widget.controller.isPremiumUnlocked.value = true;
-                widget.controller.update(['premium_unlock']);
-                Get.back();
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(36.r),
-                child: Image.asset(
-                  "assets/images/premium.png",
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      isDismissible: true,
-      enableDrag: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -1178,10 +1273,8 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
       final plan = (account?['yourPlan'] ?? 'Free').toString();
       final price =
           (account?['premiumPerMonth'] ?? '£4.99 per month').toString();
-      final isPremium = account?['isPremium'] == true;
-      final isPremiumActive =
-          isPremium || widget.controller.isPremiumUnlocked.value;
-      final planLabel = isPremiumActive ? 'Premium' : plan;
+      final isPremiumActive = Get.find<AuthController>().isPremiumFromMe;
+      final planLabel = isPremiumActive ? context.l10n.premium : plan;
 
       return GestureDetector(
         onTap: () {
@@ -1246,7 +1339,8 @@ class _FreePlanWidgetState extends State<FreePlanWidget> {
                             GestureDetector(
                               onTap: () {
                                 if (isPremiumActive) return;
-                                _showPremiumUnlockSheet(context);
+                                SettingsBottomsheetColumn
+                                    .showFreeTrialPremiumBottomSheet(context);
                               },
                               child: Container(
                                 width: double.infinity,

@@ -67,9 +67,6 @@ class SettingsController extends GetxController {
   RxString appLanguage = "English".obs;
   RxString theme = "dark".obs;
 
-  // Premium unlock state
-  RxBool isPremiumUnlocked = false.obs;
-
   // Platform colors - null means use default
   Rx<Color?> twitchColor = Rx<Color?>(null);
   Rx<Color?> kickColor = Rx<Color?>(null);
@@ -141,6 +138,7 @@ class SettingsController extends GetxController {
     // Avoid refetching if we already have settings (e.g. warmed up on splash).
     if (settingsPayload.value != null) {
       _settingsRequested = true;
+      unawaited(Get.find<AuthController>().refreshMe(silent: true));
       return;
     }
     if (_settingsRequested) return;
@@ -668,10 +666,8 @@ class SettingsController extends GetxController {
       );
     }
 
-    final account = payload['account'];
-    if (account is Map) {
-      isPremiumUnlocked.value = _asBool(account['isPremium'], false);
-    }
+    // Premium is driven by `/api/v1/users/me` ([AuthController.isPremiumFromMe]),
+    // refreshed when settings load — not from settings payload alone.
   }
 
   bool _asBool(dynamic value, bool fallback) {

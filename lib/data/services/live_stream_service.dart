@@ -368,11 +368,13 @@ class LiveStreamService {
       return;
     }
 
-    _manuallyDisconnected = false;
     _label = normalizedLabel;
     _connectSeq++;
 
     await disconnect();
+    // [disconnect] marks manual=true; this new connect session must re-enable
+    // heartbeat + reconnect guards for timeout/disconnect recovery.
+    _manuallyDisconnected = false;
     _resetSessionTraceCounters();
 
     final socket = io.io(
@@ -424,7 +426,12 @@ class LiveStreamService {
         reason: reason?.toString() ?? 'unknown',
         source: 'socket.on(disconnect)',
       );
-      onSocketDisconnected?.call(reason?.toString() ?? '');
+      // Programmatic [disconnect] sets [_manuallyDisconnected] before dispose; that path
+      // invokes [onSocketDisconnected] once at the end of [disconnect] to avoid double
+      // callbacks and to cover dispose() not emitting this event synchronously.
+      if (!_manuallyDisconnected) {
+        onSocketDisconnected?.call(reason?.toString() ?? '');
+      }
       _stopHeartbeat();
       if (!_manuallyDisconnected) _scheduleReconnectGuard();
     });
@@ -647,6 +654,9 @@ class LiveStreamService {
     _connectedBaseUrl = null;
     _connectedPath = null;
     _connectedAccessToken = null;
+    try {
+      onSocketDisconnected?.call('manual_disconnect');
+    } catch (_) {}
   }
 
   // ---- Socket emits / keep-alive ----

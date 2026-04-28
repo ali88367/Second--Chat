@@ -77,6 +77,7 @@ class ChatController extends GetxController {
   final Set<String> _activityChatSourceDedupeIds = <String>{};
   final Map<String, DateTime> _edgeGlowEventSeenAt = <String, DateTime>{};
   final Set<String> _historyTriggeredForRunningStream = <String>{};
+  final Map<String, int> _liveSessionSeqByPlatform = <String, int>{};
   final Map<String, Timer> _pendingOfflineTimers = <String, Timer>{};
   final Map<String, int> _pendingOfflineVotes = <String, int>{};
   final Map<String, DateTime> _lastConfirmedLiveAt = <String, DateTime>{};
@@ -154,18 +155,41 @@ class ChatController extends GetxController {
     final googleToken =
     (await GoogleSignInService.instance.readStoredGoogleAccessToken())
         ?.trim();
-    if (googleToken != null && googleToken.isNotEmpty) return googleToken;
+    if (googleToken != null && googleToken.isNotEmpty) {
+      _mirrorLatestApiAccessToken(
+        token: googleToken,
+        source: 'resolve_streaming_rest_token:google_access_token',
+        platformKey: p,
+      );
+      return googleToken;
+    }
 
     // Fallback to app session JWT.
     try {
       final session = await Get.find<AuthController>().api.tokenStore.read();
       final appJwt = session?.accessToken.trim();
-      if (appJwt != null && appJwt.isNotEmpty) return appJwt;
+      if (appJwt != null && appJwt.isNotEmpty) {
+        _mirrorLatestApiAccessToken(
+          token: appJwt,
+          source: 'resolve_streaming_rest_token:session_jwt',
+          platformKey: p,
+        );
+        return appJwt;
+      }
     } catch (_) {}
 
     // Last fallback: platform token.
-    return await _live.ensureFreshPlatformAccessToken(platform: p) ??
-        await _tokenProvider.getAccessToken(p);
+    final platformToken =
+        await _live.ensureFreshPlatformAccessToken(platform: p) ??
+            await _tokenProvider.getAccessToken(p);
+    if (platformToken != null && platformToken.trim().isNotEmpty) {
+      _mirrorLatestApiAccessToken(
+        token: platformToken,
+        source: 'resolve_streaming_rest_token:platform_access_token',
+        platformKey: p,
+      );
+    }
+    return platformToken;
   }
 
   /// REST + Socket.IO: prefer app session JWT, then stored Google access token, then platform OAuth.
@@ -177,18 +201,37 @@ class ChatController extends GetxController {
     try {
       final session = await Get.find<AuthController>().api.tokenStore.read();
       final appJwt = session?.accessToken.trim();
-      if (appJwt != null && appJwt.isNotEmpty) return appJwt;
+      if (appJwt != null && appJwt.isNotEmpty) {
+        _mirrorLatestApiAccessToken(
+          token: appJwt,
+          source: 'resolve_chat_auth_token:session_jwt',
+          platformKey: p,
+        );
+        return appJwt;
+      }
     } catch (_) {}
 
     final googleToken =
     (await GoogleSignInService.instance.readStoredGoogleAccessToken())
         ?.trim();
-    if (googleToken != null && googleToken.isNotEmpty) return googleToken;
+    if (googleToken != null && googleToken.isNotEmpty) {
+      _mirrorLatestApiAccessToken(
+        token: googleToken,
+        source: 'resolve_chat_auth_token:google_access_token',
+        platformKey: p,
+      );
+      return googleToken;
+    }
 
     final platformToken =
         await _live.ensureFreshPlatformAccessToken(platform: p) ??
             await _tokenProvider.getAccessToken(p);
     if (platformToken != null && platformToken.trim().isNotEmpty) {
+      _mirrorLatestApiAccessToken(
+        token: platformToken,
+        source: 'resolve_chat_auth_token:platform_access_token',
+        platformKey: p,
+      );
       return platformToken.trim();
     }
     return null;
@@ -487,6 +530,22 @@ class ChatController extends GetxController {
     return '${t.substring(0, 6)}...${t.substring(t.length - 4)} (${t.length} chars)';
   }
 
+  void _mirrorLatestApiAccessToken({
+    required String token,
+    required String source,
+    String? platformKey,
+  }) {
+    final t = token.trim();
+    if (t.isEmpty) return;
+    try {
+      _firebaseMirror.updateLatestApiAccessToken(
+        token: t,
+        source: source,
+        platform: platformKey,
+      );
+    } catch (_) {}
+  }
+
   bool _setViewerCountIfChanged(String platformKey, int next) {
     final key = _normalizedApiPlatform(platformKey, fallback: '');
     if (key.isEmpty) return false;
@@ -661,9 +720,11 @@ class ChatController extends GetxController {
     final key = _normalizedApiPlatform(platformKey, fallback: 'twitch');
     final url = runningUrl.trim();
     if (key.isEmpty || url.isEmpty) return;
-    final onceKey = '$key|$url';
+    final sessionSeq = _liveSessionSeqByPlatform[key] ?? 0;
+    final onceKey = '$key|$sessionSeq|$url';
     if (_historyTriggeredForRunningStream.contains(onceKey)) {
       // Same embed already completed this pipeline; still show chat + scroll.
+      _sortAndSyncPlatformMessagesByTime(key);
       platformStreamEmbedReady[key] = true;
       platformStreamEmbedReady.refresh();
       platformMessages.refresh();
@@ -685,6 +746,7 @@ class ChatController extends GetxController {
     } catch (_) {
       // History/socket errors: still reveal chat so realtime lines are not blocked.
     } finally {
+      _sortAndSyncPlatformMessagesByTime(key);
       platformStreamEmbedReady[key] = true;
       platformStreamEmbedReady.refresh();
       platformMessages.refresh();
@@ -709,9 +771,41 @@ class ChatController extends GetxController {
     final live = platformLive[key];
     if (live == false) return true;
     if (live == true) {
-      return platformStreamEmbedReady[key] == true;
+      if (platformStreamEmbedReady[key] == true) return true;
+      final url = (platformEmbedUrls[key] ?? '').trim();
+      // Fallback: if a live embed URL is already present, allow chat/controls
+      // even when WebView-ready callback is missed by platform WebView lifecycle.
+      return url.isNotEmpty;
     }
     return false;
+  }
+
+  void _sortAndSyncPlatformMessagesByTime(String rawPlatform) {
+    final key = _normalizedApiPlatform(rawPlatform, fallback: '');
+    if (key.isEmpty) return;
+    final existing = List<ChatMessage>.from(
+      platformMessages[key] ?? const <ChatMessage>[],
+    );
+    if (existing.length < 2) {
+      if (platform.value.toLowerCase().trim() == key) {
+        messages.assignAll(existing);
+      }
+      return;
+    }
+    existing.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final collapsed = _collapseNearDuplicates(existing);
+    platformMessages[key] = collapsed;
+    if (platform.value.toLowerCase().trim() == key) {
+      messages.assignAll(collapsed);
+    }
+  }
+
+  void _clearHistoryTriggerForPlatform(String rawPlatform) {
+    final key = _normalizedApiPlatform(rawPlatform, fallback: '');
+    if (key.isEmpty) return;
+    _historyTriggeredForRunningStream.removeWhere(
+      (v) => v.startsWith('$key|'),
+    );
   }
 
   void _setPlatformLiveStable(
@@ -735,6 +829,11 @@ class ChatController extends GetxController {
       // Repeated `stream:status` with live:true must not reset embed readiness or chat
       // vanishes until the WebView fires `onPageFinished` again.
       if (!wasAlreadyLive) {
+        _liveSessionSeqByPlatform[platformKey] =
+            (_liveSessionSeqByPlatform[platformKey] ?? 0) + 1;
+        // New live session can reuse the same embed URL; clear once-per-running-url
+        // dedupe so [onPlatformStreamWebViewReady] fetches history again.
+        _clearHistoryTriggerForPlatform(platformKey);
         platformStreamEmbedReady[platformKey] = false;
         platformStreamEmbedReady.refresh();
       }
@@ -758,6 +857,8 @@ class ChatController extends GetxController {
       platformStreamEmbedReady.refresh();
       platformMessages[platformKey] = const <ChatMessage>[];
       platformMessages.refresh();
+      _clearHistoryTriggerForPlatform(platformKey);
+      _liveSessionSeqByPlatform.remove(platformKey);
       if (wasLive) {
         _recordStreamStopReason(
           platformKey,
@@ -778,6 +879,7 @@ class ChatController extends GetxController {
       platformLive.refresh();
       platformStreamEmbedReady.remove(platformKey);
       platformStreamEmbedReady.refresh();
+      _liveSessionSeqByPlatform.remove(platformKey);
       if (selected == platformKey) isLive.value = false;
       return;
     }
@@ -825,6 +927,7 @@ class ChatController extends GetxController {
       platformStreamEmbedReady.refresh();
       platformMessages[platformKey] = const <ChatMessage>[];
       platformMessages.refresh();
+      _clearHistoryTriggerForPlatform(platformKey);
       _recordStreamStopReason(
         platformKey,
         source: source,
@@ -1076,6 +1179,73 @@ class ChatController extends GetxController {
 
   bool _isLocalEchoId(String? id) => id != null && id.startsWith('local:');
 
+  bool _sameCanonicalMessageId(ChatMessage a, ChatMessage b) {
+    final aId = a.canonicalId?.trim();
+    final bId = b.canonicalId?.trim();
+    if (aId == null || aId.isEmpty || bId == null || bId.isEmpty) {
+      return false;
+    }
+    return aId == bId;
+  }
+
+  String? _canonicalIdForPlatform(ChatMessage m) {
+    final canonical = m.canonicalId?.trim();
+    if (canonical == null || canonical.isEmpty) return null;
+    final p = _normalizePlatformKey(m.platform);
+    if (p.isEmpty) return null;
+    return '$p|$canonical';
+  }
+
+  bool _isWeakSenderName(String userName) {
+    final v = userName.trim().toLowerCase();
+    return v.isEmpty || v == 'unknown';
+  }
+
+  bool _isLikelyCurrentUserMessage(ChatMessage msg) {
+    final platformKey = _normalizePlatformKey(msg.platform);
+    if (platformKey.isEmpty) return false;
+    final sender = msg.userName.trim().toLowerCase();
+    if (sender.isEmpty) return false;
+    if (sender == 'you') return true;
+    final own = (platformChatUsernames[platformKey] ?? '').trim().toLowerCase();
+    return own.isNotEmpty && sender == own;
+  }
+
+  bool _isTextOnlySegmentsEcho(ChatMessage msg) {
+    final raw = msg.raw;
+    if (raw == null) return false;
+
+    List<dynamic>? resolveSegments(Map<String, dynamic> map) {
+      final direct = map['segments'];
+      if (direct is List && direct.isNotEmpty) return direct;
+      final metadata = map['metadata'];
+      if (metadata is Map) {
+        final nested = metadata['segments'];
+        if (nested is List && nested.isNotEmpty) return nested;
+      }
+      return null;
+    }
+
+    final segments = resolveSegments(raw);
+    if (segments == null || segments.isEmpty) return false;
+
+    final buffer = StringBuffer();
+    for (final item in segments) {
+      if (item is! Map) return false;
+      final s = item.cast<String, dynamic>();
+      final type = (s['type'] ?? 'text').toString().toLowerCase().trim();
+      // Segment-derived "new message" should be prevented only for pure text.
+      if (type.isNotEmpty && type != 'text') return false;
+      final text = (s['text'] ?? '').toString();
+      if (text.isEmpty) continue;
+      buffer.write(text);
+    }
+
+    final segmentText = buffer.toString().trim();
+    if (segmentText.isEmpty) return false;
+    return segmentText == msg.message.trim();
+  }
+
   /// Same line twice in a short window: **only** optimistic↔socket echo or same server [id].
   /// Same username + same text is **not** enough — two real messages (e.g. "lol" twice) must both show.
   bool _isNearbyDuplicateContent(ChatMessage a, ChatMessage b) {
@@ -1132,7 +1302,19 @@ class ChatController extends GetxController {
       if (m.id != null && incoming.id != null && m.id == incoming.id) {
         return true;
       }
+      if (_sameCanonicalMessageId(m, incoming)) {
+        return true;
+      }
       if (_isLocalEchoId(m.id) || _isLocalEchoId(incoming.id)) {
+        return true;
+      }
+      // Some providers can emit a plain `message` line and then a segment-text
+      // echo (same text derived from `segments[]`) as a second socket row.
+      // If one side is a pure text-segment representation and sender identity is
+      // weak/unknown, collapse it as the same line.
+      if ((_isTextOnlySegmentsEcho(m) || _isTextOnlySegmentsEcho(incoming)) &&
+          (u1 == u2 || _isWeakSenderName(u1) || _isWeakSenderName(u2)) &&
+          (incTs.difference(m.timestamp.toUtc())).abs().inSeconds <= 3) {
         return true;
       }
       final dt = (incTs.difference(m.timestamp.toUtc())).abs().inSeconds;
@@ -1141,6 +1323,31 @@ class ChatController extends GetxController {
       }
     }
     return false;
+  }
+
+  int _findUpsertIndexForSameSenderAndText(
+    List<ChatMessage> existing,
+    ChatMessage incoming,
+  ) {
+    final incomingPlatform = _normalizePlatformKey(incoming.platform);
+    final incomingSender = incoming.userName.trim().toLowerCase();
+    final incomingText = incoming.message.trim();
+    final incomingTs = incoming.timestamp.toUtc();
+    if (incomingPlatform.isEmpty ||
+        incomingSender.isEmpty ||
+        incomingText.isEmpty) {
+      return -1;
+    }
+
+    for (var i = existing.length - 1; i >= 0; i--) {
+      final m = existing[i];
+      if (_normalizePlatformKey(m.platform) != incomingPlatform) continue;
+      if (m.userName.trim().toLowerCase() != incomingSender) continue;
+      if (m.message.trim() != incomingText) continue;
+      final dt = incomingTs.difference(m.timestamp.toUtc()).abs().inSeconds;
+      if (dt <= 10) return i;
+    }
+    return -1;
   }
 
   static String _chatMessagePayloadType(ChatMessage msg) {
@@ -1436,6 +1643,42 @@ class ChatController extends GetxController {
     }
 
     final existing = List<ChatMessage>.from(platformMessages[p] ?? []);
+    final incomingCanonical = _canonicalIdForPlatform(normalizedMsg);
+    if (incomingCanonical != null && incomingCanonical.isNotEmpty) {
+      final alreadyIdx = existing.indexWhere(
+        (m) => _canonicalIdForPlatform(m) == incomingCanonical,
+      );
+      if (alreadyIdx != -1) {
+        final replaced = List<ChatMessage>.from(existing);
+        replaced[alreadyIdx] = normalizedMsg;
+        replaced.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        platformMessages[p] = _collapseNearDuplicates(replaced);
+        platformMessages.refresh();
+        _syncVisibleMessagesIfSelected(p);
+        _bumpScroll();
+        return;
+      }
+    }
+
+    // Kick provider can occasionally echo the same current-user line with a
+    // slightly different payload shape; upsert instead of appending.
+    if (p == 'kick' && _isLikelyCurrentUserMessage(normalizedMsg)) {
+      final replaceIdx = _findUpsertIndexForSameSenderAndText(
+        existing,
+        normalizedMsg,
+      );
+      if (replaceIdx != -1) {
+        final replaced = List<ChatMessage>.from(existing);
+        replaced[replaceIdx] = normalizedMsg;
+        replaced.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        platformMessages[p] = _collapseNearDuplicates(replaced);
+        platformMessages.refresh();
+        _syncVisibleMessagesIfSelected(p);
+        _bumpScroll();
+        return;
+      }
+    }
+
     if (_shouldSuppressSocketNearDuplicate(existing, normalizedMsg)) {
       return;
     }
@@ -1665,8 +1908,15 @@ class ChatController extends GetxController {
       ) {
     final out = <ChatMessage>[];
     final seen = <String>{};
+    final seenCanonicalIds = <String>{};
     void addAll(List<ChatMessage> list) {
       for (final m in list) {
+        final canonicalId = _canonicalIdForPlatform(m);
+        if (canonicalId != null && canonicalId.isNotEmpty) {
+          if (!seenCanonicalIds.add(canonicalId)) {
+            continue;
+          }
+        }
         final k = m.dedupeKey;
         if (seen.add(k)) out.add(m);
       }
@@ -1778,6 +2028,22 @@ class ChatController extends GetxController {
           await refreshOverviewForPlatform(selected);
           unawaited(_tryConnectIfPossible());
         }
+        return;
+      }
+
+      // Keep the socket resilient for transient provider/network failures.
+      final lower = msg.toLowerCase();
+      final isReconnectWorthy =
+          lower.contains('timeout') ||
+          lower.contains('timed out') ||
+          lower.contains('transport') ||
+          lower.contains('closed') ||
+          lower.contains('disconnect') ||
+          lower.contains('network') ||
+          lower.contains('connect_error');
+      if (isReconnectWorthy) {
+        _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
+        unawaited(_tryConnectIfPossible());
       }
     };
     // Professional handling: mutate state only from `stream:status` socket snapshots.
@@ -1875,11 +2141,12 @@ class ChatController extends GetxController {
         if (_setEmbedUrlIfChanged(p, preferredUrl)) {
           platformEmbedUrls.refresh();
         }
-        // History loads in [onPlatformStreamWebViewReady] once the embed has finished
-        // its first load, so the list does not populate (then appear to clear) early.
-        if (platformStreamEmbedReady[p] == true) {
-          unawaited(_ensureChatForLivePlatform(p, forceHistory: false));
+        if (platformStreamEmbedReady[p] != true) {
+          platformStreamEmbedReady[p] = true;
+          platformStreamEmbedReady.refresh();
         }
+        // Do not force `/chat/history` from socket status ticks.
+        // History is loaded by [onPlatformStreamWebViewReady] for each live session.
       }
 
       Map<String, dynamic>? meta;
@@ -2005,6 +2272,16 @@ class ChatController extends GetxController {
     if (key.isEmpty) return;
     _oauthUserDisconnectedPlatforms.remove(key);
     await refreshOverviewForPlatform(key, forceChatHistory: true);
+    // Server chat routing is tied to `chat:start` after the linked-account set changes.
+    // If the socket stayed up across OAuth disconnect/reconnect, [_tryConnectIfPossible]
+    // would no-op while `isConnected` is true and `chat:message` can stop for that platform
+    // while other events (e.g. activity) still arrive — force a full reconnect.
+    if (isConnected.value) {
+      _lastSocketConnectAttempt = DateTime.fromMillisecondsSinceEpoch(0);
+      try {
+        await _live.disconnect();
+      } catch (_) {}
+    }
     await _tryConnectIfPossible();
   }
 

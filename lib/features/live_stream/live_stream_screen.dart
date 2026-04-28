@@ -21,7 +21,7 @@ import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
 import 'widgets/live_stream_embed_stack.dart';
-// import 'socket_log_screen.dart';
+import 'socket_log_screen.dart';
 
 class Livestreaming extends StatefulWidget {
   const Livestreaming({super.key});
@@ -43,6 +43,7 @@ class _LivestreamingState extends State<Livestreaming> {
   final ValueNotifier<String?> _chatFilter = ValueNotifier<String?>(null);
   bool _streakCompletionChecked = false;
   bool _streakSheetOpening = false;
+  Worker? _platformLiveWorker;
 
   // Resizable bottom section state
   double _bottomSectionHeight = 0;
@@ -76,6 +77,10 @@ class _LivestreamingState extends State<Livestreaming> {
     _chatFilter.addListener(_updateImageBasedOnFilter);
     _chatFilter.addListener(_syncSelectedPlatformFromFilter);
     _showActivity.addListener(_onShowActivityOpened);
+    _platformLiveWorker = ever<Map<String, bool>>(
+      Get.find<ChatController>().platformLive,
+      (_) => _syncSelectedPlatformFromFilter(),
+    );
     _warmPrefetchBottomSheets();
     _maybeCompleteStreakForToday();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -112,10 +117,19 @@ class _LivestreamingState extends State<Livestreaming> {
     final chatCtrl = Get.find<ChatController>();
     final selected = _chatFilter.value?.toLowerCase().trim();
     if (selected == null || selected.isEmpty) {
-      // "All" is a chat aggregation mode; keep currently selected stream platform.
-      final fallback = _normalizeUiPlatform(chatCtrl.platform.value);
+      // "All": single webview should follow the first live platform.
+      final firstLive = <String>['twitch', 'kick', 'youtube'].firstWhere(
+        (k) => chatCtrl.isPlatformLive(k),
+        orElse: () => '',
+      );
+      final fallback = firstLive.isNotEmpty
+          ? firstLive
+          : _normalizeUiPlatform(chatCtrl.platform.value);
       if (_selectedPlatform.value != fallback) {
         _selectedPlatform.value = fallback;
+      }
+      if (chatCtrl.platform.value.toLowerCase().trim() != fallback) {
+        chatCtrl.selectPlatformInstant(fallback);
       }
       return;
     }
@@ -198,6 +212,7 @@ class _LivestreamingState extends State<Livestreaming> {
     _chatFilter.removeListener(_updateImageBasedOnFilter);
     _chatFilter.removeListener(_syncSelectedPlatformFromFilter);
     _showActivity.removeListener(_onShowActivityOpened);
+    _platformLiveWorker?.dispose();
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
     _showActivity.dispose();
@@ -243,6 +258,13 @@ class _LivestreamingState extends State<Livestreaming> {
     if (mounted) {
       _collapseActivityExpandedIfNeeded(context);
     }
+    final selectingNew = _chatFilter.value != platformKey;
+    if (selectingNew && _showServiceCard.value) {
+      final chatCtrl = Get.find<ChatController>();
+      if (!chatCtrl.isPlatformLive(platformKey)) {
+        return;
+      }
+    }
     if (_chatFilter.value == platformKey) {
       _chatFilter.value = null;
     } else {
@@ -255,16 +277,33 @@ class _LivestreamingState extends State<Livestreaming> {
       _collapseActivityExpandedIfNeeded(context);
     }
     const platforms = [null, 'twitch', 'kick', 'youtube'];
-    final currentIndex = platforms.indexOf(_chatFilter.value);
-
-    if (swipeRight) {
-      final nextIndex = (currentIndex + 1) % platforms.length;
-      _chatFilter.value = platforms[nextIndex];
-    } else {
-      final prevIndex =
-          (currentIndex - 1 + platforms.length) % platforms.length;
-      _chatFilter.value = platforms[prevIndex];
+    if (!_showServiceCard.value) {
+      final currentIndex = platforms.indexOf(_chatFilter.value);
+      if (swipeRight) {
+        _chatFilter.value =
+            platforms[(currentIndex + 1) % platforms.length];
+      } else {
+        _chatFilter.value =
+            platforms[(currentIndex - 1 + platforms.length) % platforms.length];
+      }
+      return;
     }
+
+    final chatCtrl = Get.find<ChatController>();
+    var idx = platforms.indexOf(_chatFilter.value);
+    for (var attempt = 0; attempt < platforms.length; attempt++) {
+      if (swipeRight) {
+        idx = (idx + 1) % platforms.length;
+      } else {
+        idx = (idx - 1 + platforms.length) % platforms.length;
+      }
+      final next = platforms[idx];
+      if (next == null || chatCtrl.isPlatformLive(next)) {
+        _chatFilter.value = next;
+        return;
+      }
+    }
+    _chatFilter.value = null;
   }
 
   void _log(String message) {
@@ -318,6 +357,44 @@ class _LivestreamingState extends State<Livestreaming> {
       return 'youtube';
     }
     return 'twitch';
+  }
+
+  static const List<String> _activityPlatformOrder = [
+    'twitch',
+    'kick',
+    'youtube',
+  ];
+
+  List<String> _livePlatformKeys(ChatController chatCtrl) {
+    return _activityPlatformOrder
+        .where((k) => chatCtrl.isPlatformLive(k))
+        .toList(growable: false);
+  }
+
+  /// Whether [e] belongs in the activity rail for the current chat filter.
+  /// For **All**, only platforms with `live == true` are included (fixes wrong
+  /// stream when [ChatController.platform] still points at an offline tab).
+  bool _activityEventMatchesChatFilter({
+    required ChatController chatCtrl,
+    required String? chatFilter,
+    required Map<String, dynamic> e,
+  }) {
+    final raw = (e['platform'] ?? '').toString().trim();
+    final normalizedFilter = chatFilter?.toLowerCase().trim();
+    final eventKey = raw.isEmpty ? '' : _normalizeUiPlatform(raw);
+
+    if (normalizedFilter != null && normalizedFilter.isNotEmpty) {
+      if (!chatCtrl.isPlatformLive(normalizedFilter)) return false;
+      if (raw.isEmpty) return true;
+      return eventKey == normalizedFilter;
+    }
+
+    final live = _livePlatformKeys(chatCtrl);
+    if (live.isEmpty) return false;
+    if (raw.isEmpty) {
+      return live.length == 1;
+    }
+    return live.contains(eventKey);
   }
 
   /// Primary line: `{username} joined|followed|unfollowed` when [type] matches; else fallback.
@@ -588,49 +665,57 @@ class _LivestreamingState extends State<Livestreaming> {
                       _isDraggingActivity
                           ? const NeverScrollableScrollPhysics()
                           : const BouncingScrollPhysics(),
-                      child: Obx(() {
-                        final chatCtrl = Get.find<ChatController>();
-                        chatCtrl.platform.value;
-                        _settingsCtrl.clockFormat.value;
-                        final selected = _normalizeUiPlatform(
-                          chatCtrl.platform.value,
-                        );
-                        // Prefer controller activity list (wired to sockets).
-                        // Chat "normal" lines stay in chat; activity = everything else.
-                        final events = chatCtrl.activityEvents
-                            .where((e) {
-                          final t =
-                          (e['type'] ?? e['eventType'] ?? '')
-                              .toString()
-                              .trim()
-                              .toLowerCase();
-                          return t != 'normal';
-                        })
-                            .where((e) {
-                          final raw =
-                          (e['platform'] ?? '').toString().trim();
-                          if (raw.isEmpty) return true;
-                          return _normalizeUiPlatform(raw) == selected;
-                        })
-                            .toList(growable: false);
-                        if (events.isEmpty) {
-                          return Center(
-                            child: Padding(
-                              padding: EdgeInsets.only(top: 24.h),
-                              child: Text(
-                                context.l10n.noActivityYet,
-                                textAlign: TextAlign.center,
-                                style: sfProText400(13.sp, Colors.white54),
-                              ),
-                            ),
-                          );
-                        }
-                        // Render newest first.
-                        final list = events.reversed.toList(growable: false);
-                        return RepaintBoundary(
-                          child: Column(
-                            key: ValueKey<String>('activity_$selected'),
-                            children: [
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: _chatFilter,
+                        builder: (context, chatFilterSnap, _) {
+                          return Obx(() {
+                            final chatCtrl = Get.find<ChatController>();
+                            chatCtrl.platform.value;
+                            chatCtrl.platformLive.keys;
+                            _settingsCtrl.clockFormat.value;
+                            final liveKeys = _livePlatformKeys(chatCtrl);
+                            final filterKey =
+                                chatFilterSnap?.toLowerCase().trim();
+                            // Prefer controller activity list (wired to sockets).
+                            // Chat "normal" lines stay in chat; activity = everything else.
+                            final events = chatCtrl.activityEvents
+                                .where((e) {
+                              final t =
+                              (e['type'] ?? e['eventType'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .toLowerCase();
+                              return t != 'normal';
+                            })
+                                .where(
+                                  (e) => _activityEventMatchesChatFilter(
+                                    chatCtrl: chatCtrl,
+                                    chatFilter: filterKey,
+                                    e: e,
+                                  ),
+                                )
+                                .toList(growable: false);
+                            if (events.isEmpty) {
+                              return Center(
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: 24.h),
+                                  child: Text(
+                                    context.l10n.noActivityYet,
+                                    textAlign: TextAlign.center,
+                                    style: sfProText400(13.sp, Colors.white54),
+                                  ),
+                                ),
+                              );
+                            }
+                            // Render newest first.
+                            final list =
+                                events.reversed.toList(growable: false);
+                            final scopeKey =
+                                '${filterKey ?? 'all'}_${liveKeys.join('_')}';
+                            return RepaintBoundary(
+                              child: Column(
+                                key: ValueKey<String>('activity_$scopeKey'),
+                                children: [
                               for (var i = 0; i < list.length; i++) ...[
                                 Builder(
                                   builder: (ctx) {
@@ -663,8 +748,19 @@ class _LivestreamingState extends State<Livestreaming> {
                                       user: user,
                                       typeRaw: type,
                                     );
+                                    final fallbackPlatform =
+                                        liveKeys.length == 1
+                                            ? liveKeys.first
+                                            : (filterKey != null &&
+                                                    filterKey.isNotEmpty
+                                                ? filterKey
+                                                : _normalizeUiPlatform(
+                                                    chatCtrl.platform.value,
+                                                  ));
                                     final pKey = _normalizeUiPlatform(
-                                      platform.isNotEmpty ? platform : selected,
+                                      platform.isNotEmpty
+                                          ? platform
+                                          : fallbackPlatform,
                                     );
                                     return activityRow(
                                       _assetForPlatform(pKey),
@@ -679,9 +775,11 @@ class _LivestreamingState extends State<Livestreaming> {
                                   SizedBox(height: 12.h),
                               ],
                             ],
-                          ),
-                        );
-                      }),
+                              ),
+                            );
+                          });
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -873,27 +971,26 @@ class _LivestreamingState extends State<Livestreaming> {
                       }),
                       Row(
                         children: [
-                          // Socket log screen (temporarily disabled)
-                          // GestureDetector(
-                          //   onTap: () {
-                          //     Get.to(() => const SocketLogScreen());
-                          //   },
-                          //   child: Container(
-                          //     width: 36.w,
-                          //     height: 36.w,
-                          //     alignment: Alignment.center,
-                          //     decoration: BoxDecoration(
-                          //       color: const Color(0xFF2C2C2E),
-                          //       borderRadius: BorderRadius.circular(10.r),
-                          //     ),
-                          //     child: Icon(
-                          //       Icons.terminal_rounded,
-                          //       size: 20.sp,
-                          //       color: Colors.white70,
-                          //     ),
-                          //   ),
-                          // ),
-                          // SizedBox(width: 6.w),
+                          GestureDetector(
+                            onTap: () {
+                              Get.to(() => const SocketLogScreen());
+                            },
+                            child: Container(
+                              width: 36.w,
+                              height: 36.w,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2C2C2E),
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
+                              child: Icon(
+                                Icons.terminal_rounded,
+                                size: 20.sp,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 6.w),
                           GestureDetector(
                             onTap: () {
                               Get.bottomSheet(
@@ -1237,14 +1334,29 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                 _collapseActivityExpandedIfNeeded(
                                                                                                   context,
                                                                                                 );
-                                                                                                _selectedPlatform.value = null;
-                                                                                                _showServiceCard.value = false;
-                                                                                                _titleSelected.value = false;
-                                                                                                _showActivity.value = false;
-                                                                                                _activityHeight =
-                                                                                                0;
-                                                                                                _isDraggingActivity =
-                                                                                                false;
+                                                                                                final rawFilter =
+                                                                                                    (_chatFilter.value ?? '')
+                                                                                                        .trim()
+                                                                                                        .toLowerCase();
+                                                                                                final isAllFilter =
+                                                                                                    rawFilter.isEmpty ||
+                                                                                                        rawFilter == 'all';
+                                                                                                if (isAllFilter) {
+                                                                                                  // In "All", back should return from a specific
+                                                                                                  // platform details view to the 3-tile chooser.
+                                                                                                  _selectedPlatform.value = null;
+                                                                                                  _titleSelected.value = true;
+                                                                                                  _showServiceCard.value = true;
+                                                                                                  _showActivity.value = false;
+                                                                                                } else {
+                                                                                                  // In platform-specific filters, back closes title panel.
+                                                                                                  _selectedPlatform.value = null;
+                                                                                                  _showServiceCard.value = false;
+                                                                                                  _titleSelected.value = false;
+                                                                                                  _showActivity.value = false;
+                                                                                                  _activityHeight = 0;
+                                                                                                  _isDraggingActivity = false;
+                                                                                                }
                                                                                               },
                                                                                               child: Container(
                                                                                                 padding: EdgeInsets.all(
@@ -1272,50 +1384,27 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                               ),
                                                                                             ),
                                                                                             const Spacer(),
-                                                                                            ValueListenableBuilder<
-                                                                                                String?
-                                                                                            >(
-                                                                                              valueListenable:
-                                                                                              _chatFilter,
-                                                                                              builder: (
-                                                                                                  context,
-                                                                                                  chatFilterSnap,
-                                                                                                  _,
-                                                                                                  ) {
-                                                                                                return Obx(
-                                                                                                      () {
-                                                                                                    chatCtrl.platform.value;
-                                                                                                    final cfs =
-                                                                                                    chatFilterSnap?.trim();
-                                                                                                    final raw =
-                                                                                                    (cfs !=
-                                                                                                        null &&
-                                                                                                        cfs.isNotEmpty)
-                                                                                                        ? cfs
-                                                                                                        : chatCtrl.platform.value.toString().trim();
-                                                                                                    final displayKey = _normalizeUiPlatform(
-                                                                                                      raw.isNotEmpty
-                                                                                                          ? raw
-                                                                                                          : activePlatform,
-                                                                                                    );
-                                                                                                    final iconAsset = _assetForPlatform(
-                                                                                                      displayKey,
-                                                                                                    );
-                                                                                                    final iconColor = _settingsCtrl.getPlatformColor(
-                                                                                                      displayKey,
-                                                                                                    );
-                                                                                                    return Center(
-                                                                                                      child: Image.asset(
-                                                                                                        iconAsset,
-                                                                                                        color:
-                                                                                                        iconColor,
-                                                                                                        width:
-                                                                                                        22.w,
-                                                                                                        height:
-                                                                                                        22.h,
-                                                                                                      ),
-                                                                                                    );
-                                                                                                  },
+                                                                                            Obx(
+                                                                                                  () {
+                                                                                                final displayKey = _normalizeUiPlatform(
+                                                                                                  activePlatform,
+                                                                                                );
+                                                                                                final iconAsset = _assetForPlatform(
+                                                                                                  displayKey,
+                                                                                                );
+                                                                                                final iconColor = _settingsCtrl.getPlatformColor(
+                                                                                                  displayKey,
+                                                                                                );
+                                                                                                return Center(
+                                                                                                  child: Image.asset(
+                                                                                                    iconAsset,
+                                                                                                    color:
+                                                                                                    iconColor,
+                                                                                                    width:
+                                                                                                    22.w,
+                                                                                                    height:
+                                                                                                    22.h,
+                                                                                                  ),
                                                                                                 );
                                                                                               },
                                                                                             ),
@@ -1331,67 +1420,47 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                         height:
                                                                                         16.h,
                                                                                       ),
-                                                                                      ValueListenableBuilder<
-                                                                                          String?
-                                                                                      >(
-                                                                                        valueListenable:
-                                                                                        _chatFilter,
-                                                                                        builder: (
-                                                                                            context,
-                                                                                            chatFilter,
-                                                                                            _,
-                                                                                            ) {
-                                                                                          return Obx(
-                                                                                                () {
-                                                                                              chatCtrl.platform.value;
-                                                                                              final cf =
-                                                                                              chatFilter?.trim();
-                                                                                              final metaKey =
-                                                                                              _normalizeUiPlatform(
-                                                                                                (cf !=
-                                                                                                    null &&
-                                                                                                    cf.isNotEmpty)
-                                                                                                    ? cf
-                                                                                                    : chatCtrl.platform.value.toString().trim(),
-                                                                                              ).toString().trim();
-                                                                                              final titleLive =
+                                                                                      Obx(
+                                                                                            () {
+                                                                                          final metaKey = _normalizeUiPlatform(
+                                                                                            activePlatform,
+                                                                                          ).toString().trim();
+                                                                                          final titleLive =
                                                                                               (chatCtrl.streamTitleByPlatform[metaKey] ??
-                                                                                                  '')
+                                                                                                      '')
                                                                                                   .trim();
-                                                                                              final categoryLive =
+                                                                                          final categoryLive =
                                                                                               (chatCtrl.streamCategoryByPlatform[metaKey] ??
-                                                                                                  '')
+                                                                                                      '')
                                                                                                   .trim();
-                                                                                              final titlePanel =
+                                                                                          final titlePanel =
                                                                                               titleLive.isNotEmpty
                                                                                                   ? titleLive
                                                                                                   : context.l10n.streamMetaEmpty;
-                                                                                              final categoryPanel =
+                                                                                          final categoryPanel =
                                                                                               categoryLive.isNotEmpty
                                                                                                   ? categoryLive
                                                                                                   : context.l10n.streamMetaEmpty;
-                                                                                              return Column(
-                                                                                                mainAxisSize:
+                                                                                          return Column(
+                                                                                            mainAxisSize:
                                                                                                 MainAxisSize.min,
-                                                                                                children: [
-                                                                                                  panelRow(
-                                                                                                    titlePanel,
-                                                                                                  ),
-                                                                                                  SizedBox(
-                                                                                                    height:
+                                                                                            children: [
+                                                                                              panelRow(
+                                                                                                titlePanel,
+                                                                                              ),
+                                                                                              SizedBox(
+                                                                                                height:
                                                                                                     12.h,
-                                                                                                  ),
-                                                                                                  // Category row: no chevron / picker (disabled).
-                                                                                                  panelRow(
-                                                                                                    categoryPanel,
-                                                                                                    showChevron:
+                                                                                              ),
+                                                                                              // Category row: no chevron / picker (disabled).
+                                                                                              panelRow(
+                                                                                                categoryPanel,
+                                                                                                showChevron:
                                                                                                     false,
-                                                                                                    onTap:
+                                                                                                onTap:
                                                                                                     null,
-                                                                                                  ),
-                                                                                                ],
-                                                                                              );
-                                                                                            },
+                                                                                              ),
+                                                                                            ],
                                                                                           );
                                                                                         },
                                                                                       ),
@@ -1414,7 +1483,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                     horizontal:
                                                                                     14.w,
                                                                                     vertical:
-                                                                                    14.h,
+                                                                                    8.h,
                                                                                   ),
                                                                                   decoration: BoxDecoration(
                                                                                     color:
@@ -1427,10 +1496,61 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                     mainAxisSize:
                                                                                     MainAxisSize.min,
                                                                                     mainAxisAlignment:
-                                                                                    MainAxisAlignment.center,
+                                                                                    MainAxisAlignment.start,
                                                                                     children: [
                                                                                       Obx(
                                                                                             () {
+                                                                                          final rawFilter =
+                                                                                              (_chatFilter.value ?? '')
+                                                                                                  .trim()
+                                                                                                  .toLowerCase();
+                                                                                          final isAllFilter =
+                                                                                              rawFilter.isEmpty ||
+                                                                                                  rawFilter == 'all';
+                                                                                          if (isAllFilter) {
+                                                                                            return Column(
+                                                                                              mainAxisSize:
+                                                                                                  MainAxisSize.min,
+                                                                                              children: List.generate(3, (index) {
+                                                                                                const platforms = <String>[
+                                                                                                  'twitch',
+                                                                                                  'kick',
+                                                                                                  'youtube',
+                                                                                                ];
+                                                                                                final platformKey = platforms[index];
+                                                                                                return Padding(
+                                                                                                  padding: EdgeInsets.only(
+                                                                                                    bottom: index == platforms.length - 1 ? 0 : 6.h,
+                                                                                                  ),
+                                                                                                  child: serviceRow(
+                                                                                                    asset: _assetForPlatform(
+                                                                                                      platformKey,
+                                                                                                    ),
+                                                                                                    iconColor:
+                                                                                                        _settingsCtrl.getPlatformColor(
+                                                                                                      platformKey,
+                                                                                                    ),
+                                                                                                    title:
+                                                                                                        context.l10n.title,
+                                                                                                    subtitle:
+                                                                                                        context.l10n.category,
+                                                                                                    onTap: () {
+                                                                                                      _collapseActivityExpandedIfNeeded(
+                                                                                                        context,
+                                                                                                      );
+                                                                                                      _selectedPlatform.value =
+                                                                                                          platformKey;
+                                                                                                      _titleSelected.value =
+                                                                                                          true;
+                                                                                                      _showServiceCard.value =
+                                                                                                          true;
+                                                                                                    },
+                                                                                                  ),
+                                                                                                );
+                                                                                              }),
+                                                                                            );
+                                                                                          }
+
                                                                                           final currentPlatform = _normalizeUiPlatform(
                                                                                             _chatFilter.value ??
                                                                                                 chatCtrl.platform.value,
@@ -1443,9 +1563,9 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                               currentPlatform,
                                                                                             ),
                                                                                             title:
-                                                                                            context.l10n.title,
+                                                                                                context.l10n.title,
                                                                                             subtitle:
-                                                                                            context.l10n.category,
+                                                                                                context.l10n.category,
                                                                                             onTap: () {
                                                                                               _collapseActivityExpandedIfNeeded(
                                                                                                 context,
@@ -1457,10 +1577,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                           );
                                                                                         },
                                                                                       ),
-                                                                                      SizedBox(
-                                                                                        height:
-                                                                                        36.h,
-                                                                                      ),
+                                                                                      SizedBox(height: 6.h),
                                                                                     ],
                                                                                   ),
                                                                                 ),

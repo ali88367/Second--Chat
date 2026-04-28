@@ -73,10 +73,11 @@ class ChatSocketService extends GetxService {
     String? label,
   }) async {
     try {
-      _manuallyDisconnected = false;
       _label = (label == null || label.trim().isEmpty) ? 'socket' : label.trim();
       _connectSeq++;
       await disconnect(); // ensures clean slate
+      // [disconnect] sets manual=true; restore auto-reconnect behavior for this session.
+      _manuallyDisconnected = false;
 
       _logSocket('init', {
         'baseUrl': baseUrl,
@@ -422,19 +423,25 @@ class ChatSocketService extends GetxService {
       final platform =
           (map['platform'] ?? map['source'] ?? 'twitch').toString();
       final metadata = map['metadata'];
-      final metaUser = metadata is Map
-          ? (metadata['login'] ??
-                  metadata['user_login'] ??
-                  metadata['userLogin'] ??
-                  metadata['sender_username'] ??
-                  metadata['senderUsername'] ??
-                  metadata['username'] ??
-                  metadata['user'] ??
-                  metadata['name'] ??
-                  metadata['displayName'] ??
-                  metadata['display_name'])
-              ?.toString()
+      final metaMap = metadata is Map ? metadata.cast<String, dynamic>() : null;
+      final metaAuthor = metaMap?['author'];
+      final metaAuthorMap = metaAuthor is Map
+          ? metaAuthor.cast<String, dynamic>()
           : null;
+      final metaUser = (metaMap?['login'] ??
+              metaMap?['user_login'] ??
+              metaMap?['userLogin'] ??
+              metaMap?['sender_username'] ??
+              metaMap?['senderUsername'] ??
+              metaMap?['username'] ??
+              metaMap?['user'] ??
+              metaMap?['name'] ??
+              metaMap?['displayName'] ??
+              metaMap?['display_name'] ??
+              metaAuthorMap?['displayName'] ??
+              metaAuthorMap?['display_name'] ??
+              metaAuthorMap?['name'])
+          ?.toString();
 
       String user = (map['username'] ??
               map['sender_username'] ??
@@ -451,19 +458,26 @@ class ChatSocketService extends GetxService {
           .toString()
           .trim();
       if (user.isEmpty) user = (metaUser ?? 'Unknown').toString().trim();
-      final message = (map['message'] ?? map['text'] ?? '').toString();
+      final message =
+          (map['message'] ?? map['text'] ?? metaMap?['message'] ?? '').toString();
       if (message.trim().isEmpty) return null;
 
       final id = (map['platform_message_id'] ??
               map['platformMessageId'] ??
               map['id'] ??
               map['_id'] ??
-              map['messageId'])
+              map['messageId'] ??
+              metaMap?['id'] ??
+              metaMap?['messageId'])
           ?.toString();
-      final tsRaw = (metadata is Map
-              ? (metadata['timestamp'] ?? metadata['ts'] ?? metadata['time'])
-              : null) ??
+      final tsRaw = (metaMap?['timestamp'] ??
+              metaMap?['ts'] ??
+              metaMap?['time'] ??
+              metaMap?['publishedAt'] ??
+              metaMap?['published_at']) ??
           map['timestamp'] ??
+          map['publishedAt'] ??
+          map['published_at'] ??
           map['created_at'] ??
           map['createdAt'] ??
           map['ts'] ??

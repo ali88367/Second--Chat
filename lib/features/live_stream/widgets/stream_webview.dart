@@ -107,6 +107,11 @@ class StreamWebViewState extends State<StreamWebView>
     return _normalizedPlatformKeyFromCacheKey(widget.cacheKey);
   }
 
+  bool get _disableLiveLoadingOverlayForPlatform {
+    // Keep Kick behavior as before: no animated dots while waiting for URL.
+    return _normalizedPlatformKey == 'kick';
+  }
+
   static bool _shouldReuseControllerCacheForKey(String rawCacheKey) {
     final normalized = _normalizedPlatformKeyFromCacheKey(rawCacheKey);
     if (normalized == 'kick') return false;
@@ -252,6 +257,16 @@ class StreamWebViewState extends State<StreamWebView>
     if (widget.streamExpectedLive) {
       _noStreamOverlayTimer?.cancel();
       _noStreamOverlayTimer = null;
+      if (_disableLiveLoadingOverlayForPlatform) {
+        _setDotsAnimating(false);
+        if (_showLiveLoadingOverlay || _showNoStreamOverlay) {
+          setState(() {
+            _showNoStreamOverlay = false;
+            _showLiveLoadingOverlay = false;
+          });
+        }
+        return;
+      }
       if (!_showLiveLoadingOverlay || _showNoStreamOverlay) {
         setState(() {
           _showNoStreamOverlay = false;
@@ -677,6 +692,9 @@ class StreamWebViewState extends State<StreamWebView>
               .loadRequest(Uri.parse(sanitized))
               .catchError(_logWebNavError);
           _persistSnapshot();
+          // Fallback: if some providers don't emit a reliable page-finished
+          // callback after warm reloads, still report stream readiness.
+          unawaited(_maybeReportStreamReady());
         }
         _applyMuteState();
         return;
@@ -687,6 +705,8 @@ class StreamWebViewState extends State<StreamWebView>
       _initialUri = Uri.tryParse(sanitized);
       _controller.loadRequest(Uri.parse(sanitized)).catchError(_logWebNavError);
       _persistSnapshot();
+      // Fallback readiness signal (primary signal remains onPageFinished).
+      unawaited(_maybeReportStreamReady());
       _applyMuteState();
     } catch (e) {
       if (kDebugMode) {
@@ -834,6 +854,20 @@ class StreamWebViewState extends State<StreamWebView>
       _lastStreamReadyReportedId = '';
     } else if (liveFlagChanged) {
       _syncOverlays();
+      // Stream can restart with the same embed URL. Reset ready dedupe and
+      // re-emit readiness when live flips true so chat gate can reopen.
+      _lastStreamReadyReportedId = '';
+      if (widget.streamExpectedLive) {
+        // Force a real reload on live restart even when URL string is unchanged.
+        // Some providers (notably Twitch) keep showing stale "offline" state unless
+        // the embed document is re-requested.
+        _lastCanonicalEmbedId = '';
+        _lastCommittedNavigation = null;
+        if (widget.url.trim().isNotEmpty) {
+          _loadUrlIntoController(widget.url);
+        }
+        unawaited(_maybeReportStreamReady());
+      }
     }
     if (oldWidget.muted != widget.muted) {
       _applyMuteState();

@@ -477,6 +477,20 @@ class _SplashScreenState extends State<_SplashScreen>
     return !enabled;
   }
 
+  Future<bool> _consumeFirstLaunchFlag() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isFirstLaunch =
+          prefs.getBool(AppConstants.keyIsFirstLaunch) ?? true;
+      if (isFirstLaunch) {
+        await prefs.setBool(AppConstants.keyIsFirstLaunch, false);
+      }
+      return isFirstLaunch;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _routeAfterSessionCheck() async {
     if (_startupInProgress) return;
     _startupInProgress = true;
@@ -511,6 +525,13 @@ class _SplashScreenState extends State<_SplashScreen>
         await _animForward.orCancel;
       } catch (_) {}
       if (!mounted) return;
+
+      final isFirstLaunch = await _consumeFirstLaunchFlag();
+      if (isFirstLaunch) {
+        if (!mounted) return;
+        Get.offAll(() => const IntroScreen1());
+        return;
+      }
 
       if (!auth.isAuthenticated.value) {
         if (!mounted) return;

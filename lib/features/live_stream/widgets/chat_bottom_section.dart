@@ -436,8 +436,10 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
     void addRow(ChatMessage m) {
       final key = (m.platform).toLowerCase().trim();
+      final canonicalId = m.canonicalId?.trim();
       rows.add({
         'platformKey': key,
+        'canonicalId': canonicalId,
         'platform': _getPlatformAsset(key),
         'isCurrentUser': _isMessageFromCurrentUser(m),
         'name': hideNames ? '' : m.userName,
@@ -483,6 +485,32 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
 
     rows.sort((a, b) => (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime));
+
+    // Final UI-level guard: prevent duplicate rendering when backend/socket/history
+    // provide the same logical message row multiple times.
+    final uniqueRows = <Map<String, dynamic>>[];
+    final seenCanonical = <String>{};
+    final seenFallback = <String>{};
+    for (final row in rows) {
+      final platformKey = (row['platformKey'] ?? '').toString();
+      final canonical = (row['canonicalId'] ?? '').toString().trim();
+      if (canonical.isNotEmpty) {
+        final key = '$platformKey|$canonical';
+        if (!seenCanonical.add(key)) continue;
+      } else {
+        final ts = row['_ts'] as DateTime;
+        final message = (row['message'] ?? '').toString().trim();
+        final name = (row['name'] ?? '').toString().trim().toLowerCase();
+        final fallbackKey =
+            '$platformKey|${ts.toUtc().millisecondsSinceEpoch}|$name|$message';
+        if (!seenFallback.add(fallbackKey)) continue;
+      }
+      uniqueRows.add(row);
+    }
+    rows
+      ..clear()
+      ..addAll(uniqueRows);
+
     for (final row in rows) {
       row.remove('_ts');
     }
@@ -559,16 +587,24 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   }
 
   /// Send emote directly to chat (not to text field)
-  void _sendEmoteDirectly(String emoteName) {
+  void _sendEmoteDirectly(
+    String emoteName, {
+    String? forcePlatform,
+  }) {
+    final forced = forcePlatform?.toLowerCase().trim();
+    final forceTwitch = forced == 'twitch';
     final selectedFilter = widget.chatFilter.value?.toLowerCase().trim();
-    final bool isAllSelected = selectedFilter == null || selectedFilter.isEmpty;
-    String currentPlatform = selectedFilter ?? 'twitch';
-    if (isAllSelected && widget.selectedPlatform.value != null) {
+    final bool isAllSelected =
+        !forceTwitch && (selectedFilter == null || selectedFilter.isEmpty);
+    String currentPlatform = forceTwitch ? 'twitch' : (selectedFilter ?? 'twitch');
+    if (!forceTwitch && isAllSelected && widget.selectedPlatform.value != null) {
       currentPlatform = widget.selectedPlatform.value!.toLowerCase().trim();
     }
-    final authPlatform = _chatCtrl.platform.value.toLowerCase().trim().isEmpty
+    final authPlatform = forceTwitch
         ? 'twitch'
-        : _chatCtrl.platform.value.toLowerCase().trim();
+        : (_chatCtrl.platform.value.toLowerCase().trim().isEmpty
+            ? 'twitch'
+            : _chatCtrl.platform.value.toLowerCase().trim());
 
     if (!isAllSelected && _streamOffForSendTarget(currentPlatform)) {
       return;
@@ -629,10 +665,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                     Navigator.of(dialogContext).pop();
                     _focusNode.requestFocus();
                   },
-                  onEmoteSelected: (emoteName) {
+                  onEmoteSelected: (emoteName, sourcePlatform) {
                     // Emote goes directly to chat
                     Navigator.of(dialogContext).pop();
-                    _sendEmoteDirectly(emoteName);
+                    _sendEmoteDirectly(
+                      emoteName,
+                      forcePlatform: sourcePlatform,
+                    );
                   },
                 ),
               ),
@@ -1048,106 +1087,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                   padding: EdgeInsets.symmetric(horizontal: 24.w),
                   child: Row(
                     children: [
-                      Obx(() {
-                        final chatCtrl = _chatCtrl;
-                        final filter = widget.chatFilter.value?.toLowerCase().trim();
-                        final isAllSelected = filter == null || filter.isEmpty;
-                        final currentPlatform = isAllSelected
-                            ? widget.selectedPlatform.value?.toLowerCase().trim() ?? ''
-                            : filter ?? '';
-
-                        // Access reactive maps to ensure GetX tracks dependencies
-                        // (even when not needed, to avoid "improper use of GetX" error)
-                        // Using .keys to trigger reactive read of RxMap
-                        chatCtrl.platformLive.keys;
-                        chatCtrl.platformStreamEmbedReady.keys;
-
-                        // Button is enabled only if platform is live AND embed is ready
-                        final bool isEnabled = currentPlatform.isEmpty ||
-                            (chatCtrl.isPlatformLive(currentPlatform) &&
-                             chatCtrl.isPlatformStreamEmbedReadyForChat(currentPlatform));
-
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: widget.titleSelected,
-                          builder: (context, val, _) {
-                            return GestureDetector(
-                              onTap: isEnabled ? () {
-                                widget.onOverlayViewChange?.call();
-                                final newVal = !val;
-                                widget.titleSelected.value = newVal;
-                                if (newVal) {
-                                  widget.showActivity.value = false;
-                                }
-                                widget.showServiceCard.value =
-                                    newVal || widget.showActivity.value;
-                                setState(() {});
-                                setSheetState(() {});
-                              } : null,
-                              child: Opacity(
-                                opacity: isEnabled ? 1.0 : 0.4,
-                                child: pillButton(
-                                  "Title",
-                                  isActive: val,
-                                  assetPath: 'assets/images/magic.png',
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }),
-                      SizedBox(width: 12.w),
-                      Obx(() {
-                        final chatCtrl = _chatCtrl;
-                        final filter = widget.chatFilter.value?.toLowerCase().trim();
-                        final isAllSelected = filter == null || filter.isEmpty;
-                        final currentPlatform = isAllSelected
-                            ? widget.selectedPlatform.value?.toLowerCase().trim() ?? ''
-                            : filter ?? '';
-
-                        // Access reactive maps to ensure GetX tracks dependencies
-                        // (even when not needed, to avoid "improper use of GetX" error)
-                        // Using .keys to trigger reactive read of RxMap
-                        chatCtrl.platformLive.keys;
-                        chatCtrl.platformStreamEmbedReady.keys;
-
-                        // Button is enabled only if platform is live AND embed is ready
-                        final bool isEnabled = currentPlatform.isEmpty ||
-                            (chatCtrl.isPlatformLive(currentPlatform) &&
-                             chatCtrl.isPlatformStreamEmbedReadyForChat(currentPlatform));
-
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: widget.showActivity,
-                          builder: (context, active, _) {
-                            return GestureDetector(
-                              onTap: isEnabled ? () {
-                                widget.onOverlayViewChange?.call();
-                                final newVal = !active;
-                                widget.showActivity.value = newVal;
-                                if (newVal) {
-                                  widget.titleSelected.value = false;
-                                  widget.selectedPlatform.value = null;
-                                  widget.showServiceCard.value = true;
-                                } else {
-                                  widget.showServiceCard.value =
-                                      widget.titleSelected.value;
-                                }
-                                setState(() {});
-                                setSheetState(() {});
-                              } : null,
-                              child: Opacity(
-                                opacity: isEnabled ? 1.0 : 0.4,
-                                child: pillButton(
-                                  context.l10n.activity,
-                                  isActive: active,
-                                  assetPath: 'assets/images/line.png',
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }),
                       const Spacer(),
-                      SizedBox(width: 12.w),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: SizedBox(
@@ -1406,6 +1346,19 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                           onTap: isEnabled ? () {
                             widget.onOverlayViewChange?.call();
                             final newVal = !val;
+                            final rawFilter =
+                                widget.chatFilter.value?.toLowerCase().trim();
+                            final isAllFilter =
+                                rawFilter == null ||
+                                rawFilter.isEmpty ||
+                                rawFilter == 'all';
+                            if (newVal) {
+                              // Title behavior:
+                              // - All filter: always open the main 3-tile selector first.
+                              // - Specific filter: open that platform directly.
+                              widget.selectedPlatform.value =
+                                  isAllFilter ? null : rawFilter;
+                            }
                             widget.titleSelected.value = newVal;
                             if (newVal) {
                               widget.showActivity.value = false;
@@ -1665,7 +1618,7 @@ class _EmojiEmotePickerDialog extends StatefulWidget {
   final List<String> emojis;
   final EmoteService emoteService;
   final Function(String) onEmojiSelected;
-  final Function(String) onEmoteSelected;
+  final Function(String, String?) onEmoteSelected;
 
   const _EmojiEmotePickerDialog({
     required this.width,
@@ -1686,6 +1639,13 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  String? get _activeEmotePlatform {
+    // Tabs: 0=Emoji, 1=Recent, 2=Twitch, 3=Kick(7TV)
+    if (_tabController.index == 2) return 'twitch';
+    if (_tabController.index == 3) return 'kick';
+    return null;
+  }
 
   @override
   void initState() {
@@ -1863,10 +1823,10 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                       // Recent emotes tab
                       _buildRecentEmotesGrid(),
 
-                      // 7TV Emotes tab (Twitch)
-                      _build7TVEmotesGrid(),
+                      // Twitch Emotes tab
+                      _buildTwitchEmotesGrid(),
 
-                      // Kick Emotes tab (same as Twitch/7TV)
+                      // Kick/7TV Emotes tab
                       _build7TVEmotesGrid(),
                     ],
                   ),
@@ -2026,6 +1986,88 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
     });
   }
 
+  Widget _buildTwitchEmotesGrid() {
+    return Obx(() {
+      if (widget.emoteService.isTwitchLoading.value &&
+          widget.emoteService.twitchEmoteList.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 32.sp,
+                height: 32.sp,
+                child: const CircularProgressIndicator(
+                  color: Colors.white54,
+                  strokeWidth: 2,
+                ),
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                context.l10n.loadingEmotes,
+                style: TextStyle(color: Colors.white54, fontSize: 14.sp),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (widget.emoteService.hasTwitchError.value &&
+          widget.emoteService.twitchEmoteList.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: Colors.red.shade300,
+                size: 48.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                context.l10n.failedToLoadEmotes,
+                style: TextStyle(color: Colors.white54, fontSize: 14.sp),
+              ),
+              SizedBox(height: 8.h),
+              GestureDetector(
+                onTap: () => widget.emoteService.fetchTwitchEmotes(),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    context.l10n.retry,
+                    style: TextStyle(color: Colors.white, fontSize: 14.sp),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      final emotes = _searchQuery.isEmpty
+          ? widget.emoteService.twitchEmoteList.toList()
+          : widget.emoteService.searchTwitchEmotes(_searchQuery);
+
+      if (emotes.isEmpty) {
+        return Center(
+          child: Text(
+            context.l10n.noEmotesFound,
+            style: TextStyle(color: Colors.white38, fontSize: 14.sp),
+          ),
+        );
+      }
+
+      return _buildEmoteGridView(emotes);
+    });
+  }
+
   Widget _buildEmoteGridView(List<Emote> emotes) {
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
@@ -2044,7 +2086,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
           preferBelow: false,
           waitDuration: const Duration(milliseconds: 500),
           child: GestureDetector(
-            onTap: () => widget.onEmoteSelected(emote.name),
+            onTap: () => widget.onEmoteSelected(emote.name, _activeEmotePlatform),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),

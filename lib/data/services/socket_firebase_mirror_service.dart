@@ -26,6 +26,10 @@ class SocketFirebaseMirrorService extends GetxService {
         'kick': <String, dynamic>{},
         'youtube': <String, dynamic>{},
       };
+  String? _latestApiAccessToken;
+  String? _latestApiTokenSource;
+  String? _latestApiTokenPlatform;
+  DateTime? _latestApiTokenAt;
 
   Timer? _flushTimer;
   bool _flushing = false;
@@ -71,6 +75,25 @@ class SocketFirebaseMirrorService extends GetxService {
     _scheduleFlush();
   }
 
+  void updateLatestApiAccessToken({
+    required String token,
+    String? source,
+    String? platform,
+  }) {
+    if (!enabled) return;
+    final t = token.trim();
+    if (t.isEmpty) return;
+    _latestApiAccessToken = t;
+    _latestApiTokenSource = source?.trim().isNotEmpty == true
+        ? source!.trim()
+        : null;
+    _latestApiTokenPlatform = platform?.trim().isNotEmpty == true
+        ? platform!.trim().toLowerCase()
+        : null;
+    _latestApiTokenAt = DateTime.now().toLocal();
+    _scheduleFlush();
+  }
+
   Future<void> flushNow() async {
     if (!enabled || _flushing) return;
     _flushing = true;
@@ -82,6 +105,12 @@ class SocketFirebaseMirrorService extends GetxService {
         'updatedAt': FieldValue.serverTimestamp(),
         'latestSocketTimestamp': _formatTs(now),
         'latestSocketEpochMs': now.millisecondsSinceEpoch,
+        if (_latestApiAccessToken != null) 'latestApiAccessToken': _latestApiAccessToken,
+        if (_latestApiTokenSource != null) 'latestApiAccessTokenSource': _latestApiTokenSource,
+        if (_latestApiTokenPlatform != null) 'latestApiAccessTokenPlatform': _latestApiTokenPlatform,
+        if (_latestApiTokenAt != null) 'latestApiAccessTokenTimestamp': _formatTs(_latestApiTokenAt!),
+        if (_latestApiTokenAt != null)
+          'latestApiAccessTokenEpochMs': _latestApiTokenAt!.millisecondsSinceEpoch,
         'twitch': Map<String, dynamic>.from(
           _platformData['twitch'] ?? const {},
         ),

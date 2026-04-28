@@ -82,6 +82,61 @@ class ChatService {
 
   final Dio _dio;
 
+  bool _isKickOutgoingMirrorId(String? id) {
+    final v = id?.trim().toLowerCase() ?? '';
+    return v.startsWith('kick-outgoing:');
+  }
+
+  bool _isKickRealPlatformId(String? id) {
+    final v = id?.trim().toLowerCase() ?? '';
+    if (v.isEmpty) return false;
+    if (v.startsWith('kick-outgoing:')) return false;
+    return v.contains(':');
+  }
+
+  List<ChatMessage> _collapseKickHistoryOutgoingMirrors(List<ChatMessage> rows) {
+    if (rows.length < 2) return rows;
+
+    final out = <ChatMessage>[];
+    final realByFingerprint = <String, List<ChatMessage>>{};
+
+    String fingerprint(ChatMessage m) {
+      final p = m.platform.toLowerCase().trim();
+      final u = m.userName.toLowerCase().trim();
+      final text = m.message.trim();
+      return '$p|$u|$text';
+    }
+
+    for (final m in rows) {
+      if (m.platform.toLowerCase().trim() != 'kick') continue;
+      if (!_isKickRealPlatformId(m.id)) continue;
+      final key = fingerprint(m);
+      (realByFingerprint[key] ??= <ChatMessage>[]).add(m);
+    }
+
+    bool hasMatchingReal(ChatMessage mirror) {
+      final key = fingerprint(mirror);
+      final candidates = realByFingerprint[key];
+      if (candidates == null || candidates.isEmpty) return false;
+      final ts = mirror.timestamp.toUtc();
+      for (final c in candidates) {
+        final dt = ts.difference(c.timestamp.toUtc()).abs().inSeconds;
+        if (dt <= 5) return true;
+      }
+      return false;
+    }
+
+    for (final m in rows) {
+      final isKick = m.platform.toLowerCase().trim() == 'kick';
+      if (isKick && _isKickOutgoingMirrorId(m.id) && hasMatchingReal(m)) {
+        continue;
+      }
+      out.add(m);
+    }
+
+    return out;
+  }
+
   Future<void> sendMessage({
     required String platform,
     required String accessToken,
@@ -309,8 +364,9 @@ class ChatService {
           'data': _responseBodyJsonForLog(_chatHistoryEnvelopeDataOnly(json)),
         });
 
+        final sanitized = _collapseKickHistoryOutgoingMirrors(out);
         return ChatHistoryLoadResult(
-          messages: out,
+          messages: sanitized,
           activities: historyActivities,
         );
       } on DioException catch (e, st) {

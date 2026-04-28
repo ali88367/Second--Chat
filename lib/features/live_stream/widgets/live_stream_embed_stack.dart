@@ -168,7 +168,11 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
     return i >= 0 ? i : 0;
   }
 
-  void _openTwitchFullscreenRoute(BuildContext context, String runningUrl) {
+  void _openPlatformFullscreenRoute(
+    BuildContext context,
+    String platformKey,
+    String runningUrl,
+  ) {
     if (!context.mounted) return;
     final url = runningUrl.trim();
     if (url.isEmpty) return;
@@ -176,7 +180,7 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
       MaterialPageRoute<void>(
         builder:
             (_) => _FullScreenStreamWebViewPage(
-              platformKey: 'twitch',
+              platformKey: platformKey,
               url: url,
               onStreamReady: onStreamReady,
             ),
@@ -211,16 +215,16 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
                   suppressNativeFullscreen: platform == 'twitch',
                 );
                 final child =
-                    platform != 'twitch'
+                    (platform != 'twitch' && platform != 'kick')
                         ? slot
                         : Obx(() {
                           final url =
-                              chatCtrl.urlForPlatform('twitch')?.trim() ?? '';
+                              chatCtrl.urlForPlatform(platform)?.trim() ?? '';
                           final canOpen =
-                              chatCtrl.isPlatformLive('twitch') &&
+                              chatCtrl.isPlatformLive(platform) &&
                               url.isNotEmpty &&
                               chatCtrl.isPlatformStreamEmbedReadyForChat(
-                                'twitch',
+                                platform,
                               );
                           return Stack(
                             fit: StackFit.expand,
@@ -238,8 +242,9 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
                                       clipBehavior: Clip.antiAlias,
                                       child: InkWell(
                                         onTap:
-                                            () => _openTwitchFullscreenRoute(
+                                            () => _openPlatformFullscreenRoute(
                                               context,
+                                              platform,
                                               url,
                                             ),
                                         child: Padding(
@@ -283,7 +288,11 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
 
   static const _platforms = <String>['twitch', 'kick', 'youtube'];
 
-  void _openTwitchFullscreenRoute(BuildContext context, String runningUrl) {
+  void _openPlatformFullscreenRoute(
+    BuildContext context,
+    String platformKey,
+    String runningUrl,
+  ) {
     if (!context.mounted) return;
     final url = runningUrl.trim();
     if (url.isEmpty) return;
@@ -291,7 +300,7 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
       MaterialPageRoute<void>(
         builder:
             (_) => _FullScreenStreamWebViewPage(
-              platformKey: 'twitch',
+              platformKey: platformKey,
               url: url,
               onStreamReady: onStreamReady,
             ),
@@ -320,10 +329,59 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
       );
 
       if (platform != 'twitch') {
+        if (platform != 'kick') {
+          return ClipRRect(
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: slot,
+          );
+        }
         return ClipRRect(
           borderRadius: radius,
           clipBehavior: Clip.antiAlias,
-          child: slot,
+          child: Obx(() {
+            final chatCtrl = Get.find<ChatController>();
+            final url = chatCtrl.urlForPlatform('kick')?.trim() ?? '';
+            final canOpen =
+                chatCtrl.isPlatformLive('kick') &&
+                url.isNotEmpty &&
+                chatCtrl.isPlatformStreamEmbedReadyForChat('kick');
+            return Stack(
+              fit: StackFit.expand,
+              clipBehavior: Clip.hardEdge,
+              children: [
+                slot,
+                if (canOpen)
+                  Positioned(
+                    bottom: 8.h,
+                    right: 8.w,
+                    child: PointerInterceptor(
+                      child: Material(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20.r),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap:
+                              () => _openPlatformFullscreenRoute(
+                                context,
+                                'kick',
+                                url,
+                              ),
+                          child: Padding(
+                            padding: EdgeInsets.all(8.w),
+                            child: Icon(
+                              Icons.fullscreen,
+                              color: Colors.white,
+                              size: 22.sp,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          }),
         );
       }
 
@@ -352,7 +410,12 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20.r),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
-                        onTap: () => _openTwitchFullscreenRoute(context, url),
+                        onTap:
+                            () => _openPlatformFullscreenRoute(
+                              context,
+                              'twitch',
+                              url,
+                            ),
                         child: Padding(
                           padding: EdgeInsets.all(8.w),
                           child: Icon(

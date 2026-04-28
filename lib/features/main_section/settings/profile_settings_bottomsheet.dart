@@ -25,20 +25,6 @@ String? _pickString(Map<String, dynamic>? map, List<String> keys) {
   return null;
 }
 
-bool _pickBool(Map<String, dynamic>? map, List<String> keys) {
-  if (map == null) return false;
-  for (final k in keys) {
-    final v = map[k];
-    if (v is bool) return v;
-    if (v is num) return v != 0;
-    if (v is String) {
-      final t = v.toLowerCase().trim();
-      if (t == 'true' || t == '1') return true;
-    }
-  }
-  return false;
-}
-
 DateTime? _parseDate(dynamic v) {
   if (v == null) return null;
   if (v is DateTime) return v;
@@ -89,13 +75,10 @@ class _ProfileSettingsBottomSheetState extends State<ProfileSettingsBottomSheet>
       final created = _parseDate(
         me?['created_at'] ?? me?['createdAt'],
       );
-      final mePremium = _pickBool(me, const ['is_premium', 'isPremium']);
-
       final account =
           settings.settingsPayload.value?['account'] as Map<String, dynamic>?;
       final planFromSettings = (account?['yourPlan'] ?? '').toString().trim();
-      final isPremiumAccount = account?['isPremium'] == true;
-      final premiumLabel = isPremiumAccount || mePremium
+      final premiumLabel = auth.isPremiumFromMe
           ? context.l10n.premium
           : (planFromSettings.isEmpty ? context.l10n.free : planFromSettings);
 

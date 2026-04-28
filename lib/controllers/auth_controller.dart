@@ -570,6 +570,28 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     return true;
   }
 
+  /// Premium from `/api/v1/users/me` only (not settings cache or local toggles).
+  bool get isPremiumFromMe {
+    final profile = me.value;
+    if (profile == null || profile.isEmpty) return false;
+
+    bool scan(Map<String, dynamic> map) {
+      if (_toBool(map['isPremium']) == true) return true;
+      if (_toBool(map['is_premium']) == true) return true;
+      return false;
+    }
+
+    if (scan(profile)) return true;
+
+    final data = _toMap(profile['data']);
+    if (data != null && data.isNotEmpty && scan(data)) return true;
+
+    final user = _toMap(profile['user']);
+    if (user != null && user.isNotEmpty && scan(user)) return true;
+
+    return false;
+  }
+
   Future<void> refreshMe({
     bool silent = false,
     bool clearSessionOnFailure = false,
