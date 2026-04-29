@@ -98,8 +98,7 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
 
       Widget embed(double w, double h) {
         final platform = widget.platformKey.toLowerCase().trim();
-        final cacheKey =
-            platform == 'kick' ? '${widget.cacheScope}_$platform' : platform;
+        final cacheKey = '${widget.cacheScope}_$platform';
         return StreamWebView(
           key: ValueKey('${widget.streamViewKey}_$_sessionNonce'),
           url: webUrl,
@@ -490,6 +489,9 @@ class _FullScreenStreamWebViewPage extends StatefulWidget {
 
 class _FullScreenStreamWebViewPageState
     extends State<_FullScreenStreamWebViewPage> {
+  late final String _fullscreenSessionCacheKey =
+      'fullscreen_${widget.platformKey}_${DateTime.now().microsecondsSinceEpoch}';
+
   @override
   void initState() {
     super.initState();
@@ -526,7 +528,7 @@ class _FullScreenStreamWebViewPageState
                     url: widget.url,
                     width: constraints.maxWidth,
                     height: constraints.maxHeight,
-                    cacheKey: 'fullscreen_${widget.platformKey}',
+                    cacheKey: _fullscreenSessionCacheKey,
                     muted: false,
                     streamExpectedLive: true,
                     suppressNativeFullscreen: true,

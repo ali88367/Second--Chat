@@ -575,6 +575,17 @@ class ChatController extends GetxController {
     return true;
   }
 
+  String _withStreamReloadMarker(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return trimmed;
+    final marker = DateTime.now().millisecondsSinceEpoch.toString();
+    // Fragment changes force a WebView navigation reload but do not alter
+    // backend/player query semantics.
+    return uri.replace(fragment: 'sc_reload=$marker').toString();
+  }
+
   bool _setPlatformUsernameIfChanged(String platformKey, String? username) {
     final key = _normalizedApiPlatform(platformKey, fallback: '');
     if (key.isEmpty) return false;
@@ -771,11 +782,7 @@ class ChatController extends GetxController {
     final live = platformLive[key];
     if (live == false) return true;
     if (live == true) {
-      if (platformStreamEmbedReady[key] == true) return true;
-      final url = (platformEmbedUrls[key] ?? '').trim();
-      // Fallback: if a live embed URL is already present, allow chat/controls
-      // even when WebView-ready callback is missed by platform WebView lifecycle.
-      return url.isNotEmpty;
+      return platformStreamEmbedReady[key] == true;
     }
     return false;
   }
@@ -2137,13 +2144,13 @@ class ChatController extends GetxController {
       if (platformLive[p] == true &&
           preferredUrl != null &&
           preferredUrl.isNotEmpty) {
+        final effectivePreferredUrl =
+            p == 'twitch'
+                ? _withStreamReloadMarker(preferredUrl)
+                : preferredUrl;
         _lastPlayerUrlUpdateAt[p] = DateTime.now().toUtc();
-        if (_setEmbedUrlIfChanged(p, preferredUrl)) {
+        if (_setEmbedUrlIfChanged(p, effectivePreferredUrl)) {
           platformEmbedUrls.refresh();
-        }
-        if (platformStreamEmbedReady[p] != true) {
-          platformStreamEmbedReady[p] = true;
-          platformStreamEmbedReady.refresh();
         }
         // Do not force `/chat/history` from socket status ticks.
         // History is loaded by [onPlatformStreamWebViewReady] for each live session.
@@ -2271,6 +2278,17 @@ class ChatController extends GetxController {
     final key = _normalizedApiPlatform(platformKey, fallback: '');
     if (key.isEmpty) return;
     _oauthUserDisconnectedPlatforms.remove(key);
+
+    // Reconnect while stream is already live should behave like a fresh live
+    // session for chat/activity bootstrap: wait for next full WebView ready
+    // callback, then fetch history+activities again.
+    _clearHistoryTriggerForPlatform(key);
+    _liveSessionSeqByPlatform[key] = (_liveSessionSeqByPlatform[key] ?? 0) + 1;
+    if (platformLive[key] == true) {
+      platformStreamEmbedReady[key] = false;
+      platformStreamEmbedReady.refresh();
+    }
+
     await refreshOverviewForPlatform(key, forceChatHistory: true);
     // Server chat routing is tied to `chat:start` after the linked-account set changes.
     // If the socket stayed up across OAuth disconnect/reconnect, [_tryConnectIfPossible]

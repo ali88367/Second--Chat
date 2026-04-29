@@ -1641,16 +1641,15 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
   String _searchQuery = '';
 
   String? get _activeEmotePlatform {
-    // Tabs: 0=Emoji, 1=Recent, 2=Twitch, 3=Kick(7TV)
+    // Tabs: 0=Emoji, 1=Recent, 2=Twitch
     if (_tabController.index == 2) return 'twitch';
-    if (_tabController.index == 3) return 'kick';
     return null;
   }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -1794,20 +1793,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                           ],
                         ),
                       ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              'assets/images/kick.png',
-                              width: 16.sp,
-                              height: 16.sp,
-                            ),
-                            SizedBox(width: 4.w),
-                            Text('Kick', style: TextStyle(color: kickGreen)),
-                          ],
-                        ),
-                      ),
+                      // Kick emotes tab disabled.
                     ],
                   ),
                 ),
@@ -1826,8 +1812,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                       // Twitch Emotes tab
                       _buildTwitchEmotesGrid(),
 
-                      // Kick/7TV Emotes tab
-                      _build7TVEmotesGrid(),
+                      // Kick/7TV Emotes tab disabled.
                     ],
                   ),
                 ),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:second_chat/core/localization/l10n.dart';
@@ -75,6 +76,7 @@ class StreamWebViewState extends State<StreamWebView>
   late WebViewController _controller;
   String? _initialUrl;
   Uri? _initialUri;
+  String _packageNameForYoutubeHeaders = 'second.chat';
   bool _delegateAttached = false;
 
   /// Dedupes navigations: `''` = idle shell, else last sanitized embed URL.
@@ -197,11 +199,24 @@ class StreamWebViewState extends State<StreamWebView>
       _controller = _createController();
     }
     _ensureNavigationDelegate();
+    unawaited(_loadPackageInfo());
     _loadUrlIntoController(widget.url);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncOverlays();
     });
+  }
+
+  Future<void> _loadPackageInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final packageName = info.packageName.trim();
+      if (packageName.isNotEmpty && mounted) {
+        setState(() {
+          _packageNameForYoutubeHeaders = packageName;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -313,9 +328,38 @@ class StreamWebViewState extends State<StreamWebView>
     }
 
     final host = uri.host.toLowerCase();
+    final isYoutubeHost =
+        host.contains('youtube.com') || host.contains('youtube-nocookie.com');
+    final isYoutubeEmbedPath =
+        uri.path.toLowerCase().contains('/embed/');
+    if (isYoutubeHost && isYoutubeEmbedPath) {
+      final qp = Map<String, String>.from(uri.queryParameters);
+      // WebView-safe YouTube embed defaults: avoid common embed/player errors.
+      qp['autoplay'] = '1';
+      qp['mute'] = '1';
+      qp['playsinline'] = '1';
+      qp['enablejsapi'] = '1';
+      if (widget.suppressNativeFullscreen) {
+        qp['fs'] = '0';
+      }
+      final pathParts = uri.pathSegments;
+      final embedIdx = pathParts.indexOf('embed');
+      String videoId = '';
+      if (embedIdx != -1 && embedIdx + 1 < pathParts.length) {
+        videoId = pathParts[embedIdx + 1].trim();
+      }
+      if (videoId.isEmpty) {
+        return uri.replace(queryParameters: qp).toString();
+      }
+      return Uri.https(
+        'www.youtube-nocookie.com',
+        '/embed/$videoId',
+        qp,
+      ).toString();
+    }
+
     if (widget.suppressNativeFullscreen &&
-        (host.contains('youtube.com') ||
-            host.contains('youtube-nocookie.com'))) {
+        isYoutubeHost) {
       final qp = Map<String, String>.from(uri.queryParameters);
       qp['fs'] = '0';
       return uri.replace(queryParameters: qp).toString();
@@ -617,8 +661,21 @@ class StreamWebViewState extends State<StreamWebView>
     _delegateAttached = true;
     _controller.setNavigationDelegate(
       NavigationDelegate(
-        onPageStarted: (_) {},
-        onPageFinished: (_) {
+        onPageStarted: (url) {
+          if (kDebugMode) {
+            debugPrint(
+              '[StreamWebView] page_started '
+              'platform=$_normalizedPlatformKey url=$url',
+            );
+          }
+        },
+        onPageFinished: (url) {
+          if (kDebugMode) {
+            debugPrint(
+              '[StreamWebView] page_finished '
+              'platform=$_normalizedPlatformKey url=$url',
+            );
+          }
           _applyMuteState();
           unawaited(_suppressEmbeddedFullscreenChrome());
           unawaited(_injectKickEmbedContainmentLayout());
@@ -643,6 +700,15 @@ class StreamWebViewState extends State<StreamWebView>
           }
           _maybeReportStreamReady();
         },
+        onWebResourceError: _logWebResourceError,
+        onHttpError: (error) {
+          if (!kDebugMode) return;
+          debugPrint(
+            '[StreamWebView] http_error '
+            'platform=$_normalizedPlatformKey error=$error '
+            'initial=${_initialUrl ?? '(none)'}',
+          );
+        },
         onNavigationRequest: (req) {
           // Keep iframe/media/control navigations untouched.
           // Blocking subframe requests can freeze some embeds (Kick play/pause path).
@@ -660,6 +726,26 @@ class StreamWebViewState extends State<StreamWebView>
     if (kDebugMode) {
       debugPrint('[StreamWebView] navigation failed: $error');
     }
+  }
+
+  void _logWebResourceError(WebResourceError error) {
+    if (!kDebugMode) return;
+    String failingUrl = '(not_exposed_by_plugin_version)';
+    try {
+      final dynamic e = error;
+      final dynamic url = e.failingUrl;
+      if (url != null && url.toString().trim().isNotEmpty) {
+        failingUrl = url.toString().trim();
+      }
+    } catch (_) {}
+    debugPrint(
+      '[StreamWebView] web_resource_error '
+      'platform=$_normalizedPlatformKey '
+      'code=${error.errorCode} type=${error.errorType} '
+      'url=$failingUrl '
+      'desc=${error.description} '
+      'initial=${_initialUrl ?? '(none)'}',
+    );
   }
 
   /// Keeps the native WebView alive: empty URL → local black HTML shell under overlay.
@@ -688,13 +774,30 @@ class StreamWebViewState extends State<StreamWebView>
           _lastCommittedNavigation = sanitized;
           _initialUrl = sanitized;
           _initialUri = Uri.tryParse(sanitized);
-          _controller
-              .loadRequest(Uri.parse(sanitized))
-              .catchError(_logWebNavError);
+          final uri = Uri.tryParse(sanitized);
+          final host = uri?.host.toLowerCase() ?? '';
+          final isYoutubeEmbed =
+              uri != null &&
+              (host.contains('youtube.com') ||
+                  host.contains('youtube-nocookie.com')) &&
+              uri.path.toLowerCase().contains('/embed/');
+          if (isYoutubeEmbed) {
+            final origin = 'https://$_packageNameForYoutubeHeaders';
+            _controller
+                .loadRequest(
+                  uri,
+                  headers: <String, String>{
+                    'Referer': origin,
+                    'Origin': origin,
+                  },
+                )
+                .catchError(_logWebNavError);
+          } else {
+            _controller
+                .loadRequest(Uri.parse(sanitized))
+                .catchError(_logWebNavError);
+          }
           _persistSnapshot();
-          // Fallback: if some providers don't emit a reliable page-finished
-          // callback after warm reloads, still report stream readiness.
-          unawaited(_maybeReportStreamReady());
         }
         _applyMuteState();
         return;
@@ -703,10 +806,27 @@ class StreamWebViewState extends State<StreamWebView>
       _lastCanonicalEmbedId = nextId;
       _initialUrl = sanitized;
       _initialUri = Uri.tryParse(sanitized);
-      _controller.loadRequest(Uri.parse(sanitized)).catchError(_logWebNavError);
+      final uri = Uri.tryParse(sanitized);
+      final host = uri?.host.toLowerCase() ?? '';
+      final isYoutubeEmbed =
+          uri != null &&
+          (host.contains('youtube.com') || host.contains('youtube-nocookie.com')) &&
+          uri.path.toLowerCase().contains('/embed/');
+      if (isYoutubeEmbed) {
+        final origin = 'https://$_packageNameForYoutubeHeaders';
+        _controller
+            .loadRequest(
+              uri,
+              headers: <String, String>{
+                'Referer': origin,
+                'Origin': origin,
+              },
+            )
+            .catchError(_logWebNavError);
+      } else {
+        _controller.loadRequest(Uri.parse(sanitized)).catchError(_logWebNavError);
+      }
       _persistSnapshot();
-      // Fallback readiness signal (primary signal remains onPageFinished).
-      unawaited(_maybeReportStreamReady());
       _applyMuteState();
     } catch (e) {
       if (kDebugMode) {
@@ -866,7 +986,6 @@ class StreamWebViewState extends State<StreamWebView>
         if (widget.url.trim().isNotEmpty) {
           _loadUrlIntoController(widget.url);
         }
-        unawaited(_maybeReportStreamReady());
       }
     }
     if (oldWidget.muted != widget.muted) {

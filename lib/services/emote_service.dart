@@ -160,22 +160,40 @@ class EmoteService extends GetxController {
   /// Fetch Twitch global emotes from backend API.
   Future<void> fetchTwitchEmotes() async {
     try {
-      final resolved = await _resolveTwitchBearerToken();
-      final token = resolved.$1;
-      final source = resolved.$2;
+      final resolved = await _resolveFreshTwitchBearerToken();
+      var token = resolved.$1;
+      var source = resolved.$2;
       if (token == null || token.isEmpty) {
         _handleTwitchError('Missing Twitch/Google access token');
         return;
       }
       debugPrint('EmoteService Twitch token source: $source');
 
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}$_twitchGlobalApiPath?global=true'),
-        headers: <String, String>{
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
+      Future<http.Response> fetchWithToken(String bearer) {
+        return http
+            .get(
+              Uri.parse('${ApiConfig.baseUrl}$_twitchGlobalApiPath?global=true'),
+              headers: <String, String>{
+                'Authorization': 'Bearer $bearer',
+                'Accept': 'application/json',
+              },
+            )
+            .timeout(const Duration(seconds: 10));
+      }
+
+      var response = await fetchWithToken(token);
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        // Token might have expired between refresh and request; refresh once more and retry.
+        final retryResolved = await _resolveFreshTwitchBearerToken(force: true);
+        final retryToken = retryResolved.$1;
+        final retrySource = retryResolved.$2;
+        if (retryToken != null && retryToken.isNotEmpty && retryToken != token) {
+          token = retryToken;
+          source = '$source -> $retrySource';
+          debugPrint('EmoteService Twitch token retried with source: $source');
+          response = await fetchWithToken(token);
+        }
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -251,6 +269,36 @@ class EmoteService extends GetxController {
       return (twitch, 'platform:twitch');
     }
     return (null, 'none');
+  }
+
+  Future<(String?, String)> _resolveFreshTwitchBearerToken({
+    bool force = true,
+  }) async {
+    // Always prefer a freshly refreshed Twitch platform token for emote endpoint.
+    if (force) {
+      try {
+        final refreshToken = (await _tokenProvider.getRefreshToken('twitch'))
+            ?.trim();
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          final refreshed = await _appApi.auth.refresh(refreshToken);
+          final refreshedAccess = refreshed.accessToken.trim();
+          final refreshedRefresh = refreshed.refreshToken.trim();
+          if (refreshedAccess.isNotEmpty && refreshedRefresh.isNotEmpty) {
+            await _tokenProvider.setPlatformTokens(
+              platform: 'twitch',
+              accessToken: refreshedAccess,
+              refreshToken: refreshedRefresh,
+            );
+            return (refreshedAccess, 'platform:twitch_refreshed');
+          }
+        }
+      } catch (e) {
+        debugPrint('EmoteService Twitch refresh failed: $e');
+      }
+    }
+
+    // Fallback to existing token resolution chain if refresh is unavailable.
+    return _resolveTwitchBearerToken();
   }
 
   List<dynamic> _extractTwitchEmotesArray(Map<String, dynamic> payload) {
