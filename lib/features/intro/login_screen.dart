@@ -28,6 +28,37 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   late _LanguageItem selectedLanguage = _languages[0];
   bool _googleBusy = false;
+  bool _appleBusy = false;
+  Future<void> _onAppleSignIn() async {
+    if (_appleBusy || _googleBusy) return;
+    setState(() => _appleBusy = true);
+    try {
+      final auth = Get.find<AuthController>();
+      final ok = await auth.loginWithApple();
+      if (!ok) return;
+      if (!mounted) return;
+      await _restoreLanguageSelectionAndLocale();
+      await _routeAfterLoginSuccess();
+    } catch (_) {
+      if (!mounted) return;
+      final auth = Get.find<AuthController>();
+      final msg = auth.lastError.value;
+      Get.snackbar(
+        context.l10n.signIn,
+        (msg != null && msg.isNotEmpty)
+            ? msg
+            : context.l10n.couldNotSignInPleaseTryAgain,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF2C2C2E),
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12.w),
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      if (mounted) setState(() => _appleBusy = false);
+    }
+  }
+
 
   final List<_LanguageItem> _languages = [
     _LanguageItem('en', 'Eng', 'https://flagcdn.com/w160/us.png'),
@@ -138,18 +169,6 @@ class _LoginScreenState extends State<LoginScreen> {
       defaultValue: false,
     );
     return !enabled;
-  }
-
-  void _showAppleComingSoon() {
-    Get.snackbar(
-      context.l10n.signInWithApple,
-      context.l10n.comingSoon,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFF2C2C2E),
-      colorText: Colors.white,
-      margin: EdgeInsets.all(12.w),
-      duration: const Duration(seconds: 2),
-    );
   }
 
   Future<void> _persistLanguage(_LanguageItem lang) async {
@@ -289,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: goldeffect.withOpacity(0.4),
+                        color: goldeffect.withValues(alpha: 0.4),
                         blurRadius: 144,
                         spreadRadius: 48,
                       ),
@@ -364,7 +383,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white,
                           size: 20.sp,
                         ),
-                        onPressed: _showAppleComingSoon,
+                        isLoading: _appleBusy,
+                        onPressed: _onAppleSignIn,
                       ),
                       SizedBox(height: 10.h),
                       _LoginActionButton(
@@ -377,9 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 22.w,
                         ),
                         isLoading: _googleBusy,
-                        onPressed: () {
-                          _onGoogleSignIn();
-                        },
+                        onPressed: _onGoogleSignIn,
                       ),
                     ],
                   ),
@@ -506,7 +524,7 @@ class _ShimmerTextState extends State<_ShimmerText>
               shadows: [
                 Shadow(
                   blurRadius: 12,
-                  color: Colors.white.withOpacity(_glowAnimation.value),
+                  color: Colors.white.withValues(alpha: _glowAnimation.value),
                   offset: const Offset(0, 0),
                 ),
               ],

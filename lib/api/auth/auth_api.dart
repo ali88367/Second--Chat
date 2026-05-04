@@ -42,6 +42,39 @@ class AuthApi {
     return _parseTokens(res.data);
   }
 
+  /// Apple Sign-In exchange endpoint (iOS mobile).
+  /// Matches backend contract:
+  /// `{ identityToken, fullName?, email? }`.
+  Future<SessionTokens> loginWithApple({
+    required String identityToken,
+    String? fullName,
+    String? email,
+  }) async {
+    final trimmedId = identityToken.trim();
+    if (!trimmedId.startsWith('eyJ')) {
+      throw ArgumentError(
+        'identityToken must be the Apple identity token JWT (typically starts with "eyJ").',
+      );
+    }
+    final trimmedFullName = fullName?.trim();
+    final trimmedEmail = email?.trim();
+    final res = await _dio.post<dynamic>(
+      '/api/v1/auth/apple/mobile',
+      data: <String, dynamic>{
+        'identityToken': trimmedId,
+        'fullName':
+            (trimmedFullName != null && trimmedFullName.isNotEmpty)
+                ? trimmedFullName
+                : null,
+        'email':
+            (trimmedEmail != null && trimmedEmail.isNotEmpty)
+                ? trimmedEmail
+                : null,
+      },
+    );
+    return _parseTokens(res.data);
+  }
+
   Future<SessionTokens> login({
     required String email,
     required String password,

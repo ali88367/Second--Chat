@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -14,8 +15,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/app_api.dart';
 import '../api/auth/auth_api.dart';
+import '../api/auth/apple_sign_in_service.dart';
 import '../api/auth/google_sign_in_service.dart';
 import '../api/auth/jwt_utils.dart';
+import '../api/auth/models/apple_sign_in_credentials.dart';
 import '../api/auth/models/google_sign_in_credentials.dart';
 import '../api/auth/models/session_tokens.dart';
 import '../api/auth/oauth_api.dart';
@@ -772,8 +775,9 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         rethrow;
       } catch (e) {
         lastError.value = 'Could not complete sign-in. Please try again.';
-        if (kDebugMode)
+        if (kDebugMode) {
           debugPrint('loginWithGoogle: Google OK, unexpected: $e');
+        }
         rethrow;
       }
     } on GoogleSignInException catch (e) {
@@ -788,6 +792,95 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     } catch (e) {
       lastError.value = 'Google sign-in failed: $e';
       if (kDebugMode) debugPrint('Google sign-in: $e');
+      rethrow;
+    }
+  }
+
+  String _messageForAppleLoginApiFailure(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final err = data['error'];
+        if (err is Map) {
+          final raw = err['message']?.toString().trim();
+          if (raw != null && raw.isNotEmpty) return raw;
+        }
+        final top = data['message']?.toString().trim();
+        if (top != null && top.isNotEmpty) return top;
+      }
+      final status = e.response?.statusCode;
+      if (status == 404 || status == 501) {
+        return 'Apple backend login is not enabled yet. Share your Apple API and I will finish the server exchange.';
+      }
+      if (status != null) {
+        return 'Could not complete Apple sign-in (server responded with $status). Please try again.';
+      }
+    }
+    return 'Could not complete Apple sign-in. Please try again.';
+  }
+
+  Future<bool> loginWithApple() async {
+    try {
+      final AppleSignInCredentials creds =
+          await AppleSignInService.instance.signInAndFetchCredentials();
+      try {
+        final fullName = [
+          creds.givenName?.trim(),
+          creds.familyName?.trim(),
+        ].where((v) => v != null && v.isNotEmpty).join(' ').trim();
+        var tokens = await authApi.loginWithApple(
+          identityToken: creds.idToken,
+          fullName: fullName.isEmpty ? null : fullName,
+          email: creds.email,
+        );
+        if (tokens.accessTokenExpiresAt == null &&
+            tokens.accessToken.isNotEmpty) {
+          final exp = parseJwtAccessTokenExpiryUtc(tokens.accessToken);
+          if (exp != null) {
+            tokens = tokens.copyWith(accessTokenExpiresAt: exp);
+          }
+        }
+        await _api.tokenStore.write(tokens);
+        await PlatformTokenProvider().setGoogleOAuthAccessToken(null);
+        isAuthenticated.value = true;
+        lastError.value = null;
+        await refreshMe(silent: true);
+        if (!isAuthenticated.value) {
+          throw StateError('Could not verify session after sign-in.');
+        }
+        try {
+          await _syncIntroOnboardingFlagAfterLogin();
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('INTRO ONBOARDING SYNC (Apple login) failed: $e');
+          }
+        }
+        unawaited(_registerPushTokenAfterAuth('apple_login'));
+        return true;
+      } on DioException catch (e) {
+        lastError.value = _messageForAppleLoginApiFailure(e);
+        if (kDebugMode) {
+          debugPrint('loginWithApple: Apple/Firebase OK, backend error: $e');
+        }
+        rethrow;
+      } catch (e) {
+        lastError.value = 'Could not complete Apple sign-in. Please try again.';
+        if (kDebugMode) {
+          debugPrint('loginWithApple: Apple/Firebase OK, unexpected: $e');
+        }
+        rethrow;
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        lastError.value = null;
+        return false;
+      }
+      lastError.value = 'Apple sign-in failed: ${e.message}';
+      if (kDebugMode) debugPrint('Apple sign-in: $e');
+      rethrow;
+    } catch (e) {
+      lastError.value = 'Apple sign-in failed: $e';
+      if (kDebugMode) debugPrint('Apple sign-in: $e');
       rethrow;
     }
   }
@@ -807,6 +900,12 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       isAuthenticated.value = true;
       lastError.value = null;
       await refreshMe(silent: true);
+      if (!isAuthenticated.value) {
+        lastError.value =
+            getAppL10n()?.couldNotPrepareDataPleaseTryAgain ??
+                'Could not prepare your data. Please try again.';
+        throw StateError('Could not verify session after sign-in.');
+      }
       try {
         await _syncIntroOnboardingFlagAfterLogin();
       } catch (e) {
@@ -815,11 +914,38 @@ class AuthController extends GetxController with WidgetsBindingObserver {
         }
       }
       unawaited(_registerPushTokenAfterAuth('email_login'));
+    } on DioException catch (e) {
+      lastError.value = _messageForEmailLoginFailure(e);
+      if (kDebugMode) debugPrint('API ERROR(login): $e');
+      rethrow;
     } catch (e) {
       lastError.value = 'Login failed: $e';
       if (kDebugMode) debugPrint('API ERROR(login): $e');
       rethrow;
     }
+  }
+
+  String _messageForEmailLoginFailure(DioException e) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final err = data['error'];
+      if (err is Map) {
+        final raw = err['message']?.toString().trim();
+        if (raw != null && raw.isNotEmpty) return raw;
+      }
+      final top = data['message']?.toString().trim();
+      if (top != null && top.isNotEmpty) return top;
+    }
+    final status = e.response?.statusCode;
+    if (status == 401 || status == 403) {
+      return getAppL10n()?.invalidLoginCredentials ??
+          'Invalid email or password.';
+    }
+    if (status != null) {
+      return 'Could not sign in (server responded with $status). Please try again.';
+    }
+    return getAppL10n()?.loginNetworkError ??
+        'Could not connect. Please check your network and try again.';
   }
 
   Future<void> logout() async {
@@ -861,6 +987,7 @@ class AuthController extends GetxController with WidgetsBindingObserver {
     me.value = null;
     lastError.value = null;
     await GoogleSignInService.instance.signOut();
+    await AppleSignInService.instance.signOutFirebaseSession();
   }
 
   Future<void> _registerPushTokenAfterAuth(String source) async {

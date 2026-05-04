@@ -24,8 +24,10 @@ class AppConstants {
   static const String googleServerClientId =
       '209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com';
 
-  /// iOS-only OAuth client ID if you do not use `--dart-define=GOOGLE_IOS_CLIENT_ID`.
-  static const String googleIosClientId = '';
+  /// iOS OAuth client ID (`CLIENT_ID` in `GoogleService-Info.plist`). Same Firebase project as
+  /// [googleServerClientId]. Override with `--dart-define=GOOGLE_IOS_CLIENT_ID=...`.
+  static const String googleIosClientId =
+      '209792077701-uqmqji55nnm6dvmsi7pekcqh30e6uogp.apps.googleusercontent.com';
   static const int connectionTimeout = 30000; // milliseconds
   static const int receiveTimeout = 30000; // milliseconds
 

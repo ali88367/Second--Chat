@@ -65,6 +65,21 @@
   "signIn": "Iniciar sesión",
   "logIn": "Iniciar sesión",
   "loginSubtitle": "Para sincronizar y gestionar suscripciones",
+  "signInWithEmail": "Continuar con correo",
+  "emailHint": "Correo electrónico",
+  "passwordHint": "Contraseña",
+  "invalidEmailAddress": "Introduce un correo electrónico válido",
+  "passwordTooShort": "La contraseña debe tener al menos {minLength} caracteres",
+  "@passwordTooShort": {
+    "placeholders": {
+      "minLength": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldRequired": "Obligatorio",
+  "invalidLoginCredentials": "Correo o contraseña incorrectos.",
+  "loginNetworkError": "No se pudo conectar. Comprueba tu red e inténtalo de nuevo.",
   "comingSoon": "Próximamente",
   "couldNotSignInPleaseTryAgain": "No se pudo iniciar sesión. Por favor, inténtalo de nuevo.",
   "couldNotPrepareDataPleaseTryAgain": "No se pudieron preparar tus datos. Por favor, inténtalo de nuevo.",

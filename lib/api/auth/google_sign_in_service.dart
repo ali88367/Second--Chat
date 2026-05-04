@@ -13,7 +13,8 @@ import 'models/google_sign_in_credentials.dart';
 /// access token is persisted via [PlatformTokenProvider.setGoogleOAuthAccessToken]; session
 /// checks must **not** call the Google SDK again (avoids repeated account prompts).
 ///
-/// Initialization uses only [ApiConfig.googleServerClientId] (Web OAuth client id) — no per-platform `clientId`.
+/// Initialization uses [ApiConfig.googleServerClientId] (web client for ID tokens) and, on iOS,
+/// [ApiConfig.googleIosClientId] when set (matches `CLIENT_ID` in `GoogleService-Info.plist`).
 class GoogleSignInService {
   GoogleSignInService._();
   static final GoogleSignInService instance = GoogleSignInService._();
@@ -38,8 +39,13 @@ class GoogleSignInService {
       );
     }
 
+    final iosClientId = ApiConfig.googleIosClientId.trim();
     await GoogleSignIn.instance.initialize(
       serverClientId: serverId,
+      clientId:
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && iosClientId.isNotEmpty
+              ? iosClientId
+              : null,
     );
     _initialized = true;
   }
