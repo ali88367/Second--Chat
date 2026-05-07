@@ -578,9 +578,7 @@ class _SplashScreenState extends State<_SplashScreen>
         }
       } catch (_) {}
 
-      final anyLive =
-          chat.platformLive.values.any((v) => v == true) ||
-          (chat.overview.value?.live == true);
+      final anyLive = await _hasAnyConnectedLivePlatform(chat);
       if (anyLive) {
         Get.offAll(() => const Livestreaming());
         return;
@@ -589,6 +587,24 @@ class _SplashScreenState extends State<_SplashScreen>
       Get.offAll(() => const HomeScreen2());
     } finally {
       _startupInProgress = false;
+    }
+  }
+
+  Future<bool> _hasAnyConnectedLivePlatform(ChatController chat) async {
+    try {
+      final connected = await PlatformTokenProvider().getConnectedPlatforms();
+      final connectedKeys = connected
+          .map((p) => p.toLowerCase().trim())
+          .where((p) => p.isNotEmpty)
+          .toSet();
+      if (connectedKeys.isEmpty) return false;
+
+      // Explicit startup refresh so navigation reflects current backend live state.
+      await chat.refreshOverviewsForPlatforms(connectedKeys.toList(growable: false));
+      return connectedKeys.any((p) => chat.platformLive[p] == true);
+    } catch (_) {
+      return chat.platformLive.values.any((v) => v == true) ||
+          (chat.overview.value?.live == true);
     }
   }
 

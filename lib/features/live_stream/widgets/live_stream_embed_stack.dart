@@ -309,6 +309,7 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatCtrl = Get.find<ChatController>();
     final tileGap = 8.w;
     const topFlex = 56;
     const bottomFlex = 44;
@@ -433,41 +434,87 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        Expanded(
-          flex: topFlex,
-          child: Row(
-            children: [
-              Expanded(
-                child: tile(
-                  platform: _platforms[0],
-                  radius: BorderRadius.only(topLeft: Radius.circular(16.r)),
+    return Obx(() {
+      final livePlatforms = _platforms
+          .where((p) => chatCtrl.isPlatformLive(p))
+          .toList(growable: false);
+      final selected = chatCtrl.platform.value.toLowerCase().trim();
+      final fallbackPlatform =
+          _platforms.contains(selected) ? selected : _platforms.first;
+      final visiblePlatforms = livePlatforms.isNotEmpty
+          ? livePlatforms
+          : <String>[fallbackPlatform];
+
+      if (visiblePlatforms.length == 1) {
+        return tile(
+          platform: visiblePlatforms.first,
+          radius: BorderRadius.circular(16.r),
+        );
+      }
+
+      if (visiblePlatforms.length == 2) {
+        return Row(
+          children: [
+            Expanded(
+              child: tile(
+                platform: visiblePlatforms[0],
+                radius: BorderRadius.only(
+                  topLeft: Radius.circular(16.r),
+                  bottomLeft: Radius.circular(16.r),
                 ),
               ),
-              SizedBox(width: tileGap),
-              Expanded(
-                child: tile(
-                  platform: _platforms[1],
-                  radius: BorderRadius.only(topRight: Radius.circular(16.r)),
+            ),
+            SizedBox(width: tileGap),
+            Expanded(
+              child: tile(
+                platform: visiblePlatforms[1],
+                radius: BorderRadius.only(
+                  topRight: Radius.circular(16.r),
+                  bottomRight: Radius.circular(16.r),
                 ),
               ),
-            ],
-          ),
-        ),
-        SizedBox(height: tileGap),
-        Expanded(
-          flex: bottomFlex,
-          child: tile(
-            platform: _platforms[2],
-            radius: BorderRadius.only(
-              bottomLeft: Radius.circular(16.r),
-              bottomRight: Radius.circular(16.r),
+            ),
+          ],
+        );
+      }
+
+      // Keep the existing 3-tile layout when all configured streams are live.
+      return Column(
+        children: [
+          Expanded(
+            flex: topFlex,
+            child: Row(
+              children: [
+                Expanded(
+                  child: tile(
+                    platform: visiblePlatforms[0],
+                    radius: BorderRadius.only(topLeft: Radius.circular(16.r)),
+                  ),
+                ),
+                SizedBox(width: tileGap),
+                Expanded(
+                  child: tile(
+                    platform: visiblePlatforms[1],
+                    radius: BorderRadius.only(topRight: Radius.circular(16.r)),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
-    );
+          SizedBox(height: tileGap),
+          Expanded(
+            flex: bottomFlex,
+            child: tile(
+              platform: visiblePlatforms[2],
+              radius: BorderRadius.only(
+                bottomLeft: Radius.circular(16.r),
+                bottomRight: Radius.circular(16.r),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 

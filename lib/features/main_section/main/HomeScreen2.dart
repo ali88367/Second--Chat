@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/core/widgets/stream_header_buttons.dart';
@@ -329,11 +330,10 @@ class _HomeScreen2State extends State<HomeScreen2> {
                 children: [
                   Obx(() {
                     final chatCtrl = Get.find<ChatController>();
-                    final socketConnected = chatCtrl.isConnected.value;
                     final anyLive = chatCtrl.platformLive.values.any(
                       (v) => v == true,
                     );
-                    final streamOnline = socketConnected && anyLive;
+                    final streamOnline = anyLive;
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -477,8 +477,11 @@ class GettingStartedCard extends StatefulWidget {
 }
 
 class _GettingStartedCardState extends State<GettingStartedCard> {
+  static const String _kHome2SettingsOpenedKey =
+      'second_chat.home2.settings_opened_done';
   bool _settingsOpened = false;
   bool _streakLoading = false;
+  bool _autoOpenedLiveStream = false;
   late final SettingsController _settingsCtrl;
   late final StreamStreaksController _streakCtrl;
   late final PlatformConnectController _platformCtrl;
@@ -495,6 +498,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
         Get.isRegistered<PlatformConnectController>()
             ? Get.find<PlatformConnectController>()
             : Get.put(PlatformConnectController());
+    unawaited(_loadSettingsOpenedState());
     _settingsCtrl.loadSettingsIfNeeded();
     if (_platformCtrl.isConnected.isEmpty) {
       unawaited(_platformCtrl.refreshConnections());
@@ -502,6 +506,25 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     if (_streakCtrl.current.value == null && !_streakCtrl.isLoading.value) {
       _checkStreakExists();
     }
+  }
+
+  Future<void> _loadSettingsOpenedState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final opened = prefs.getBool(_kHome2SettingsOpenedKey) ?? false;
+      if (!mounted) return;
+      setState(() => _settingsOpened = opened);
+    } catch (_) {}
+  }
+
+  Future<void> _markSettingsOpenedDone() async {
+    if (_settingsOpened) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kHome2SettingsOpenedKey, true);
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _settingsOpened = true);
   }
 
   Future<void> _checkStreakExists() async {
@@ -631,6 +654,18 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
           (_settingsOpened ? 1 : 0) +
           (streaksCustomized ? 1 : 0);
       final isAllCompleted = completedCount == 4;
+      if (isAllCompleted && !_autoOpenedLiveStream) {
+        _autoOpenedLiveStream = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Get.to(
+            () => Livestreaming(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.fastOutSlowIn,
+          );
+        });
+      }
 
       return Stack(
         clipBehavior: Clip.none,
@@ -796,9 +831,7 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
                               enterBottomSheetDuration: Duration.zero,
                               exitBottomSheetDuration: Duration.zero,
                             ).then((_) {
-                              setState(() {
-                                _settingsOpened = true;
-                              });
+                              unawaited(_markSettingsOpenedDone());
                             });
                           },
                           child: _buildMenuItem(
