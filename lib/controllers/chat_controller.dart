@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -2301,6 +2302,51 @@ class ChatController extends GetxController {
       } catch (_) {}
     }
     await _tryConnectIfPossible();
+  }
+
+  Future<bool> updateStreamMetadata({
+    required String platformKey,
+    required String title,
+    required String category,
+    String? categoryId,
+  }) async {
+    final p = _normalizedApiPlatform(platformKey, fallback: '');
+    if (p.isEmpty) return false;
+    final nextTitle = title.trim();
+    final nextCategory = category.trim();
+    if (nextTitle.isEmpty || nextCategory.isEmpty) return false;
+
+    try {
+      final auth = Get.find<AuthController>();
+      await auth.ensureValidSession(refreshIfExpired: true);
+      final accessToken = (await _resolveStreamingRestToken(p))?.trim();
+      if (accessToken == null || accessToken.isEmpty) return false;
+
+      final payload = <String, dynamic>{
+        'title': nextTitle,
+        'category': nextCategory,
+      };
+      final normalizedCategoryId = categoryId?.trim();
+      if (normalizedCategoryId != null && normalizedCategoryId.isNotEmpty) {
+        payload['categoryId'] = normalizedCategoryId;
+      }
+
+      await auth.api.client.dio.patch<dynamic>(
+        '/api/v1/platforms/$p/stream',
+        data: payload,
+        options: Options(
+          headers: <String, String>{'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      streamTitleByPlatform[p] = nextTitle;
+      streamCategoryByPlatform[p] = nextCategory;
+      streamTitleByPlatform.refresh();
+      streamCategoryByPlatform.refresh();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

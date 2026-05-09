@@ -64,6 +64,13 @@ class _LivestreamingState extends State<Livestreaming> {
   static const double _activityMinHeight = 0.3;
   static const double _activityMaxHeight = 0.65;
   final ScrollController _activityScrollController = ScrollController();
+  final TextEditingController _streamTitleEditController =
+      TextEditingController();
+  final TextEditingController _streamCategoryEditController =
+      TextEditingController();
+  bool _isEditingStreamDetails = false;
+  bool _isSavingStreamDetails = false;
+  String? _editingPlatformKey;
 
   late final SettingsController _settingsCtrl;
   late final StreamStreaksController _streakCtrl;
@@ -220,7 +227,68 @@ class _LivestreamingState extends State<Livestreaming> {
     _topBarImage.dispose();
     _chatFilter.dispose();
     _activityScrollController.dispose();
+    _streamTitleEditController.dispose();
+    _streamCategoryEditController.dispose();
     super.dispose();
+  }
+
+  void _startEditingStreamDetails({
+    required String platformKey,
+    required String title,
+    required String category,
+  }) {
+    _streamTitleEditController.text = title;
+    _streamCategoryEditController.text = category;
+    setState(() {
+      _editingPlatformKey = platformKey;
+      _isEditingStreamDetails = true;
+    });
+  }
+
+  Future<void> _saveStreamDetails(BuildContext context) async {
+    final platformKey = _editingPlatformKey;
+    if (platformKey == null || platformKey.trim().isEmpty) return;
+    final nextTitle = _streamTitleEditController.text.trim();
+    final nextCategory = _streamCategoryEditController.text.trim();
+    if (nextTitle.isEmpty || nextCategory.isEmpty) return;
+
+    setState(() {
+      _isSavingStreamDetails = true;
+    });
+    final chatCtrl = Get.find<ChatController>();
+    final ok = await chatCtrl.updateStreamMetadata(
+      platformKey: platformKey,
+      title: nextTitle,
+      category: nextCategory,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isSavingStreamDetails = false;
+      if (ok) {
+        _isEditingStreamDetails = false;
+      }
+    });
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save stream details')),
+      );
+    }
+  }
+
+  Widget _streamMetaRow({
+    required Widget content,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
+      decoration: BoxDecoration(
+        color: greyy,
+        borderRadius: BorderRadius.circular(28.r),
+      ),
+      child: Row(
+        children: [Expanded(child: content)],
+      ),
+    );
   }
 
   void _collapseActivityExpandedIfNeeded(BuildContext context) {
@@ -663,13 +731,15 @@ class _LivestreamingState extends State<Livestreaming> {
                       padding: EdgeInsets.only(
                         left: 12.w,
                         right: 12.w,
-                        top: 22.h,
-                        bottom: 28.h,
+                        top: 28.h,
+                        bottom: 26.h,
                       ),
                       physics:
                       _isDraggingActivity
                           ? const NeverScrollableScrollPhysics()
-                          : const BouncingScrollPhysics(),
+                          : const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
                       child: ValueListenableBuilder<String?>(
                         valueListenable: _chatFilter,
                         builder: (context, chatFilterSnap, _) {
@@ -1354,6 +1424,10 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   _titleSelected.value = true;
                                                                                                   _showServiceCard.value = true;
                                                                                                   _showActivity.value = false;
+                                                                                                  _isEditingStreamDetails =
+                                                                                                      false;
+                                                                                                  _isSavingStreamDetails =
+                                                                                                      false;
                                                                                                 } else {
                                                                                                   // In platform-specific filters, back closes title panel.
                                                                                                   _selectedPlatform.value = null;
@@ -1362,6 +1436,10 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   _showActivity.value = false;
                                                                                                   _activityHeight = 0;
                                                                                                   _isDraggingActivity = false;
+                                                                                                  _isEditingStreamDetails =
+                                                                                                      false;
+                                                                                                  _isSavingStreamDetails =
+                                                                                                      false;
                                                                                                 }
                                                                                               },
                                                                                               child: Container(
@@ -1451,20 +1529,141 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                             mainAxisSize:
                                                                                                 MainAxisSize.min,
                                                                                             children: [
-                                                                                              panelRow(
-                                                                                                titlePanel,
+                                                                                              _streamMetaRow(
+                                                                                                content:
+                                                                                                    _isEditingStreamDetails &&
+                                                                                                            _editingPlatformKey ==
+                                                                                                                metaKey
+                                                                                                        ? TextField(
+                                                                                                            controller:
+                                                                                                                _streamTitleEditController,
+                                                                                                            style: sfProText600(
+                                                                                                              13.sp,
+                                                                                                              Colors.white,
+                                                                                                            ),
+                                                                                                            decoration:
+                                                                                                                const InputDecoration(
+                                                                                                              isDense: true,
+                                                                                                              border:
+                                                                                                                  InputBorder.none,
+                                                                                                              enabledBorder:
+                                                                                                                  InputBorder.none,
+                                                                                                              focusedBorder:
+                                                                                                                  InputBorder.none,
+                                                                                                              disabledBorder:
+                                                                                                                  InputBorder.none,
+                                                                                                              contentPadding:
+                                                                                                                  EdgeInsets.zero,
+                                                                                                            ),
+                                                                                                          )
+                                                                                                        : Text(
+                                                                                                            titlePanel,
+                                                                                                            style: sfProText600(
+                                                                                                              13.sp,
+                                                                                                              Colors.white,
+                                                                                                            ),
+                                                                                                          ),
                                                                                               ),
                                                                                               SizedBox(
                                                                                                 height:
                                                                                                     12.h,
                                                                                               ),
                                                                                               // Category row: no chevron / picker (disabled).
-                                                                                              panelRow(
-                                                                                                categoryPanel,
-                                                                                                showChevron:
-                                                                                                    false,
-                                                                                                onTap:
-                                                                                                    null,
+                                                                                              _streamMetaRow(
+                                                                                                content:
+                                                                                                    _isEditingStreamDetails &&
+                                                                                                            _editingPlatformKey ==
+                                                                                                                metaKey
+                                                                                                        ? TextField(
+                                                                                                            controller:
+                                                                                                                _streamCategoryEditController,
+                                                                                                            style: sfProText600(
+                                                                                                              13.sp,
+                                                                                                              Colors.white,
+                                                                                                            ),
+                                                                                                            decoration:
+                                                                                                                const InputDecoration(
+                                                                                                              isDense: true,
+                                                                                                              border:
+                                                                                                                  InputBorder.none,
+                                                                                                              enabledBorder:
+                                                                                                                  InputBorder.none,
+                                                                                                              focusedBorder:
+                                                                                                                  InputBorder.none,
+                                                                                                              disabledBorder:
+                                                                                                                  InputBorder.none,
+                                                                                                              contentPadding:
+                                                                                                                  EdgeInsets.zero,
+                                                                                                            ),
+                                                                                                          )
+                                                                                                        : Text(
+                                                                                                            categoryPanel,
+                                                                                                            style: sfProText600(
+                                                                                                              13.sp,
+                                                                                                              Colors.white,
+                                                                                                            ),
+                                                                                                          ),
+                                                                                              ),
+                                                                                              SizedBox(
+                                                                                                height:
+                                                                                                    8.h,
+                                                                                              ),
+                                                                                              Align(
+                                                                                                alignment:
+                                                                                                    Alignment.bottomRight,
+                                                                                                child: GestureDetector(
+                                                                                                  onTap:
+                                                                                                      _isSavingStreamDetails
+                                                                                                          ? null
+                                                                                                          : () {
+                                                                                                              final isEditingThis =
+                                                                                                                  _isEditingStreamDetails &&
+                                                                                                                  _editingPlatformKey ==
+                                                                                                                      metaKey;
+                                                                                                              if (isEditingThis) {
+                                                                                                                _saveStreamDetails(
+                                                                                                                  context,
+                                                                                                                );
+                                                                                                              } else {
+                                                                                                                _startEditingStreamDetails(
+                                                                                                                  platformKey:
+                                                                                                                      metaKey,
+                                                                                                                  title:
+                                                                                                                      titlePanel,
+                                                                                                                  category:
+                                                                                                                      categoryPanel,
+                                                                                                                );
+                                                                                                              }
+                                                                                                            },
+                                                                                                  child: Container(
+                                                                                                    padding: EdgeInsets.symmetric(
+                                                                                                      horizontal:
+                                                                                                          10.w,
+                                                                                                      vertical:
+                                                                                                          6.h,
+                                                                                                    ),
+                                                                                                    decoration: BoxDecoration(
+                                                                                                      color: Colors.black,
+                                                                                                      borderRadius:
+                                                                                                          BorderRadius.circular(
+                                                                                                        12.r,
+                                                                                                      ),
+                                                                                                    ),
+                                                                                                    child: Text(
+                                                                                                      (_isEditingStreamDetails &&
+                                                                                                              _editingPlatformKey ==
+                                                                                                                  metaKey)
+                                                                                                          ? (_isSavingStreamDetails
+                                                                                                              ? 'Saving...'
+                                                                                                              : 'Save')
+                                                                                                          : 'Edit',
+                                                                                                      style: sfProText500(
+                                                                                                        11.sp,
+                                                                                                        Colors.white,
+                                                                                                      ),
+                                                                                                    ),
+                                                                                                  ),
+                                                                                                ),
                                                                                               ),
                                                                                             ],
                                                                                           );
@@ -1623,7 +1822,7 @@ class _LivestreamingState extends State<Livestreaming> {
                               },
                             ),
                           ),
-                          SizedBox(height: 12.h),
+                          SizedBox(height: 6.h),
                           _buildResizableBottomSection(context, constraints),
                         ],
                       );
@@ -1698,7 +1897,7 @@ class _LivestreamingState extends State<Livestreaming> {
       child: Column(
         children: [
           Padding(
-            padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
+            padding: EdgeInsets.only(top: 8.h, bottom: 6.h),
             child: _buildInteractiveCounterRow(),
           ),
           Expanded(

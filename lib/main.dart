@@ -387,6 +387,8 @@ class _SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<_SplashScreen>
     with TickerProviderStateMixin {
+  static const String _kHome2SettingsOpenedKey =
+      'second_chat.home2.settings_opened_done';
   bool _startupInProgress = false;
   String? _startupError;
 
@@ -578,6 +580,11 @@ class _SplashScreenState extends State<_SplashScreen>
         }
       } catch (_) {}
 
+      if (await _areHome2StepsCompleted()) {
+        Get.offAll(() => const Livestreaming());
+        return;
+      }
+
       final anyLive = await _hasAnyConnectedLivePlatform(chat);
       if (anyLive) {
         Get.offAll(() => const Livestreaming());
@@ -605,6 +612,74 @@ class _SplashScreenState extends State<_SplashScreen>
     } catch (_) {
       return chat.platformLive.values.any((v) => v == true) ||
           (chat.overview.value?.live == true);
+    }
+  }
+
+  String _normalizePlatformKey(String raw) {
+    final value = raw.toLowerCase().trim();
+    if (value.contains('youtube') || value.contains('google')) return 'youtube';
+    if (value.contains('twitch')) return 'twitch';
+    if (value.contains('kick')) return 'kick';
+    return value;
+  }
+
+  bool _allCorePlatformsConnectedFromSettings(SettingsController settingsCtrl) {
+    final raw = settingsCtrl.settingsPayload.value?['connectPlatforms'];
+    if (raw is! List) return false;
+    final connected = <String>{};
+    for (final item in raw) {
+      if (item is String) {
+        connected.add(_normalizePlatformKey(item));
+        continue;
+      }
+      if (item is! Map) continue;
+      final row = Map<String, dynamic>.from(item);
+      final platform = (row['platform'] ?? row['platformName'] ?? '').toString();
+      final isConnected =
+          row['connected'] == true ||
+          row['is_active'] == true ||
+          row['isConnected'] == true;
+      if (!isConnected) continue;
+      connected.add(_normalizePlatformKey(platform));
+    }
+    return connected.contains('twitch') &&
+        connected.contains('kick') &&
+        connected.contains('youtube');
+  }
+
+  bool _allCorePlatformsConnectedFromController(
+    PlatformConnectController platformCtrl,
+  ) {
+    final connected = <String>{};
+    for (final entry in platformCtrl.isConnected.entries) {
+      if (entry.value != true) continue;
+      connected.add(_normalizePlatformKey(entry.key.toString()));
+    }
+    return connected.contains('twitch') &&
+        connected.contains('kick') &&
+        connected.contains('youtube');
+  }
+
+  Future<bool> _areHome2StepsCompleted() async {
+    try {
+      final settingsCtrl = Get.find<SettingsController>();
+      final platformCtrl = Get.find<PlatformConnectController>();
+      final streakCtrl = Get.find<StreamStreaksController>();
+      final prefs = await SharedPreferences.getInstance();
+
+      final notificationsEnabled = settingsCtrl.notifications.value;
+      final allPlatformsConnected =
+          _allCorePlatformsConnectedFromController(platformCtrl) ||
+          _allCorePlatformsConnectedFromSettings(settingsCtrl);
+      final settingsOpened = prefs.getBool(_kHome2SettingsOpenedKey) == true;
+      final streaksCustomized = streakCtrl.hasStreak;
+
+      return notificationsEnabled &&
+          allPlatformsConnected &&
+          settingsOpened &&
+          streaksCustomized;
+    } catch (_) {
+      return false;
     }
   }
 

@@ -205,7 +205,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
 
     // Scroll trigger driven by controller updates (no UI layout change).
     _scrollWorker = ever<int>(_chatCtrl.scrollTick, (_) {
-      _scheduleReliableScrollToBottom(animate: true);
+      _scheduleReliableScrollToBottom(animate: false);
     });
 
     _embedReadyWorker = ever<Map<String, bool>>(
@@ -1137,10 +1137,13 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               ),
                               controller: _expandedScrollController,
                               padding: EdgeInsets.only(bottom: 16.h + 20.h),
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
                               itemCount: filteredList.length,
                               reverse: false,
                               addAutomaticKeepAlives: false,
-                              addRepaintBoundaries: false,
+                              addRepaintBoundaries: true,
                               itemBuilder: (context, index) {
                                 final item = filteredList[index];
                                 final nameHash = item['name'].hashCode;
@@ -1481,6 +1484,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 'main_chat_${filter ?? 'all'}',
                               ),
                               controller: _mainScrollController,
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
                               padding: EdgeInsets.only(
                                 left: 16.w,
                                 right: 16.w,
@@ -1489,7 +1495,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               itemCount: filteredList.length,
                               reverse: false,
                               addAutomaticKeepAlives: false,
-                              addRepaintBoundaries: false,
+                              addRepaintBoundaries: true,
                               shrinkWrap: false,
                               itemBuilder: (context, index) {
                                 final item = filteredList[index];
