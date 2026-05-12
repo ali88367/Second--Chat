@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -187,6 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showAppleSignIn =
+        kIsWeb || defaultTargetPlatform != TargetPlatform.android;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
@@ -355,18 +359,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: sfProText400(15.sp, const Color(0xFF6E6E73)),
                       ),
                       SizedBox(height: 14.h),
-                      _LoginActionButton(
-                        label: context.l10n.signInWithApple,
-                        backgroundColor: const Color(0xFF1A1C22),
-                        textColor: Colors.white,
-                        leading: Icon(
-                          Icons.apple,
-                          color: Colors.white,
-                          size: 20.sp,
+                      if (showAppleSignIn) ...[
+                        _LoginActionButton(
+                          label: context.l10n.signInWithApple,
+                          backgroundColor: const Color(0xFF1A1C22),
+                          textColor: Colors.white,
+                          leading: Icon(
+                            Icons.apple,
+                            color: Colors.white,
+                            size: 20.sp,
+                          ),
+                          onPressed: _showAppleComingSoon,
                         ),
-                        onPressed: _showAppleComingSoon,
-                      ),
-                      SizedBox(height: 10.h),
+                        SizedBox(height: 10.h),
+                      ],
                       _LoginActionButton(
                         label: context.l10n.signInWithGoogle,
                         backgroundColor: Colors.white,

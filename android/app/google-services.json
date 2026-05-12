@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "209792077701-ueg09cfpv934ff3n39if949ob29kcsk2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.second_chat",
+            "certificate_hash": "43fcecbe68e5868216983964c9e94d3312a93896"
+          }
+        },
+        {
           "client_id": "209792077701-v5sfu36ukds68ct74iu882odlc0q67m1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -35,14 +43,105 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "209792077701-eftgsqfh9deks7hmo697d1dkp41a6umd.apps.googleusercontent.com",
+              "client_id": "209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "209792077701-fql181lav8fpsj99njarbrhd27mue2qj.apps.googleusercontent.com",
+              "client_id": "209792077701-9r4qg4qe03koh7nuhs4ri27fcpj1chuq.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.secondChat.app"
+                "bundle_id": "com.secondChatapp.app",
+                "app_store_id": "6765677375"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209792077701:android:e7d8147508667cc5c7beec",
+        "android_client_info": {
+          "package_name": "com.secondChatapp.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "209792077701-hlo0t0ufs95rgftlnvrp4qto97luur2a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.secondChatapp.app",
+            "certificate_hash": "4994fa59a72f2892fd34a4ef4d748d9453e39d61"
+          }
+        },
+        {
+          "client_id": "209792077701-s9s60fhncbks1kap52d287gjh06it3oq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.secondChatapp.app",
+            "certificate_hash": "457a9e191cdf6f3b51bccd333ecfdc1b30a96e7a"
+          }
+        },
+        {
+          "client_id": "209792077701-eftgsqfh9deks7hmo697d1dkp41a6umd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqqT1qiRlpbqoucgnjJNoP5fZlyBVt-xc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "209792077701-9r4qg4qe03koh7nuhs4ri27fcpj1chuq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.secondChatapp.app",
+                "app_store_id": "6765677375"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209792077701:android:5777315ad86b58f7c7beec",
+        "android_client_info": {
+          "package_name": "com.secondchat.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "209792077701-eftgsqfh9deks7hmo697d1dkp41a6umd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqqT1qiRlpbqoucgnjJNoP5fZlyBVt-xc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "209792077701-9r4qg4qe03koh7nuhs4ri27fcpj1chuq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.secondChatapp.app",
+                "app_store_id": "6765677375"
               }
             }
           ]
