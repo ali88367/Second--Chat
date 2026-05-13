@@ -5,7 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
-import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
+import 'dart:async';
 
 import '../../api/config/api_config.dart';
 import '../../core/constants/app_colors/app_colors.dart';
@@ -13,6 +13,7 @@ import '../../core/constants/constants.dart';
 import '../../core/localization/get_l10n.dart';
 import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
+import 'premium_flow.dart';
 
 class IntroScreen5 extends StatelessWidget {
   const IntroScreen5({Key? key}) : super(key: key);
@@ -23,11 +24,15 @@ class IntroScreen5 extends StatelessWidget {
     controller.loadPlansIfNeeded();
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-
-      body: Stack(
-        children: [
+    return WillPopScope(
+      onWillPop: () async {
+        unawaited(PremiumFlow.dismissToApp());
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0A0A),
+        body: Stack(
+          children: [
           // Background Image
           // Positioned.fill(
           //   child: Image.asset(
@@ -69,12 +74,7 @@ class IntroScreen5 extends StatelessWidget {
                     alignment: Alignment.topRight,
                     child: GestureDetector(
                       onTap: () {
-                        Get.offAll(
-                          () => const HomeScreen2(),
-                          transition: Transition.cupertino,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.fastOutSlowIn,
-                        );
+                        unawaited(PremiumFlow.dismissToApp());
                       },
                       child: Container(
                         width: 40.w,
@@ -260,7 +260,8 @@ class IntroScreen5 extends StatelessWidget {
               ],
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1030,12 +1031,7 @@ class IntroScreen5Controller extends GetxController {
             .rememberIntroOnboardingCompletedForCurrentUser();
       } catch (_) {}
     } catch (_) {}
-    Get.offAll(
-      () => const HomeScreen2(),
-      transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.fastOutSlowIn,
-    );
+    unawaited(PremiumFlow.dismissToApp());
   }
 
   void copyLink() {

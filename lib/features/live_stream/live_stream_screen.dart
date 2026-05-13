@@ -169,21 +169,6 @@ class _LivestreamingState extends State<Livestreaming> {
     _streakCompletionChecked = true;
 
     try {
-      final result = await _streakCtrl.markStreakComplete(
-        date: DateTime.now(),
-        showErrors: false,
-        allowWhenNoStreak: true,
-      );
-
-      // Never auto-open streak UI on app restart; user can open it explicitly via
-      // the streak button.
-      if (result.skipped && result.message == 'needs_freeze') {
-        if (kDebugMode) {
-          debugPrint(
-            '[STREAK] check-in gated: needs freeze (not auto-opening sheet)',
-          );
-        }
-      }
       await _refreshStreakOnEntry();
     } catch (e) {
       debugPrint('STREAK COMPLETE ERROR: $e');

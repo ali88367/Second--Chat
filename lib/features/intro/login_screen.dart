@@ -58,7 +58,21 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final auth = Get.find<AuthController>();
       final ok = await auth.loginWithGoogle();
-      if (!ok) return;
+      if (!ok) {
+        final msg = auth.lastError.value;
+        if (msg != null && msg.isNotEmpty && mounted) {
+          Get.snackbar(
+            context.l10n.signIn,
+            msg,
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: const Color(0xFF2C2C2E),
+            colorText: Colors.white,
+            margin: EdgeInsets.all(12.w),
+            duration: const Duration(seconds: 6),
+          );
+        }
+        return;
+      }
       if (!mounted) return;
       await _restoreLanguageSelectionAndLocale();
       await _routeAfterLoginSuccess();

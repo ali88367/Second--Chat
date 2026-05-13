@@ -16,7 +16,7 @@ import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'intro_screen3.dart';
+import 'intro_screen4.dart';
 
 class NotficationScreens extends StatefulWidget {
   const NotficationScreens({super.key});
@@ -87,7 +87,7 @@ class _NotficationScreensState extends State<NotficationScreens> {
       _routeToAppDestination();
     } else {
       Get.to(
-        () => const IntroScreen3(),
+        () => const IntroScreen4(),
         transition: Transition.cupertino,
         duration: const Duration(milliseconds: 250),
         curve: Curves.fastOutSlowIn,

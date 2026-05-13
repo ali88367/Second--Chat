@@ -38,6 +38,11 @@ class _StreakSheetRouterState extends State<StreakSheetRouter> {
         }
         return const StreamStreakSetupBottomSheet();
       }
+
+      // New stream-streak API: when inactive, always show the setup/activate sheet.
+      if (!streak.isActive) {
+        return const StreamStreakSetupBottomSheet();
+      }
       final isInDanger =
           widget.forceFreezePreview || streak.isInDanger;
 

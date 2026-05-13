@@ -14,6 +14,16 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+
+val releaseKeyAlias: String? = keystoreProperties.getProperty("keyAlias")
+val releaseKeyPassword: String? = keystoreProperties.getProperty("keyPassword")
+val releaseStoreFile: String? = keystoreProperties.getProperty("storeFile")
+val releaseStorePassword: String? = keystoreProperties.getProperty("storePassword")
+val hasReleaseSigning: Boolean =
+    !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank() &&
+        !releaseStoreFile.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank()
 android {
     namespace = "com.secondchat.app"
     compileSdk = 36
@@ -39,11 +49,13 @@ android {
         versionName = flutter.versionName
     }
     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String
+        if (hasReleaseSigning) {
+            create("release") {
+                keyAlias = releaseKeyAlias!!
+                keyPassword = releaseKeyPassword!!
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword!!
+            }
         }
     }
     buildTypes {
@@ -51,7 +63,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
 //            signingConfig = signingConfigs.getByName("debug")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig =
+                if (hasReleaseSigning) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
             
             // Enable code shrinking, obfuscation, and optimization
             isMinifyEnabled = true

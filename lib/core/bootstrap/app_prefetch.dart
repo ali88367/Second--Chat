@@ -48,13 +48,6 @@ class AppPrefetch {
       blockingTasks.add(
         streakCtrl.fetchCurrentStreak(force: false, silent: true).then((_) {}),
       );
-      unawaited(
-        (() async {
-          try {
-            await streakCtrl.tryAutoCheckInTodayForAppOpen();
-          } catch (_) {}
-        })(),
-      );
     }
 
     if (Get.isRegistered<InviteController>()) {

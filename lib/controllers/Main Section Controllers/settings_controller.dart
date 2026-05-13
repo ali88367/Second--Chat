@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -276,6 +277,176 @@ class SettingsController extends GetxController {
     }
 
     if (target == null) return;
+
+    Future<bool> _showConfirmDialog({
+      required IconData icon,
+      required String title,
+      required String message,
+      required String primaryLabel,
+      required String secondaryLabel,
+    }) async {
+      final result = await Get.dialog<bool>(
+        Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF2C2C2E),
+                      Color(0xFF1C1C1E),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: const Color.fromRGBO(255, 255, 255, 0.10),
+                    width: 1,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color.fromRGBO(0, 0, 0, 0.35),
+                      blurRadius: 28,
+                      offset: Offset(0, 18),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              beige.withValues(alpha: 0.35),
+                              const Color.fromRGBO(255, 255, 255, 0.0),
+                            ],
+                          ),
+                        ),
+                        child: Icon(icon, color: Colors.white, size: 28),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.25,
+                          color: Color.fromRGBO(235, 235, 245, 0.72),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor:
+                                    const Color.fromRGBO(235, 235, 245, 0.82),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                  side: const BorderSide(
+                                    color: Color.fromRGBO(255, 255, 255, 0.14),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              onPressed: () => Get.back(result: false),
+                              child: Text(secondaryLabel),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                backgroundColor: beige,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                              onPressed: () => Get.back(result: true),
+                              child: Text(
+                                primaryLabel,
+                                style:
+                                    const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: true,
+        barrierColor: const Color.fromRGBO(0, 0, 0, 0.62),
+      );
+      return result ?? false;
+    }
+
+    // If Low Power Mode is enabled, block turning animations ON until it is disabled.
+    if (key == 'animations' && value == true && lowPowerMode.value == true) {
+      final disableLowPower = await _showConfirmDialog(
+        icon: Icons.bolt_rounded,
+        title: 'Low Power Mode is on',
+        message:
+            'Disable Low Power Mode to enable animations. This may use more battery.',
+        primaryLabel: 'Disable & Enable',
+        secondaryLabel: 'Cancel',
+      );
+
+      if (!disableLowPower) {
+        // Keep animations off.
+        if (animations.value != false) animations.value = false;
+        return;
+      }
+
+      // Disable low power first, then continue enabling animations.
+      await updateToggle('lowPowerMode', false);
+    }
+
+    // If Low Power Mode is turned ON while animations are ON, prompt to disable animations.
+    if (key == 'lowPowerMode' && value == true && animations.value == true) {
+      final disableAnimations = await _showConfirmDialog(
+        icon: Icons.motion_photos_off_rounded,
+        title: 'Animations will be turned off',
+        message:
+            'Low Power Mode disables animations to reduce battery usage.',
+        primaryLabel: 'Continue',
+        secondaryLabel: 'Cancel',
+      );
+      if (!disableAnimations) return;
+      await updateToggle('animations', false);
+    }
+
     target.value = value;
     final patch = _buildTogglePatch(key, value);
     final ok = await _patchSettings(patch);
@@ -285,6 +456,22 @@ class SettingsController extends GetxController {
       print(
         'SETTINGS TOGGLE PATCH FAILED (keeping local state): key=$key value=$value',
       );
+    }
+
+    // Guard against inconsistent state from server/cache: low power + animations together.
+    // If both end up true, prompt to turn animations off.
+    if (lowPowerMode.value == true && animations.value == true) {
+      final disableAnimations = await _showConfirmDialog(
+        icon: Icons.motion_photos_off_rounded,
+        title: 'Low Power Mode',
+        message:
+            'Animations are enabled, but Low Power Mode is on. Turn off animations to reduce battery usage.',
+        primaryLabel: 'Turn off',
+        secondaryLabel: 'Later',
+      );
+      if (disableAnimations) {
+        await updateToggle('animations', false);
+      }
     }
   }
 

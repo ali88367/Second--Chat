@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -7,7 +8,8 @@ import 'package:second_chat/core/constants/app_colors/app_colors.dart';
 
 import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
-import 'intro_screen4.dart';
+import 'intro_screen5.dart';
+import 'premium_flow.dart';
 
 // Controller
 class IntroScreen3Controller extends GetxController {
@@ -18,7 +20,7 @@ class IntroScreen3Controller extends GetxController {
     isLoading.value = false;
 
     Get.to(
-          () => const IntroScreen4(),
+      () => const IntroScreen5(),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 250),
       curve: Curves.fastOutSlowIn,
@@ -36,11 +38,15 @@ class IntroScreen3 extends StatelessWidget {
 
     final mq = MediaQuery.of(context);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-
-      body: Stack(
-        children: [
+    return WillPopScope(
+      onWillPop: () async {
+        unawaited(PremiumFlow.dismissToApp());
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0A0A),
+        body: Stack(
+          children: [
           // Background
           // Positioned.fill(
           //   child: Image.asset(
@@ -76,12 +82,7 @@ class IntroScreen3 extends StatelessWidget {
                             alignment: Alignment.topRight,
                             child: GestureDetector(
                               onTap: () {
-                                Get.to(
-                                  () => const IntroScreen4(),
-                                  transition: Transition.cupertino,
-                                  duration: const Duration(milliseconds: 250),
-                                  curve: Curves.fastOutSlowIn,
-                                );
+                                unawaited(PremiumFlow.dismissToApp());
                               },
                               child: Container(
                                 width: 44.w,
@@ -90,10 +91,11 @@ class IntroScreen3 extends StatelessWidget {
                                   color: blackbox.withOpacity(0.6),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 24.sp,
+                                  child: Center(
+                                    child: Text(
+                                    context.l10n.skip,
+                                    style: sfProText600(14.sp, Colors.white),
+                                  ),
                                 ),
                               ),
                             ),
@@ -260,7 +262,8 @@ class IntroScreen3 extends StatelessWidget {
               },
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

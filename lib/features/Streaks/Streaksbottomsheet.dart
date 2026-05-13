@@ -30,9 +30,30 @@ class _StreamStreakSetupBottomSheetState
   bool _isSubmitting = false;
   late final StreamStreaksController _streakCtrl;
   late final SettingsController _settings;
-  Worker? _lowPowerWorker;
+  Worker? _settingsWorker;
 
   static const int totalFrames = 90; // Frames from 0001 to 0119
+
+  void _syncAnimationsFromSettings() {
+    final shouldAnimate =
+        _settings.animations.value && !_settings.lowPowerMode.value;
+
+    if (shouldAnimate) {
+      if (!_glowController.isAnimating) {
+        _glowController.repeat(reverse: true);
+      }
+      if (!_frameController.isAnimating) {
+        _frameController.repeat();
+      }
+    } else {
+      _glowController.stop();
+      _frameController.stop();
+      _glowController.value = 0.5;
+      _frameController.value = 0;
+    }
+
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
@@ -58,24 +79,11 @@ class _StreamStreakSetupBottomSheetState
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOutSine),
     );
 
-    if (_settings.lowPowerMode.value) {
-      _glowController.value = 0.5;
-      _frameController.value = 0;
-    } else {
-      _glowController.repeat(reverse: true);
-      _frameController.repeat();
-    }
-
-    _lowPowerWorker = ever(_settings.lowPowerMode, (bool low) {
-      if (low) {
-        _glowController.stop();
-        _frameController.stop();
-      } else {
-        _glowController.repeat(reverse: true);
-        _frameController.repeat();
-      }
-      if (mounted) setState(() {});
-    });
+    _syncAnimationsFromSettings();
+    _settingsWorker =
+        everAll([_settings.lowPowerMode, _settings.animations], (_) {
+          _syncAnimationsFromSettings();
+        });
   }
 
   @override
@@ -114,7 +122,7 @@ class _StreamStreakSetupBottomSheetState
 
   @override
   void dispose() {
-    _lowPowerWorker?.dispose();
+    _settingsWorker?.dispose();
     _glowController.dispose();
     _frameController.dispose();
     super.dispose();
@@ -275,7 +283,8 @@ class _StreamStreakSetupBottomSheetState
                     SizedBox(height: 10.h),
                     RepaintBoundary(
                       child:
-                          _settings.lowPowerMode.value
+                          (_settings.lowPowerMode.value ||
+                                  !_settings.animations.value)
                               ? _lowPowerStreakGraphic(context)
                               : AnimatedBuilder(
                                 animation: Listenable.merge([
@@ -288,7 +297,7 @@ class _StreamStreakSetupBottomSheetState
                                   int frame =
                                       ((animValue * totalFrames).round() %
                                           totalFrames);
-                                  frame = (frame == 0 ? totalFrames : frame)
+                                  frame = (frame == 0 ? 1 : frame)
                                       .clamp(1, totalFrames);
                                   String frameNumber = frame.toString().padLeft(
                                     4,

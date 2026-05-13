@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
+import 'package:second_chat/controllers/auth_controller.dart';
 import 'package:second_chat/core/widgets/stream_header_buttons.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
@@ -19,6 +20,8 @@ import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_co
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/api/auth/oauth_provider.dart';
 import 'package:second_chat/core/localization/l10n.dart';
+import 'package:second_chat/core/utils/premium_reprompt.dart';
+import 'package:second_chat/features/intro/intro_screen4.dart';
 
 import '../settings/settings_bottomsheet_column.dart';
 
@@ -40,6 +43,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
   late final StreamStreaksController _streakCtrl;
   bool _streakSheetOpening = false;
   bool _streakCompletionChecked = false;
+  bool _premiumPromptCheckedThisLaunch = false;
 
   @override
   void initState() {
@@ -59,7 +63,31 @@ class _HomeScreen2State extends State<HomeScreen2> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(Get.find<ChatController>().ensureStreamRealtimeBootstrap());
+      unawaited(_maybeShowPremiumReprompt());
     });
+  }
+
+  Future<void> _maybeShowPremiumReprompt() async {
+    if (_premiumPromptCheckedThisLaunch) return;
+    _premiumPromptCheckedThisLaunch = true;
+
+    if (!Get.isRegistered<AuthController>()) return;
+    final auth = Get.find<AuthController>();
+    if (auth.isPremiumFromMe) return;
+
+    bool eligible = false;
+    try {
+      eligible = await PremiumReprompt.isEligibleNow();
+    } catch (_) {}
+    if (!eligible) return;
+
+    // Show Premium flow (Unlock -> How it works -> Plans).
+    Get.to(
+      () => const IntroScreen4(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   Future<void> _loadStreakOnLaunch() async {
@@ -67,7 +95,6 @@ class _HomeScreen2State extends State<HomeScreen2> {
     final hasSession = await _streakCtrl.ensureSession(showErrors: false);
     if (!hasSession) return;
     await _streakCtrl.fetchCurrentStreak(force: false, silent: true);
-    unawaited(_streakCtrl.tryAutoCheckInTodayForAppOpen());
   }
 
   Future<void> _openStreakSheet() async {
@@ -105,17 +132,6 @@ class _HomeScreen2State extends State<HomeScreen2> {
     _streakCompletionChecked = true;
 
     try {
-      final result = await _streakCtrl.markStreakComplete(
-        date: DateTime.now(),
-        showErrors: false,
-        allowWhenNoStreak: true,
-      );
-
-      if (result.skipped && result.message == 'needs_freeze' && kDebugMode) {
-        debugPrint(
-          '[STREAK][HomeScreen2] check-in gated: needs freeze (not auto-opening sheet)',
-        );
-      }
       await _refreshStreakOnEntry();
     } catch (e) {
       debugPrint('HOME STREAK COMPLETE ERROR: $e');

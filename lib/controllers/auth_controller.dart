@@ -778,7 +778,18 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       }
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
-        lastError.value = null;
+        // Note: on Android, some configuration errors are surfaced as "canceled"
+        // by the underlying credential flow (after the user selects an account).
+        // Give users a clear next step instead of silently doing nothing.
+        if (Platform.isAndroid) {
+          lastError.value =
+              'Google sign-in did not complete. If this happens after selecting an account, '
+              'your Android OAuth configuration is likely missing the correct SHA-1/SHA-256 '
+              'for package `com.secondchat.app` in Firebase/Google Cloud. '
+              'Add the signing certificate fingerprints, then download a new `google-services.json` and rebuild.';
+        } else {
+          lastError.value = null;
+        }
         return false;
       }
       lastError.value =

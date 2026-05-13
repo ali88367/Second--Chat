@@ -1,13 +1,15 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
-import 'package:second_chat/features/intro/intro_screen5.dart';
 
 import '../../core/localization/l10n.dart';
 import '../../core/themes/textstyles.dart';
+import 'intro_screen3.dart';
+import 'premium_flow.dart';
 
 // GetX Controller
 class IntroScreen4Controller extends GetxController {
@@ -18,9 +20,9 @@ class IntroScreen4Controller extends GetxController {
 
     isLoading.value = false;
 
-    // Navigate to IntroScreen5 using GetX
+    // Continue to "How your Premium works"
     Get.to(
-      () => const IntroScreen5(),
+      () => const IntroScreen3(),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 250),
       curve: Curves.fastOutSlowIn,
@@ -142,34 +144,23 @@ class _IntroScreen4State extends State<IntroScreen4> {
   @override
   void initState() {
     super.initState();
-    // Sync Free column scroll to Premium column
-    _freeScrollController.addListener(_syncFreeToPremiun);
-    // Sync Premium column scroll to Free column
-    _premiumScrollController.addListener(_syncPremiumToFree);
   }
 
-  void _syncFreeToPremiun() {
-    if (_isSyncing) return;
+  bool _syncScroll(ScrollController from, ScrollController to) {
+    if (_isSyncing) return false;
+    if (!from.hasClients || !to.hasClients) return false;
+    final target = from.position.pixels.clamp(
+      to.position.minScrollExtent,
+      to.position.maxScrollExtent,
+    );
     _isSyncing = true;
-    if (_premiumScrollController.hasClients) {
-      _premiumScrollController.jumpTo(_freeScrollController.offset);
-    }
+    to.jumpTo(target.toDouble());
     _isSyncing = false;
-  }
-
-  void _syncPremiumToFree() {
-    if (_isSyncing) return;
-    _isSyncing = true;
-    if (_freeScrollController.hasClients) {
-      _freeScrollController.jumpTo(_premiumScrollController.offset);
-    }
-    _isSyncing = false;
+    return false;
   }
 
   @override
   void dispose() {
-    _freeScrollController.removeListener(_syncFreeToPremiun);
-    _premiumScrollController.removeListener(_syncPremiumToFree);
     _freeScrollController.dispose();
     _premiumScrollController.dispose();
     super.dispose();
@@ -181,11 +172,15 @@ class _IntroScreen4State extends State<IntroScreen4> {
     final mq = MediaQuery.of(context);
     final rowHeight = 72.h;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-
-      body: Stack(
-        children: [
+    return WillPopScope(
+      onWillPop: () async {
+        unawaited(PremiumFlow.dismissToApp());
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0A0A),
+        body: Stack(
+          children: [
           // Background Image
           // Positioned.fill(
           //   child: Image.asset(
@@ -208,12 +203,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                     alignment: Alignment.topRight,
                     child: GestureDetector(
                       onTap: () {
-                        Get.to(
-                          () => const IntroScreen5(),
-                          transition: Transition.cupertino,
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.fastOutSlowIn,
-                        );
+                        unawaited(PremiumFlow.dismissToApp());
                       },
                       child: Container(
                         width: 40.w,
@@ -308,23 +298,35 @@ class _IntroScreen4State extends State<IntroScreen4> {
                             children: [
                               // 1. The Scrollable Content
                               Positioned.fill(
-                                child: SingleChildScrollView(
-                                  controller: _freeScrollController,
-                                  padding: EdgeInsets.only(
-                                    top: 82.h,
-                                    bottom: mq.viewPadding.bottom,
-                                  ),
-                                  child: Column(
-                                    children:
-                                        _features(context)
-                                            .map(
-                                              (item) => _buildFeatureRow(
-                                                item.label,
-                                                item.isFree,
-                                                rowHeight,
-                                              ),
-                                            )
-                                            .toList(),
+                                child: NotificationListener<ScrollNotification>(
+                                  onNotification: (n) {
+                                    if (n is ScrollUpdateNotification &&
+                                        n.dragDetails != null) {
+                                      return _syncScroll(
+                                        _freeScrollController,
+                                        _premiumScrollController,
+                                      );
+                                    }
+                                    return false;
+                                  },
+                                  child: SingleChildScrollView(
+                                    controller: _freeScrollController,
+                                    padding: EdgeInsets.only(
+                                      top: 82.h,
+                                      bottom: mq.viewPadding.bottom,
+                                    ),
+                                    child: Column(
+                                      children:
+                                          _features(context)
+                                              .map(
+                                                (item) => _buildFeatureRow(
+                                                  item.label,
+                                                  item.isFree,
+                                                  rowHeight,
+                                                ),
+                                              )
+                                              .toList(),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -382,24 +384,38 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                       ),
                                     ),
                                     Expanded(
-                                      child: SingleChildScrollView(
-                                        controller: _premiumScrollController,
-                                        padding: EdgeInsets.only(
-                                          top: 5.h,
-                                          bottom: mq.viewPadding.bottom,
-                                        ),
-                                        child: Column(
-                                          children:
-                                              _features(context)
-                                                  .map(
-                                                    (item) => _buildBadgeRow(
-                                                      item.badge,
-                                                      rowHeight,
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                        ),
-                                      ),
+                                      child:
+                                          NotificationListener<ScrollNotification>(
+                                            onNotification: (n) {
+                                              if (n is ScrollUpdateNotification &&
+                                                  n.dragDetails != null) {
+                                                return _syncScroll(
+                                                  _premiumScrollController,
+                                                  _freeScrollController,
+                                                );
+                                              }
+                                              return false;
+                                            },
+                                            child: SingleChildScrollView(
+                                              controller: _premiumScrollController,
+                                              padding: EdgeInsets.only(
+                                                top: 5.h,
+                                                bottom: mq.viewPadding.bottom,
+                                              ),
+                                              child: Column(
+                                                children:
+                                                    _features(context)
+                                                        .map(
+                                                          (item) =>
+                                                              _buildBadgeRow(
+                                                            item.badge,
+                                                            rowHeight,
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                              ),
+                                            ),
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -467,7 +483,8 @@ class _IntroScreen4State extends State<IntroScreen4> {
               ],
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

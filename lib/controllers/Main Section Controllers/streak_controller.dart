@@ -13,6 +13,7 @@ enum CellType { tick, cross, dot, freeze }
 
 class StreakData {
   const StreakData({
+    required this.isActive,
     required this.currentStreak,
     required this.longestStreak,
     required this.selectedDays,
@@ -32,6 +33,7 @@ class StreakData {
     this.raw,
   });
 
+  final bool isActive;
   final int currentStreak;
   final int longestStreak;
   final List<String> selectedDays;
@@ -51,6 +53,7 @@ class StreakData {
   final Map<String, dynamic>? raw;
 
   bool get isConfigured {
+    if (isActive) return true;
     if (selectedDays.isNotEmpty) return true;
     if (targetDaysPerWeek > 0) return true;
     if (currentStreak > 0 || longestStreak > 0) return true;
@@ -96,6 +99,7 @@ class StreakData {
   }
 
   StreakData copyWith({
+    bool? isActive,
     int? currentStreak,
     int? longestStreak,
     List<String>? selectedDays,
@@ -114,6 +118,7 @@ class StreakData {
     List<CellType>? weekGrid,
   }) {
     return StreakData(
+      isActive: isActive ?? this.isActive,
       currentStreak: currentStreak ?? this.currentStreak,
       longestStreak: longestStreak ?? this.longestStreak,
       selectedDays: selectedDays ?? this.selectedDays,
@@ -136,6 +141,9 @@ class StreakData {
   }
 
   factory StreakData.fromPayload(dynamic payload) {
+    final streamStreak = _fromStreamStreakPayload(payload);
+    if (streamStreak != null) return streamStreak;
+
     final overviewData = _extractOverviewData(payload);
     if (overviewData != null) {
       final parsed = _fromOverviewData(overviewData);
@@ -298,6 +306,7 @@ class StreakData {
             .toInt();
 
     return StreakData(
+      isActive: status.toLowerCase() != 'inactive',
       currentStreak: currentStreak,
       longestStreak: longestStreak,
       selectedDays: selectedDays,
@@ -315,6 +324,90 @@ class StreakData {
       frozenDates: frozenDates,
       weekGrid: weekGrid,
       raw: map.isEmpty ? null : map,
+    );
+  }
+
+  /// Parses the newer `/api/v1/stream-streak/*` API payload shape.
+  static StreakData? _fromStreamStreakPayload(dynamic payload) {
+    final root = _asMap(payload);
+    if (root.isEmpty) return null;
+
+    final data = _asMap(root['data']) ?? root;
+    if (data.isEmpty) return null;
+
+    final hasShape =
+        data.containsKey('isActive') &&
+        (data.containsKey('currentStreak') || data.containsKey('bestStreak'));
+    if (!hasShape) return null;
+
+    final isActive = _asBool(data['isActive']);
+    final currentStreak = _asInt(data['currentStreak']);
+    final bestStreak = _asInt(data['bestStreak']);
+    final status = _asString(data['status']);
+
+    final settings = _asMap(data['settings']);
+    final freezeAllowancePerMonth = _asInt(settings['freezeAllowancePerMonth']);
+
+    final lastStreamDate = _parseDate(data['lastStreamDate']);
+    final createdAt = _parseDate(data['createdAt']);
+
+    final completedDates = <DateTime>[];
+    final history = data['streamHistory'];
+    if (history is List) {
+      for (final entry in history) {
+        if (entry is String) {
+          final d = _parseDate(entry);
+          if (d != null) completedDates.add(d);
+        } else if (entry is Map) {
+          final d = _parseDate(
+            entry['date'] ??
+                entry['streamDate'] ??
+                entry['stream_date'] ??
+                entry['day'],
+          );
+          if (d != null) completedDates.add(d);
+        }
+      }
+    }
+    if (lastStreamDate != null &&
+        !completedDates.any(
+          (d) => _isSameDay(_stripTime(d), _stripTime(lastStreamDate)),
+        )) {
+      completedDates.add(lastStreamDate);
+    }
+
+    final weekStart = _startOfWeek(DateTime.now());
+    final weekGrid = _normalizeRow(
+      _buildWeekRowFromDates(
+        weekStart: weekStart,
+        historyDates: completedDates,
+        frozenDates: const <DateTime>[],
+      ),
+    );
+
+    return StreakData(
+      isActive: isActive,
+      currentStreak: currentStreak,
+      longestStreak: bestStreak,
+      selectedDays: const <String>[],
+      targetDaysPerWeek: 0,
+      completedThisWeek: _countCompletedFromDates(
+        historyDates: completedDates,
+        frozenDates: const <DateTime>[],
+        weekStart: weekStart,
+      ),
+      remainingThisWeek: 0,
+      freezeTokens: 0,
+      freezeAllowancePerMonth: freezeAllowancePerMonth,
+      freezeUsedThisMonth: 0,
+      status: status.isNotEmpty ? status : (isActive ? 'active' : 'inactive'),
+      isInDanger: false,
+      weekStartDate: weekStart,
+      lastCompletedDate: lastStreamDate ?? createdAt,
+      completedDates: completedDates.map(_stripTime).toSet().toList()..sort(),
+      frozenDates: const <DateTime>[],
+      weekGrid: weekGrid,
+      raw: data,
     );
   }
 }
@@ -434,25 +527,20 @@ class StreamStreaksController extends GetxController {
 
       final auth = Get.find<AuthController>();
       final res = await auth.api.client.dio.get<dynamic>(
-        '/api/v1/streaks/overview',
+        '/api/v1/stream-streak/status',
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
 
-      _logStreakResponse('GET /api/v1/streaks/overview', res.data);
+      _logStreakResponse('GET /api/v1/stream-streak/status', res.data);
       unawaited(_persistCache(res.data));
       final snapshot = StreakData.fromPayload(res.data);
       current.value = snapshot;
       historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
       return current.value;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
-        current.value = null;
-        historyRows.clear();
-      } else {
-        debugPrint('STREAK LOAD ERROR: ${e.response?.data ?? e.message}');
-        if (!silent) {
-          _showConnectionIssue();
-        }
+      debugPrint('STREAK LOAD ERROR: ${e.response?.data ?? e.message}');
+      if (!silent) {
+        _showConnectionIssue();
       }
     } catch (e) {
       debugPrint('STREAK LOAD ERROR: $e');
@@ -466,33 +554,12 @@ class StreamStreaksController extends GetxController {
   }
 
   Future<void> ensureInitialStreakForNewUser({bool showErrors = false}) async {
-    final snapshot = await fetchCurrentStreak(force: true, silent: !showErrors);
-    if (snapshot != null && snapshot.hasCreatedStreak) {
-      return;
-    }
-
-    final completion = await markStreakComplete(
-      date: DateTime.now(),
-      showErrors: showErrors,
-      bypassFreezeGate: true,
-      allowWhenNoStreak: true,
-    );
-
-    if (completion.didUpdate) {
-      await fetchCurrentStreak(force: true, silent: true);
-    }
+    await fetchCurrentStreak(force: true, silent: !showErrors);
   }
 
   Future<void> tryAutoCheckInTodayForAppOpen({bool showErrors = false}) async {
     final hasSession = await ensureSession(showErrors: showErrors);
     if (!hasSession) return;
-
-    await markStreakComplete(
-      date: DateTime.now(),
-      showErrors: showErrors,
-      allowWhenNoStreak: true,
-    );
-
     await fetchCurrentStreak(force: true, silent: true);
   }
 
@@ -532,44 +599,7 @@ class StreamStreaksController extends GetxController {
     if (isHistoryLoading.value && !force) return historyRows;
     isHistoryLoading.value = true;
     try {
-      final accessToken = await _getAccessToken(showErrors: !silent);
-      if (accessToken == null || accessToken.isEmpty) {
-        return historyRows;
-      }
-
-      // Keep current snapshot hydrated for parsing fallbacks/selected days.
-      if (current.value == null || force) {
-        await fetchCurrentStreak(force: force, silent: true);
-      }
-
-      final auth = Get.find<AuthController>();
-      final res = await auth.api.client.dio.get<dynamic>(
-        '/api/v1/streak/history',
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-      );
-      _logStreakResponse('GET /api/v1/streak/history', res.data);
-
-      final parsedRows = _parseHistoryRows(res.data);
-      if (parsedRows.isNotEmpty) {
-        historyRows.assignAll(parsedRows);
-      } else if (current.value != null) {
-        historyRows.assignAll(_buildHistoryRowsFromDates(current.value!));
-      }
-      return historyRows;
-    } on DioException catch (e) {
-      debugPrint('STREAK HISTORY LOAD ERROR: ${e.response?.data ?? e.message}');
-      if (!silent) {
-        _showConnectionIssue();
-      }
-      if (current.value != null) {
-        historyRows.assignAll(_buildHistoryRowsFromDates(current.value!));
-      }
-      return historyRows;
-    } catch (e) {
-      debugPrint('STREAK HISTORY LOAD ERROR: $e');
-      if (!silent) {
-        _showConnectionIssue();
-      }
+      await fetchCurrentStreak(force: force, silent: silent);
       if (current.value != null) {
         historyRows.assignAll(_buildHistoryRowsFromDates(current.value!));
       }
@@ -595,40 +625,11 @@ class StreamStreaksController extends GetxController {
       }
 
       final auth = Get.find<AuthController>();
-      final payload = <String, dynamic>{
-        'selectedDays': selectedDays,
-        'targetDaysPerWeek': targetDaysPerWeek,
-        // Back-compat with servers that only support weekly goal.
-        'weeklyGoal': targetDaysPerWeek,
-      };
-
-      try {
-        await auth.api.client.dio.post<dynamic>(
-          '/api/v1/streak',
-          data: payload,
-          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-        );
-      } on DioException catch (e) {
-        // If already initialized, treat create as update.
-        if (e.response?.statusCode == 409) {
-          await auth.api.client.dio.patch<dynamic>(
-            '/api/v1/streak',
-            data: payload,
-            options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-          );
-        } else if (e.response?.statusCode == 404 ||
-            e.response?.statusCode == 405 ||
-            e.response?.statusCode == 501) {
-          // Fallback: "simple streaks" settings endpoint.
-          await auth.api.client.dio.patch<dynamic>(
-            '/api/v1/streaks/settings',
-            data: <String, dynamic>{'weeklyGoal': targetDaysPerWeek},
-            options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-          );
-        } else {
-          rethrow;
-        }
-      }
+      final res = await auth.api.client.dio.post<dynamic>(
+        '/api/v1/stream-streak/activate',
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      _logStreakResponse('POST /api/v1/stream-streak/activate', res.data);
 
       await fetchCurrentStreak(force: true, silent: true);
       return true;
@@ -653,60 +654,10 @@ class StreamStreaksController extends GetxController {
     required List<String> selectedDays,
     bool showErrors = true,
   }) async {
-    if (isMutating.value) return false;
-    isMutating.value = true;
-    mutationError.value = null;
-    try {
-      final accessToken = await _getAccessToken(showErrors: showErrors);
-      if (accessToken == null || accessToken.isEmpty) {
-        mutationError.value = 'Missing session';
-        return false;
-      }
-
-      final auth = Get.find<AuthController>();
-      final payload = <String, dynamic>{
-        'selectedDays': selectedDays,
-        'targetDaysPerWeek': selectedDays.length,
-        'weeklyGoal': selectedDays.length,
-      };
-
-      try {
-        await auth.api.client.dio.patch<dynamic>(
-          '/api/v1/streak',
-          data: payload,
-          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-        );
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404 ||
-            e.response?.statusCode == 405 ||
-            e.response?.statusCode == 501) {
-          await auth.api.client.dio.patch<dynamic>(
-            '/api/v1/streaks/settings',
-            data: <String, dynamic>{'weeklyGoal': selectedDays.length},
-            options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-          );
-        } else {
-          rethrow;
-        }
-      }
-
-      await fetchCurrentStreak(force: true, silent: true);
-      return true;
-    } on DioException catch (e) {
-      mutationError.value = _extractMutationError(e);
-      if (showErrors) {
-        _showConnectionIssue(message: mutationError.value);
-      }
-      return false;
-    } catch (e) {
-      mutationError.value = 'Failed to update streak';
-      if (showErrors) {
-        _showConnectionIssue(message: mutationError.value);
-      }
-      return false;
-    } finally {
-      isMutating.value = false;
-    }
+    // New stream streak API does not currently support day selection editing.
+    // Keep the method for backward compatibility with UI callers.
+    await fetchCurrentStreak(force: true, silent: true);
+    return true;
   }
 
   String _extractMutationError(DioException e) {
@@ -738,114 +689,14 @@ class StreamStreaksController extends GetxController {
     bool bypassFreezeGate = false,
     bool allowWhenNoStreak = false,
   }) async {
-    final accessToken = await _getAccessToken(showErrors: showErrors);
-    if (accessToken == null || accessToken.isEmpty) {
-      return const StreakCompleteResult(
-        success: false,
-        alreadyCompleted: false,
-        skipped: true,
-        message: 'missing_session',
-      );
-    }
-
-    final currentStreak = await fetchCurrentStreak(force: true, silent: true);
-    if (currentStreak == null) {
-      if (allowWhenNoStreak) {
-        return _postStreakCheckIn(
-          date: date,
-          accessToken: accessToken,
-          showErrors: showErrors,
-        );
-      }
-      return const StreakCompleteResult(
-        success: false,
-        alreadyCompleted: false,
-        skipped: true,
-        message: 'no_streak',
-      );
-    }
-
-    if (!bypassFreezeGate &&
-        _shouldGateCheckInUntilFreeze(
-          streak: currentStreak,
-          checkInDate: date,
-          now: DateTime.now(),
-        )) {
-      return const StreakCompleteResult(
-        success: false,
-        alreadyCompleted: false,
-        skipped: true,
-        message: 'needs_freeze',
-      );
-    }
-
-    if (currentStreak.isDateCompleted(date) ||
-        currentStreak.isDateFrozen(date)) {
-      return const StreakCompleteResult(
-        success: false,
-        alreadyCompleted: true,
-        skipped: false,
-        message: 'already_completed',
-      );
-    }
-
-    return _postStreakCheckIn(
-      date: date,
-      accessToken: accessToken,
-      showErrors: showErrors,
-    );
-  }
-
-  Future<StreakCompleteResult> _postStreakCheckIn({
-    required DateTime date,
-    required String accessToken,
-    required bool showErrors,
-  }) async {
-    try {
-      final auth = Get.find<AuthController>();
-      final res = await auth.api.client.dio.post<dynamic>(
-        '/api/v1/streaks/check-in',
-        data: {'date': _formatDate(date)},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-      );
-
-      _logStreakResponse('POST /api/v1/streaks/check-in', res.data);
-      final snapshot = StreakData.fromPayload(res.data);
-      current.value = snapshot;
-      historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
-
-      return const StreakCompleteResult(
-        success: true,
-        alreadyCompleted: false,
-        skipped: false,
-      );
-    } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      if (status == 409 || status == 400) {
-        await fetchCurrentStreak(force: true, silent: true);
-        return const StreakCompleteResult(
-          success: false,
-          alreadyCompleted: true,
-          skipped: false,
-          message: 'already_completed',
-        );
-      }
-      debugPrint('STREAK COMPLETE ERROR: ${e.response?.data ?? e.message}');
-      if (showErrors) {
-        _showConnectionIssue();
-      }
-    } catch (e) {
-      debugPrint('STREAK COMPLETE ERROR: $e');
-      if (showErrors) {
-        _showConnectionIssue();
-      }
-    }
-
+    // Stream streaks are computed by the backend from actual streaming sessions.
+    // No manual check-in is supported in the new API surface.
+    unawaited(fetchCurrentStreak(force: true, silent: true));
     return const StreakCompleteResult(
       success: false,
       alreadyCompleted: false,
-      skipped: false,
-      message: 'failed',
+      skipped: true,
+      message: 'not_supported',
     );
   }
 
@@ -905,38 +756,11 @@ class StreamStreaksController extends GetxController {
   }
 
   Future<bool> freezeStreak({DateTime? date, bool showErrors = true}) async {
-    if (isMutating.value) return false;
-    isMutating.value = true;
-    try {
-      final accessToken = await _getAccessToken(showErrors: showErrors);
-      if (accessToken == null || accessToken.isEmpty) return false;
-      final freezeDate = await _resolveFreezeRequestDate(explicitDate: date);
-
-      final auth = Get.find<AuthController>();
-      final res = await auth.api.client.dio.post<dynamic>(
-        '/api/v1/streaks/freeze/use',
-        data: {'date': _formatDate(freezeDate)},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-      );
-
-      _logStreakResponse('POST /api/v1/streaks/freeze/use', res.data);
-      final snapshot = StreakData.fromPayload(res.data);
-      current.value = snapshot;
-      historyRows.assignAll(_buildHistoryRowsFromDates(snapshot));
-      return true;
-    } on DioException catch (e) {
-      debugPrint('STREAK FREEZE ERROR: ${e.response?.data ?? e.message}');
-      if (showErrors) {
-        _showConnectionIssue();
-      }
-    } catch (e) {
-      debugPrint('STREAK FREEZE ERROR: $e');
-      if (showErrors) {
-        _showConnectionIssue();
-      }
-    } finally {
-      isMutating.value = false;
+    mutationError.value = 'Freeze is not supported by the current stream streak API.';
+    if (showErrors) {
+      _showConnectionIssue(message: mutationError.value);
     }
+    unawaited(fetchCurrentStreak(force: true, silent: true));
     return false;
   }
 
@@ -1788,6 +1612,7 @@ StreakData? _fromOverviewData(Map<String, dynamic> data) {
   );
 
   return StreakData(
+    isActive: status.toLowerCase() != 'inactive',
     currentStreak: currentStreak,
     longestStreak: longestStreak,
     selectedDays: const <String>[],
