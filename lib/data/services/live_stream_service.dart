@@ -466,6 +466,10 @@ class LiveStreamService {
 
     socket.on('activity:sync', (d) {
       _recordInboundSocket('activity:sync', d);
+      if (kDebugMode) {
+        final rawWire = _payloadToInboundLogString(_unwrapSocketIoData(d));
+        debugPrint('[ACTIVITY_VERIFY] activity:sync RAW wire:\n$rawWire');
+      }
       final m = _asMap(d);
       if (m == null) {
         _recordInboundSocket('activity:sync:parse_failed', <String, dynamic>{
@@ -484,10 +488,13 @@ class LiveStreamService {
       if (kDebugMode) {
         try {
           debugPrint(
-            '[ACTIVITY_SOCKET] activity:sync count=${list.length} payload=${jsonEncode(m)}',
+            '[ACTIVITY_VERIFY] activity:sync PARSED '
+            '(events=${list.length}):\n${jsonEncode(m)}',
           );
         } catch (_) {
-          debugPrint('[ACTIVITY_SOCKET] activity:sync count=${list.length} $m');
+          debugPrint(
+            '[ACTIVITY_VERIFY] activity:sync PARSED (events=${list.length}): $m',
+          );
         }
       }
       onActivitySync?.call(list);
@@ -496,6 +503,10 @@ class LiveStreamService {
     // Server contract: event name is always `activity:event`; kind is only in JSON `type`
     // (`join` | `follow`). See [_normalizeJoinFollowFromActivityEvent].
     socket.on('activity:event', (d) {
+      if (kDebugMode) {
+        final rawWire = _payloadToInboundLogString(_unwrapSocketIoData(d));
+        debugPrint('[ACTIVITY_VERIFY] activity:event RAW wire:\n$rawWire');
+      }
       _recordInboundSocket('activity:event', d);
       _handleActivitySocketEvent('activity:event', d);
     });
@@ -999,10 +1010,11 @@ class LiveStreamService {
     if (kDebugMode) {
       try {
         debugPrint(
-          '[ACTIVITY_SOCKET] $socketEventName ${jsonEncode(m)}',
+          '[ACTIVITY_VERIFY] $socketEventName NORMALIZED (after type merge):\n'
+          '${jsonEncode(m)}',
         );
       } catch (_) {
-        debugPrint('[ACTIVITY_SOCKET] $socketEventName $m');
+        debugPrint('[ACTIVITY_VERIFY] $socketEventName NORMALIZED: $m');
       }
     }
     onActivityEvent?.call(m);
