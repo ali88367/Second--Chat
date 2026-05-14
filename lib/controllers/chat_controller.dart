@@ -2058,15 +2058,6 @@ class ChatController extends GetxController {
     _live.onViewerCountUpdate = (_, __) {};
     _live.onLiveUpdate = (_, __) {};
     _live.onPlayerUrlUpdate = (_, __) {};
-    _live.onActivitySync = (events) {
-      if (events.isEmpty) return;
-      final filtered = events
-          .where((e) => _isActivityPayload(e))
-          .toList(growable: false);
-      if (filtered.isNotEmpty) {
-        activityEvents.assignAll(filtered);
-      }
-    };
     _live.onActivityEvent = (e) {
       _handleIncomingActivityEvent(e);
     };

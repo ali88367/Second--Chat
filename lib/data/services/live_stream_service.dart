@@ -128,7 +128,6 @@ class LiveStreamService {
   void Function(String reason)? onSocketDisconnected;
   void Function(JsonMap payload)? onConnectedEvent;
   void Function(JsonMap payload)? onSettingsUpdate;
-  void Function(List<JsonMap> events)? onActivitySync;
   void Function(JsonMap event)? onActivityEvent;
   void Function(JsonMap payload)? onStreamStatus;
   void Function(JsonMap payload)? onStreamLive;
@@ -231,6 +230,16 @@ class LiveStreamService {
     if (cb == null) return;
     if (!shouldForward) return;
     cb(eventName, payloadText);
+  }
+
+  /// Inbound **`activity:event`** (all platforms): verify log, socket trace, then parse.
+  void _onInboundActivityChannel(String socketEventName, dynamic d) {
+    if (kDebugMode) {
+      final rawWire = _payloadToInboundLogString(_unwrapSocketIoData(d));
+      debugPrint('[ACTIVITY_VERIFY] $socketEventName RAW wire:\n$rawWire');
+    }
+    _recordInboundSocket(socketEventName, d);
+    _handleActivitySocketEvent(socketEventName, d);
   }
 
   void _resetSessionTraceCounters() {
@@ -410,7 +419,7 @@ class LiveStreamService {
         'auth':
             'handshake auth.token + Authorization: Bearer <accessToken> (§5 Connection)',
         'perApiDoc': 'GET /streaming/overview → chatSocketUrl + chatSocketPath',
-        'afterConnect': 'emit chat:start (starts session; server sends settings:update, activity:sync)',
+        'afterConnect': 'emit chat:start (starts session; server sends settings:update)',
         'timestamp': DateTime.now().toIso8601String(),
       });
       onSocketConnected?.call();
@@ -464,55 +473,18 @@ class LiveStreamService {
       onSettingsUpdate?.call(m);
     });
 
-    socket.on('activity:sync', (d) {
-      _recordInboundSocket('activity:sync', d);
-      if (kDebugMode) {
-        final rawWire = _payloadToInboundLogString(_unwrapSocketIoData(d));
-        debugPrint('[ACTIVITY_VERIFY] activity:sync RAW wire:\n$rawWire');
-      }
-      final m = _asMap(d);
-      if (m == null) {
-        _recordInboundSocket('activity:sync:parse_failed', <String, dynamic>{
-          'hint': 'Server sent activity:sync but payload could not be mapped',
-          'raw': _payloadToInboundLogString(d),
-        });
-        return;
-      }
-      final events = m['events'];
-      if (events is! List) return;
-      final list = <JsonMap>[];
-      for (final e in events) {
-        final em = _asMap(e);
-        if (em != null) list.add(em);
-      }
-      if (kDebugMode) {
-        try {
-          debugPrint(
-            '[ACTIVITY_VERIFY] activity:sync PARSED '
-            '(events=${list.length}):\n${jsonEncode(m)}',
-          );
-        } catch (_) {
-          debugPrint(
-            '[ACTIVITY_VERIFY] activity:sync PARSED (events=${list.length}): $m',
-          );
-        }
-      }
-      onActivitySync?.call(list);
-    });
+    // `activity:sync` is ignored: it can arrive after `activity:event` and would wipe the
+    // activity list if applied. Activity rail is driven by `activity:event` + REST history merge.
 
-    // Server contract: event name is always `activity:event`; kind is only in JSON `type`
-    // (`join` | `follow`). See [_normalizeJoinFollowFromActivityEvent].
-    socket.on('activity:event', (d) {
-      if (kDebugMode) {
-        final rawWire = _payloadToInboundLogString(_unwrapSocketIoData(d));
-        debugPrint('[ACTIVITY_VERIFY] activity:event RAW wire:\n$rawWire');
-      }
-      _recordInboundSocket('activity:event', d);
-      _handleActivitySocketEvent('activity:event', d);
-    });
+    // All platforms (incl. YouTube subscribe/unsubscribe): **`activity:event`** only — body `type`
+    // carries the kind (`join`, `follow`, `subscribe`, `unsubscribe`, …).
+    socket.on(
+      'activity:event',
+      (d) => _onInboundActivityChannel('activity:event', d),
+    );
 
-    // Keep activity consumption strict: only `activity:event` is authoritative.
-    // Other `activity:*` channels are ignored for activity UI/LED behavior.
+    // `onAny`: only `activity:event` feeds [ChatController.activityEvents]; other `activity:*`
+    // channels are ignored (server should normalize to `activity:event`).
     socket.onAny((eventName, data) {
       final ev = eventName.toString();
       final name = ev.toLowerCase().trim();
@@ -530,10 +502,8 @@ class LiveStreamService {
           'payload_preview': _payloadToInboundLogString(_unwrapSocketIoData(data)),
         });
       }
-      // Ignore non-authoritative typed activity events (e.g., activity:follow).
-      if (name.startsWith('activity:') &&
-          name != 'activity:sync' &&
-          name != 'activity:event') {
+      // Ignore non-authoritative typed activity events (e.g., activity:follow, activity:sync).
+      if (name.startsWith('activity:') && name != 'activity:event') {
         return;
       }
     });
@@ -950,11 +920,10 @@ class LiveStreamService {
   }
 
   /// Normalizes `type` for activity rows:
-  /// - **Primary contract**: socket **`activity:event`** with body **`type`: `join` | `follow`**
-  ///   (also accepts same values via `eventType` / `kind` if `type` is empty).
-  ///   The channel name does not imply a kind (see [_typeFromActivityEventName]).
-  /// - **Typed channels** (`activity:follow`, `activity:join`, …): if body omits `type`, it is
-  ///   inferred from the channel (`follow`, `join`, …).
+  /// - **`activity:event`**: body **`type`** (e.g. `join`, `follow`, YouTube `subscribe`), with
+  ///   fallbacks `eventType` / `kind`. Channel name does not imply kind (see [_typeFromActivityEventName]).
+  /// - **Typed channels** (`activity:follow`, `activity:join`, `activity:subscribe`, …): if body omits
+  ///   `type`, it is inferred from the channel name.
   void _coalesceActivityType(JsonMap m, String socketEventName) {
     var t = m['type']?.toString().trim();
     if (t == null || t.isEmpty) {
@@ -977,8 +946,8 @@ class LiveStreamService {
     }
   }
 
-  /// For **`activity:event`**, backend sends the kind only in **`type`** (`join` or `follow`).
-  /// Normalizes casing (`Follow` → `follow`) so [ChatController] and UI see stable values.
+  /// For **`activity:event`**, normalizes **`join` / `follow`** casing only; other `type` values
+  /// (e.g. YouTube **`subscribe`**) are left unchanged.
   void _normalizeJoinFollowFromActivityEvent(JsonMap m) {
     final raw = m['type']?.toString().trim().toLowerCase();
     if (raw == 'join' || raw == 'follow') {
@@ -987,13 +956,13 @@ class LiveStreamService {
     }
     if (kDebugMode && (raw == null || raw.isEmpty)) {
       debugPrint(
-        '[ACTIVITY_SOCKET] activity:event missing `type` (expected join|follow): $m',
+        '[ACTIVITY_SOCKET] activity:event missing `type` (e.g. join|follow|subscribe): $m',
       );
     }
   }
 
   void _handleActivitySocketEvent(String socketEventName, dynamic payload) {
-    final m = _asMap(payload);
+    final m = _asMap(_unwrapSocketIoData(payload));
     if (m == null) {
       if (kDebugMode) {
         debugPrint('[ACTIVITY_SOCKET] $socketEventName (unparsed) $payload');

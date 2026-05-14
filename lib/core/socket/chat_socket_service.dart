@@ -141,20 +141,7 @@ class ChatSocketService extends GetxService {
         if (m != null) settingsUpdate.value = m;
       });
 
-      // `activity:sync` (sent once after chat:start)
-      socket.on('activity:sync', (d) {
-        final m = _asMap(d);
-        if (m == null) return;
-        final events = m['events'];
-        if (events is List) {
-          final list = <Map<String, dynamic>>[];
-          for (final e in events) {
-            final em = _asMap(e);
-            if (em != null) list.add(em);
-          }
-          activity.assignAll(list);
-        }
-      });
+      // `activity:sync` intentionally ignored (can replace live `activity:event` rows).
 
       // `activity:event` (pushed live)
       socket.on('activity:event', (d) {

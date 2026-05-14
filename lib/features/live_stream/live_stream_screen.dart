@@ -86,7 +86,10 @@ class _LivestreamingState extends State<Livestreaming> {
     _showActivity.addListener(_onShowActivityOpened);
     _platformLiveWorker = ever<Map<String, bool>>(
       Get.find<ChatController>().platformLive,
-      (_) => _syncSelectedPlatformFromFilter(),
+      (_) {
+        _collapseOverlaysIfStreamWentOffline();
+        _syncSelectedPlatformFromFilter();
+      },
     );
     _warmPrefetchBottomSheets();
     _maybeCompleteStreakForToday();
@@ -117,6 +120,60 @@ class _LivestreamingState extends State<Livestreaming> {
       _activityPanelExpanded = false;
       _activityHeight = 0;
       _bottomSectionHeightBeforeActivityExpand = null;
+    });
+  }
+
+  static const List<String> _streamPlatformKeys = [
+    'twitch',
+    'kick',
+    'youtube',
+    'tiktok',
+  ];
+
+  bool _anyPlatformLive(ChatController chatCtrl) {
+    for (final k in _streamPlatformKeys) {
+      if (chatCtrl.isPlatformLive(k)) return true;
+    }
+    return false;
+  }
+
+  /// When [ChatController.platformLive] updates from the socket, return the user from the
+  /// title/activity/service overlay to the stream preview if the stream they were tied to
+  /// is no longer live (specific filter → that platform; **All** + pinned row → that
+  /// platform; **All** without a pin → only when no platform is live).
+  void _collapseOverlaysIfStreamWentOffline() {
+    if (!mounted) return;
+    final overlayOpen = _showServiceCard.value || _showActivity.value;
+    if (!overlayOpen) return;
+
+    final chatCtrl = Get.find<ChatController>();
+    final raw = (_chatFilter.value ?? '').trim().toLowerCase();
+    final isAll = raw.isEmpty || raw == 'all';
+
+    final bool shouldClose;
+    if (!isAll) {
+      shouldClose = !chatCtrl.isPlatformLive(raw);
+    } else {
+      final pinned = _selectedPlatform.value?.trim().toLowerCase();
+      if (pinned != null && pinned.isNotEmpty) {
+        shouldClose = !chatCtrl.isPlatformLive(pinned);
+      } else {
+        shouldClose = !_anyPlatformLive(chatCtrl);
+      }
+    }
+    if (!shouldClose) return;
+
+    _titleSelected.value = false;
+    _showActivity.value = false;
+    _showServiceCard.value = false;
+    _selectedPlatform.value = null;
+    setState(() {
+      _activityHeight = 0;
+      _activityPanelExpanded = false;
+      _isDraggingActivity = false;
+      _bottomSectionHeightBeforeActivityExpand = null;
+      _isEditingStreamDetails = false;
+      _isSavingStreamDetails = false;
     });
   }
 
@@ -468,11 +525,20 @@ class _LivestreamingState extends State<Livestreaming> {
     if (type == 'follow' || type == 'new_follower' || type == 'new follow') {
       return (u.isNotEmpty ? '$u followed' : 'Someone followed', '');
     }
+    if (type == 'subscribe' ||
+        type == 'subscription' ||
+        type == 'new_subscriber' ||
+        type == 'new subscriber') {
+      return (u.isNotEmpty ? '$u subscribed' : 'Someone subscribed', '');
+    }
     if (type == 'unfollow' ||
         type == 'unfollowed' ||
         type == 'follow_off' ||
         type == 'followoff') {
       return (u.isNotEmpty ? '$u unfollowed' : 'Someone unfollowed', '');
+    }
+    if (type == 'unsubscribe') {
+      return (u.isNotEmpty ? '$u unsubscribed' : 'Someone unsubscribed', '');
     }
     final primary =
     u.isNotEmpty ? u : (typeRaw.isNotEmpty ? typeRaw : 'Activity');
