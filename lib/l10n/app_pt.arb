@@ -65,6 +65,22 @@
   "signIn": "Entrar",
   "logIn": "Entrar",
   "loginSubtitle": "Para sincronizar e gerenciar assinaturas",
+    "signInWithEmail": "Continuar com e-mail",
+    "emailHint": "E-mail",
+    "passwordHint": "Senha",
+    "invalidEmailAddress": "Insira um e-mail válido",
+    "passwordTooShort": "A senha deve ter pelo menos {minLength} caracteres",
+    "@passwordTooShort": {
+      "placeholders": {
+        "minLength": {
+          "type": "int"
+        }
+      }
+    },
+    "fieldRequired": "Obrigatório",
+    "invalidLoginCredentials": "E-mail ou senha inválidos.",
+    "loginNetworkError": "Não foi possível conectar. Verifique a rede e tente novamente.",
+
   "comingSoon": "Em breve",
   "couldNotSignInPleaseTryAgain": "Não foi possível entrar. Tente novamente.",
   "couldNotPrepareDataPleaseTryAgain": "Não foi possível preparar seus dados. Tente novamente.",

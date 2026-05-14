@@ -65,6 +65,21 @@
   "signIn": "Sign in",
   "logIn": "Log in",
   "loginSubtitle": "For synchronising and managing subscriptions",
+    "signInWithEmail": "Continue with email",
+    "emailHint": "Email",
+    "passwordHint": "Password",
+    "invalidEmailAddress": "Enter a valid email address",
+    "passwordTooShort": "Password must be at least {minLength} characters",
+    "@passwordTooShort": {
+      "placeholders": {
+        "minLength": {
+          "type": "int"
+        }
+      }
+    },
+    "fieldRequired": "Required",
+    "invalidLoginCredentials": "Invalid email or password.",
+    "loginNetworkError": "Could not connect. Check your network and try again.",
   "comingSoon": "Coming soon",
   "couldNotSignInPleaseTryAgain": "Could not sign in. Please try again.",
   "couldNotPrepareDataPleaseTryAgain": "Could not prepare your data. Please try again.",

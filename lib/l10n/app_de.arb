@@ -65,6 +65,22 @@
   "signIn": "Anmelden",
   "logIn": "Anmelden",
   "loginSubtitle": "Zum Synchronisieren und Verwalten von Abonnements",
+    "signInWithEmail": "Mit E-Mail fortfahren",
+    "emailHint": "E-Mail",
+    "passwordHint": "Passwort",
+    "invalidEmailAddress": "Bitte gib eine gültige E-Mail-Adresse ein",
+    "passwordTooShort": "Das Passwort muss mindestens {minLength} Zeichen haben",
+    "@passwordTooShort": {
+      "placeholders": {
+        "minLength": {
+          "type": "int"
+        }
+      }
+    },
+    "fieldRequired": "Pflichtfeld",
+    "invalidLoginCredentials": "E-Mail oder Passwort ist ungültig.",
+    "loginNetworkError": "Verbindung fehlgeschlagen. Bitte Netzwerk prüfen und erneut versuchen.",
+
   "comingSoon": "Demnächst verfügbar",
   "couldNotSignInPleaseTryAgain": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
   "couldNotPrepareDataPleaseTryAgain": "Deine Daten konnten nicht vorbereitet werden. Bitte versuche es erneut.",

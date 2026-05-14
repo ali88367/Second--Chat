@@ -200,6 +200,34 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zum Synchronisieren und Verwalten von Abonnements';
 
   @override
+  String get signInWithEmail => 'Mit E-Mail fortfahren';
+
+  @override
+  String get emailHint => 'E-Mail';
+
+  @override
+  String get passwordHint => 'Passwort';
+
+  @override
+  String get invalidEmailAddress => 'Bitte gib eine gültige E-Mail-Adresse ein';
+
+  @override
+  String passwordTooShort(int minLength) {
+    return 'Das Passwort muss mindestens $minLength Zeichen haben';
+  }
+
+  @override
+  String get fieldRequired => 'Pflichtfeld';
+
+  @override
+  String get invalidLoginCredentials => 'E-Mail oder Passwort ist ungültig.';
+
+  @override
+  String get loginNetworkError =>
+      'Verbindung fehlgeschlagen. Bitte Netzwerk prüfen und erneut versuchen.';
+
+
+  @override
   String get comingSoon => 'Demnächst verfügbar';
 
   @override

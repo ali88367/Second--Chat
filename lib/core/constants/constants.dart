@@ -21,8 +21,10 @@ class AppConstants {
   /// (`INVALID_TOKEN` / “jwt audience invalid” means the server expects different client IDs than
   /// this one — fix the server config, or align Firebase with the backend’s Google Cloud project).
   /// Override per build with `--dart-define=GOOGLE_SERVER_CLIENT_ID=...` or `dart_defines.json`.
-  static const String googleServerClientId =
-      '209792077701-4ohf0aotq67a9orph2mhfal4rsnqvcf2.apps.googleusercontent.com';
+  /// iOS OAuth client ID (`CLIENT_ID` in `GoogleService-Info.plist`). Same Firebase project as
+  /// [googleServerClientId]. Override with `--dart-define=GOOGLE_IOS_CLIENT_ID=...`.
+  static const String googleIosClientId =
+      '209792077701-uqmqji55nnm6dvmsi7pekcqh30e6uogp.apps.googleusercontent.com';
 
   /// iOS-only OAuth client ID if you do not use `--dart-define=GOOGLE_IOS_CLIENT_ID`.
   static const String googleIosClientId = '';

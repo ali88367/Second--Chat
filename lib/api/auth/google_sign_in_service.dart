@@ -38,10 +38,14 @@ class GoogleSignInService {
       );
     }
 
+    final iosClientId = ApiConfig.googleIosClientId.trim();
     await GoogleSignIn.instance.initialize(
       serverClientId: serverId,
+      clientId:
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && iosClientId.isNotEmpty
+          ? iosClientId
+          : null,
     );
-    _initialized = true;
   }
 
   /// Token saved at Google login — **no** Google SDK calls (safe during session checks).

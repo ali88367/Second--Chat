@@ -198,6 +198,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get loginSubtitle => 'Para sincronizar y gestionar suscripciones';
 
   @override
+  String get signInWithEmail => 'Continuar con correo';
+
+  @override
+  String get emailHint => 'Correo electrónico';
+
+  @override
+  String get passwordHint => 'Contraseña';
+
+  @override
+  String get invalidEmailAddress => 'Introduce un correo electrónico válido';
+
+  @override
+  String passwordTooShort(int minLength) {
+    return 'La contraseña debe tener al menos $minLength caracteres';
+  }
+
+  @override
+  String get fieldRequired => 'Obligatorio';
+
+  @override
+  String get invalidLoginCredentials => 'Correo o contraseña incorrectos.';
+
+  @override
+  String get loginNetworkError =>
+      'No se pudo conectar. Comprueba tu red e inténtalo de nuevo.';
+
+
+  @override
   String get comingSoon => 'Próximamente';
 
   @override

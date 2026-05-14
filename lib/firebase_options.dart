@@ -66,10 +66,13 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCMrOput8WUYRsFQvyXcm0SAXOmOmtkPr8',
-    appId: '1:209792077701:ios:7eb0ffc390f2458cc7beec',
+    appId: '1:209792077701:ios:d51e4795a73e6ebec7beec',
     messagingSenderId: '209792077701',
     projectId: 'second-chat-5eef5',
     storageBucket: 'second-chat-5eef5.firebasestorage.app',
-    iosBundleId: 'com.secondChat.app',
+    androidClientId: '209792077701-ueg09cfpv934ff3n39if949ob29kcsk2.apps.googleusercontent.com',
+    iosClientId: '209792077701-uqmqji55nnm6dvmsi7pekcqh30e6uogp.apps.googleusercontent.com',
+    iosBundleId: 'com.secondChatapp.app',
   );
+
 }

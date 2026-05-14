@@ -65,6 +65,22 @@
   "signIn": "تسجيل الدخول",
   "logIn": "تسجيل الدخول",
   "loginSubtitle": "لمزامنة الاشتراكات وإدارتها",
+    "signInWithEmail": "المتابعة بالبريد الإلكتروني",
+    "emailHint": "البريد الإلكتروني",
+    "passwordHint": "كلمة المرور",
+    "invalidEmailAddress": "أدخل بريدًا إلكترونيًا صالحًا",
+    "passwordTooShort": "يجب أن تكون كلمة المرور {minLength} أحرف على الأقل",
+    "@passwordTooShort": {
+      "placeholders": {
+        "minLength": {
+          "type": "int"
+        }
+      }
+    },
+    "fieldRequired": "مطلوب",
+    "invalidLoginCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "loginNetworkError": "تعذر الاتصال. تحقق من الشبكة وحاول مرة أخرى.",
+
   "comingSoon": "قريبًا",
   "couldNotSignInPleaseTryAgain": "تعذر تسجيل الدخول. يرجى المحاولة مرة أخرى.",
   "couldNotPrepareDataPleaseTryAgain": "تعذر تجهيز بياناتك. يرجى المحاولة مرة أخرى.",

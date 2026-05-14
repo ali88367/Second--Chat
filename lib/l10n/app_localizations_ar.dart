@@ -195,6 +195,35 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginSubtitle => 'لمزامنة الاشتراكات وإدارتها';
 
   @override
+  String get signInWithEmail => 'المتابعة بالبريد الإلكتروني';
+
+  @override
+  String get emailHint => 'البريد الإلكتروني';
+
+  @override
+  String get passwordHint => 'كلمة المرور';
+
+  @override
+  String get invalidEmailAddress => 'أدخل بريدًا إلكترونيًا صالحًا';
+
+  @override
+  String passwordTooShort(int minLength) {
+    return 'يجب أن تكون كلمة المرور $minLength أحرف على الأقل';
+  }
+
+  @override
+  String get fieldRequired => 'مطلوب';
+
+  @override
+  String get invalidLoginCredentials =>
+      'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+
+  @override
+  String get loginNetworkError =>
+      'تعذر الاتصال. تحقق من الشبكة وحاول مرة أخرى.';
+
+
+  @override
   String get comingSoon => 'قريبًا';
 
   @override

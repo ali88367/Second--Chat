@@ -200,6 +200,34 @@ class AppLocalizationsPt extends AppLocalizations {
   String get loginSubtitle => 'Para sincronizar e gerenciar assinaturas';
 
   @override
+  String get signInWithEmail => 'Continuar com e-mail';
+
+  @override
+  String get emailHint => 'E-mail';
+
+  @override
+  String get passwordHint => 'Senha';
+
+  @override
+  String get invalidEmailAddress => 'Insira um e-mail válido';
+
+  @override
+  String passwordTooShort(int minLength) {
+    return 'A senha deve ter pelo menos $minLength caracteres';
+  }
+
+  @override
+  String get fieldRequired => 'Obrigatório';
+
+  @override
+  String get invalidLoginCredentials => 'E-mail ou senha inválidos.';
+
+  @override
+  String get loginNetworkError =>
+      'Não foi possível conectar. Verifique a rede e tente novamente.';
+
+
+  @override
   String get comingSoon => 'Em breve';
 
   @override

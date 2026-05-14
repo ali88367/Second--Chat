@@ -199,6 +199,34 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loginSubtitle => 'Pour synchroniser et gérer les abonnements';
 
   @override
+  String get signInWithEmail => 'Continuer avec l\'e-mail';
+
+  @override
+  String get emailHint => 'E-mail';
+
+  @override
+  String get passwordHint => 'Mot de passe';
+
+  @override
+  String get invalidEmailAddress => 'Saisissez une adresse e-mail valide';
+
+  @override
+  String passwordTooShort(int minLength) {
+    return 'Le mot de passe doit contenir au moins $minLength caractères';
+  }
+
+  @override
+  String get fieldRequired => 'Obligatoire';
+
+  @override
+  String get invalidLoginCredentials => 'E-mail ou mot de passe invalide.';
+
+  @override
+  String get loginNetworkError =>
+      'Connexion impossible. Vérifiez votre réseau et réessayez.';
+
+
+  @override
   String get comingSoon => 'Bientôt disponible';
 
   @override
