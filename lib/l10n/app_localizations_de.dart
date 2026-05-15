@@ -226,7 +226,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginNetworkError =>
       'Verbindung fehlgeschlagen. Bitte Netzwerk prüfen und erneut versuchen.';
 
-
   @override
   String get comingSoon => 'Demnächst verfügbar';
 

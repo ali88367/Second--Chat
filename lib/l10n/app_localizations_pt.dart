@@ -226,7 +226,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get loginNetworkError =>
       'Não foi possível conectar. Verifique a rede e tente novamente.';
 
-
   @override
   String get comingSoon => 'Em breve';
 

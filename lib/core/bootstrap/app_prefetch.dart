@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/settings_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
+import 'package:second_chat/controllers/platform_categories_controller.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
 
 class AppPrefetch {
@@ -52,6 +53,14 @@ class AppPrefetch {
 
     if (Get.isRegistered<InviteController>()) {
       unawaited(Get.find<InviteController>().loadInvites().catchError((_) {}));
+    }
+
+    if (Get.isRegistered<PlatformCategoriesController>()) {
+      unawaited(
+        Get.find<PlatformCategoriesController>()
+            .prefetchAllIfNeeded()
+            .catchError((_) {}),
+      );
     }
 
     if (blockingTasks.isNotEmpty) {

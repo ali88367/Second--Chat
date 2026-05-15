@@ -223,7 +223,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginNetworkError =>
       'Could not connect. Check your network and try again.';
 
-
   @override
   String get comingSoon => 'Coming soon';
 

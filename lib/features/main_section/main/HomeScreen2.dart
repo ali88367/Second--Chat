@@ -304,9 +304,9 @@ class _HomeScreen2State extends State<HomeScreen2> {
                     SizedBox(height: 24.h),
                     Obx(() {
                       final chatCtrl = Get.find<ChatController>();
-                      final streamOnline =
-                          chatCtrl.isConnected.value &&
-                          chatCtrl.platformLive.values.any((v) => v == true);
+                      chatCtrl.overview.value;
+                      chatCtrl.platformLive.keys;
+                      final streamOnline = chatCtrl.isAnyStreamLive;
                       return Text(
                         streamOnline
                             ? context.l10n.homeStreamLiveMessage
@@ -346,10 +346,9 @@ class _HomeScreen2State extends State<HomeScreen2> {
                 children: [
                   Obx(() {
                     final chatCtrl = Get.find<ChatController>();
-                    final anyLive = chatCtrl.platformLive.values.any(
-                      (v) => v == true,
-                    );
-                    final streamOnline = anyLive;
+                    chatCtrl.overview.value;
+                    chatCtrl.platformLive.keys;
+                    final streamOnline = chatCtrl.isAnyStreamLive;
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

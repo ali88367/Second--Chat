@@ -514,7 +514,6 @@ abstract class AppLocalizations {
   /// **'Could not connect. Check your network and try again.'**
   String get loginNetworkError;
 
-
   /// No description provided for @comingSoon.
   ///
   /// In en, this message translates to:

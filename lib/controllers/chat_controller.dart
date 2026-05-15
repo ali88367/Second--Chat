@@ -773,6 +773,15 @@ class ChatController extends GetxController {
     return platformLive[key] == true;
   }
 
+  /// True when any platform is live per socket [platformLive] or REST overview snapshot.
+  bool get isAnyStreamLive {
+    if (platformLive.values.any((v) => v == true)) return true;
+    final ov = overview.value;
+    if (ov == null) return false;
+    if (ov.live) return true;
+    return ov.liveByPlatform.values.any((v) => v == true);
+  }
+
   /// Chat may be shown for this platform only when offline, or live and embed ready.
   ///
   /// When [platformLive] has no entry yet, we return false so REST/socket history
@@ -2305,7 +2314,7 @@ class ChatController extends GetxController {
     if (p.isEmpty) return false;
     final nextTitle = title.trim();
     final nextCategory = category.trim();
-    if (nextTitle.isEmpty || nextCategory.isEmpty) return false;
+    if (nextTitle.isEmpty) return false;
 
     try {
       final auth = Get.find<AuthController>();
@@ -2313,13 +2322,13 @@ class ChatController extends GetxController {
       final accessToken = (await _resolveStreamingRestToken(p))?.trim();
       if (accessToken == null || accessToken.isEmpty) return false;
 
-      final payload = <String, dynamic>{
-        'title': nextTitle,
-        'category': nextCategory,
-      };
-      final normalizedCategoryId = categoryId?.trim();
-      if (normalizedCategoryId != null && normalizedCategoryId.isNotEmpty) {
-        payload['categoryId'] = normalizedCategoryId;
+      final payload = <String, dynamic>{'title': nextTitle};
+      if (nextCategory.isNotEmpty) {
+        payload['category'] = nextCategory;
+        final normalizedCategoryId = categoryId?.trim();
+        if (normalizedCategoryId != null && normalizedCategoryId.isNotEmpty) {
+          payload['categoryId'] = normalizedCategoryId;
+        }
       }
 
       await auth.api.client.dio.patch<dynamic>(

@@ -164,10 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (_) {}
 
-    final anyLive =
-        chat.platformLive.values.any((v) => v == true) ||
-        (chat.overview.value?.live == true);
-    if (anyLive) {
+    if (chat.isAnyStreamLive) {
       Get.offAll(() => const Livestreaming());
       return;
     }

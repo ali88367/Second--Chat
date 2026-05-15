@@ -222,7 +222,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginNetworkError =>
       'تعذر الاتصال. تحقق من الشبكة وحاول مرة أخرى.';
 
-
   @override
   String get comingSoon => 'قريبًا';
 

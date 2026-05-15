@@ -225,7 +225,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loginNetworkError =>
       'Connexion impossible. Vérifiez votre réseau et réessayez.';
 
-
   @override
   String get comingSoon => 'Bientôt disponible';
 

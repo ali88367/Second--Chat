@@ -12,6 +12,7 @@ import '../../../../core/themes/textstyles.dart';
 import 'package:second_chat/core/utils/app_clock_format.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
+import '../../../controllers/platform_categories_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
 import '../../core/widgets/stream_header_buttons.dart';
 import '../../core/localization/l10n.dart';
@@ -21,6 +22,7 @@ import '../main_section/settings/settings_bottomsheet_column.dart';
 import 'widgets/chat_bottom_section.dart';
 import 'widgets/live_stream_helper_widgets.dart';
 import 'widgets/live_stream_embed_stack.dart';
+import 'widgets/stream_title_edit_panel.dart';
 // import 'socket_log_screen.dart';
 
 class Livestreaming extends StatefulWidget {
@@ -52,7 +54,9 @@ class _LivestreamingState extends State<Livestreaming> {
   double _activityLayoutMin = 0;
   double _activityLayoutMax = 0;
   double? _bottomSectionHeightBeforeActivityExpand;
+  double? _bottomSectionHeightBeforeCategoryMenu;
   bool _isInitialHeightSet = false;
+  static const double _categoryMenuBottomHeightFraction = 0.42;
   static const double _dragSensitivity = 1.8;
   static const double _minBottomSectionHeightFactor = 0.20;
   static const double _minUpperSectionHeight = 50.0;
@@ -68,10 +72,11 @@ class _LivestreamingState extends State<Livestreaming> {
       TextEditingController();
   final TextEditingController _streamCategoryEditController =
       TextEditingController();
-  bool _isEditingStreamDetails = false;
-  bool _isSavingStreamDetails = false;
-  String? _editingPlatformKey;
-
+  final ValueNotifier<bool> _isEditingStreamDetails = ValueNotifier(false);
+  final ValueNotifier<bool> _isSavingStreamDetails = ValueNotifier(false);
+  final ValueNotifier<String?> _editingPlatformKey = ValueNotifier(null);
+  final ValueNotifier<bool> _categoryMenuOpen = ValueNotifier(false);
+  final ValueNotifier<String?> _selectedCategoryId = ValueNotifier(null);
   late final SettingsController _settingsCtrl;
   late final StreamStreaksController _streakCtrl;
 
@@ -84,6 +89,7 @@ class _LivestreamingState extends State<Livestreaming> {
     _chatFilter.addListener(_updateImageBasedOnFilter);
     _chatFilter.addListener(_syncSelectedPlatformFromFilter);
     _showActivity.addListener(_onShowActivityOpened);
+    _categoryMenuOpen.addListener(_syncLayoutForCategoryMenu);
     _platformLiveWorker = ever<Map<String, bool>>(
       Get.find<ChatController>().platformLive,
       (_) {
@@ -121,6 +127,61 @@ class _LivestreamingState extends State<Livestreaming> {
       _activityHeight = 0;
       _bottomSectionHeightBeforeActivityExpand = null;
     });
+  }
+
+  /// Shrinks chat while the inline category list is open so the title panel can grow.
+  void _syncLayoutForCategoryMenu() {
+    if (!mounted || !_isInitialHeightSet) return;
+
+    final screenHeight = Get.height;
+    final minHeight = _bottomSectionMinHeight(screenHeight);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final maxHeight =
+        screenHeight -
+            _layoutTopPadding(context) -
+            _minUpperSectionHeight -
+            16.h -
+            12.h -
+            bottomInset;
+    final clampedMaxHeight = maxHeight > minHeight ? maxHeight : minHeight;
+    final effectiveMaxHeight =
+        _bottomSectionMaxHeight == null
+            ? clampedMaxHeight
+            : math.min(clampedMaxHeight, _bottomSectionMaxHeight!);
+
+    final shrinkChat =
+        _showServiceCard.value &&
+        _titleSelected.value &&
+        _categoryMenuOpen.value;
+
+    if (shrinkChat) {
+      final topPadding = _layoutTopPadding(context);
+      final availableHeight =
+          screenHeight - topPadding - (16.h + bottomInset);
+      final compactTarget = math
+          .min(
+            availableHeight * _categoryMenuBottomHeightFraction,
+            effectiveMaxHeight,
+          )
+          .clamp(minHeight, effectiveMaxHeight)
+          .toDouble();
+
+      _bottomSectionHeightBeforeCategoryMenu ??= _bottomSectionHeight;
+      if (_bottomSectionHeight != compactTarget) {
+        setState(() => _bottomSectionHeight = compactTarget);
+      }
+      return;
+    }
+
+    if (_bottomSectionHeightBeforeCategoryMenu != null) {
+      final restored = _bottomSectionHeightBeforeCategoryMenu!
+          .clamp(minHeight, effectiveMaxHeight)
+          .toDouble();
+      setState(() {
+        _bottomSectionHeight = restored;
+        _bottomSectionHeightBeforeCategoryMenu = null;
+      });
+    }
   }
 
   static const List<String> _streamPlatformKeys = [
@@ -167,14 +228,19 @@ class _LivestreamingState extends State<Livestreaming> {
     _showActivity.value = false;
     _showServiceCard.value = false;
     _selectedPlatform.value = null;
+    _isEditingStreamDetails.value = false;
+    _isSavingStreamDetails.value = false;
+    _categoryMenuOpen.value = false;
+    _editingPlatformKey.value = null;
+    _selectedCategoryId.value = null;
     setState(() {
       _activityHeight = 0;
       _activityPanelExpanded = false;
       _isDraggingActivity = false;
       _bottomSectionHeightBeforeActivityExpand = null;
-      _isEditingStreamDetails = false;
-      _isSavingStreamDetails = false;
+      _bottomSectionHeightBeforeCategoryMenu = null;
     });
+    _syncLayoutForCategoryMenu();
   }
 
   void _syncSelectedPlatformFromFilter() {
@@ -261,6 +327,7 @@ class _LivestreamingState extends State<Livestreaming> {
     _chatFilter.removeListener(_updateImageBasedOnFilter);
     _chatFilter.removeListener(_syncSelectedPlatformFromFilter);
     _showActivity.removeListener(_onShowActivityOpened);
+    _categoryMenuOpen.removeListener(_syncLayoutForCategoryMenu);
     _platformLiveWorker?.dispose();
     _showServiceCard.dispose();
     _selectedPlatform.dispose();
@@ -271,6 +338,11 @@ class _LivestreamingState extends State<Livestreaming> {
     _activityScrollController.dispose();
     _streamTitleEditController.dispose();
     _streamCategoryEditController.dispose();
+    _isEditingStreamDetails.dispose();
+    _isSavingStreamDetails.dispose();
+    _editingPlatformKey.dispose();
+    _categoryMenuOpen.dispose();
+    _selectedCategoryId.dispose();
     super.dispose();
   }
 
@@ -281,36 +353,65 @@ class _LivestreamingState extends State<Livestreaming> {
   }) {
     _streamTitleEditController.text = title;
     _streamCategoryEditController.text = category;
-    setState(() {
-      _editingPlatformKey = platformKey;
-      _isEditingStreamDetails = true;
-    });
+    _selectedCategoryId.value = null;
+    _categoryMenuOpen.value = false;
+    final normalized = _normalizeUiPlatform(platformKey);
+    _editingPlatformKey.value = normalized;
+    _isEditingStreamDetails.value = true;
+    unawaited(
+      Get.find<PlatformCategoriesController>().ensureCategoriesFor(normalized),
+    );
+  }
+
+  void _toggleCategoryMenu() {
+    if (!_isEditingStreamDetails.value) return;
+
+    final opening = !_categoryMenuOpen.value;
+    final key = _editingPlatformKey.value?.trim() ?? '';
+    if (opening && key.isNotEmpty) {
+      unawaited(
+        Get.find<PlatformCategoriesController>().ensureCategoriesFor(key),
+      );
+    }
+    _categoryMenuOpen.value = opening;
+    _syncLayoutForCategoryMenu();
+  }
+
+  void _dismissCategoryMenu() {
+    if (!_categoryMenuOpen.value) return;
+    _categoryMenuOpen.value = false;
+    _syncLayoutForCategoryMenu();
+  }
+
+  void _onCategoryPicked(String name, String id) {
+    _streamCategoryEditController.text = name;
+    _selectedCategoryId.value = id;
+    _dismissCategoryMenu();
   }
 
   Future<void> _saveStreamDetails(BuildContext context) async {
-    final platformKey = _editingPlatformKey;
+    final platformKey = _editingPlatformKey.value;
     if (platformKey == null || platformKey.trim().isEmpty) return;
     final nextTitle = _streamTitleEditController.text.trim();
     final nextCategory = _streamCategoryEditController.text.trim();
-    if (nextTitle.isEmpty || nextCategory.isEmpty) return;
+    if (nextTitle.isEmpty) return;
 
-    setState(() {
-      _isSavingStreamDetails = true;
-    });
+    _isSavingStreamDetails.value = true;
     final chatCtrl = Get.find<ChatController>();
     final ok = await chatCtrl.updateStreamMetadata(
       platformKey: platformKey,
       title: nextTitle,
       category: nextCategory,
+      categoryId: _selectedCategoryId.value,
     );
     if (!mounted) return;
-    setState(() {
-      _isSavingStreamDetails = false;
-      if (ok) {
-        _isEditingStreamDetails = false;
-      }
-    });
-    if (!ok) {
+    _isSavingStreamDetails.value = false;
+    if (ok) {
+      _isEditingStreamDetails.value = false;
+      _dismissCategoryMenu();
+      _editingPlatformKey.value = null;
+      _selectedCategoryId.value = null;
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to save stream details')),
       );
@@ -1259,42 +1360,32 @@ class _LivestreamingState extends State<Livestreaming> {
                                 final streamPreviewHeight =
                                 upperSectionHeight.toDouble();
 
-                                return ValueListenableBuilder<bool>(
-                                  valueListenable: _showActivity,
-                                  builder: (context, showActivity, _) {
-                                    return SizedBox(
-                                      height: upperSectionHeight,
-                                      width: double.infinity,
-                                      child: Stack(
-                                        clipBehavior: Clip.hardEdge,
-                                        children: [
-                                          IgnorePointer(
-                                            ignoring: showActivity,
-                                            child: SingleChildScrollView(
-                                              physics:
-                                              _isDraggingActivity
-                                                  ? const NeverScrollableScrollPhysics()
-                                                  : const ClampingScrollPhysics(),
-                                              padding: EdgeInsets.only(
-                                                bottom:
-                                                MediaQuery.of(
-                                                  context,
-                                                ).viewPadding.bottom,
-                                              ),
-                                              child: ConstrainedBox(
-                                                constraints: BoxConstraints(
-                                                  minHeight: upperSectionHeight,
-                                                ),
-                                                child: ValueListenableBuilder<
-                                                    bool
-                                                >(
-                                                  valueListenable:
-                                                  _showServiceCard,
-                                                  builder: (
-                                                      context,
-                                                      showCard,
-                                                      child,
-                                                      ) {
+                                return AnimatedBuilder(
+                                  animation: Listenable.merge([
+                                    _showActivity,
+                                    _showServiceCard,
+                                    _isEditingStreamDetails,
+                                    _categoryMenuOpen,
+                                  ]),
+                                  builder: (context, _) {
+                                    final showActivity = _showActivity.value;
+                                    final showCard = _showServiceCard.value;
+                                    final lockUpperScroll =
+                                        showCard ||
+                                        showActivity ||
+                                        _isDraggingActivity ||
+                                        _categoryMenuOpen.value;
+
+                                    final streamCardContent =
+                                        ValueListenableBuilder<
+                                            bool
+                                        >(
+                                          valueListenable: _showServiceCard,
+                                          builder: (
+                                            context,
+                                            showCardInner,
+                                            child,
+                                          ) {
                                                     final chatCtrl =
                                                     Get.find<
                                                         ChatController
@@ -1394,7 +1485,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                       child: Stack(
                                                         fit: StackFit.expand,
                                                         clipBehavior:
-                                                        Clip.hardEdge,
+                                                        Clip.none,
                                                         children: [
                                                           Offstage(
                                                             offstage: showCard,
@@ -1429,7 +1520,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                             platform,
                                                                           );
                                                                           return Column(
-                                                                            children: [
+                                                                                children: [
                                                                               Expanded(
                                                                                 child: Container(
                                                                                   width:
@@ -1475,10 +1566,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   _titleSelected.value = true;
                                                                                                   _showServiceCard.value = true;
                                                                                                   _showActivity.value = false;
-                                                                                                  _isEditingStreamDetails =
+                                                                                                  _isEditingStreamDetails.value =
                                                                                                       false;
-                                                                                                  _isSavingStreamDetails =
+                                                                                                  _isSavingStreamDetails.value =
                                                                                                       false;
+                                                                                                  _categoryMenuOpen.value = false;
+                                                                                                  _editingPlatformKey.value = null;
                                                                                                 } else {
                                                                                                   // In platform-specific filters, back closes title panel.
                                                                                                   _selectedPlatform.value = null;
@@ -1487,10 +1580,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                                   _showActivity.value = false;
                                                                                                   _activityHeight = 0;
                                                                                                   _isDraggingActivity = false;
-                                                                                                  _isEditingStreamDetails =
+                                                                                                  _isEditingStreamDetails.value =
                                                                                                       false;
-                                                                                                  _isSavingStreamDetails =
+                                                                                                  _isSavingStreamDetails.value =
                                                                                                       false;
+                                                                                                  _categoryMenuOpen.value = false;
+                                                                                                  _editingPlatformKey.value = null;
                                                                                                 }
                                                                                               },
                                                                                               child: Container(
@@ -1555,7 +1650,8 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                         height:
                                                                                         16.h,
                                                                                       ),
-                                                                                      Obx(
+                                                                                      Expanded(
+                                                                                        child: Obx(
                                                                                             () {
                                                                                           final metaKey = _normalizeUiPlatform(
                                                                                             activePlatform,
@@ -1576,150 +1672,88 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                               categoryLive.isNotEmpty
                                                                                                   ? categoryLive
                                                                                                   : context.l10n.streamMetaEmpty;
-                                                                                          return Column(
-                                                                                            mainAxisSize:
-                                                                                                MainAxisSize.min,
-                                                                                            children: [
-                                                                                              _streamMetaRow(
-                                                                                                content:
-                                                                                                    _isEditingStreamDetails &&
-                                                                                                            _editingPlatformKey ==
-                                                                                                                metaKey
-                                                                                                        ? TextField(
-                                                                                                            controller:
-                                                                                                                _streamTitleEditController,
-                                                                                                            style: sfProText600(
-                                                                                                              13.sp,
-                                                                                                              Colors.white,
-                                                                                                            ),
-                                                                                                            decoration:
-                                                                                                                const InputDecoration(
-                                                                                                              isDense: true,
-                                                                                                              border:
-                                                                                                                  InputBorder.none,
-                                                                                                              enabledBorder:
-                                                                                                                  InputBorder.none,
-                                                                                                              focusedBorder:
-                                                                                                                  InputBorder.none,
-                                                                                                              disabledBorder:
-                                                                                                                  InputBorder.none,
-                                                                                                              contentPadding:
-                                                                                                                  EdgeInsets.zero,
-                                                                                                            ),
-                                                                                                          )
-                                                                                                        : Text(
-                                                                                                            titlePanel,
-                                                                                                            style: sfProText600(
-                                                                                                              13.sp,
-                                                                                                              Colors.white,
-                                                                                                            ),
-                                                                                                          ),
-                                                                                              ),
-                                                                                              SizedBox(
-                                                                                                height:
-                                                                                                    12.h,
-                                                                                              ),
-                                                                                              // Category row: no chevron / picker (disabled).
-                                                                                              _streamMetaRow(
-                                                                                                content:
-                                                                                                    _isEditingStreamDetails &&
-                                                                                                            _editingPlatformKey ==
-                                                                                                                metaKey
-                                                                                                        ? TextField(
-                                                                                                            controller:
-                                                                                                                _streamCategoryEditController,
-                                                                                                            style: sfProText600(
-                                                                                                              13.sp,
-                                                                                                              Colors.white,
-                                                                                                            ),
-                                                                                                            decoration:
-                                                                                                                const InputDecoration(
-                                                                                                              isDense: true,
-                                                                                                              border:
-                                                                                                                  InputBorder.none,
-                                                                                                              enabledBorder:
-                                                                                                                  InputBorder.none,
-                                                                                                              focusedBorder:
-                                                                                                                  InputBorder.none,
-                                                                                                              disabledBorder:
-                                                                                                                  InputBorder.none,
-                                                                                                              contentPadding:
-                                                                                                                  EdgeInsets.zero,
-                                                                                                            ),
-                                                                                                          )
-                                                                                                        : Text(
-                                                                                                            categoryPanel,
-                                                                                                            style: sfProText600(
-                                                                                                              13.sp,
-                                                                                                              Colors.white,
-                                                                                                            ),
-                                                                                                          ),
-                                                                                              ),
-                                                                                              SizedBox(
-                                                                                                height:
-                                                                                                    8.h,
-                                                                                              ),
-                                                                                              Align(
-                                                                                                alignment:
-                                                                                                    Alignment.bottomRight,
-                                                                                                child: GestureDetector(
-                                                                                                  onTap:
-                                                                                                      _isSavingStreamDetails
-                                                                                                          ? null
-                                                                                                          : () {
-                                                                                                              final isEditingThis =
-                                                                                                                  _isEditingStreamDetails &&
-                                                                                                                  _editingPlatformKey ==
-                                                                                                                      metaKey;
-                                                                                                              if (isEditingThis) {
-                                                                                                                _saveStreamDetails(
-                                                                                                                  context,
-                                                                                                                );
-                                                                                                              } else {
-                                                                                                                _startEditingStreamDetails(
-                                                                                                                  platformKey:
-                                                                                                                      metaKey,
-                                                                                                                  title:
-                                                                                                                      titlePanel,
-                                                                                                                  category:
-                                                                                                                      categoryPanel,
-                                                                                                                );
-                                                                                                              }
-                                                                                                            },
-                                                                                                  child: Container(
-                                                                                                    padding: EdgeInsets.symmetric(
-                                                                                                      horizontal:
-                                                                                                          10.w,
-                                                                                                      vertical:
-                                                                                                          6.h,
-                                                                                                    ),
-                                                                                                    decoration: BoxDecoration(
-                                                                                                      color: Colors.black,
-                                                                                                      borderRadius:
-                                                                                                          BorderRadius.circular(
-                                                                                                        12.r,
-                                                                                                      ),
-                                                                                                    ),
-                                                                                                    child: Text(
-                                                                                                      (_isEditingStreamDetails &&
-                                                                                                              _editingPlatformKey ==
-                                                                                                                  metaKey)
-                                                                                                          ? (_isSavingStreamDetails
-                                                                                                              ? 'Saving...'
-                                                                                                              : 'Save')
-                                                                                                          : 'Edit',
-                                                                                                      style: sfProText500(
-                                                                                                        11.sp,
-                                                                                                        Colors.white,
-                                                                                                      ),
-                                                                                                    ),
-                                                                                                  ),
-                                                                                                ),
-                                                                                              ),
-                                                                                            ],
+                                                                                          return ValueListenableBuilder<bool>(
+                                                                                            valueListenable:
+                                                                                                _isEditingStreamDetails,
+                                                                                            builder: (
+                                                                                              context,
+                                                                                              isEditing,
+                                                                                              _,
+                                                                                            ) {
+                                                                                              return ValueListenableBuilder<
+                                                                                                  String?>
+                                                                                                (
+                                                                                                valueListenable:
+                                                                                                    _editingPlatformKey,
+                                                                                                builder: (
+                                                                                                  context,
+                                                                                                  editingKey,
+                                                                                                  __,
+                                                                                                ) {
+                                                                                                  return ValueListenableBuilder<
+                                                                                                      bool>(
+                                                                                                    valueListenable:
+                                                                                                        _isSavingStreamDetails,
+                                                                                                    builder: (
+                                                                                                      context,
+                                                                                                      isSaving,
+                                                                                                      ___,
+                                                                                                    ) {
+                                                                                                      final isEditingThis =
+                                                                                                          isEditing &&
+                                                                                                          editingKey ==
+                                                                                                              metaKey;
+                                                                                                      return StreamTitleEditPanel(
+                                                                                                        platformKey: metaKey,
+                                                                                                        isEditing: isEditingThis,
+                                                                                                        isSaving: isSaving,
+                                                                                                        titleDisplay: titlePanel,
+                                                                                                        categoryDisplay: categoryPanel,
+                                                                                                        titleField: isEditingThis
+                                                                                                            ? TextField(
+                                                                                                                controller: _streamTitleEditController,
+                                                                                                                style: sfProText600(13.sp, Colors.white),
+                                                                                                                decoration: const InputDecoration(
+                                                                                                                  isDense: true,
+                                                                                                                  border: InputBorder.none,
+                                                                                                                  enabledBorder: InputBorder.none,
+                                                                                                                  focusedBorder: InputBorder.none,
+                                                                                                                  disabledBorder: InputBorder.none,
+                                                                                                                  contentPadding: EdgeInsets.zero,
+                                                                                                                ),
+                                                                                                              )
+                                                                                                            : Text(
+                                                                                                                titlePanel,
+                                                                                                                style: sfProText600(13.sp, Colors.white),
+                                                                                                              ),
+                                                                                                        categoryController: _streamCategoryEditController,
+                                                                                                        categoryMenuOpen: _categoryMenuOpen,
+                                                                                                        selectedCategoryId: _selectedCategoryId,
+                                                                                                        onToggleCategoryMenu: _toggleCategoryMenu,
+                                                                                                        onCategoryPicked: _onCategoryPicked,
+                                                                                                        onEditOrSave: isSaving
+                                                                                                            ? () {}
+                                                                                                            : () {
+                                                                                                                if (isEditingThis) {
+                                                                                                                  _saveStreamDetails(context);
+                                                                                                                } else {
+                                                                                                                  _startEditingStreamDetails(
+                                                                                                                    platformKey: metaKey,
+                                                                                                                    title: titleLive,
+                                                                                                                    category: categoryLive,
+                                                                                                                  );
+                                                                                                                }
+                                                                                                              },
+                                                                                                        metaRowBuilder: (child) => _streamMetaRow(content: child),
+                                                                                                      );
+                                                                                                    },
+                                                                                                  );
+                                                                                                },
+                                                                                              );
+                                                                                            },
                                                                                           );
                                                                                         },
-                                                                                      ),
+                                                                                      ),),
                                                                                     ],
                                                                                   ),
                                                                                 ),
@@ -1853,9 +1887,34 @@ class _LivestreamingState extends State<Livestreaming> {
                                                       ),
                                                     );
                                                   },
-                                                ),
-                                              ),
-                                            ),
+                                                );
+
+                                    return SizedBox(
+                                      height: upperSectionHeight,
+                                      width: double.infinity,
+                                      child: Stack(
+                                        clipBehavior: Clip.hardEdge,
+                                        children: [
+                                          IgnorePointer(
+                                            ignoring: showActivity,
+                                            child: lockUpperScroll
+                                                ? SizedBox(
+                                                    height: upperSectionHeight,
+                                                    width: double.infinity,
+                                                    child: streamCardContent,
+                                                  )
+                                                : SingleChildScrollView(
+                                                    physics:
+                                                        const ClampingScrollPhysics(),
+                                                    child: ConstrainedBox(
+                                                      constraints:
+                                                          BoxConstraints(
+                                                        minHeight:
+                                                            upperSectionHeight,
+                                                      ),
+                                                      child: streamCardContent,
+                                                    ),
+                                                  ),
                                           ),
                                           if (showActivity)
                                             Positioned.fill(
@@ -1873,7 +1932,7 @@ class _LivestreamingState extends State<Livestreaming> {
                               },
                             ),
                           ),
-                          SizedBox(height: 6.h),
+                          SizedBox(height: 3.h),
                           _buildResizableBottomSection(context, constraints),
                         ],
                       );

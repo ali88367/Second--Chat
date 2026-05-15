@@ -20,6 +20,7 @@ import 'package:second_chat/core/utils/platform_token_provider.dart';
 import 'package:second_chat/data/services/live_stream_service.dart';
 import 'package:second_chat/data/services/socket_firebase_mirror_service.dart';
 import 'package:second_chat/controllers/edge_glow_notification_controller.dart';
+import 'package:second_chat/controllers/platform_categories_controller.dart';
 import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
@@ -111,6 +112,7 @@ void main() {
         permanent: true,
       );
       Get.put(PlatformConnectController(), permanent: true);
+      Get.put(PlatformCategoriesController(), permanent: true);
       await PushNotificationService.initialize();
 
       // Load persisted locale (if any) before building the app.
@@ -606,12 +608,11 @@ class _SplashScreenState extends State<_SplashScreen>
           .toSet();
       if (connectedKeys.isEmpty) return false;
 
-      // Explicit startup refresh so navigation reflects current backend live state.
+      // Overview API is the startup source of truth (socket may not be connected yet).
       await chat.refreshOverviewsForPlatforms(connectedKeys.toList(growable: false));
-      return connectedKeys.any((p) => chat.platformLive[p] == true);
+      return chat.isAnyStreamLive;
     } catch (_) {
-      return chat.platformLive.values.any((v) => v == true) ||
-          (chat.overview.value?.live == true);
+      return chat.isAnyStreamLive;
     }
   }
 

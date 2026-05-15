@@ -81,6 +81,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   Worker? _scrollWorker;
   Worker? _embedReadyWorker;
 
+  /// Twitch-style: stay pinned to newest lines unless the user scrolls up.
+  static const double _pinThresholdPx = 80;
+  static const int _maxVisibleChatRows = 300;
+  bool _pinnedToBottom = true;
+  int _lastFilteredCount = 0;
+
   // Emote service - initialized lazily
   late final EmoteService _emoteService;
   EmoteParser? _emoteParser;
@@ -198,31 +204,47 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     // Initial parser setup
     _updateEmoteParser();
 
-    // Auto-scroll to bottom on initial load
+    void onScrollChanged() {
+      if (!mounted) return;
+      _updatePinnedFromScroll(_mainScrollController);
+      _updatePinnedFromScroll(_expandedScrollController);
+    }
+
+    _mainScrollController.addListener(onScrollChanged);
+    _expandedScrollController.addListener(onScrollChanged);
+
+    // Auto-scroll to newest on initial load.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleReliableScrollToBottom(animate: false);
+      _scrollToNewestIfPinned(animate: false);
     });
 
     // Scroll trigger driven by controller updates (no UI layout change).
     _scrollWorker = ever<int>(_chatCtrl.scrollTick, (_) {
-      _scheduleReliableScrollToBottom(animate: false);
+      final animate = _pinnedToBottom && _lastFilteredCount > 0;
+      _scrollToNewestIfPinned(animate: animate);
     });
 
     _embedReadyWorker = ever<Map<String, bool>>(
       _chatCtrl.platformStreamEmbedReady,
           (_) {
         if (mounted) {
-          _scheduleReliableScrollToBottom(animate: false);
+          _scrollToNewestIfPinned(animate: false);
         }
       },
     );
 
     _focusNode.addListener(_onFocusChanged);
     widget.chatFilter.addListener(_syncFilterLabelFromChatFilter);
+    widget.chatFilter.addListener(_onChatFilterChangedForScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncFilterLabelFromChatFilter();
     });
     _log('initState completed');
+  }
+
+  void _onChatFilterChangedForScroll() {
+    _pinnedToBottom = true;
+    _scrollToNewestIfPinned(animate: false);
   }
 
   /// Keeps [FilterController] label aligned with swipe / viewer-count changes.
@@ -284,6 +306,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   @override
   void dispose() {
     widget.chatFilter.removeListener(_syncFilterLabelFromChatFilter);
+    widget.chatFilter.removeListener(_onChatFilterChangedForScroll);
     _focusNode.removeListener(_onFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
     _scrollWorker?.dispose();
@@ -332,60 +355,38 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     }
   }
 
-  /// ListView [maxScrollExtent] often updates one or two frames after data changes — a single
-  /// [jumpTo]/[animateTo] can run too early and leave the list mid-scroll.
-  /// Expanded chat may not be built yet; each controller is scrolled only if [hasClients].
-  void _scheduleReliableScrollToBottom({required bool animate}) {
+  /// With [reverse: true], offset `0` is the newest (bottom) edge — same as Twitch chat.
+  void _updatePinnedFromScroll(ScrollController controller) {
+    if (!controller.hasClients) return;
+    final pos = controller.position;
+    final distanceFromNewest = pos.pixels - pos.minScrollExtent;
+    _pinnedToBottom = distanceFromNewest <= _pinThresholdPx;
+  }
+
+  void _scrollToNewestIfPinned({required bool animate}) {
+    if (!_pinnedToBottom) return;
+
     void apply(ScrollController c) {
       if (!c.hasClients) return;
       try {
-        final maxScroll = c.position.maxScrollExtent;
-        if (!maxScroll.isFinite) return;
+        final target = c.position.minScrollExtent;
+        if (!target.isFinite) return;
         if (animate) {
           c.animateTo(
-            maxScroll,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
+            target,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
           );
         } else {
-          c.jumpTo(maxScroll);
+          c.jumpTo(target);
         }
       } catch (_) {}
     }
 
-    void applyBoth() {
-      apply(_mainScrollController);
-      apply(_expandedScrollController);
-    }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      applyBoth();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        applyBoth();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          applyBoth();
-        });
-      });
-    });
-
-    Future<void>.delayed(const Duration(milliseconds: 48), () {
-      if (!mounted) return;
-      applyBoth();
-    });
-    Future<void>.delayed(const Duration(milliseconds: 160), () {
-      if (!mounted) return;
-      applyBoth();
-    });
-    Future<void>.delayed(const Duration(milliseconds: 280), () {
-      if (!mounted) return;
-      applyBoth();
-    });
-    Future<void>.delayed(const Duration(milliseconds: 420), () {
-      if (!mounted) return;
-      applyBoth();
+      apply(_mainScrollController);
+      apply(_expandedScrollController);
     });
   }
 
@@ -484,7 +485,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       return const [];
     }
 
-    rows.sort((a, b) => (a['_ts'] as DateTime).compareTo(b['_ts'] as DateTime));
+    rows.sort(
+      (a, b) => (b['_ts'] as DateTime).compareTo(a['_ts'] as DateTime),
+    );
 
     // Final UI-level guard: prevent duplicate rendering when backend/socket/history
     // provide the same logical message row multiple times.
@@ -515,43 +518,50 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
       row.remove('_ts');
     }
 
-    // If no streams are live, hide chat entirely.
-    if (_chatCtrl.platformLive.isNotEmpty &&
-        !_chatCtrl.platformLive.values.any((v) => v == true)) {
-      return const [];
+    if (rows.length > _maxVisibleChatRows) {
+      rows.removeRange(_maxVisibleChatRows, rows.length);
+    }
+
+    List<Map<String, dynamic>> finalize(List<Map<String, dynamic>> list) {
+      _lastFilteredCount = list.length;
+      return list;
     }
 
     if (normalizedFilter == null || normalizedFilter.isEmpty) {
       // Keep "All" scoped to currently live platforms when live-map is known.
       if (_chatCtrl.platformLive.isNotEmpty) {
-        return rows
-            .where(
-              (item) {
-            final pk = (item['platformKey'] ?? '').toString();
-            return _chatCtrl.isPlatformLive(pk) &&
-                _chatCtrl.isPlatformStreamEmbedReadyForChat(pk);
-          },
-        )
-            .toList(growable: false);
+        return finalize(
+          rows
+              .where(
+                (item) {
+              final pk = (item['platformKey'] ?? '').toString();
+              return _chatCtrl.isPlatformLive(pk) &&
+                  _chatCtrl.isPlatformStreamEmbedReadyForChat(pk);
+            },
+          )
+              .toList(growable: false),
+        );
       }
-      return rows;
+      return finalize(rows);
     }
 
     // Live platform: wait for embed WebView before showing chat.
     if (_chatCtrl.platformLive.isNotEmpty &&
         _chatCtrl.isPlatformLive(normalizedFilter) &&
         !_chatCtrl.isPlatformStreamEmbedReadyForChat(normalizedFilter)) {
-      return const [];
+      return finalize(const []);
     }
 
     // If selected platform is offline, hide messages.
     if (_chatCtrl.platformLive.isNotEmpty &&
         !_chatCtrl.isPlatformLive(normalizedFilter)) {
-      return const [];
+      return finalize(const []);
     }
-    return rows
-        .where((item) => (item['platformKey'] ?? '').toString() == normalizedFilter)
-        .toList(growable: false);
+    return finalize(
+      rows
+          .where((item) => (item['platformKey'] ?? '').toString() == normalizedFilter)
+          .toList(growable: false),
+    );
   }
 
   void _sendMessage() {
@@ -582,7 +592,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     _focusNode.requestFocus();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleReliableScrollToBottom(animate: false);
+      _scrollToNewestIfPinned(animate: false);
     });
   }
 
@@ -619,7 +629,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     _emoteService.addToRecentlyUsed(emoteName);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleReliableScrollToBottom(animate: false);
+      _scrollToNewestIfPinned(animate: false);
     });
   }
 
@@ -928,59 +938,44 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
           ),
         ];
 
-    return TweenAnimationBuilder<double>(
+    return Padding(
       key: key,
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 8 * (1 - value)),
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: RichText(
-                text: TextSpan(
-                  children: [
-                    // Platform icon
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: isCurrentUser
-                          ? Padding(
-                              padding: EdgeInsets.only(right: 6.w),
-                              child: Icon(
-                                Icons.mic,
-                                size: 14.sp,
-                                color: _settingsController.getPlatformColor(
-                                  (platformKey ?? '').toLowerCase().trim(),
-                                ),
-                              ),
-                            )
-                          : Padding(
-                              padding: EdgeInsets.only(right: 6.w),
-                              child: Image.asset(
-                                platform,
-                                width: 14.sp,
-                                height: 14.sp,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                    ),
-                    if (name.isNotEmpty)
-                      TextSpan(
-                        text: "$name: ",
-                        style: sfProText500(12.sp, nameColor),
+      padding: EdgeInsets.only(bottom: 12.h),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: isCurrentUser
+                  ? Padding(
+                      padding: EdgeInsets.only(right: 6.w),
+                      child: Icon(
+                        Icons.mic,
+                        size: 14.sp,
+                        color: _settingsController.getPlatformColor(
+                          (platformKey ?? '').toLowerCase().trim(),
+                        ),
                       ),
-                    // Message with emotes
-                    ...messageSpans,
-                  ],
-                ),
-              ),
+                    )
+                  : Padding(
+                      padding: EdgeInsets.only(right: 6.w),
+                      child: Image.asset(
+                        platform,
+                        width: 14.sp,
+                        height: 14.sp,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
             ),
-          ),
-        );
-      },
+            if (name.isNotEmpty)
+              TextSpan(
+                text: "$name: ",
+                style: sfProText500(12.sp, nameColor),
+              ),
+            ...messageSpans,
+          ],
+        ),
+      ),
     );
   }
 
@@ -1137,11 +1132,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               ),
                               controller: _expandedScrollController,
                               padding: EdgeInsets.only(bottom: 16.h + 20.h),
-                              physics: const BouncingScrollPhysics(
+                              physics: const ClampingScrollPhysics(
                                 parent: AlwaysScrollableScrollPhysics(),
                               ),
+                              cacheExtent: 480,
                               itemCount: filteredList.length,
-                              reverse: false,
+                              reverse: true,
                               addAutomaticKeepAlives: false,
                               addRepaintBoundaries: true,
                               itemBuilder: (context, index) {
@@ -1150,6 +1146,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 final nameColor =
                                 nameColors[nameHash.abs() %
                                     nameColors.length];
+                                final rowKey = (item['canonicalId'] ?? '')
+                                        .toString()
+                                        .trim()
+                                        .isNotEmpty
+                                    ? 'expanded_${item['platformKey']}_${item['canonicalId']}'
+                                    : 'expanded_${item['name']}_${index}_${item['message']}';
                                 return _chatItem(
                                   item['platform'],
                                   item['name'],
@@ -1163,9 +1165,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   socketEmoteOverrides:
                                   item['socketEmoteOverrides']
                                   as Map<String, String>?,
-                                  key: ValueKey(
-                                    'expanded_${item['name']}_${index}_${item['message']}',
-                                  ),
+                                  key: ValueKey(rowKey),
                                 );
                               },
                             );
@@ -1484,16 +1484,18 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 'main_chat_${filter ?? 'all'}',
                               ),
                               controller: _mainScrollController,
-                              physics: const BouncingScrollPhysics(
+                              physics: const ClampingScrollPhysics(
                                 parent: AlwaysScrollableScrollPhysics(),
                               ),
+                              cacheExtent: 480,
                               padding: EdgeInsets.only(
                                 left: 16.w,
                                 right: 16.w,
+                                top: 8.h,
                                 bottom: 80.h + 20.h,
                               ),
                               itemCount: filteredList.length,
-                              reverse: false,
+                              reverse: true,
                               addAutomaticKeepAlives: false,
                               addRepaintBoundaries: true,
                               shrinkWrap: false,
@@ -1503,6 +1505,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                 final nameColor =
                                 nameColors[nameHash.abs() %
                                     nameColors.length];
+                                final rowKey = (item['canonicalId'] ?? '')
+                                        .toString()
+                                        .trim()
+                                        .isNotEmpty
+                                    ? 'main_${item['platformKey']}_${item['canonicalId']}'
+                                    : 'main_${item['name']}_${index}_${item['message']}';
                                 return _chatItem(
                                   item['platform'],
                                   item['name'],
@@ -1516,9 +1524,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                                   socketEmoteOverrides:
                                   item['socketEmoteOverrides']
                                   as Map<String, String>?,
-                                  key: ValueKey(
-                                    'main_${item['name']}_${index}_${item['message']}',
-                                  ),
+                                  key: ValueKey(rowKey),
                                 );
                               },
                             ),
