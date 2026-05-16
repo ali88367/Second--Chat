@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -40,7 +42,6 @@ class StreamTitleEditPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         metaRowBuilder(titleField),
@@ -52,26 +53,42 @@ class StreamTitleEditPanel extends StatelessWidget {
           menuOpen: categoryMenuOpen,
           onMenuToggle: isEditing ? onToggleCategoryMenu : () {},
         ),
-        ValueListenableBuilder<bool>(
-          valueListenable: categoryMenuOpen,
-          builder: (context, menuOpen, _) {
-            return AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              alignment: Alignment.topCenter,
-              clipBehavior: Clip.hardEdge,
-              child: menuOpen && isEditing
-                  ? Padding(
-                      padding: EdgeInsets.only(top: 8.h),
-                      child: StreamCategoryDropdownPanel(
-                        platformKey: platformKey,
-                        selectedCategoryId: selectedCategoryId,
-                        onPick: onCategoryPicked,
+        Expanded(
+          child: ValueListenableBuilder<bool>(
+            valueListenable: categoryMenuOpen,
+            builder: (context, menuOpen, _) {
+              if (!menuOpen || !isEditing) {
+                return const SizedBox.shrink();
+              }
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final cap = math.min(
+                    StreamCategoryMetaRow.dropdownMaxHeight.h,
+                    math.max(0.0, constraints.maxHeight - 8.h),
+                  );
+                  if (cap <= 1) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: EdgeInsets.only(top: 8.h),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(
+                        height: cap,
+                        width: double.infinity,
+                        child: StreamCategoryDropdownPanel(
+                          platformKey: platformKey,
+                          maxHeight: cap,
+                          selectedCategoryId: selectedCategoryId,
+                          onPick: onCategoryPicked,
+                        ),
                       ),
-                    )
-                  : const SizedBox(width: double.infinity),
-            );
-          },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
         SizedBox(height: 8.h),
         Align(

@@ -1538,6 +1538,7 @@ class _LivestreamingState extends State<Livestreaming> {
                                                                                       20.r,
                                                                                     ),
                                                                                   ),
+                                                                                  clipBehavior: Clip.antiAlias,
                                                                                   child: Column(
                                                                                     children: [
                                                                                       Padding(
