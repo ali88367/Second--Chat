@@ -210,7 +210,9 @@ class LiveStreamService {
   /// Logged by name (plus every inbound `chat:*`, [connected], socket session lines).
   static const Set<String> inboundLogNamedSocketEvents = <String>{
     'activity:follow',
+    'activity:join',
     'activity:event',
+    'stream:info:update',
   };
 
   void _recordInboundSocket(String eventName, dynamic payload) {
@@ -482,9 +484,16 @@ class LiveStreamService {
       'activity:event',
       (d) => _onInboundActivityChannel('activity:event', d),
     );
+    for (final channel in const [
+      'activity:join',
+      'activity:follow',
+      'activity:subscribe',
+      'activity:unsubscribe',
+    ]) {
+      socket.on(channel, (d) => _onInboundActivityChannel(channel, d));
+    }
 
-    // `onAny`: only `activity:event` feeds [ChatController.activityEvents]; other `activity:*`
-    // channels are ignored (server should normalize to `activity:event`).
+    // `onAny`: typed `activity:*` (except sync/event) — Kick may emit `activity:join` directly.
     socket.onAny((eventName, data) {
       final ev = eventName.toString();
       final name = ev.toLowerCase().trim();
@@ -502,9 +511,14 @@ class LiveStreamService {
           'payload_preview': _payloadToInboundLogString(_unwrapSocketIoData(data)),
         });
       }
-      // Ignore non-authoritative typed activity events (e.g., activity:follow, activity:sync).
-      if (name.startsWith('activity:') && name != 'activity:event') {
-        return;
+      if (name.startsWith('activity:') &&
+          name != 'activity:sync' &&
+          name != 'activity:event' &&
+          name != 'activity:join' &&
+          name != 'activity:follow' &&
+          name != 'activity:subscribe' &&
+          name != 'activity:unsubscribe') {
+        _onInboundActivityChannel(ev, data);
       }
     });
 

@@ -576,6 +576,85 @@ class ChatController extends GetxController {
     return true;
   }
 
+  static String? _stringFromStreamMetaField(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is String) {
+      final s = raw.trim();
+      return s.isEmpty ? null : s;
+    }
+    if (raw is Map) {
+      final m = raw.cast<String, dynamic>();
+      return _stringFromStreamMetaField(
+        m['name'] ?? m['title'] ?? m['label'],
+      );
+    }
+    final s = raw.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  /// Reads title/category from `meta`, top-level fields, and Kick-style `streamInfo`.
+  ({String? title, String? category}) _streamMetaFromStatusPayload(
+    Map<String, dynamic> m,
+  ) {
+    Map<String, dynamic>? meta;
+    final rawMeta = m['meta'];
+    if (rawMeta is Map) meta = rawMeta.cast<String, dynamic>();
+
+    var title = _stringFromStreamMetaField(meta?['title'] ?? m['title']);
+    var category = _stringFromStreamMetaField(meta?['category'] ?? m['category']);
+
+    final streamInfo = m['streamInfo'];
+    if (streamInfo is Map) {
+      final si = streamInfo.cast<String, dynamic>();
+      title ??= _stringFromStreamMetaField(
+        si['title'] ??
+            si['stream_title'] ??
+            si['streamTitle'] ??
+            si['session_title'] ??
+            si['sessionTitle'],
+      );
+      final livestream = si['livestream'];
+      if (livestream is Map) {
+        final ls = livestream.cast<String, dynamic>();
+        title ??= _stringFromStreamMetaField(
+          ls['title'] ?? ls['session_title'] ?? ls['sessionTitle'],
+        );
+      }
+      category ??= _stringFromStreamMetaField(
+        si['category'] ?? si['game_name'] ?? si['gameName'],
+      );
+    }
+
+    return (title: title, category: category);
+  }
+
+  bool _applyStreamTitleCategory(String platformKey, Map<String, dynamic> m) {
+    final p = _normalizedApiPlatform(platformKey, fallback: '');
+    if (p.isEmpty) return false;
+
+    final parsed = _streamMetaFromStatusPayload(m);
+    var metaChanged = false;
+    final title = parsed.title;
+    if (title != null && title.isNotEmpty) {
+      if ((streamTitleByPlatform[p] ?? '').trim() != title) {
+        streamTitleByPlatform[p] = title;
+        metaChanged = true;
+      }
+    }
+    final category = parsed.category;
+    if (category != null && category.isNotEmpty) {
+      if ((streamCategoryByPlatform[p] ?? '').trim() != category) {
+        streamCategoryByPlatform[p] = category;
+        metaChanged = true;
+      }
+    }
+    if (metaChanged) {
+      streamTitleByPlatform.refresh();
+      streamCategoryByPlatform.refresh();
+    }
+    return metaChanged;
+  }
+
   String _withStreamReloadMarker(String url) {
     final trimmed = url.trim();
     if (trimmed.isEmpty) return trimmed;
@@ -1415,6 +1494,7 @@ class ChatController extends GetxController {
   static bool _isNormalChatMessage(ChatMessage msg) {
     final t = _chatMessagePayloadType(msg);
     if (_isSocketChatActivityOnlyType(t)) return false;
+    if (_isActivityType(t)) return false;
     return true;
   }
 
@@ -1435,7 +1515,22 @@ class ChatController extends GetxController {
   }
 
   static String _normalizeActivityType(String? rawType) {
-    return (rawType ?? '').toLowerCase().trim();
+    final type = (rawType ?? '').toLowerCase().trim().replaceAll(' ', '_');
+    switch (type) {
+      case 'viewer_join':
+      case 'user_join':
+      case 'chat_join':
+      case 'joined':
+        return 'join';
+      case 'new_follower':
+      case 'new_follow':
+        return 'follow';
+      case 'new_subscriber':
+      case 'new_sub':
+        return 'subscribe';
+      default:
+        return type;
+    }
   }
 
   static bool _isActivityType(String? rawType) {
@@ -1601,8 +1696,13 @@ class ChatController extends GetxController {
       debugPrint('[ACTIVITY_EVENT][CHAT_CONTROLLER] $event');
     }
     if (!_isActivityPayload(event)) return;
-    activityEvents.add(event);
-    _maybeTriggerEdgeGlowForActivity(event);
+    final normalized = Map<String, dynamic>.from(event);
+    final type = _normalizeActivityType(
+      (event['type'] ?? event['eventType'] ?? event['kind'])?.toString(),
+    );
+    if (type.isNotEmpty) normalized['type'] = type;
+    activityEvents.add(normalized);
+    _maybeTriggerEdgeGlowForActivity(normalized);
   }
 
   void _appendActivityFromChatMessage(
@@ -1623,7 +1723,7 @@ class ChatController extends GetxController {
     final activityPayload = <String, dynamic>{
       'id': id,
       'platform': msg.platform,
-      'type': _chatMessagePayloadType(msg),
+      'type': _normalizeActivityType(_chatMessagePayloadType(msg)),
       'metadata': <String, dynamic>{
         'user': msg.userName,
         'username': msg.userName,
@@ -1838,6 +1938,10 @@ class ChatController extends GetxController {
       if (id.isNotEmpty && existingIds.contains(id)) continue;
 
       final copy = Map<String, dynamic>.from(item);
+      final normalizedType = _normalizeActivityType(
+        (copy['type'] ?? copy['eventType'] ?? copy['kind'])?.toString(),
+      );
+      if (normalizedType.isNotEmpty) copy['type'] = normalizedType;
       final meta = copy['metadata'];
       if (meta is Map) {
         final mm = Map<String, dynamic>.from(meta.cast<String, dynamic>());
@@ -2182,28 +2286,7 @@ class ChatController extends GetxController {
         // History is loaded by [onPlatformStreamWebViewReady] for each live session.
       }
 
-      Map<String, dynamic>? meta;
-      final rawMeta = m['meta'];
-      if (rawMeta is Map) meta = rawMeta.cast<String, dynamic>();
-      final title = (meta?['title'] ?? m['title'])?.toString().trim();
-      final category = (meta?['category'] ?? m['category'])?.toString().trim();
-      var metaChanged = false;
-      if (title != null && title.isNotEmpty) {
-        if ((streamTitleByPlatform[p] ?? '').trim() != title) {
-          streamTitleByPlatform[p] = title;
-          metaChanged = true;
-        }
-      }
-      if (category != null && category.isNotEmpty) {
-        if ((streamCategoryByPlatform[p] ?? '').trim() != category) {
-          streamCategoryByPlatform[p] = category;
-          metaChanged = true;
-        }
-      }
-      if (metaChanged) {
-        streamTitleByPlatform.refresh();
-        streamCategoryByPlatform.refresh();
-      }
+      _applyStreamTitleCategory(p, m);
 
       final selected = _normalizedApiPlatform(
         platform.value,
@@ -2237,7 +2320,7 @@ class ChatController extends GetxController {
     }
 
     _live.onStreamStatus = applyStreamStatus;
-    _live.onStreamInfoUpdate = (_) {};
+    _live.onStreamInfoUpdate = applyStreamStatus;
     _live.onChatMessage = _handleIncomingChatMessage;
   }
 
