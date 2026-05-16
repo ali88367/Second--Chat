@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>209792077701-9r4qg4qe03koh7nuhs4ri27fcpj1chuq.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.209792077701-9r4qg4qe03koh7nuhs4ri27fcpj1chuq</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>209792077701-ueg09cfpv934ff3n39if949ob29kcsk2.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCMrOput8WUYRsFQvyXcm0SAXOmOmtkPr8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>209792077701</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.secondChatapp.app</string>
+	<key>PROJECT_ID</key>
+	<string>second-chat-5eef5</string>
+	<key>STORAGE_BUCKET</key>
+	<string>second-chat-5eef5.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:209792077701:ios:d51e4795a73e6ebec7beec</string>
+</dict>
+</plist>
