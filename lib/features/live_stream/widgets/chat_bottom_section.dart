@@ -578,7 +578,12 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
         ? 'twitch'
         : _chatCtrl.platform.value.toLowerCase().trim();
 
-    if (!isAllSelected && _streamOffForSendTarget(currentPlatform)) {
+    if (isAllSelected) {
+      if (_chatCtrl.livePlatformsForChatSend().isEmpty) {
+        _messageController.clear();
+        return;
+      }
+    } else if (_streamOffForSendTarget(currentPlatform)) {
       _messageController.clear();
       return;
     }
@@ -616,7 +621,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
             ? 'twitch'
             : _chatCtrl.platform.value.toLowerCase().trim());
 
-    if (!isAllSelected && _streamOffForSendTarget(currentPlatform)) {
+    if (isAllSelected) {
+      if (_chatCtrl.livePlatformsForChatSend().isEmpty) return;
+    } else if (_streamOffForSendTarget(currentPlatform)) {
       return;
     }
     _chatCtrl.sendMessage(

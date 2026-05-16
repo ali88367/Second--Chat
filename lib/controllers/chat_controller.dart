@@ -1061,6 +1061,19 @@ class ChatController extends GetxController {
     return platformLive[key] == false;
   }
 
+  static const List<String> _broadcastChatPlatforms = [
+    'twitch',
+    'kick',
+    'youtube',
+  ];
+
+  /// Platforms that are live right now (used for **All** chat send).
+  List<String> livePlatformsForChatSend() {
+    return _broadcastChatPlatforms
+        .where((p) => isPlatformLive(p))
+        .toList(growable: false);
+  }
+
   Future<void> sendMessage(
       String text, {
         String? platformForApi,
@@ -1069,11 +1082,10 @@ class ChatController extends GetxController {
     final msg = text.trim();
     if (msg.isEmpty) return;
     final requestedRaw =
-    (platformForApi ?? platform.value).toLowerCase().trim();
-    final isAllTarget = requestedRaw == 'all';
-    final apiPlatform =
-    isAllTarget
-        ? 'all'
+        (platformForApi ?? platform.value).toLowerCase().trim();
+    final isAllTarget = requestedRaw.isEmpty || requestedRaw == 'all';
+    final apiPlatform = isAllTarget
+        ? ''
         : _normalizedApiPlatform(requestedRaw, fallback: 'twitch');
     final tokenPlatform = _normalizedApiPlatform(
       (authPlatform ?? platform.value),
@@ -1083,22 +1095,17 @@ class ChatController extends GetxController {
     if (token == null || token.isEmpty) return;
     _socketAuthToken = token.trim();
 
+    final optimisticTargets = isAllTarget
+        ? livePlatformsForChatSend()
+        : <String>[apiPlatform];
+
+    if (optimisticTargets.isEmpty) return;
+
+    if (!isAllTarget && !isPlatformLive(apiPlatform)) return;
+
     _purgeStalePendingEchoes();
     final localIds = <String>[];
     final nowUtc = DateTime.now().toUtc();
-    final optimisticTargets = <String>[];
-    if (isAllTarget) {
-      for (final p in const <String>['twitch', 'kick', 'youtube']) {
-        if (platformLive[p] == true) {
-          optimisticTargets.add(p);
-        }
-      }
-      if (optimisticTargets.isEmpty) {
-        optimisticTargets.add(tokenPlatform);
-      }
-    } else {
-      optimisticTargets.add(apiPlatform);
-    }
 
     for (final p in optimisticTargets) {
       final localId = 'local:$p:${DateTime.now().microsecondsSinceEpoch}';
@@ -1122,21 +1129,39 @@ class ChatController extends GetxController {
       _appendAndSortPlatformMessages(p, optimistic);
     }
 
-    try {
-      await _live.sendMessage(
-        platform: apiPlatform,
-        accessToken: _socketAuthToken!,
-        message: msg,
-      );
-    } catch (_) {
-      // Drop optimistic row if send fails.
-      _pendingLocalChatEchoes.removeWhere(
-            (e) => localIds.contains(e.localMessageId),
-      );
+    if (isAllTarget) {
       for (var i = 0; i < optimisticTargets.length; i++) {
         final p = optimisticTargets[i];
-        if (i >= localIds.length) break;
-        _removeMessageById(p, localIds[i]);
+        final localId = localIds[i];
+        try {
+          await _live.sendMessage(
+            platform: p,
+            accessToken: _socketAuthToken!,
+            message: msg,
+          );
+        } catch (_) {
+          _pendingLocalChatEchoes.removeWhere(
+            (e) => e.localMessageId == localId,
+          );
+          _removeMessageById(p, localId);
+        }
+      }
+    } else {
+      try {
+        await _live.sendMessage(
+          platform: apiPlatform,
+          accessToken: _socketAuthToken!,
+          message: msg,
+        );
+      } catch (_) {
+        _pendingLocalChatEchoes.removeWhere(
+          (e) => localIds.contains(e.localMessageId),
+        );
+        for (var i = 0; i < optimisticTargets.length; i++) {
+          final p = optimisticTargets[i];
+          if (i >= localIds.length) break;
+          _removeMessageById(p, localIds[i]);
+        }
       }
     }
     _bumpScroll();
@@ -2319,8 +2344,6 @@ class ChatController extends GetxController {
     try {
       final auth = Get.find<AuthController>();
       await auth.ensureValidSession(refreshIfExpired: true);
-      final accessToken = (await _resolveStreamingRestToken(p))?.trim();
-      if (accessToken == null || accessToken.isEmpty) return false;
 
       final payload = <String, dynamic>{'title': nextTitle};
       if (nextCategory.isNotEmpty) {
@@ -2331,12 +2354,11 @@ class ChatController extends GetxController {
         }
       }
 
+      // Same client as `/api/v1/settings`, `/api/v1/platforms`, etc.: [AuthInterceptor]
+      // attaches the backend session JWT — do not override with Google/platform tokens.
       await auth.api.client.dio.patch<dynamic>(
         '/api/v1/platforms/$p/stream',
         data: payload,
-        options: Options(
-          headers: <String, String>{'Authorization': 'Bearer $accessToken'},
-        ),
       );
 
       streamTitleByPlatform[p] = nextTitle;

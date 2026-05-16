@@ -85,7 +85,7 @@ class PlatformCategoriesController extends GetxController {
 
       final queryParams = _queryParamsForPlatform(key);
 
-      // Prefer backend session JWT (AuthInterceptor). Platform OAuth tokens can 401 here.
+      // Same Dio as other authenticated REST: session JWT via [AuthInterceptor] only.
       var items = await _platforms.fetchCategories(
         platform: key,
         query: queryParams.query,

@@ -247,7 +247,8 @@ class _LivestreamingState extends State<Livestreaming> {
     final chatCtrl = Get.find<ChatController>();
     final selected = _chatFilter.value?.toLowerCase().trim();
     if (selected == null || selected.isEmpty) {
-      // "All": single webview should follow the first live platform.
+      // "All": embed follows first live when no explicit pick; keep title detail
+      // on whatever platform the user chose until it goes offline.
       final firstLive = <String>['twitch', 'kick', 'youtube'].firstWhere(
         (k) => chatCtrl.isPlatformLive(k),
         orElse: () => '',
@@ -255,11 +256,39 @@ class _LivestreamingState extends State<Livestreaming> {
       final fallback = firstLive.isNotEmpty
           ? firstLive
           : _normalizeUiPlatform(chatCtrl.platform.value);
-      if (_selectedPlatform.value != fallback) {
-        _selectedPlatform.value = fallback;
+
+      final pinned = _selectedPlatform.value?.trim();
+      final inPlatformChooser =
+          _titleSelected.value &&
+          (pinned == null || pinned.isEmpty);
+
+      if (inPlatformChooser) {
+        // 3-tile picker: leave [_selectedPlatform] null; only sync embed.
+        if (chatCtrl.platform.value.toLowerCase().trim() != fallback) {
+          chatCtrl.selectPlatformInstant(fallback);
+        }
+        return;
       }
+
+      if (pinned != null &&
+          pinned.isNotEmpty &&
+          chatCtrl.isPlatformLive(pinned)) {
+        final pin = pinned.toLowerCase();
+        if (chatCtrl.platform.value.toLowerCase().trim() != pin) {
+          chatCtrl.selectPlatformInstant(pin);
+        }
+        return;
+      }
+
       if (chatCtrl.platform.value.toLowerCase().trim() != fallback) {
         chatCtrl.selectPlatformInstant(fallback);
+      }
+      if (pinned != null &&
+          pinned.isNotEmpty &&
+          !chatCtrl.isPlatformLive(pinned)) {
+        if (_selectedPlatform.value != fallback) {
+          _selectedPlatform.value = fallback;
+        }
       }
       return;
     }
