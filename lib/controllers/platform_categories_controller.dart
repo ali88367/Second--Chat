@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../api/platforms/platforms_api.dart';
@@ -7,6 +10,25 @@ import '../core/utils/platform_token_provider.dart';
 
 /// Cached platform category lists from REST (prefetched once after auth).
 class PlatformCategoriesController extends GetxController {
+  /// YouTube categories allowed for live stream assignment (matches backend).
+  static const Set<String> youtubeLiveAssignableCategoryIds = {
+    '1',
+    '2',
+    '10',
+    '15',
+    '17',
+    '19',
+    '20',
+    '22',
+    '23',
+    '24',
+    '25',
+    '26',
+    '27',
+    '28',
+    '29',
+  };
+
   PlatformCategoriesController({
     PlatformsApi? platformsApi,
     AuthController? auth,
@@ -25,13 +47,53 @@ class PlatformCategoriesController extends GetxController {
   final RxMap<String, bool> loadingByPlatform = <String, bool>{}.obs;
 
   final Map<String, Future<void>> _inFlightByPlatform = {};
+  final Map<String, Timer?> _searchDebounceTimers = {};
+  final Map<String, TextEditingController> _searchControllers = {};
 
   bool _prefetchInFlight = false;
+  bool _suppressSearchListener = false;
+
+  static const Duration _searchDebounce = Duration(milliseconds: 350);
+
+  bool supportsCategorySearch(String platform) {
+    final key = _normalizePlatform(platform);
+    return key == 'twitch' || key == 'kick';
+  }
+
+  TextEditingController searchControllerFor(String platform) {
+    final key = _normalizePlatform(platform);
+    return _searchControllers.putIfAbsent(key, () {
+      final controller = TextEditingController();
+      controller.addListener(() {
+        if (_suppressSearchListener) return;
+        _scheduleCategorySearch(key, controller.text);
+      });
+      return controller;
+    });
+  }
 
   List<Map<String, String>> categoriesFor(String platform) {
     final key = _normalizePlatform(platform);
     if (key.isEmpty) return const [];
-    return List<Map<String, String>>.from(categoriesByPlatform[key] ?? const []);
+    return _visibleCategoriesForPlatform(
+      key,
+      categoriesByPlatform[key] ?? const [],
+    );
+  }
+
+  static List<Map<String, String>> _visibleCategoriesForPlatform(
+    String platformKey,
+    List<Map<String, String>> items,
+  ) {
+    if (platformKey != 'youtube') {
+      return List<Map<String, String>>.from(items);
+    }
+    return items
+        .where((item) {
+          final id = (item['id'] ?? '').trim();
+          return youtubeLiveAssignableCategoryIds.contains(id);
+        })
+        .toList(growable: false);
   }
 
   bool isLoading(String platform) {
@@ -68,22 +130,62 @@ class PlatformCategoriesController extends GetxController {
       return Future.value();
     }
 
-    final pending = _inFlightByPlatform[key];
-    if (pending != null) return pending;
-
-    final run = _fetchAndStore(key);
-    _inFlightByPlatform[key] = run;
-    return run.whenComplete(() => _inFlightByPlatform.remove(key));
+    return _fetchCategories(key);
   }
 
-  Future<void> _fetchAndStore(String key) async {
+  /// Clears Twitch/Kick search and loads default `chat` / `irl` results.
+  Future<void> resetAndLoadCategories(String platform) {
+    final key = _normalizePlatform(platform);
+    if (key.isEmpty) return Future.value();
+    _clearSearchField(key);
+    return _fetchCategories(key, searchQuery: null);
+  }
+
+  void _scheduleCategorySearch(String key, String rawQuery) {
+    if (!supportsCategorySearch(key)) return;
+    _searchDebounceTimers[key]?.cancel();
+    _searchDebounceTimers[key] = Timer(_searchDebounce, () {
+      _searchDebounceTimers.remove(key);
+      unawaited(_fetchCategories(key, searchQuery: rawQuery.trim()));
+    });
+  }
+
+  void _clearSearchField(String key) {
+    _suppressSearchListener = true;
+    try {
+      final controller = _searchControllers[key];
+      if (controller != null && controller.text.isNotEmpty) {
+        controller.text = '';
+      }
+    } finally {
+      _suppressSearchListener = false;
+    }
+  }
+
+  Future<void> _fetchCategories(String key, {String? searchQuery}) {
+    final inFlightKey = _inFlightKey(key, searchQuery);
+    final pending = _inFlightByPlatform[inFlightKey];
+    if (pending != null) return pending;
+
+    final run = _fetchAndStore(key, searchQuery: searchQuery);
+    _inFlightByPlatform[inFlightKey] = run;
+    return run.whenComplete(() => _inFlightByPlatform.remove(inFlightKey));
+  }
+
+  static String _inFlightKey(String platformKey, String? searchQuery) {
+    final trimmed = searchQuery?.trim() ?? '';
+    if (trimmed.isEmpty) return '$platformKey|_default_';
+    return '$platformKey|$trimmed';
+  }
+
+  Future<void> _fetchAndStore(String key, {String? searchQuery}) async {
     if (!_auth.isAuthenticated.value) return;
     loadingByPlatform[key] = true;
     loadingByPlatform.refresh();
     try {
       await _auth.ensureValidSession(refreshIfExpired: true);
 
-      final queryParams = _queryParamsForPlatform(key);
+      final queryParams = _queryParamsForPlatform(key, searchQuery: searchQuery);
 
       // Same Dio as other authenticated REST: session JWT via [AuthInterceptor] only.
       var items = await _platforms.fetchCategories(
@@ -114,8 +216,8 @@ class PlatformCategoriesController extends GetxController {
         );
       }
 
-      if (items.isEmpty) return;
-      categoriesByPlatform[key] = items;
+      final visible = _visibleCategoriesForPlatform(key, items);
+      categoriesByPlatform[key] = visible;
       categoriesByPlatform.refresh();
     } finally {
       loadingByPlatform[key] = false;
@@ -123,17 +225,40 @@ class PlatformCategoriesController extends GetxController {
     }
   }
 
-  static _CategoryQuery _queryParamsForPlatform(String key) {
+  static _CategoryQuery _queryParamsForPlatform(
+    String key, {
+    String? searchQuery,
+  }) {
+    final trimmed = searchQuery?.trim() ?? '';
     switch (key) {
       case 'twitch':
-        return const _CategoryQuery(query: 'chat', first: 20);
+        return _CategoryQuery(
+          query: trimmed.isNotEmpty ? trimmed : 'chat',
+          first: 20,
+        );
       case 'kick':
-        return const _CategoryQuery(query: 'irl', limit: 20);
+        return _CategoryQuery(
+          query: trimmed.isNotEmpty ? trimmed : 'irl',
+          limit: 20,
+        );
       case 'youtube':
         return const _CategoryQuery(region: 'US');
       default:
         return const _CategoryQuery();
     }
+  }
+
+  @override
+  void onClose() {
+    for (final timer in _searchDebounceTimers.values) {
+      timer?.cancel();
+    }
+    _searchDebounceTimers.clear();
+    for (final controller in _searchControllers.values) {
+      controller.dispose();
+    }
+    _searchControllers.clear();
+    super.onClose();
   }
 
   static String _normalizePlatform(String raw) {

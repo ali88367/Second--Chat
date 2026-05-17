@@ -398,8 +398,11 @@ class _LivestreamingState extends State<Livestreaming> {
     final opening = !_categoryMenuOpen.value;
     final key = _editingPlatformKey.value?.trim() ?? '';
     if (opening && key.isNotEmpty) {
+      final categoriesCtrl = Get.find<PlatformCategoriesController>();
       unawaited(
-        Get.find<PlatformCategoriesController>().ensureCategoriesFor(key),
+        categoriesCtrl.supportsCategorySearch(key)
+            ? categoriesCtrl.resetAndLoadCategories(key)
+            : categoriesCtrl.ensureCategoriesFor(key),
       );
     }
     _categoryMenuOpen.value = opening;
@@ -1214,8 +1217,7 @@ class _LivestreamingState extends State<Livestreaming> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Obx(() {
-                        final streakTotal =
-                            _streakCtrl.current.value?.headerStreakTotal ?? 0;
+                        final streakTotal = _streakCtrl.headerDisplayCount;
                         return StreakButton(
                           count: streakTotal,
                           onTap: _openStreakSheet,
@@ -1428,11 +1430,20 @@ class _LivestreamingState extends State<Livestreaming> {
                                                       height:
                                                       streamPreviewHeight,
                                                       child: Obx(() {
-                                                        final multi =
-                                                            settingsCtrl
-                                                                .multiScreenPreview
-                                                                .value ==
-                                                                true;
+                                                        chatCtrl
+                                                            .platformLive
+                                                            .keys;
+                                                        final useMultiGrid =
+                                                            LiveStreamEmbedHost
+                                                                .useMultiGridLayout(
+                                                          multiScreenPreviewEnabled:
+                                                              settingsCtrl
+                                                                  .multiScreenPreview
+                                                                  .value,
+                                                          isPlatformLive:
+                                                              chatCtrl
+                                                                  .isPlatformLive,
+                                                        );
                                                         return Container(
                                                           width:
                                                           MediaQuery.of(
@@ -1456,33 +1467,12 @@ class _LivestreamingState extends State<Livestreaming> {
                                                             child: Padding(
                                                               padding:
                                                               EdgeInsets.all(
-                                                                multi
+                                                                useMultiGrid
                                                                     ? 8.w
                                                                     : 0,
                                                               ),
                                                               child:
-                                                              multi
-                                                                  ? LiveStreamMultiEmbedGrid(
-                                                                streamPreviewHeight:
-                                                                streamPreviewHeight,
-                                                                globalMuted:
-                                                                showCard || showActivity,
-                                                                onStreamReady: (
-                                                                    platformKey,
-                                                                    runningUrl,
-                                                                    ) {
-                                                                  Get.find<
-                                                                      ChatController
-                                                                  >()
-                                                                      .onPlatformStreamWebViewReady(
-                                                                    platformKey:
-                                                                    platformKey,
-                                                                    runningUrl:
-                                                                    runningUrl,
-                                                                  );
-                                                                },
-                                                              )
-                                                                  : LiveStreamSingleEmbedStack(
+                                                              LiveStreamEmbedHost(
                                                                 streamPreviewHeight:
                                                                 streamPreviewHeight,
                                                                 globalMuted:

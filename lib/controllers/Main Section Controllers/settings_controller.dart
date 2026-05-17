@@ -50,6 +50,12 @@ class SettingsController extends GetxController {
   RxBool multiScreenPreview = false.obs;
   RxBool animations = true.obs;
   RxBool fullActivityFilters = false.obs;
+
+  /// True when motion/animation-heavy UI should run (animations on and low power off).
+  bool get animationsEnabled => animations.value && !lowPowerMode.value;
+
+  /// True when animations are off or low power is on — same reduced-motion behavior.
+  bool get reduceMotion => lowPowerMode.value || !animations.value;
   RxBool ttsAdvancedSettings = false.obs;
 
   // Chat / Viewer related toggles
@@ -412,39 +418,15 @@ class SettingsController extends GetxController {
       return result ?? false;
     }
 
-    // If Low Power Mode is enabled, block turning animations ON until it is disabled.
-    if (key == 'animations' && value == true && lowPowerMode.value == true) {
-      final disableLowPower = await _showConfirmDialog(
-        icon: Icons.bolt_rounded,
-        title: 'Low Power Mode is on',
-        message:
-            'Disable Low Power Mode to enable animations. This may use more battery.',
-        primaryLabel: 'Disable & Enable',
-        secondaryLabel: 'Cancel',
-      );
-
-      if (!disableLowPower) {
-        // Keep animations off.
-        if (animations.value != false) animations.value = false;
-        return;
-      }
-
-      // Disable low power first, then continue enabling animations.
-      await updateToggle('lowPowerMode', false);
+    // Low power on: animations cannot be enabled.
+    if (key == 'animations' && value == true && lowPowerMode.value) {
+      if (animations.value) animations.value = false;
+      return;
     }
 
-    // If Low Power Mode is turned ON while animations are ON, prompt to disable animations.
-    if (key == 'lowPowerMode' && value == true && animations.value == true) {
-      final disableAnimations = await _showConfirmDialog(
-        icon: Icons.motion_photos_off_rounded,
-        title: 'Animations will be turned off',
-        message:
-            'Low Power Mode disables animations to reduce battery usage.',
-        primaryLabel: 'Continue',
-        secondaryLabel: 'Cancel',
-      );
-      if (!disableAnimations) return;
-      await updateToggle('animations', false);
+    // Low power on mirrors animations off — keep both toggles consistent.
+    if (key == 'lowPowerMode' && value == true && animations.value) {
+      animations.value = false;
     }
 
     target.value = value;
@@ -458,19 +440,19 @@ class SettingsController extends GetxController {
       );
     }
 
-    // Guard against inconsistent state from server/cache: low power + animations together.
-    // If both end up true, prompt to turn animations off.
-    if (lowPowerMode.value == true && animations.value == true) {
-      final disableAnimations = await _showConfirmDialog(
-        icon: Icons.motion_photos_off_rounded,
-        title: 'Low Power Mode',
-        message:
-            'Animations are enabled, but Low Power Mode is on. Turn off animations to reduce battery usage.',
-        primaryLabel: 'Turn off',
-        secondaryLabel: 'Later',
-      );
-      if (disableAnimations) {
-        await updateToggle('animations', false);
+    if (key == 'lowPowerMode' && value == true && !animations.value) {
+      final animOk = await _patchSettings(_buildTogglePatch('animations', false));
+      if (animOk) {
+        _applyToggleToPayload('animations', false);
+      }
+    }
+
+    // Never keep both on (e.g. after server/cache merge).
+    if (lowPowerMode.value && animations.value) {
+      animations.value = false;
+      final animOk = await _patchSettings(_buildTogglePatch('animations', false));
+      if (animOk) {
+        _applyToggleToPayload('animations', false);
       }
     }
   }
@@ -843,6 +825,9 @@ class SettingsController extends GetxController {
       );
       animations.value = _asBool(other['animations'], animations.value);
       lowPowerMode.value = _asBool(other['lowPowerMode'], lowPowerMode.value);
+      if (lowPowerMode.value && animations.value) {
+        animations.value = false;
+      }
       fullActivityFilters.value = _asBool(
         other['fullActivityFilters'],
         fullActivityFilters.value,

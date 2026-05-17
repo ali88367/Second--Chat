@@ -455,6 +455,26 @@ class StreamStreaksController extends GetxController {
   final RxBool isMutating = false.obs;
   final RxnString mutationError = RxnString();
 
+  /// Latest `streak_count` from realtime `stream:status` (while connected).
+  final RxnInt socketStreakCount = RxnInt();
+
+  /// Count shown on [StreakButton] in live stream + home headers.
+  int get headerDisplayCount {
+    final fromSocket = socketStreakCount.value;
+    if (fromSocket != null) return fromSocket;
+    return current.value?.headerStreakTotal ?? 0;
+  }
+
+  void applySocketStreakCount(int count) {
+    final normalized = count < 0 ? 0 : count;
+    if (socketStreakCount.value == normalized) return;
+    socketStreakCount.value = normalized;
+  }
+
+  void clearSocketStreakCount() {
+    socketStreakCount.value = null;
+  }
+
   List<int> get availableNumbers =>
       _fullNumberList.where((n) => !selectedMenuNumbers.contains(n)).toList();
   int get selectedCount => selectedMenuNumbers.length;

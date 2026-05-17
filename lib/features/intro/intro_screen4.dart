@@ -58,6 +58,9 @@ class _IntroScreen4State extends State<IntroScreen4> {
   final ScrollController _premiumScrollController = ScrollController();
   bool _isSyncing = false;
 
+  /// Left list top padding (82.h) minus right crown + padding (65.h + 5.h).
+  double get _scrollLinkDelta => 82.h - 65.h - 5.h;
+
   List<FeatureRowData> _features(BuildContext context) => [
         FeatureRowData(
           context.l10n.featureMultiPlatformChat,
@@ -144,23 +147,50 @@ class _IntroScreen4State extends State<IntroScreen4> {
   @override
   void initState() {
     super.initState();
+    _freeScrollController.addListener(_onFreeScroll);
+    _premiumScrollController.addListener(_onPremiumScroll);
   }
 
-  bool _syncScroll(ScrollController from, ScrollController to) {
-    if (_isSyncing) return false;
-    if (!from.hasClients || !to.hasClients) return false;
-    final target = from.position.pixels.clamp(
+  void _onFreeScroll() => _linkScroll(
+        from: _freeScrollController,
+        to: _premiumScrollController,
+        fromIsFree: true,
+      );
+
+  void _onPremiumScroll() => _linkScroll(
+        from: _premiumScrollController,
+        to: _freeScrollController,
+        fromIsFree: false,
+      );
+
+  void _linkScroll({
+    required ScrollController from,
+    required ScrollController to,
+    required bool fromIsFree,
+  }) {
+    if (_isSyncing) return;
+    if (!from.hasClients || !to.hasClients) return;
+
+    final delta = _scrollLinkDelta;
+    final mapped = fromIsFree
+        ? from.position.pixels - delta
+        : from.position.pixels + delta;
+    final target = mapped.clamp(
       to.position.minScrollExtent,
       to.position.maxScrollExtent,
     );
+
+    if ((to.position.pixels - target).abs() < 0.5) return;
+
     _isSyncing = true;
-    to.jumpTo(target.toDouble());
+    to.jumpTo(target);
     _isSyncing = false;
-    return false;
   }
 
   @override
   void dispose() {
+    _freeScrollController.removeListener(_onFreeScroll);
+    _premiumScrollController.removeListener(_onPremiumScroll);
     _freeScrollController.dispose();
     _premiumScrollController.dispose();
     super.dispose();
@@ -298,18 +328,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                             children: [
                               // 1. The Scrollable Content
                               Positioned.fill(
-                                child: NotificationListener<ScrollNotification>(
-                                  onNotification: (n) {
-                                    if (n is ScrollUpdateNotification &&
-                                        n.dragDetails != null) {
-                                      return _syncScroll(
-                                        _freeScrollController,
-                                        _premiumScrollController,
-                                      );
-                                    }
-                                    return false;
-                                  },
-                                  child: SingleChildScrollView(
+                                child: SingleChildScrollView(
                                     controller: _freeScrollController,
                                     padding: EdgeInsets.only(
                                       top: 82.h,
@@ -328,7 +347,6 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                               .toList(),
                                     ),
                                   ),
-                                ),
                               ),
                               // 2. The Sticky Glass Header (Pinned on top)
                               Positioned(
@@ -384,19 +402,7 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                       ),
                                     ),
                                     Expanded(
-                                      child:
-                                          NotificationListener<ScrollNotification>(
-                                            onNotification: (n) {
-                                              if (n is ScrollUpdateNotification &&
-                                                  n.dragDetails != null) {
-                                                return _syncScroll(
-                                                  _premiumScrollController,
-                                                  _freeScrollController,
-                                                );
-                                              }
-                                              return false;
-                                            },
-                                            child: SingleChildScrollView(
+                                      child: SingleChildScrollView(
                                               controller: _premiumScrollController,
                                               padding: EdgeInsets.only(
                                                 top: 5.h,
@@ -415,7 +421,6 @@ class _IntroScreen4State extends State<IntroScreen4> {
                                                         .toList(),
                                               ),
                                             ),
-                                          ),
                                     ),
                                   ],
                                 ),

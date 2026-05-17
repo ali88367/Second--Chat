@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
+import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
 import '../../../core/localization/l10n.dart';
 import 'stream_embed_url_utils.dart';
@@ -187,84 +188,132 @@ class LiveStreamSingleEmbedStack extends StatelessWidget {
     );
   }
 
+  Widget _singlePlatformEmbed(
+    BuildContext context,
+    ChatController chatCtrl,
+    String platform,
+  ) {
+    final slot = _LiveStreamPlatformSlot(
+      platformKey: platform,
+      height: streamPreviewHeight,
+      muted: false,
+      globalMuted: globalMuted,
+      streamViewKey: ValueKey('stream_single_$platform'),
+      cacheScope: 'embed',
+      onStreamReady: onStreamReady,
+      fillConstraints: true,
+      useEagerGestureArena: true,
+      suppressNativeFullscreen: platform == 'twitch',
+    );
+
+    if (platform != 'twitch' && platform != 'kick') {
+      return slot;
+    }
+
+    return Obx(() {
+      final url = chatCtrl.urlForPlatform(platform)?.trim() ?? '';
+      final canOpen =
+          chatCtrl.isPlatformLive(platform) &&
+          url.isNotEmpty &&
+          chatCtrl.isPlatformStreamEmbedReadyForChat(platform);
+      return Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.hardEdge,
+        children: [
+          slot,
+          if (canOpen)
+            Positioned(
+              bottom: 8.h,
+              right: 8.w,
+              child: PointerInterceptor(
+                child: Material(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20.r),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _openPlatformFullscreenRoute(
+                      context,
+                      platform,
+                      url,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(8.w),
+                      child: Icon(
+                        Icons.fullscreen,
+                        color: Colors.white,
+                        size: 22.sp,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatCtrl = Get.find<ChatController>();
     return Obx(() {
       final selected = chatCtrl.platform.value.toLowerCase().trim();
-      final index = _embedIndex(selected);
-      return IndexedStack(
-        index: index,
-        sizing: StackFit.expand,
-        children: [
-          for (var i = 0; i < _platforms.length; i++)
-            Builder(
-              builder: (context) {
-                final platform = _platforms[i];
-                final slot = _LiveStreamPlatformSlot(
-                  platformKey: platform,
-                  height: streamPreviewHeight,
-                  muted: i != index,
-                  globalMuted: globalMuted,
-                  streamViewKey: ValueKey('stream_single_$platform'),
-                  cacheScope: 'single',
-                  onStreamReady: onStreamReady,
-                  fillConstraints: true,
-                  useEagerGestureArena: true,
-                  suppressNativeFullscreen: platform == 'twitch',
-                );
-                final child =
-                    (platform != 'twitch' && platform != 'kick')
-                        ? slot
-                        : Obx(() {
-                          final url =
-                              chatCtrl.urlForPlatform(platform)?.trim() ?? '';
-                          final canOpen =
-                              chatCtrl.isPlatformLive(platform) &&
-                              url.isNotEmpty &&
-                              chatCtrl.isPlatformStreamEmbedReadyForChat(
-                                platform,
-                              );
-                          return Stack(
-                            fit: StackFit.expand,
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              slot,
-                              if (canOpen && i == index)
-                                Positioned(
-                                  bottom: 8.h,
-                                  right: 8.w,
-                                  child: PointerInterceptor(
-                                    child: Material(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(20.r),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: InkWell(
-                                        onTap:
-                                            () => _openPlatformFullscreenRoute(
-                                              context,
-                                              platform,
-                                              url,
-                                            ),
-                                        child: Padding(
-                                          padding: EdgeInsets.all(8.w),
-                                          child: Icon(
-                                            Icons.fullscreen,
-                                            color: Colors.white,
-                                            size: 22.sp,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        });
-                return IgnorePointer(ignoring: i != index, child: child);
-              },
-            ),
-        ],
+      final platform = _platforms[_embedIndex(selected)];
+      return _singlePlatformEmbed(context, chatCtrl, platform);
+    });
+  }
+}
+
+/// Switches single vs multi preview. Only one layout is mounted so each platform
+/// has a single [StreamWebView] (shared controllers cannot attach to two widgets).
+class LiveStreamEmbedHost extends StatelessWidget {
+  const LiveStreamEmbedHost({
+    super.key,
+    required this.streamPreviewHeight,
+    this.globalMuted = false,
+    this.onStreamReady,
+  });
+
+  final double streamPreviewHeight;
+  final bool globalMuted;
+  final void Function(String platformKey, String runningUrl)? onStreamReady;
+
+  static const _platforms = <String>['twitch', 'kick', 'youtube'];
+
+  /// Multi tile grid (2+ live). Otherwise single-preview layout + chrome.
+  static bool useMultiGridLayout({
+    required bool multiScreenPreviewEnabled,
+    required bool Function(String platformKey) isPlatformLive,
+  }) {
+    if (!multiScreenPreviewEnabled) return false;
+    return _platforms.where(isPlatformLive).length >= 2;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsCtrl = Get.find<SettingsController>();
+    final chatCtrl = Get.find<ChatController>();
+    return Obx(() {
+      // Rebuild when live state or selected platform changes.
+      chatCtrl.platformLive.keys;
+      chatCtrl.platform.value;
+
+      final useMultiGrid = useMultiGridLayout(
+        multiScreenPreviewEnabled: settingsCtrl.multiScreenPreview.value,
+        isPlatformLive: chatCtrl.isPlatformLive,
+      );
+
+      if (useMultiGrid) {
+        return LiveStreamMultiEmbedGrid(
+          streamPreviewHeight: streamPreviewHeight,
+          globalMuted: globalMuted,
+          onStreamReady: onStreamReady,
+        );
+      }
+      return LiveStreamSingleEmbedStack(
+        streamPreviewHeight: streamPreviewHeight,
+        globalMuted: globalMuted,
+        onStreamReady: onStreamReady,
       );
     });
   }
@@ -321,7 +370,7 @@ class LiveStreamMultiEmbedGrid extends StatelessWidget {
         muted: false,
         globalMuted: globalMuted,
         streamViewKey: ValueKey('stream_$platform'),
-        cacheScope: 'multi',
+        cacheScope: 'embed',
         onStreamReady: onStreamReady,
         fillConstraints: true,
         useEagerGestureArena: true,

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -56,7 +56,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       CurvedAnimation(parent: _freezeController, curve: Curves.easeInOutQuad),
     );
 
-    if (_settings.lowPowerMode.value) {
+    if (_settings.reduceMotion) {
       _freezeController.value = 0.5;
       _frameController.value = 0;
     } else {
@@ -64,7 +64,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       _frameController.repeat();
     }
 
-    _lowPowerWorker = ever(_settings.lowPowerMode, (bool low) {
+    _lowPowerWorker = everAll([_settings.lowPowerMode, _settings.animations], (_) {
+      final low = _settings.reduceMotion;
       if (low) {
         _freezeController.stop();
         _frameController.stop();
@@ -344,7 +345,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                           ),
                         ),
                         RepaintBoundary(
-                          child: _settings.lowPowerMode.value
+                          child: _settings.reduceMotion
                               ? _lowPowerFreezeUseGraphic(context)
                               : AnimatedBuilder(
                                   animation: Listenable.merge([

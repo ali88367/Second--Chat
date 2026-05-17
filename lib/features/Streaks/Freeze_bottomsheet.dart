@@ -64,7 +64,7 @@ class _StreakFreezePreviewBottomSheetState
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    if (_settings.lowPowerMode.value) {
+    if (_settings.reduceMotion) {
       _pulseController.value = 0.5;
       _frameController.value = 0;
     } else {
@@ -72,7 +72,8 @@ class _StreakFreezePreviewBottomSheetState
       _frameController.repeat();
     }
 
-    _lowPowerWorker = ever(_settings.lowPowerMode, (bool low) {
+    _lowPowerWorker = everAll([_settings.lowPowerMode, _settings.animations], (_) {
+      final low = _settings.reduceMotion;
       if (low) {
         _pulseController.stop();
         _frameController.stop();
@@ -405,7 +406,7 @@ class _StreakFreezePreviewBottomSheetState
                       ),
                       SizedBox(height: 10.h),
                       RepaintBoundary(
-                        child: _settings.lowPowerMode.value
+                        child: _settings.reduceMotion
                             ? _lowPowerFreezeGraphic(context)
                             : AnimatedBuilder(
                                 animation: Listenable.merge([

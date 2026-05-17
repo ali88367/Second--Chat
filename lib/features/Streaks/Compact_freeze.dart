@@ -62,7 +62,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       end: -8.h,
     ).animate(CurvedAnimation(parent: _fireController, curve: Curves.bounceIn));
 
-    if (_settings.lowPowerMode.value) {
+    if (_settings.reduceMotion) {
       _fireController.value = 0.5;
       _frameController.value = 0;
     } else {
@@ -70,7 +70,8 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
       _frameController.repeat();
     }
 
-    _lowPowerWorker = ever(_settings.lowPowerMode, (bool low) {
+    _lowPowerWorker = everAll([_settings.lowPowerMode, _settings.animations], (_) {
+      final low = _settings.reduceMotion;
       if (low) {
         _fireController.stop();
         _frameController.stop();
@@ -409,7 +410,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                   // --- ANIMATED FIRE SECTION ---
                   RepaintBoundary(
                     child:
-                        _settings.lowPowerMode.value
+                        _settings.reduceMotion
                             ? _lowPowerCompactFireGraphic(
                               context,
                               longestStreak,

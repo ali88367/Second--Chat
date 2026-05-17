@@ -390,6 +390,19 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
     });
   }
 
+  static final Color _ownMessageNameColor = beige;
+
+  Color _nameColorForChatRow(Map<String, dynamic> item) {
+    if (item['isCurrentUser'] == true) {
+      return _ownMessageNameColor;
+    }
+    final platformKey = (item['platformKey'] ?? '').toString().toLowerCase().trim();
+    if (platformKey.isNotEmpty) {
+      return _settingsController.getPlatformColor(platformKey);
+    }
+    return Colors.white;
+  }
+
   String _getPlatformAsset(String? platformName) {
     if (platformName == null) return platforms[0];
     switch (platformName.toLowerCase()) {
@@ -405,6 +418,9 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
   }
 
   bool _isMessageFromCurrentUser(ChatMessage message) {
+    final localId = message.id?.trim() ?? '';
+    if (localId.startsWith('local:')) return true;
+
     final platformKey = message.platform.toLowerCase().trim();
     final ownPlatformUsername =
         (_chatCtrl.platformChatUsernames[platformKey] ?? '').trim().toLowerCase();
@@ -670,6 +686,8 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                   height: pickerHeight,
                   emojis: _emojis,
                   emoteService: _emoteService,
+                  showTwitchEmoteTabs:
+                      widget.chatFilter.value?.toLowerCase().trim() == 'twitch',
                   onEmojiSelected: (emoji) {
                     // Emoji still goes to text field
                     final currentText = _messageController.text;
@@ -959,9 +977,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                       child: Icon(
                         Icons.mic,
                         size: 14.sp,
-                        color: _settingsController.getPlatformColor(
-                          (platformKey ?? '').toLowerCase().trim(),
-                        ),
+                        color: _ownMessageNameColor,
                       ),
                     )
                   : Padding(
@@ -1149,10 +1165,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               addRepaintBoundaries: true,
                               itemBuilder: (context, index) {
                                 final item = filteredList[index];
-                                final nameHash = item['name'].hashCode;
-                                final nameColor =
-                                nameColors[nameHash.abs() %
-                                    nameColors.length];
+                                final nameColor = _nameColorForChatRow(item);
                                 final rowKey = (item['canonicalId'] ?? '')
                                         .toString()
                                         .trim()
@@ -1508,10 +1521,7 @@ class _ChatBottomSectionState extends State<ChatBottomSection>
                               shrinkWrap: false,
                               itemBuilder: (context, index) {
                                 final item = filteredList[index];
-                                final nameHash = item['name'].hashCode;
-                                final nameColor =
-                                nameColors[nameHash.abs() %
-                                    nameColors.length];
+                                final nameColor = _nameColorForChatRow(item);
                                 final rowKey = (item['canonicalId'] ?? '')
                                         .toString()
                                         .trim()
@@ -1636,6 +1646,7 @@ class _EmojiEmotePickerDialog extends StatefulWidget {
   final double height;
   final List<String> emojis;
   final EmoteService emoteService;
+  final bool showTwitchEmoteTabs;
   final Function(String) onEmojiSelected;
   final Function(String, String?) onEmoteSelected;
 
@@ -1644,6 +1655,7 @@ class _EmojiEmotePickerDialog extends StatefulWidget {
     required this.height,
     required this.emojis,
     required this.emoteService,
+    required this.showTwitchEmoteTabs,
     required this.onEmojiSelected,
     required this.onEmoteSelected,
   });
@@ -1655,31 +1667,30 @@ class _EmojiEmotePickerDialog extends StatefulWidget {
 
 class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  TabController? _tabController;
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  String? get _activeEmotePlatform {
-    // Tabs: 0=Emoji, 1=Recent, 2=Twitch
-    if (_tabController.index == 2) return 'twitch';
-    return null;
-  }
+  final ValueNotifier<String> _searchQuery = ValueNotifier('');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    if (widget.showTwitchEmoteTabs) {
+      _tabController = TabController(length: 3, vsync: this);
+    }
+    _searchController.addListener(() {
+      _searchQuery.value = _searchController.text;
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     _searchController.dispose();
+    _searchQuery.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _pickerShell({required Widget child}) {
     return Material(
       color: Colors.transparent,
       child: ClipRRect(
@@ -1711,19 +1722,34 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                 ),
               ],
             ),
-            child: Column(
-              children: [
-                // Search bar (only show when on emotes tab)
-                AnimatedBuilder(
-                  animation: _tabController,
-                  builder: (context, child) {
-                    final showSearch = _tabController.index >= 2;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      height: showSearch ? 50.h : 0,
-                      child:
-                      showSearch
-                          ? Padding(
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.showTwitchEmoteTabs) {
+      return _pickerShell(
+        child: _buildEmojiGrid(),
+      );
+    }
+
+    final tabController = _tabController!;
+    return _pickerShell(
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: tabController,
+            builder: (context, child) {
+              final showSearch = tabController.index >= 2;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: showSearch ? 50.h : 0,
+                child: showSearch
+                    ? Padding(
                         padding: EdgeInsets.fromLTRB(
                           12.w,
                           8.h,
@@ -1758,87 +1784,67 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
                               vertical: 8.h,
                             ),
                           ),
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
                         ),
                       )
-                          : const SizedBox.shrink(),
-                    );
-                  },
+                    : const SizedBox.shrink(),
+              );
+            },
+          ),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1,
                 ),
-
-                // Tab bar
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorColor: Colors.white,
-                    indicatorWeight: 2,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white54,
-                    dividerColor: Colors.transparent,
-                    labelPadding: EdgeInsets.symmetric(horizontal: 4.w),
-                    labelStyle: TextStyle(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    tabs: [
-                      Tab(text: context.l10n.emoji),
-                      Tab(text: context.l10n.recent),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              'assets/images/twitch1.png',
-                              width: 16.sp,
-                              height: 16.sp,
-                            ),
-                            SizedBox(width: 4.w),
-                            Text(
-                              'Twitch',
-                              style: TextStyle(color: twitchPurple),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Kick emotes tab disabled.
-                    ],
-                  ),
-                ),
-
-                // Tab content
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
+              ),
+            ),
+            child: TabBar(
+              controller: tabController,
+              indicatorColor: Colors.white,
+              indicatorWeight: 2,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white54,
+              dividerColor: Colors.transparent,
+              labelPadding: EdgeInsets.symmetric(horizontal: 4.w),
+              labelStyle: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
+              ),
+              tabs: [
+                Tab(text: context.l10n.emoji),
+                Tab(text: context.l10n.recent),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Unicode Emojis tab
-                      _buildEmojiGrid(),
-
-                      // Recent emotes tab
-                      _buildRecentEmotesGrid(),
-
-                      // Twitch Emotes tab
-                      _buildTwitchEmotesGrid(),
-
-                      // Kick/7TV Emotes tab disabled.
+                      Image.asset(
+                        'assets/images/twitch1.png',
+                        width: 16.sp,
+                        height: 16.sp,
+                      ),
+                      SizedBox(width: 4.w),
+                      Text(
+                        'Twitch',
+                        style: TextStyle(color: twitchPurple),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-        ),
+          Expanded(
+            child: TabBarView(
+              controller: tabController,
+              children: [
+                _buildEmojiGrid(),
+                _buildRecentEmotesGrid(),
+                _buildTwitchEmotesGrid(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1902,7 +1908,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
         );
       }
 
-      return _buildEmoteGridView(recentEmotes);
+      return _buildEmoteGridView(recentEmotes, sourcePlatform: null);
     });
   }
 
@@ -1971,11 +1977,9 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
         );
       }
 
-      // Filter emotes based on search query
-      final emotes =
-      _searchQuery.isEmpty
+      final emotes = _searchQuery.value.trim().isEmpty
           ? widget.emoteService.emoteList.toList()
-          : widget.emoteService.searchEmotes(_searchQuery);
+          : widget.emoteService.searchEmotes(_searchQuery.value);
 
       if (emotes.isEmpty) {
         return Center(
@@ -1986,7 +1990,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
         );
       }
 
-      return _buildEmoteGridView(emotes);
+      return _buildEmoteGridView(emotes, sourcePlatform: null);
     });
   }
 
@@ -2055,24 +2059,32 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
         );
       }
 
-      final emotes = _searchQuery.isEmpty
-          ? widget.emoteService.twitchEmoteList.toList()
-          : widget.emoteService.searchTwitchEmotes(_searchQuery);
+      return ValueListenableBuilder<String>(
+        valueListenable: _searchQuery,
+        builder: (context, query, _) {
+          final emotes = query.trim().isEmpty
+              ? widget.emoteService.twitchEmoteList.toList()
+              : widget.emoteService.searchTwitchEmotes(query);
 
-      if (emotes.isEmpty) {
-        return Center(
-          child: Text(
-            context.l10n.noEmotesFound,
-            style: TextStyle(color: Colors.white38, fontSize: 14.sp),
-          ),
-        );
-      }
+          if (emotes.isEmpty) {
+            return Center(
+              child: Text(
+                context.l10n.noEmotesFound,
+                style: TextStyle(color: Colors.white38, fontSize: 14.sp),
+              ),
+            );
+          }
 
-      return _buildEmoteGridView(emotes);
+          return _buildEmoteGridView(emotes, sourcePlatform: 'twitch');
+        },
+      );
     });
   }
 
-  Widget _buildEmoteGridView(List<Emote> emotes) {
+  Widget _buildEmoteGridView(
+    List<Emote> emotes, {
+    String? sourcePlatform,
+  }) {
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.all(8.w),
@@ -2090,7 +2102,7 @@ class _EmojiEmotePickerDialogState extends State<_EmojiEmotePickerDialog>
           preferBelow: false,
           waitDuration: const Duration(milliseconds: 500),
           child: GestureDetector(
-            onTap: () => widget.onEmoteSelected(emote.name, _activeEmotePlatform),
+            onTap: () => widget.onEmoteSelected(emote.name, sourcePlatform),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),

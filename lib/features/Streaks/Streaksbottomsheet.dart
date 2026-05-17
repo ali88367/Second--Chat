@@ -36,7 +36,7 @@ class _StreamStreakSetupBottomSheetState
 
   void _syncAnimationsFromSettings() {
     final shouldAnimate =
-        _settings.animations.value && !_settings.lowPowerMode.value;
+        _settings.animationsEnabled;
 
     if (shouldAnimate) {
       if (!_glowController.isAnimating) {
@@ -283,8 +283,7 @@ class _StreamStreakSetupBottomSheetState
                     SizedBox(height: 10.h),
                     RepaintBoundary(
                       child:
-                          (_settings.lowPowerMode.value ||
-                                  !_settings.animations.value)
+                          _settings.reduceMotion
                               ? _lowPowerStreakGraphic(context)
                               : AnimatedBuilder(
                                 animation: Listenable.merge([

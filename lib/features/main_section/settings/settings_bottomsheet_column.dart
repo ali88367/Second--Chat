@@ -1125,15 +1125,20 @@ class SettingsBottomsheetColumn extends StatelessWidget {
   ) {
     return Obx(() {
       final baseColor = getBaseColor();
+      final animationsBlockedByLowPower =
+          switchKey == 'animations' && controller.lowPowerMode.value;
       return CustomSwitch(
         value: switchValue.value,
-        onChanged: (val) {
-          if (switchKey != null) {
-            controller.updateToggle(switchKey, val);
-          } else {
-            switchValue.value = val;
-          }
-        },
+        isDisabled: animationsBlockedByLowPower,
+        onChanged: animationsBlockedByLowPower
+            ? null
+            : (val) {
+                if (switchKey != null) {
+                  controller.updateToggle(switchKey, val);
+                } else {
+                  switchValue.value = val;
+                }
+              },
         activeColor: baseColor,
       );
     });

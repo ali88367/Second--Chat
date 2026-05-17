@@ -116,10 +116,13 @@ class StreamWebViewState extends State<StreamWebView>
 
   static bool _shouldReuseControllerCacheForKey(String rawCacheKey) {
     final normalized = _normalizedPlatformKeyFromCacheKey(rawCacheKey);
-    if (normalized == 'kick') return false;
+    // Fresh controller per mount avoids stale idle shells / dual-widget attachment races.
+    if (normalized == 'kick' || normalized == 'youtube') return false;
     if (rawCacheKey.toLowerCase().startsWith('fullscreen_')) return false;
     return true;
   }
+
+  String get _youtubeOrigin => 'https://$_packageNameForYoutubeHeaders';
 
   bool get _shouldReuseControllerCache {
     // Kick is prone to stale native player/session state after mode toggles and
@@ -211,10 +214,16 @@ class StreamWebViewState extends State<StreamWebView>
     try {
       final info = await PackageInfo.fromPlatform();
       final packageName = info.packageName.trim();
-      if (packageName.isNotEmpty && mounted) {
-        setState(() {
-          _packageNameForYoutubeHeaders = packageName;
-        });
+      if (packageName.isEmpty || !mounted) return;
+      final prev = _packageNameForYoutubeHeaders;
+      if (packageName == prev) return;
+      setState(() {
+        _packageNameForYoutubeHeaders = packageName;
+      });
+      if (_normalizedPlatformKey == 'youtube' && widget.url.trim().isNotEmpty) {
+        _lastCanonicalEmbedId = '';
+        _lastCommittedNavigation = null;
+        _loadUrlIntoController(widget.url);
       }
     } catch (_) {}
   }
@@ -307,6 +316,26 @@ class StreamWebViewState extends State<StreamWebView>
     });
   }
 
+  bool _isYoutubeHost(Uri uri) {
+    final host = uri.host.toLowerCase();
+    return host == 'youtu.be' ||
+        host.contains('youtube.com') ||
+        host.contains('youtube-nocookie.com');
+  }
+
+  void _loadYoutubeRequest(Uri uri) {
+    final origin = _youtubeOrigin;
+    _controller
+        .loadRequest(
+          uri,
+          headers: <String, String>{
+            'Referer': origin,
+            'Origin': origin,
+          },
+        )
+        .catchError(_logWebNavError);
+  }
+
   String _sanitizeUrl(String url) {
     final trimmed = url.trim();
     if (trimmed.isEmpty) return '';
@@ -327,45 +356,16 @@ class StreamWebViewState extends State<StreamWebView>
       return uri.replace(queryParameters: qp).toString();
     }
 
-    final host = uri.host.toLowerCase();
-    final isYoutubeHost =
-        host.contains('youtube.com') || host.contains('youtube-nocookie.com');
-    final isYoutubeEmbedPath =
-        uri.path.toLowerCase().contains('/embed/');
-    if (isYoutubeHost && isYoutubeEmbedPath) {
-      final qp = Map<String, String>.from(uri.queryParameters);
-      // WebView-safe YouTube embed defaults: avoid common embed/player errors.
-      qp['autoplay'] = '1';
-      qp['mute'] = '1';
-      qp['playsinline'] = '1';
-      qp['enablejsapi'] = '1';
-      if (widget.suppressNativeFullscreen) {
-        qp['fs'] = '0';
-      }
-      final pathParts = uri.pathSegments;
-      final embedIdx = pathParts.indexOf('embed');
-      String videoId = '';
-      if (embedIdx != -1 && embedIdx + 1 < pathParts.length) {
-        videoId = pathParts[embedIdx + 1].trim();
-      }
-      if (videoId.isEmpty) {
-        return uri.replace(queryParameters: qp).toString();
-      }
-      return Uri.https(
-        'www.youtube-nocookie.com',
-        '/embed/$videoId',
-        qp,
-      ).toString();
-    }
-
-    if (widget.suppressNativeFullscreen &&
-        isYoutubeHost) {
-      final qp = Map<String, String>.from(uri.queryParameters);
-      qp['fs'] = '0';
-      return uri.replace(queryParameters: qp).toString();
+    if (_isYoutubeHost(uri)) {
+      return normalizeYoutubeEmbedUrl(
+        trimmed,
+        origin: _youtubeOrigin,
+        suppressFullscreen: widget.suppressNativeFullscreen,
+      );
     }
 
     // Kick embed: ensure fullscreen is allowed when not suppressed
+    final host = uri.host.toLowerCase();
     if (host.contains('kick.com') || host.contains('player.kick.com')) {
       final qp = Map<String, String>.from(uri.queryParameters);
       if (!qp.containsKey('allowfullscreen') &&
@@ -775,23 +775,8 @@ class StreamWebViewState extends State<StreamWebView>
           _initialUrl = sanitized;
           _initialUri = Uri.tryParse(sanitized);
           final uri = Uri.tryParse(sanitized);
-          final host = uri?.host.toLowerCase() ?? '';
-          final isYoutubeEmbed =
-              uri != null &&
-              (host.contains('youtube.com') ||
-                  host.contains('youtube-nocookie.com')) &&
-              uri.path.toLowerCase().contains('/embed/');
-          if (isYoutubeEmbed) {
-            final origin = 'https://$_packageNameForYoutubeHeaders';
-            _controller
-                .loadRequest(
-                  uri,
-                  headers: <String, String>{
-                    'Referer': origin,
-                    'Origin': origin,
-                  },
-                )
-                .catchError(_logWebNavError);
+          if (uri != null && _isYoutubeHost(uri)) {
+            _loadYoutubeRequest(uri);
           } else {
             _controller
                 .loadRequest(Uri.parse(sanitized))
@@ -807,22 +792,8 @@ class StreamWebViewState extends State<StreamWebView>
       _initialUrl = sanitized;
       _initialUri = Uri.tryParse(sanitized);
       final uri = Uri.tryParse(sanitized);
-      final host = uri?.host.toLowerCase() ?? '';
-      final isYoutubeEmbed =
-          uri != null &&
-          (host.contains('youtube.com') || host.contains('youtube-nocookie.com')) &&
-          uri.path.toLowerCase().contains('/embed/');
-      if (isYoutubeEmbed) {
-        final origin = 'https://$_packageNameForYoutubeHeaders';
-        _controller
-            .loadRequest(
-              uri,
-              headers: <String, String>{
-                'Referer': origin,
-                'Origin': origin,
-              },
-            )
-            .catchError(_logWebNavError);
+      if (uri != null && _isYoutubeHost(uri)) {
+        _loadYoutubeRequest(uri);
       } else {
         _controller.loadRequest(Uri.parse(sanitized)).catchError(_logWebNavError);
       }

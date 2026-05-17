@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'auth_controller.dart';
 import 'edge_glow_notification_controller.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
+import '../controllers/Main Section Controllers/streak_controller.dart';
 import '../core/utils/platform_token_provider.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/streaming_overview.dart';
@@ -76,6 +77,8 @@ class ChatController extends GetxController {
 
   /// Dedupe chat-derived rows merged into [activityEvents] (history refresh + socket).
   final Set<String> _activityChatSourceDedupeIds = <String>{};
+  /// Dedupe realtime `activity:event` rows (and chat-derived activity merges).
+  final Set<String> _activityRealtimeDedupeKeys = <String>{};
   final Map<String, DateTime> _edgeGlowEventSeenAt = <String, DateTime>{};
   final Set<String> _historyTriggeredForRunningStream = <String>{};
   final Map<String, int> _liveSessionSeqByPlatform = <String, int>{};
@@ -1690,7 +1693,47 @@ class ChatController extends GetxController {
     return raw?.toString().trim() ?? '';
   }
 
-  /// Appends one realtime activity row (from `activity:event`, `activity:follow`, `activity:join`, …).
+  String _activityDedupeKey(Map<String, dynamic> event) {
+    final id = event['id']?.toString().trim();
+    if (id != null && id.isNotEmpty) return 'id:$id';
+
+    final platform = _normalizePlatformKey(event['platform']?.toString());
+    final type = _normalizeActivityType(
+      (event['type'] ?? event['eventType'] ?? event['kind'])?.toString(),
+    );
+    final ts =
+        (event['timestamp'] ?? event['created_at'] ?? '').toString().trim();
+    final userId = _activityUserId(event);
+    if (platform.isNotEmpty && type.isNotEmpty && ts.isNotEmpty) {
+      return 'evt:$platform|$type|$ts|$userId';
+    }
+
+    final metadata = event['metadata'];
+    var username = '';
+    if (metadata is Map) {
+      username =
+          (metadata['username'] ??
+                  metadata['user_name'] ??
+                  metadata['user'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+    }
+    return 'fb:$platform|$type|$ts|$username|${event.hashCode}';
+  }
+
+  bool _rememberActivityDedupeKey(String key) {
+    if (key.isEmpty) return false;
+    if (_activityRealtimeDedupeKeys.contains(key)) return true;
+    if (_activityRealtimeDedupeKeys.length > 2500) {
+      _activityRealtimeDedupeKeys.clear();
+    }
+    _activityRealtimeDedupeKeys.add(key);
+    return false;
+  }
+
+  /// Appends one realtime activity row from **`activity:event`** only.
   void _handleIncomingActivityEvent(Map<String, dynamic> event) {
     if (kDebugMode) {
       debugPrint('[ACTIVITY_EVENT][CHAT_CONTROLLER] $event');
@@ -1701,6 +1744,10 @@ class ChatController extends GetxController {
       (event['type'] ?? event['eventType'] ?? event['kind'])?.toString(),
     );
     if (type.isNotEmpty) normalized['type'] = type;
+
+    final dedupeKey = _activityDedupeKey(normalized);
+    if (_rememberActivityDedupeKey(dedupeKey)) return;
+
     activityEvents.add(normalized);
     _maybeTriggerEdgeGlowForActivity(normalized);
   }
@@ -1732,6 +1779,9 @@ class ChatController extends GetxController {
       'timestamp': msg.timestamp.toUtc().toIso8601String(),
       'created_at': msg.timestamp.toUtc().toIso8601String(),
     };
+    final activityDedupeKey = _activityDedupeKey(activityPayload);
+    if (_rememberActivityDedupeKey(activityDedupeKey)) return;
+
     activityEvents.add(activityPayload);
     if (triggerEdgeGlow) {
       _maybeTriggerEdgeGlowForActivity(activityPayload);
@@ -1960,6 +2010,7 @@ class ChatController extends GetxController {
       }
 
       if (id.isNotEmpty) existingIds.add(id);
+      _rememberActivityDedupeKey(_activityDedupeKey(copy));
       toAdd.add(copy);
     }
 
@@ -2093,6 +2144,22 @@ class ChatController extends GetxController {
     scrollTick.value++;
   }
 
+  static int? _parseSocketStreakCount(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw == null) return null;
+    return int.tryParse(raw.toString().trim());
+  }
+
+  void _applySocketStreakCount(int count) {
+    if (!Get.isRegistered<StreamStreaksController>()) return;
+    final normalized = count < 0 ? 0 : count;
+    Get.find<StreamStreaksController>().applySocketStreakCount(normalized);
+    if (kDebugMode) {
+      debugPrint('[ChatController] stream:status streak_count=$normalized');
+    }
+  }
+
   void _handlePlatformSwitchRequest(String key) {
     final normalized = _normalizedApiPlatform(key, fallback: 'twitch');
     if (normalized.isEmpty) return;
@@ -2109,6 +2176,7 @@ class ChatController extends GetxController {
     _pendingLocalChatEchoes.clear();
     _historyLastFetchAt.clear();
     _activityChatSourceDedupeIds.clear();
+    _activityRealtimeDedupeKeys.clear();
     _edgeGlowEventSeenAt.clear();
     for (final t in _pendingOfflineTimers.values) {
       t.cancel();
@@ -2118,6 +2186,9 @@ class ChatController extends GetxController {
     _lastConfirmedLiveAt.clear();
     _lastPlayerUrlUpdateAt.clear();
     _realtimeObserversWired = false;
+    if (Get.isRegistered<StreamStreaksController>()) {
+      Get.find<StreamStreaksController>().clearSocketStreakCount();
+    }
     try {
       await _live.disconnect();
     } catch (_) {}
@@ -2287,6 +2358,14 @@ class ChatController extends GetxController {
       }
 
       _applyStreamTitleCategory(p, m);
+
+      if (m.containsKey('streak_count') || m.containsKey('streakCount')) {
+        final streakRaw = m['streak_count'] ?? m['streakCount'];
+        final streakCount = _parseSocketStreakCount(streakRaw);
+        if (streakCount != null) {
+          _applySocketStreakCount(streakCount);
+        }
+      }
 
       final selected = _normalizedApiPlatform(
         platform.value,

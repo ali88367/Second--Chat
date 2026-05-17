@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../controllers/platform_categories_controller.dart';
 import '../../../core/constants/app_colors/app_colors.dart';
+import '../../../core/localization/l10n.dart';
 import '../../../core/themes/textstyles.dart';
 
 /// Category row in the title panel (tap toggles inline dropdown below).
@@ -93,6 +94,59 @@ class _MetaShell extends StatelessWidget {
   }
 }
 
+class _CategorySearchField extends StatelessWidget {
+  const _CategorySearchField({
+    required this.controller,
+  });
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12.w, 8.h, 12.w, 4.h),
+      child: TextField(
+        controller: controller,
+        style: sfProText400(14.sp, Colors.white),
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: '${context.l10n.search} ${context.l10n.category}...',
+          hintStyle: sfProText400(14.sp, Colors.white38),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: Colors.white38,
+            size: 20.sp,
+          ),
+          filled: true,
+          fillColor: greyy,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.r),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.r),
+            borderSide: BorderSide(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.r),
+            borderSide: BorderSide(
+              color: Colors.white.withValues(alpha: 0.22),
+              width: 1,
+            ),
+          ),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 12.w,
+            vertical: 8.h,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Inline category list shown inside the title panel when the menu is open.
 class StreamCategoryDropdownPanel extends StatelessWidget {
   const StreamCategoryDropdownPanel({
@@ -112,6 +166,10 @@ class StreamCategoryDropdownPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final categoriesCtrl = Get.find<PlatformCategoriesController>();
     final panelHeight = maxHeight ?? StreamCategoryMetaRow.dropdownMaxHeight.h;
+    final showSearch = categoriesCtrl.supportsCategorySearch(platformKey);
+    final searchController = showSearch
+        ? categoriesCtrl.searchControllerFor(platformKey)
+        : null;
 
     return Material(
       color: Colors.transparent,
@@ -128,94 +186,105 @@ class StreamCategoryDropdownPanel extends StatelessWidget {
             width: 1,
           ),
         ),
-        child: Obx(() {
-          categoriesCtrl.categoriesByPlatform.keys;
-          categoriesCtrl.loadingByPlatform.keys;
-          final items = categoriesCtrl.categoriesFor(platformKey);
-          if (items.isEmpty) {
-            if (categoriesCtrl.isLoading(platformKey)) {
-              return Padding(
-                padding: EdgeInsets.symmetric(vertical: 28.h),
-                child: Center(
-                  child: SizedBox(
-                    width: 22.w,
-                    height: 22.w,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white54,
-                    ),
-                  ),
-                ),
-              );
-            }
-            return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
-              child: Text(
-                'No categories loaded',
-                style: sfProText400(12.sp, Colors.white54),
-              ),
-            );
-          }
-
-          return ValueListenableBuilder<String?>(
-            valueListenable: selectedCategoryId,
-            builder: (context, selectedId, _) {
-              return ListView.separated(
-                padding: EdgeInsets.symmetric(vertical: 8.h),
-                physics: const ClampingScrollPhysics(),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final id = item['id'] ?? '';
-                  final name = item['name'] ?? '';
-                  final isSelected =
-                      selectedId != null &&
-                      selectedId.isNotEmpty &&
-                      selectedId == id;
-
-                  return InkWell(
-                    onTap: () => onPick(name, id),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16.w,
-                        vertical: 12.h,
-                      ),
-                      color: isSelected
-                          ? const Color.fromRGBO(49, 49, 49, 1)
-                          : Colors.transparent,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: sfProText500(
-                                12.sp,
-                                isSelected ? Colors.white : Colors.white70,
-                              ),
-                            ),
+        child: Column(
+          children: [
+            if (showSearch && searchController != null)
+              _CategorySearchField(controller: searchController),
+            Expanded(
+              child: Obx(() {
+                categoriesCtrl.categoriesByPlatform.keys;
+                categoriesCtrl.loadingByPlatform.keys;
+                final items = categoriesCtrl.categoriesFor(platformKey);
+                if (items.isEmpty) {
+                  if (categoriesCtrl.isLoading(platformKey)) {
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: 28.h),
+                      child: Center(
+                        child: SizedBox(
+                          width: 22.w,
+                          height: 22.w,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white54,
                           ),
-                          if (isSelected)
-                            Icon(
-                              Icons.check_rounded,
-                              size: 18.sp,
-                              color: Colors.white70,
-                            ),
-                        ],
+                        ),
                       ),
+                    );
+                  }
+                  return Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 20.h,
+                    ),
+                    child: Text(
+                      'No categories loaded',
+                      style: sfProText400(12.sp, Colors.white54),
                     ),
                   );
-                },
-              );
-            },
-          );
-        }),
+                }
+
+                return ValueListenableBuilder<String?>(
+                  valueListenable: selectedCategoryId,
+                  builder: (context, selectedId, _) {
+                    return ListView.separated(
+                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.white.withValues(alpha: 0.06),
+                      ),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final id = item['id'] ?? '';
+                        final name = item['name'] ?? '';
+                        final isSelected =
+                            selectedId != null &&
+                            selectedId.isNotEmpty &&
+                            selectedId == id;
+
+                        return InkWell(
+                          onTap: () => onPick(name, id),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 12.h,
+                            ),
+                            color: isSelected
+                                ? const Color.fromRGBO(49, 49, 49, 1)
+                                : Colors.transparent,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: sfProText500(
+                                      12.sp,
+                                      isSelected ? Colors.white : Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 18.sp,
+                                    color: Colors.white70,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              }),
+            ),
+          ],
+        ),
       ),
     );
   }

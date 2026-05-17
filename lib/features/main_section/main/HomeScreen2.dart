@@ -373,8 +373,7 @@ class _HomeScreen2State extends State<HomeScreen2> {
 
                   // Right Buttons
                   Obx(() {
-                    final streakTotal =
-                        _streakCtrl.current.value?.headerStreakTotal ?? 0;
+                    final streakTotal = _streakCtrl.headerDisplayCount;
                     return Row(
                       children: [
                         StreakButton(

@@ -209,8 +209,6 @@ class LiveStreamService {
 
   /// Logged by name (plus every inbound `chat:*`, [connected], socket session lines).
   static const Set<String> inboundLogNamedSocketEvents = <String>{
-    'activity:follow',
-    'activity:join',
     'activity:event',
     'stream:info:update',
   };
@@ -478,22 +476,13 @@ class LiveStreamService {
     // `activity:sync` is ignored: it can arrive after `activity:event` and would wipe the
     // activity list if applied. Activity rail is driven by `activity:event` + REST history merge.
 
-    // All platforms (incl. YouTube subscribe/unsubscribe): **`activity:event`** only — body `type`
-    // carries the kind (`join`, `follow`, `subscribe`, `unsubscribe`, …).
+    // All platforms: **`activity:event`** only — body `type` carries the kind
+    // (`join`, `follow`, `subscribe`, `unsubscribe`, …).
     socket.on(
       'activity:event',
       (d) => _onInboundActivityChannel('activity:event', d),
     );
-    for (final channel in const [
-      'activity:join',
-      'activity:follow',
-      'activity:subscribe',
-      'activity:unsubscribe',
-    ]) {
-      socket.on(channel, (d) => _onInboundActivityChannel(channel, d));
-    }
 
-    // `onAny`: typed `activity:*` (except sync/event) — Kick may emit `activity:join` directly.
     socket.onAny((eventName, data) {
       final ev = eventName.toString();
       final name = ev.toLowerCase().trim();
@@ -510,15 +499,6 @@ class LiveStreamService {
           'event': ev,
           'payload_preview': _payloadToInboundLogString(_unwrapSocketIoData(data)),
         });
-      }
-      if (name.startsWith('activity:') &&
-          name != 'activity:sync' &&
-          name != 'activity:event' &&
-          name != 'activity:join' &&
-          name != 'activity:follow' &&
-          name != 'activity:subscribe' &&
-          name != 'activity:unsubscribe') {
-        _onInboundActivityChannel(ev, data);
       }
     });
 
@@ -933,11 +913,7 @@ class LiveStreamService {
     debugPrint('[LiveStreamService] $_label#$_connectSeq $event ${payload ?? ''}');
   }
 
-  /// Normalizes `type` for activity rows:
-  /// - **`activity:event`**: body **`type`** (e.g. `join`, `follow`, YouTube `subscribe`), with
-  ///   fallbacks `eventType` / `kind`. Channel name does not imply kind (see [_typeFromActivityEventName]).
-  /// - **Typed channels** (`activity:follow`, `activity:join`, `activity:subscribe`, …): if body omits
-  ///   `type`, it is inferred from the channel name.
+  /// Normalizes `type` for **`activity:event`** rows (body `type` / `eventType` / `kind`).
   void _coalesceActivityType(JsonMap m, String socketEventName) {
     var t = m['type']?.toString().trim();
     if (t == null || t.isEmpty) {
@@ -951,12 +927,7 @@ class LiveStreamService {
       final k = m['kind']?.toString().trim();
       if (k != null && k.isNotEmpty) {
         m['type'] = k;
-        t = k;
       }
-    }
-    if (t == null || t.isEmpty) {
-      final inferred = _typeFromActivityEventName(socketEventName);
-      if (inferred != null) m['type'] = inferred;
     }
   }
 
@@ -1001,14 +972,6 @@ class LiveStreamService {
       }
     }
     onActivityEvent?.call(m);
-  }
-
-  String? _typeFromActivityEventName(String socketEventName) {
-    final name = socketEventName.toLowerCase().trim();
-    if (!name.startsWith('activity:')) return null;
-    final type = name.substring('activity:'.length).trim();
-    if (type.isEmpty || type == 'event' || type == 'sync') return null;
-    return type;
   }
 
 }
