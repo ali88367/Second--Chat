@@ -2144,19 +2144,11 @@ class ChatController extends GetxController {
     scrollTick.value++;
   }
 
-  static int? _parseSocketStreakCount(dynamic raw) {
-    if (raw is int) return raw;
-    if (raw is num) return raw.toInt();
-    if (raw == null) return null;
-    return int.tryParse(raw.toString().trim());
-  }
-
-  void _applySocketStreakCount(int count) {
+  void _applySocketStreakPayload(Map<String, dynamic> payload) {
     if (!Get.isRegistered<StreamStreaksController>()) return;
-    final normalized = count < 0 ? 0 : count;
-    Get.find<StreamStreaksController>().applySocketStreakCount(normalized);
+    Get.find<StreamStreaksController>().applySocketStreakPayload(payload);
     if (kDebugMode) {
-      debugPrint('[ChatController] stream:status streak_count=$normalized');
+      debugPrint('[ChatController] streak:status applied');
     }
   }
 
@@ -2359,13 +2351,8 @@ class ChatController extends GetxController {
 
       _applyStreamTitleCategory(p, m);
 
-      if (m.containsKey('streak_count') || m.containsKey('streakCount')) {
-        final streakRaw = m['streak_count'] ?? m['streakCount'];
-        final streakCount = _parseSocketStreakCount(streakRaw);
-        if (streakCount != null) {
-          _applySocketStreakCount(streakCount);
-        }
-      }
+      // Intentionally do NOT update streak from `stream:status` anymore.
+      // Streak realtime updates come from socket event `streak:status`.
 
       final selected = _normalizedApiPlatform(
         platform.value,
@@ -2400,6 +2387,9 @@ class ChatController extends GetxController {
 
     _live.onStreamStatus = applyStreamStatus;
     _live.onStreamInfoUpdate = applyStreamStatus;
+    _live.onStreakStatus = (payload) {
+      _applySocketStreakPayload(payload);
+    };
     _live.onChatMessage = _handleIncomingChatMessage;
   }
 

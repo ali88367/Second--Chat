@@ -530,14 +530,13 @@ class _SplashScreenState extends State<_SplashScreen>
       } catch (_) {}
       if (!mounted) return;
 
-      final isFirstLaunch = await _consumeFirstLaunchFlag();
-      if (isFirstLaunch) {
-        if (!mounted) return;
-        Get.offAll(() => const IntroScreen1());
-        return;
-      }
-
       if (!auth.isAuthenticated.value) {
+        final isFirstLaunch = await _consumeFirstLaunchFlag();
+        if (isFirstLaunch) {
+          if (!mounted) return;
+          Get.offAll(() => const IntroScreen1());
+          return;
+        }
         if (!mounted) return;
         Get.offAll(() => const LoginScreen());
         return;

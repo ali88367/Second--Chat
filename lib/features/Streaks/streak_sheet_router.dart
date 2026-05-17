@@ -4,6 +4,7 @@ import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_cont
 
 import 'Compact_freeze.dart';
 import 'Freeze_bottomsheet.dart';
+import 'Last_streak.dart';
 import 'Streaksbottomsheet.dart';
 
 class StreakSheetRouter extends StatefulWidget {
@@ -22,6 +23,9 @@ class _StreakSheetRouterState extends State<StreakSheetRouter> {
   void initState() {
     super.initState();
     _streakCtrl = Get.find<StreamStreaksController>();
+    // Ensure we route based on the freshest status (danger vs normal).
+    // This prevents showing the normal sheet when the cached snapshot is stale.
+    _streakCtrl.fetchCurrentStreak(force: true, silent: true);
   }
 
   @override
@@ -43,8 +47,14 @@ class _StreakSheetRouterState extends State<StreakSheetRouter> {
       if (!streak.isActive) {
         return const StreamStreakSetupBottomSheet();
       }
-      final isInDanger =
-          widget.forceFreezePreview || streak.isInDanger;
+
+      // If user already used a freeze token for *today*, keep them on the
+      // "freeze used" sheet for the rest of the day (no more freezes today).
+      if (_streakCtrl.hasUsedFreezeToday()) {
+        return const StreakFreezeUseBottomSheet();
+      }
+
+      final isInDanger = widget.forceFreezePreview || streak.isInDanger;
 
       // Use [StreakData.isConfigured], not [hasCreatedStreak]: new accounts can
       // have a server-side streak with count 0 before any check-ins.

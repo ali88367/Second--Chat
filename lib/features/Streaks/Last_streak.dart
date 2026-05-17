@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -122,7 +122,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
     super.dispose();
   }
 
-  Widget _lowPowerFreezeUseGraphic(BuildContext context) {
+  Widget _lowPowerFreezeUseGraphic(BuildContext context, int streakCount) {
     const glow = 0.275;
     return Stack(
       alignment: Alignment.center,
@@ -164,10 +164,20 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
         ),
         Positioned(
           bottom: 0.h,
-          child: Image.asset(
-            'assets/images/Streak number.png',
-            width: 155.w,
-            height: 90.h,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                'assets/images/Streak number.png',
+                width: 155.w,
+                height: 90.h,
+                fit: BoxFit.contain,
+              ),
+              Text(
+                '$streakCount',
+                style: sfProDisplay600(36.sp, Colors.white),
+              ),
+            ],
           ),
         ),
       ],
@@ -302,6 +312,8 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       final streak = _streakCtrl.streak;
       final available = streak?.freezeTokens ?? 0;
       final isInDanger = streak?.isInDanger ?? false;
+      final hasUsedFreezeToday = _streakCtrl.hasUsedFreezeToday();
+      final streakCount = streak?.currentStreak ?? 0;
       final rowData = _streakCtrl.buildCurrentWeekRow();
       final isLoading = _streakCtrl.isLoading.value;
 
@@ -346,7 +358,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                         ),
                         RepaintBoundary(
                           child: _settings.reduceMotion
-                              ? _lowPowerFreezeUseGraphic(context)
+                              ? _lowPowerFreezeUseGraphic(context, streakCount)
                               : AnimatedBuilder(
                                   animation: Listenable.merge([
                                     _freezeController,
@@ -418,10 +430,18 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                                         ),
                                         Positioned(
                                           bottom: 0.h,
-                                          child: Image.asset(
-                                            'assets/images/Streak number.png',
-                                            width: 155.w,
-                                            height: 90.h,
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+
+                                              Text(
+                                                '$streakCount',
+                                                style: sfProDisplay600(
+                                                  46.sp,
+                                                  Colors.white,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -601,97 +621,98 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
                     ),
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.only(
-                    left: 16.w,
-                    right: 16.w,
-                    bottom: MediaQuery.of(context).viewPadding.bottom,
-                  ),
-                  color: bottomSheetGrey,
-                  child: SafeArea(
-                    top: false,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          height: 50.h,
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: Get.back,
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Color.fromRGBO(
-                                116,
-                                116,
-                                128,
-                                0.18,
+                if (!hasUsedFreezeToday)
+                  Container(
+                    padding: EdgeInsets.only(
+                      left: 16.w,
+                      right: 16.w,
+                      bottom: MediaQuery.of(context).viewPadding.bottom,
+                    ),
+                    color: bottomSheetGrey,
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: 50.h,
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: Get.back,
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Color.fromRGBO(
+                                  116,
+                                  116,
+                                  128,
+                                  0.18,
+                                ),
+                                side: BorderSide.none,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(25.r),
+                                ),
+                                padding: EdgeInsets.zero,
                               ),
-                              side: BorderSide.none,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25.r),
-                              ),
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: Text(
-                              "Ignore",
-                              style: sfProText600(
-                                17.sp,
-                                Color.fromRGBO(235, 235, 245, 0.3),
+                              child: Text(
+                                "Ignore",
+                                style: sfProText600(
+                                  17.sp,
+                                  Color.fromRGBO(235, 235, 245, 0.3),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        SizedBox(height: 12.h),
-                        SizedBox(
-                          height: 50.h,
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed:
-                                (available > 0 && isInDanger && !_isFreezing)
-                                    ? _freezeStreak
-                                    : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  (available > 0 && isInDanger)
-                                      ? const Color(0xFF7EDDE4)
-                                      : Colors.grey.withOpacity(0.5),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25.r),
+                          SizedBox(height: 12.h),
+                          SizedBox(
+                            height: 50.h,
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed:
+                                  (available > 0 && isInDanger && !_isFreezing)
+                                      ? _freezeStreak
+                                      : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    (available > 0 && isInDanger)
+                                        ? const Color(0xFF7EDDE4)
+                                        : Colors.grey.withOpacity(0.5),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(25.r),
+                                ),
+                                padding: EdgeInsets.zero,
                               ),
-                              padding: EdgeInsets.zero,
-                            ),
-                            child:
-                                _isFreezing
-                                    ? SizedBox(
-                                      width: 20.w,
-                                      height: 20.w,
-                                      child: const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                    : Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "Use 1 ",
-                                          style: sfProText600(
-                                            17.sp,
-                                            Colors.white,
+                              child:
+                                  _isFreezing
+                                      ? SizedBox(
+                                        width: 20.w,
+                                        height: 20.w,
+                                        child: const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                      : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "Use 1 ",
+                                            style: sfProText600(
+                                              17.sp,
+                                              Colors.white,
+                                            ),
                                           ),
-                                        ),
-                                        Image.asset(
-                                          'assets/images/Mask group.png',
-                                        ),
-                                      ],
-                                    ),
+                                          Image.asset(
+                                            'assets/images/Mask group.png',
+                                          ),
+                                        ],
+                                      ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

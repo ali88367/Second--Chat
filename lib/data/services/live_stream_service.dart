@@ -116,6 +116,7 @@ class LiveStreamService {
   int _sessionInboundCount = 0;
   int _sessionChatMessageCount = 0;
   int _sessionStreamStatusCount = 0;
+  int _sessionStreakStatusCount = 0;
   bool _sessionSummaryLogged = false;
 
   // Prevent duplicate messages (bounded memory).
@@ -132,6 +133,7 @@ class LiveStreamService {
   void Function(JsonMap payload)? onStreamStatus;
   void Function(JsonMap payload)? onStreamLive;
   void Function(JsonMap payload)? onStreamInfoUpdate;
+  void Function(JsonMap payload)? onStreakStatus;
   void Function(String platform, int viewerCount)? onViewerCountUpdate;
   void Function(String platform, bool live)? onLiveUpdate;
   void Function(String platform, String? playerUrl)? onPlayerUrlUpdate;
@@ -197,6 +199,7 @@ class LiveStreamService {
     if (n.startsWith('chat:')) return false;
     if (n.startsWith('activity:')) return false;
     if (n.startsWith('stream:')) return false;
+    if (n.startsWith('streak:')) return false;
     if (n.startsWith('viewer_count')) return false;
     if (n == 'connected' ||
         n == 'settings:update' ||
@@ -218,6 +221,7 @@ class LiveStreamService {
     final normalized = eventName.toLowerCase().trim();
     if (normalized == 'chat:message') _sessionChatMessageCount++;
     if (normalized == 'stream:status') _sessionStreamStatusCount++;
+    if (normalized == 'streak:status') _sessionStreakStatusCount++;
 
     final cb = onSocketInbound;
     final shouldForward = _shouldRecordInboundSocketEvent(eventName);
@@ -247,6 +251,7 @@ class LiveStreamService {
     _sessionInboundCount = 0;
     _sessionChatMessageCount = 0;
     _sessionStreamStatusCount = 0;
+    _sessionStreakStatusCount = 0;
     _sessionSummaryLogged = false;
   }
 
@@ -266,7 +271,8 @@ class LiveStreamService {
       debugPrint(
         '[SOCKET_TRACE] $_label#$_connectSeq | summary | source=$source reason=$reason '
         'connected_for_s=${duration ?? 'n/a'} inbound=$_sessionInboundCount '
-        'chat:message=$_sessionChatMessageCount stream:status=$_sessionStreamStatusCount',
+        'chat:message=$_sessionChatMessageCount stream:status=$_sessionStreamStatusCount '
+        'streak:status=$_sessionStreakStatusCount',
       );
     }
   }
@@ -537,6 +543,19 @@ class LiveStreamService {
         return;
       }
       applyStreamPayload(m, onStreamStatus);
+    });
+
+    socket.on('streak:status', (d) {
+      _recordInboundSocket('streak:status', d);
+      final m = _asMap(d);
+      if (m == null) {
+        _recordInboundSocket('streak:status:parse_failed', <String, dynamic>{
+          'hint': 'Server sent streak:status but payload could not be mapped',
+          'raw': _payloadToInboundLogString(d),
+        });
+        return;
+      }
+      onStreakStatus?.call(m);
     });
 
     socket.on('stream:live', (d) {

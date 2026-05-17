@@ -349,7 +349,9 @@ class _StreakFreezePreviewBottomSheetState
       final streak = _streakCtrl.streak;
       final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
       final isInDanger = streak?.isInDanger ?? false;
-      final canProceedToFreeze = hasCreatedStreak && isInDanger;
+      final hasUsedFreezeToday = _streakCtrl.hasUsedFreezeToday();
+      final canProceedToFreeze =
+          hasCreatedStreak && isInDanger && !hasUsedFreezeToday;
       final currentStreakCount = streak?.currentStreak ?? 0;
       final titleText = (streak?.isInDanger ?? false)
           ? context.l10n.streakInDangerHitFreezeButton
