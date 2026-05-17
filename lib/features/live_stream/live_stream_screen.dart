@@ -1217,7 +1217,10 @@ class _LivestreamingState extends State<Livestreaming> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Obx(() {
-                        final streakTotal = _streakCtrl.headerDisplayCount;
+                        final streakTotal =
+                            (_streakCtrl.current.value?.isActive == true)
+                                ? _streakCtrl.headerDisplayCount
+                                : null;
                         return StreakButton(
                           count: streakTotal,
                           onTap: _openStreakSheet,

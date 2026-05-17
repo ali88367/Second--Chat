@@ -65,37 +65,36 @@ class _IntroScreen2State extends State<IntroScreen2> {
     final ok = await ctrl.connect(provider);
     if (!mounted) return;
     if (ok) {
+      // Do not auto-advance from IntroScreen2. Users may want to connect multiple
+      // platforms first; navigation happens only when they tap "Continue".
       await _rebootstrapChatAfterPlatformConnect(provider);
-      final prefs = await SharedPreferences.getInstance();
-      final introDone =
-          prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
-      final shouldShowNotificationIntro =
-          !introDone && await _isNotificationsDisabledFromServer();
-      if (introDone) {
-        Get.offAll(
-          () => const HomeScreen2(),
-          transition: Transition.cupertino,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.fastOutSlowIn,
-        );
-        return;
-      }
-      if (shouldShowNotificationIntro) {
-        Get.to(
-          () => NotficationScreens(),
-          transition: Transition.cupertino,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.fastOutSlowIn,
-        );
-        return;
-      }
-      Get.offAll(
-        () => const HomeScreen2(),
+    }
+  }
+
+  Future<void> _continueToApp() async {
+    final prefs = await SharedPreferences.getInstance();
+    final introDone =
+        prefs.getBool(AppConstants.keyIntroOnboardingComplete) ?? false;
+    final shouldShowNotificationIntro =
+        !introDone && await _isNotificationsDisabledFromServer();
+    if (!mounted) return;
+
+    if (shouldShowNotificationIntro) {
+      Get.to(
+        () => NotficationScreens(),
         transition: Transition.cupertino,
         duration: const Duration(milliseconds: 250),
         curve: Curves.fastOutSlowIn,
       );
+      return;
     }
+
+    Get.offAll(
+      () => const HomeScreen2(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   Future<bool> _isNotificationsDisabledFromServer() async {
@@ -417,6 +416,23 @@ class _IntroScreen2State extends State<IntroScreen2> {
                           onPressed: () {
                             _connectAndContinue(OAuthProvider.youtube);
                           },
+                        ),
+                      ),
+                      SizedBox(height: 14.h),
+                      GestureDetector(
+                        onTap: _continueToApp,
+                        child: Container(
+                          width: double.infinity,
+                          height: 52.h,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(36.r),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            context.l10n.next,
+                            style: sfProText600(17.sp, Colors.black),
+                          ),
                         ),
                       ),
                     ],

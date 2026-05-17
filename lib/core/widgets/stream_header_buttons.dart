@@ -56,6 +56,7 @@ class StreakButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showCount = count != null;
     final label = '${count ?? 0}';
 
     return GestureDetector(
@@ -68,17 +69,19 @@ class StreakButton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Image.asset(iconAsset, width: 24, height: 24),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              maxLines: 1,
-              style: const TextStyle(
-                color: Color(0xFFB0B0B0),
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                height: 1.0,
+            if (showCount) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Color(0xFFB0B0B0),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

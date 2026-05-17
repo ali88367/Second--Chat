@@ -961,7 +961,11 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       await _secureStorage.delete(key: _kIntroDoneUsers);
     } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
+    // Logout should not reset "first install" gating; otherwise an existing user
+    // would see Get Started (IntroScreen1) again after restart.
+    await prefs.setBool(AppConstants.keyIsFirstLaunch, false);
     await prefs.clear();
+    await prefs.setBool(AppConstants.keyIsFirstLaunch, false);
     isAuthenticated.value = false;
     me.value = null;
     lastError.value = null;

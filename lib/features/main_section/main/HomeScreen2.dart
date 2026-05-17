@@ -373,7 +373,10 @@ class _HomeScreen2State extends State<HomeScreen2> {
 
                   // Right Buttons
                   Obx(() {
-                    final streakTotal = _streakCtrl.headerDisplayCount;
+                    final streakTotal =
+                        (_streakCtrl.current.value?.isActive == true)
+                            ? _streakCtrl.headerDisplayCount
+                            : null;
                     return Row(
                       children: [
                         StreakButton(
@@ -661,25 +664,13 @@ class _GettingStartedCardState extends State<GettingStartedCard> {
     return Obx(() {
       final notificationsEnabled = _settingsCtrl.notifications.value;
       final allPlatformsConnected = _allCorePlatformsConnected();
-      final streaksCustomized = _streakCtrl.hasStreak;
+      final streaksCustomized = _streakCtrl.current.value?.isActive == true;
       final completedCount =
           (notificationsEnabled ? 1 : 0) +
           (allPlatformsConnected ? 1 : 0) +
           (_settingsOpened ? 1 : 0) +
           (streaksCustomized ? 1 : 0);
       final isAllCompleted = completedCount == 4;
-      if (isAllCompleted && !_autoOpenedLiveStream) {
-        _autoOpenedLiveStream = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          Get.to(
-            () => Livestreaming(),
-            transition: Transition.cupertino,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.fastOutSlowIn,
-          );
-        });
-      }
 
       return Stack(
         clipBehavior: Clip.none,
