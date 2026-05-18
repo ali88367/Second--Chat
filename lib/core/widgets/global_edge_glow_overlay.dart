@@ -1,10 +1,12 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 
+import '../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../controllers/edge_glow_notification_controller.dart';
+import 'edge_glow_painter.dart';
 
+/// Full-screen edge LED glow for realtime activity / notifications (iOS + Android).
 class GlobalEdgeGlowOverlay extends StatefulWidget {
   const GlobalEdgeGlowOverlay({super.key});
 
@@ -14,23 +16,58 @@ class GlobalEdgeGlowOverlay extends StatefulWidget {
 
 class _GlobalEdgeGlowOverlayState extends State<GlobalEdgeGlowOverlay>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  static const Duration _fadeDuration = Duration(milliseconds: 240);
+
+  late final AnimationController _rotationController;
   late final EdgeGlowNotificationController _edgeGlowCtrl;
-  int _lastSequence = -1;
+  late final SettingsController _settingsCtrl;
+
+  Worker? _sequenceWorker;
+  Worker? _visibilityWorker;
 
   @override
   void initState() {
     super.initState();
     _edgeGlowCtrl = Get.find<EdgeGlowNotificationController>();
-    _controller = AnimationController(
+    _settingsCtrl = Get.find<SettingsController>();
+
+    _rotationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: EdgeGlowPainter.rotationDuration,
     );
+
+    _sequenceWorker = ever<int>(_edgeGlowCtrl.sequence, (_) => _syncAnimation());
+    _visibilityWorker =
+        ever<bool>(_edgeGlowCtrl.isVisible, (_) => _syncAnimation());
+  }
+
+  void _syncAnimation() {
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      if (!mounted) return;
+
+      final visible = _edgeGlowCtrl.isVisible.value;
+      if (!visible) {
+        _rotationController.stop();
+        return;
+      }
+
+      final slow = _settingsCtrl.reduceMotion;
+      _rotationController.duration = slow
+          ? const Duration(milliseconds: 5600)
+          : EdgeGlowPainter.rotationDuration;
+
+      _rotationController
+        ..stop()
+        ..reset()
+        ..repeat();
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _sequenceWorker?.dispose();
+    _visibilityWorker?.dispose();
+    _rotationController.dispose();
     super.dispose();
   }
 
@@ -38,142 +75,52 @@ class _GlobalEdgeGlowOverlayState extends State<GlobalEdgeGlowOverlay>
   Widget build(BuildContext context) {
     return Obx(() {
       final visible = _edgeGlowCtrl.isVisible.value;
-      final sequence = _edgeGlowCtrl.sequence.value;
-      final platform = _edgeGlowCtrl.activePlatform.value;
-
-      if (visible && sequence != _lastSequence) {
-        _lastSequence = sequence;
-        _controller
-          ..stop()
-          ..reset()
-          ..repeat();
-      } else if (!visible && _controller.isAnimating) {
-        _controller.stop();
+      if (!visible) {
+        return const SizedBox.shrink();
       }
 
-      final colors = _platformGlowColors(platform);
+      _settingsCtrl.animations.value;
+      _settingsCtrl.lowPowerMode.value;
 
-      return IgnorePointer(
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (_, __) {
-                return CustomPaint(
-                  painter: _EdgeGlowPainter(
-                    progress: _controller.value,
-                    colors: colors,
-                  ),
-                  child: const SizedBox.expand(),
-                );
-              },
+      final platform = _edgeGlowCtrl.activePlatform.value;
+      final colors = EdgeGlowPainter.platformColors(platform);
+      final animate = _settingsCtrl.animationsEnabled;
+
+      return Positioned.fill(
+        child: IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: 1,
+            duration: _fadeDuration,
+            curve: Curves.easeOutCubic,
+            child: RepaintBoundary(
+              child: ClipRect(
+                clipBehavior: Clip.none,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return AnimatedBuilder(
+                      animation: _rotationController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          size: Size(
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                          ),
+                          painter: EdgeGlowPainter(
+                            progress:
+                                animate ? _rotationController.value : 0.18,
+                            colors: colors,
+                            animate: animate,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
       );
     });
-  }
-
-  List<Color> _platformGlowColors(String platform) {
-    final key = platform.toLowerCase().trim();
-    switch (key) {
-      case 'twitch':
-        return const [
-          Color(0xFF8F3DDB),
-          Color(0xFFC45BFF),
-        ];
-      case 'kick':
-        return const [
-          Color(0xFF00FF87),
-          Color(0xFF2BFF00),
-          Color(0xFF00E6A8),
-          Color(0xFF7CFF3A),
-          Color(0xFF00FF5A),
-        ];
-      case 'youtube':
-        return const [
-          Color(0xFFFF1744),
-          Color(0xFFFF5252),
-        ];
-      case 'tiktok':
-        return const [
-          Color(0xFF00F2EA),
-          Color(0xFFFF0050),
-          Color(0xFF69C9D0),
-        ];
-      default:
-        return const [
-          Color(0xFF8F3DDB),
-          Color(0xFFC45BFF),
-        ];
-    }
-  }
-}
-
-class _EdgeGlowPainter extends CustomPainter {
-  _EdgeGlowPainter({
-    required this.progress,
-    required this.colors,
-  });
-
-  final double progress;
-  final List<Color> colors;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const margin = 10.0;
-    final rect = Rect.fromLTWH(
-      margin,
-      margin,
-      size.width - margin * 2,
-      size.height - margin * 2,
-    );
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(26)),
-      );
-
-    final breathing = 0.75 + (0.25 * sin(progress * pi * 2).abs());
-
-    final gradient = SweepGradient(
-      colors: colors,
-      stops: List.generate(colors.length, (i) {
-        if (colors.length <= 1) return 1.0;
-        return i / (colors.length - 1);
-      }),
-      transform: GradientRotation(progress * pi * 2),
-    );
-
-    final outerPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20 * breathing
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25)
-      ..shader = gradient.createShader(rect)
-      ..color = Colors.white.withValues(alpha: 0.45);
-
-    final innerPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10 * breathing
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
-      ..shader = gradient.createShader(rect)
-      ..color = Colors.white.withValues(alpha: 0.85);
-
-    final sharpPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..shader = gradient.createShader(rect)
-      ..color = Colors.white.withValues(alpha: 0.35);
-
-    canvas.drawPath(path, outerPaint);
-    canvas.drawPath(path, innerPaint);
-    canvas.drawPath(path, sharpPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _EdgeGlowPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.colors != colors;
   }
 }
