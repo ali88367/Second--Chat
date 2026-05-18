@@ -193,6 +193,7 @@ class MyApp extends StatelessWidget {
                     textDirection: TextDirection.ltr,
                     child: Stack(
                       fit: StackFit.expand,
+                      clipBehavior: Clip.none,
                       children: [
                         child ?? const SizedBox.shrink(),
                         const GlobalEdgeGlowOverlay(),

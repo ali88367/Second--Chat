@@ -614,6 +614,52 @@ class _LivestreamingState extends State<Livestreaming> {
         .toList(growable: false);
   }
 
+  DateTime _activityEventTimeUtc(Map<String, dynamic> e) {
+    final t = e['timestamp'] ?? e['created_at'] ?? e['createdAt'];
+    if (t == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+    if (t is DateTime) return t.toUtc();
+    if (t is int) {
+      return t > 1000000000000
+          ? DateTime.fromMillisecondsSinceEpoch(t, isUtc: true)
+          : DateTime.fromMillisecondsSinceEpoch(t * 1000, isUtc: true);
+    }
+    return DateTime.tryParse(t.toString())?.toUtc() ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+
+  List<Map<String, dynamic>> _filteredSortedActivities({
+    required ChatController chatCtrl,
+    required String? filterKey,
+  }) {
+    final events = chatCtrl.activityEvents
+        .where((e) {
+          final t =
+              (e['type'] ?? e['eventType'] ?? '').toString().trim().toLowerCase();
+          return t != 'normal';
+        })
+        .where(
+          (e) => _activityEventMatchesChatFilter(
+            chatCtrl: chatCtrl,
+            chatFilter: filterKey,
+            e: e,
+          ),
+        )
+        .toList(growable: false);
+    return List<Map<String, dynamic>>.from(events)
+      ..sort(
+        (a, b) =>
+            _activityEventTimeUtc(b).compareTo(_activityEventTimeUtc(a)),
+      );
+  }
+
+  Color _activityNameColor(String platformKey) {
+    return _settingsCtrl.getPlatformColor(
+      _normalizeUiPlatform(platformKey),
+    );
+  }
+
   /// Whether [e] belongs in the activity rail for the current chat filter.
   /// For **All**, only platforms with `live == true` are included (fixes wrong
   /// stream when [ChatController.platform] still points at an offline tab).
@@ -768,8 +814,13 @@ class _LivestreamingState extends State<Livestreaming> {
       final twitchViews = chatCtrl.platformViewerCounts['twitch'];
       final kickViews = chatCtrl.platformViewerCounts['kick'];
       final youtubeViews = chatCtrl.platformViewerCounts['youtube'];
+      chatCtrl.platformLive['twitch'];
+      chatCtrl.platformLive['kick'];
+      chatCtrl.platformLive['youtube'];
       String viewerCountText(String platformKey, int? count) {
         if (!showViewerCounts) return '-';
+        // Stale viewer counts must not show when socket says the platform is offline.
+        if (!chatCtrl.isPlatformLive(platformKey)) return '-';
         final embedReady = chatCtrl.isPlatformStreamEmbedReadyForChat(platformKey);
         if (!embedReady) return '0';
         return _formatViewerCount(count);
@@ -910,135 +961,131 @@ class _LivestreamingState extends State<Livestreaming> {
                     thickness: 3.w,
                     radius: Radius.circular(8.r),
                     scrollbarOrientation: ScrollbarOrientation.right,
-                    child: SingleChildScrollView(
-                      controller: _activityScrollController,
-                      padding: EdgeInsets.only(
-                        left: 12.w,
-                        right: 12.w,
-                        top: 28.h,
-                        bottom: 26.h,
-                      ),
-                      physics:
-                      _isDraggingActivity
-                          ? const NeverScrollableScrollPhysics()
-                          : const BouncingScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
-                            ),
-                      child: ValueListenableBuilder<String?>(
-                        valueListenable: _chatFilter,
-                        builder: (context, chatFilterSnap, _) {
-                          return Obx(() {
-                            final chatCtrl = Get.find<ChatController>();
-                            chatCtrl.platform.value;
-                            chatCtrl.platformLive.keys;
-                            _settingsCtrl.clockFormat.value;
-                            final liveKeys = _livePlatformKeys(chatCtrl);
-                            final filterKey =
-                                chatFilterSnap?.toLowerCase().trim();
-                            // Prefer controller activity list (wired to sockets).
-                            // Chat "normal" lines stay in chat; activity = everything else.
-                            final events = chatCtrl.activityEvents
-                                .where((e) {
-                              final t =
-                              (e['type'] ?? e['eventType'] ?? '')
-                                  .toString()
-                                  .trim()
-                                  .toLowerCase();
-                              return t != 'normal';
-                            })
-                                .where(
-                                  (e) => _activityEventMatchesChatFilter(
-                                    chatCtrl: chatCtrl,
-                                    chatFilter: filterKey,
-                                    e: e,
-                                  ),
-                                )
-                                .toList(growable: false);
-                            if (events.isEmpty) {
-                              return Center(
-                                child: Padding(
+                    child: ValueListenableBuilder<String?>(
+                      valueListenable: _chatFilter,
+                      builder: (context, chatFilterSnap, _) {
+                        return Obx(() {
+                          final chatCtrl = Get.find<ChatController>();
+                          chatCtrl.activityEvents.length;
+                          chatCtrl.platform.value;
+                          chatCtrl.platformLive.keys;
+                          _settingsCtrl.clockFormat.value;
+                          final liveKeys = _livePlatformKeys(chatCtrl);
+                          final filterKey =
+                              chatFilterSnap?.toLowerCase().trim();
+                          final list = _filteredSortedActivities(
+                            chatCtrl: chatCtrl,
+                            filterKey: filterKey,
+                          );
+                          if (list.isEmpty) {
+                            return ListView(
+                              controller: _activityScrollController,
+                              physics:
+                                  _isDraggingActivity
+                                      ? const NeverScrollableScrollPhysics()
+                                      : const ClampingScrollPhysics(
+                                          parent:
+                                              AlwaysScrollableScrollPhysics(),
+                                        ),
+                              padding: EdgeInsets.only(
+                                left: 12.w,
+                                right: 12.w,
+                                top: 28.h,
+                                bottom: 26.h,
+                              ),
+                              children: [
+                                Padding(
                                   padding: EdgeInsets.only(top: 24.h),
                                   child: Text(
                                     context.l10n.noActivityYet,
                                     textAlign: TextAlign.center,
-                                    style: sfProText400(13.sp, Colors.white54),
+                                    style: sfProText400(
+                                      13.sp,
+                                      Colors.white54,
+                                    ),
                                   ),
                                 ),
-                              );
-                            }
-                            // Render newest first.
-                            final list =
-                                events.reversed.toList(growable: false);
-                            final scopeKey =
-                                '${filterKey ?? 'all'}_${liveKeys.join('_')}';
-                            return RepaintBoundary(
-                              child: Column(
-                                key: ValueKey<String>('activity_$scopeKey'),
-                                children: [
-                              for (var i = 0; i < list.length; i++) ...[
-                                Builder(
-                                  builder: (ctx) {
-                                    final e = list[i];
-                                    final platform =
-                                    (e['platform'] ?? '').toString();
-                                    final meta = e['metadata'];
-                                    final metaMap =
-                                    meta is Map
-                                        ? meta.cast<String, dynamic>()
-                                        : const <String, dynamic>{};
-                                    final user =
-                                    (metaMap['user'] ??
-                                        metaMap['username'] ??
-                                        metaMap['user_name'] ??
-                                        metaMap['user_login'] ??
-                                        metaMap['name'] ??
-                                        e['username'] ??
-                                        '')
-                                        .toString()
-                                        .trim();
-                                    final type =
-                                    (e['type'] ?? e['eventType'] ?? '')
-                                        .toString()
-                                        .trim();
-                                    final time = _formatActivityTime(
-                                      e['timestamp'] ?? e['created_at'],
-                                    );
-                                    final lines = _activityRowLines(
-                                      user: user,
-                                      typeRaw: type,
-                                    );
-                                    final fallbackPlatform =
-                                        liveKeys.length == 1
-                                            ? liveKeys.first
-                                            : (filterKey != null &&
-                                                    filterKey.isNotEmpty
-                                                ? filterKey
-                                                : _normalizeUiPlatform(
-                                                    chatCtrl.platform.value,
-                                                  ));
-                                    final pKey = _normalizeUiPlatform(
-                                      platform.isNotEmpty
-                                          ? platform
-                                          : fallbackPlatform,
-                                    );
-                                    return activityRow(
-                                      _assetForPlatform(pKey),
-                                      pKey,
-                                      lines.$1,
-                                      time,
-                                      lines.$2,
-                                    );
-                                  },
-                                ),
-                                if (i != list.length - 1)
-                                  SizedBox(height: 12.h),
                               ],
-                            ],
-                              ),
                             );
-                          });
-                        },
-                      ),
+                          }
+                          final scopeKey =
+                              '${filterKey ?? 'all'}_${liveKeys.join('_')}';
+                          return ListView.separated(
+                            key: ValueKey<String>('activity_$scopeKey'),
+                            controller: _activityScrollController,
+                            padding: EdgeInsets.only(
+                              left: 12.w,
+                              right: 12.w,
+                              top: 28.h,
+                              bottom: 26.h,
+                            ),
+                            physics:
+                                _isDraggingActivity
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const ClampingScrollPhysics(
+                                        parent: AlwaysScrollableScrollPhysics(),
+                                      ),
+                            cacheExtent: 480,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
+                            itemCount: list.length,
+                            separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                            itemBuilder: (context, index) {
+                              final e = list[index];
+                              final platform =
+                                  (e['platform'] ?? '').toString();
+                              final meta = e['metadata'];
+                              final metaMap =
+                                  meta is Map
+                                      ? meta.cast<String, dynamic>()
+                                      : const <String, dynamic>{};
+                              final user =
+                                  (metaMap['user'] ??
+                                          metaMap['username'] ??
+                                          metaMap['user_name'] ??
+                                          metaMap['user_login'] ??
+                                          metaMap['name'] ??
+                                          e['username'] ??
+                                          '')
+                                      .toString()
+                                      .trim();
+                              final type =
+                                  (e['type'] ?? e['eventType'] ?? '')
+                                      .toString()
+                                      .trim();
+                              final time = _formatActivityTime(
+                                e['timestamp'] ?? e['created_at'],
+                              );
+                              final lines = _activityRowLines(
+                                user: user,
+                                typeRaw: type,
+                              );
+                              final fallbackPlatform =
+                                  liveKeys.length == 1
+                                      ? liveKeys.first
+                                      : (filterKey != null &&
+                                              filterKey.isNotEmpty
+                                          ? filterKey
+                                          : _normalizeUiPlatform(
+                                              chatCtrl.platform.value,
+                                            ));
+                              final pKey = _normalizeUiPlatform(
+                                platform.isNotEmpty
+                                    ? platform
+                                    : fallbackPlatform,
+                              );
+                              return activityRow(
+                                _assetForPlatform(pKey),
+                                pKey,
+                                lines.$1,
+                                time,
+                                lines.$2,
+                                _activityNameColor(pKey),
+                              );
+                            },
+                          );
+                        });
+                      },
                     ),
                   ),
                 ),

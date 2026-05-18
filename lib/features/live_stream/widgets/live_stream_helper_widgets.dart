@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get.dart';
 import '../../../../core/themes/textstyles.dart';
-import '../../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../core/constants/app_colors/app_colors.dart';
 
 Widget serviceRow({
@@ -148,49 +146,31 @@ Widget activityRow(
   String name,
   String time,
   String message,
+  Color nameColor,
 ) {
-  SettingsController? controller;
-  try {
-    controller = Get.find<SettingsController>();
-  } catch (_) {}
-
-  return Obx(() {
-    final key = normalizedPlatformKey.toLowerCase().trim();
-    final Color nameColor;
-    if (controller != null) {
-      nameColor = controller.getPlatformColor(key);
-    } else if (key == 'kick') {
-      nameColor = const Color.fromRGBO(83, 252, 24, 1);
-    } else if (key == 'youtube') {
-      nameColor = const Color.fromRGBO(221, 44, 40, 1);
-    } else {
-      nameColor = const Color.fromRGBO(185, 80, 239, 1);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Image.asset(
-              asset,
-              color: nameColor,
-              width: 16.w,
-              height: 16.h,
-            ),
-            SizedBox(width: 8.w),
-            Text(name, style: sfProText600(14.sp, nameColor)),
-            Spacer(),
-            Text(time, style: sfProText400(12.sp, Colors.grey.shade400)),
-          ],
-        ),
-        if (message.isNotEmpty) ...[
-          SizedBox(height: 6.h),
-          Text(message, style: sfProText600(15.sp, Colors.white)),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Image.asset(
+            asset,
+            color: nameColor,
+            width: 16.w,
+            height: 16.h,
+          ),
+          SizedBox(width: 8.w),
+          Text(name, style: sfProText600(14.sp, nameColor)),
+          Spacer(),
+          Text(time, style: sfProText400(12.sp, Colors.grey.shade400)),
         ],
+      ),
+      if (message.isNotEmpty) ...[
+        SizedBox(height: 6.h),
+        Text(message, style: sfProText600(15.sp, Colors.white)),
       ],
-    );
-  });
+    ],
+  );
 }
 
 Widget pillButton(String text, {required bool isActive, String? assetPath}) {
