@@ -14,6 +14,7 @@ import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
 import '../../../controllers/platform_categories_controller.dart';
 import '../../core/constants/app_colors/app_colors.dart';
+import '../../core/widgets/go_live_fab_button.dart';
 import '../../core/widgets/stream_header_buttons.dart';
 import '../../core/localization/l10n.dart';
 import '../Invite/Invite_screen.dart';
@@ -1279,6 +1280,8 @@ class _LivestreamingState extends State<Livestreaming> {
                       }),
                       Row(
                         children: [
+                          const GoLiveFabButton(),
+                          SizedBox(width: 6.w),
                           // Socket log screen (temporarily disabled)
                           // GestureDetector(
                           //   onTap: () {

@@ -25,6 +25,8 @@ import 'package:second_chat/controllers/platform_connect_controller.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/features/main_section/main/HomeScreen2.dart';
 import 'package:second_chat/notifications.dart';
+import 'package:second_chat/controllers/rtmp_broadcast_controller.dart';
+import 'package:second_chat/core/widgets/broadcast_pip_overlay.dart';
 import 'package:second_chat/core/widgets/global_edge_glow_overlay.dart';
 import 'package:second_chat/features/Invite/Invite_screen.dart';
 import 'package:second_chat/services/push_notification_service.dart';
@@ -113,6 +115,7 @@ void main() {
       );
       Get.put(PlatformConnectController(), permanent: true);
       Get.put(PlatformCategoriesController(), permanent: true);
+      Get.put(RtmpBroadcastController(), permanent: true);
       await PushNotificationService.initialize();
 
       // Load persisted locale (if any) before building the app.
@@ -197,6 +200,7 @@ class MyApp extends StatelessWidget {
                       children: [
                         child ?? const SizedBox.shrink(),
                         const GlobalEdgeGlowOverlay(),
+                        const BroadcastPipOverlay(),
                       ],
                     ),
                   ),

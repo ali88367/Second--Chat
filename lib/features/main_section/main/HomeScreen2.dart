@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:second_chat/controllers/chat_controller.dart';
 import 'package:second_chat/controllers/Main%20Section%20Controllers/streak_controller.dart';
 import 'package:second_chat/controllers/auth_controller.dart';
+import 'package:second_chat/core/widgets/go_live_fab_button.dart';
 import 'package:second_chat/core/widgets/stream_header_buttons.dart';
 import 'package:second_chat/features/live_stream/live_stream_screen.dart';
 import 'package:second_chat/core/constants/app_colors/app_colors.dart';
@@ -365,6 +366,13 @@ class _HomeScreen2State extends State<HomeScreen2> {
                           padding: EdgeInsets.symmetric(
                             horizontal: 10.w,
                             vertical: 4.h,
+                          ),
+                        ),
+                        SizedBox(width: 6.w),
+                        const GoLiveFabButton(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
                           ),
                         ),
                       ],

@@ -67,6 +67,9 @@ dependencies:
   sign_in_with_apple:
   crypto:
   youtube_player_iframe:
+  apivideo_live_stream:
+    path: packages/apivideo_live_stream
+  wakelock_plus: ^1.4.0
 
 dev_dependencies:
   flutter_test:

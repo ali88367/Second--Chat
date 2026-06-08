@@ -7,6 +7,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import '../../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../../controllers/chat_controller.dart';
 import '../../../core/localization/l10n.dart';
+import '../../../core/widgets/broadcast_embed_preview.dart';
 import 'stream_embed_url_utils.dart';
 import 'stream_webview.dart';
 
@@ -91,7 +92,19 @@ class _LiveStreamPlatformSlotState extends State<_LiveStreamPlatformSlot> {
           _latchedEmbedUrl = '';
           _sessionNonce++;
         }
-        return RepaintBoundary(child: _buildNoStreamState(context));
+        return RepaintBoundary(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _buildNoStreamState(context),
+              BroadcastEmbedPreview(
+                platformKey: widget.platformKey,
+                fillConstraints: widget.fillConstraints,
+                height: widget.height,
+              ),
+            ],
+          ),
+        );
       }
 
       // Live state: keep last good URL latched; initialize webview once per live session.
