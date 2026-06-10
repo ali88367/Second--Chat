@@ -377,92 +377,171 @@ class StartupGate extends StatefulWidget {
 class _StartupGateState extends State<StartupGate> {
   @override
   Widget build(BuildContext context) {
-    return const _SplashScreen();
+    return _SplashScreen(introVideoController: widget.introVideoController);
   }
 }
 
 class _SplashScreen extends StatefulWidget {
-  const _SplashScreen();
+  const _SplashScreen({this.introVideoController});
+
+  static const String splashVideoAsset = 'assets/updatedsplash.mp4';
+
+  final VideoPlayerController? introVideoController;
 
   @override
   State<_SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<_SplashScreen>
-    with TickerProviderStateMixin {
+class _SplashScreenState extends State<_SplashScreen> {
   static const String _kHome2SettingsOpenedKey =
       'second_chat.home2.settings_opened_done';
   bool _startupInProgress = false;
   String? _startupError;
 
-  late final AnimationController _anim = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
-  late final TickerFuture _animForward;
-  late final AnimationController _loaderAnim = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  );
-  late final Animation<double> _fadeIn = CurvedAnimation(
-    parent: _anim,
-    curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-  );
-  late final Animation<double> _popScale = TweenSequence<double>([
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 0.82,
-        end: 1.08,
-      ).chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 70,
-    ),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 1.08,
-        end: 1.0,
-      ).chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 30,
-    ),
-  ]).animate(_anim);
-  late final Animation<double> _logoScale = TweenSequence<double>([
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 0.9,
-        end: 1.04,
-      ).chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 70,
-    ),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 1.04,
-        end: 1.0,
-      ).chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 30,
-    ),
-  ]).animate(CurvedAnimation(parent: _anim, curve: const Interval(0.15, 1.0)));
-  late final Animation<Offset> _logoSlide = Tween<Offset>(
-    begin: const Offset(0, 0.2),
-    end: Offset.zero,
-  ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
-  late final Animation<double> _glow = Tween<double>(
-    begin: 0.0,
-    end: 1.0,
-  ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+  VideoPlayerController? _videoController;
+  bool _videoInitialized = false;
+  bool _splashVideoReleased = false;
 
   @override
   void initState() {
     super.initState();
-    _animForward = _anim.forward();
-    _loaderAnim.repeat();
+    unawaited(_initSplashVideo());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _routeAfterSessionCheck();
+      unawaited(_routeAfterSessionCheck());
     });
+  }
+
+  void _onVideoTick() {
+    if (!mounted || _splashVideoReleased) return;
+    setState(() {});
+  }
+
+  Future<void> _disposeSplashVideo() async {
+    if (_splashVideoReleased) return;
+    _splashVideoReleased = true;
+
+    final controller = _videoController;
+    _videoController = null;
+    _videoInitialized = false;
+
+    if (controller == null) return;
+
+    controller.removeListener(_onVideoTick);
+    try {
+      if (controller.value.isInitialized && controller.value.isPlaying) {
+        await controller.pause();
+      }
+    } catch (_) {}
+    try {
+      await controller.dispose();
+    } catch (_) {}
+  }
+
+  Future<void> _navigateFromSplash(Widget Function() page) async {
+    await _disposeSplashVideo();
+    if (!mounted) return;
+    Get.offAll(page);
+  }
+
+  Future<void> _initSplashVideo() async {
+    _splashVideoReleased = false;
+    final controller = VideoPlayerController.asset(
+      _SplashScreen.splashVideoAsset,
+    );
+    try {
+      await controller.initialize().timeout(const Duration(seconds: 10));
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      if (kDebugMode) {
+        debugPrint('SPLASH VIDEO LOADED: ${_SplashScreen.splashVideoAsset}');
+      }
+
+      controller
+        ..setLooping(false)
+        ..setVolume(1.0)
+        ..addListener(_onVideoTick);
+
+      _videoController = controller;
+      _videoInitialized = true;
+      setState(() {});
+
+      unawaited(controller.play());
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('SPLASH VIDEO ERROR: $e');
+      }
+      try {
+        controller.removeListener(_onVideoTick);
+        await controller.dispose();
+      } catch (_) {}
+      _splashVideoReleased = true;
+      _videoController = null;
+      _videoInitialized = false;
+      if (!mounted) return;
+      setState(() {
+        _startupError = 'Could not load splash video. Tap retry to try again.';
+      });
+    }
+  }
+
+  Future<void> _waitForVideoReady() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 12));
+    while (!_videoInitialized && DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 40));
+      if (!mounted) return;
+    }
+  }
+
+  Future<void> _waitForSplashVideoToFinish() async {
+    await _waitForVideoReady();
+
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    final duration = controller.value.duration;
+    final maxWait =
+        duration > Duration.zero
+            ? duration + const Duration(milliseconds: 800)
+            : const Duration(seconds: 4);
+    final finished = Completer<void>();
+
+    void onEnd() {
+      if (_splashVideoReleased) return;
+      try {
+        final value = controller.value;
+        if (!value.isInitialized || value.duration <= Duration.zero) return;
+        final nearEnd =
+            value.position >=
+            value.duration - const Duration(milliseconds: 300);
+        if (nearEnd && !finished.isCompleted) {
+          finished.complete();
+        }
+      } catch (_) {}
+    }
+
+    controller.addListener(onEnd);
+    try {
+      await Future.any([finished.future, Future.delayed(maxWait)]);
+    } finally {
+      controller.removeListener(onEnd);
+    }
+  }
+
+  Future<void> _retrySplashVideo() async {
+    await _disposeSplashVideo();
+    if (mounted) {
+      setState(() => _startupError = null);
+    }
+    await _initSplashVideo();
+    if (!mounted) return;
+    await _routeAfterSessionCheck();
   }
 
   @override
   void dispose() {
-    _anim.dispose();
-    _loaderAnim.dispose();
+    unawaited(_disposeSplashVideo());
     super.dispose();
   }
 
@@ -499,9 +578,6 @@ class _SplashScreenState extends State<_SplashScreen>
   Future<void> _routeAfterSessionCheck() async {
     if (_startupInProgress) return;
     _startupInProgress = true;
-    if (mounted && _startupError != null) {
-      setState(() => _startupError = null);
-    }
     try {
       if (!Get.isRegistered<AuthController>()) return;
       final auth = Get.find<AuthController>();
@@ -526,20 +602,30 @@ class _SplashScreenState extends State<_SplashScreen>
         }
       }
 
-      try {
-        await _animForward.orCancel;
-      } catch (_) {}
+      await _waitForSplashVideoToFinish();
       if (!mounted) return;
+
+      if (_videoController == null || !_videoInitialized) {
+        if (_startupError == null && mounted) {
+          setState(() {
+            _startupError =
+                'Could not load splash video. Tap retry to try again.';
+          });
+        }
+        return;
+      }
 
       if (!auth.isAuthenticated.value) {
         final isFirstLaunch = await _consumeFirstLaunchFlag();
         if (isFirstLaunch) {
           if (!mounted) return;
-          Get.offAll(() => const IntroScreen1());
+          await _navigateFromSplash(
+            () => IntroScreen1(initialController: widget.introVideoController),
+          );
           return;
         }
         if (!mounted) return;
-        Get.offAll(() => const LoginScreen());
+        await _navigateFromSplash(() => const LoginScreen());
         return;
       }
 
@@ -557,11 +643,11 @@ class _SplashScreenState extends State<_SplashScreen>
         if (!mounted) return;
         try {
           if (await _shouldShowNotificationIntro(auth)) {
-            Get.offAll(() => const NotficationScreens());
+            await _navigateFromSplash(() => const NotficationScreens());
             return;
           }
         } catch (_) {}
-        Get.offAll(() => const HomeScreen2());
+        await _navigateFromSplash(() => const HomeScreen2());
         return;
       }
 
@@ -577,23 +663,23 @@ class _SplashScreenState extends State<_SplashScreen>
 
       try {
         if (await _shouldShowNotificationIntro(auth)) {
-          Get.offAll(() => const NotficationScreens());
+          await _navigateFromSplash(() => const NotficationScreens());
           return;
         }
       } catch (_) {}
 
       if (await _areHome2StepsCompleted()) {
-        Get.offAll(() => const Livestreaming());
+        await _navigateFromSplash(() => const Livestreaming());
         return;
       }
 
       final anyLive = await _hasAnyConnectedLivePlatform(chat);
       if (anyLive) {
-        Get.offAll(() => const Livestreaming());
+        await _navigateFromSplash(() => const Livestreaming());
         return;
       }
 
-      Get.offAll(() => const HomeScreen2());
+      await _navigateFromSplash(() => const HomeScreen2());
     } finally {
       _startupInProgress = false;
     }
@@ -602,14 +688,17 @@ class _SplashScreenState extends State<_SplashScreen>
   Future<bool> _hasAnyConnectedLivePlatform(ChatController chat) async {
     try {
       final connected = await PlatformTokenProvider().getConnectedPlatforms();
-      final connectedKeys = connected
-          .map((p) => p.toLowerCase().trim())
-          .where((p) => p.isNotEmpty)
-          .toSet();
+      final connectedKeys =
+          connected
+              .map((p) => p.toLowerCase().trim())
+              .where((p) => p.isNotEmpty)
+              .toSet();
       if (connectedKeys.isEmpty) return false;
 
       // Overview API is the startup source of truth (socket may not be connected yet).
-      await chat.refreshOverviewsForPlatforms(connectedKeys.toList(growable: false));
+      await chat.refreshOverviewsForPlatforms(
+        connectedKeys.toList(growable: false),
+      );
       return chat.isAnyStreamLive;
     } catch (_) {
       return chat.isAnyStreamLive;
@@ -635,7 +724,8 @@ class _SplashScreenState extends State<_SplashScreen>
       }
       if (item is! Map) continue;
       final row = Map<String, dynamic>.from(item);
-      final platform = (row['platform'] ?? row['platformName'] ?? '').toString();
+      final platform =
+          (row['platform'] ?? row['platformName'] ?? '').toString();
       final isConnected =
           row['connected'] == true ||
           row['is_active'] == true ||
@@ -686,77 +776,35 @@ class _SplashScreenState extends State<_SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final controller = _videoController;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0, -0.2),
-            radius: 1.1,
-            colors: [Color(0xFF1B1B25), Color(0xFF0A0A0A)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FadeTransition(
-                  opacity: _fadeIn,
-                  child: AnimatedBuilder(
-                    animation: _anim,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _popScale.value,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFFFFE6A7,
-                                ).withOpacity(0.18 * _glow.value),
-                                blurRadius: 28 * _glow.value,
-                                spreadRadius: 6 * _glow.value,
-                              ),
-                            ],
-                          ),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: Image.asset(
-                      'assets/images/bunnyGlow.png',
-                      width: 260.w,
-                      height: 260.w,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_videoInitialized &&
+              controller != null &&
+              controller.value.isInitialized)
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
                 ),
-                SizedBox(height: 18.h),
-                FadeTransition(
-                  opacity: _fadeIn,
-                  child: SlideTransition(
-                    position: _logoSlide,
-                    child: ScaleTransition(
-                      scale: _logoScale,
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 110.w,
-                        height: 110.w,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 10.h),
-                if (_startupError == null)
-                  FadeTransition(
-                    opacity: _fadeIn,
-                    child: _SplashDotsLoader(animation: _loaderAnim),
-                  ),
-                if (_startupError != null) ...[
-                  SizedBox(height: 14.h),
+              ),
+            )
+          else
+            const ColoredBox(color: Colors.black),
+          if (_startupError != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 80,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 22.w),
                     child: Text(
@@ -771,10 +819,11 @@ class _SplashScreenState extends State<_SplashScreen>
                   ),
                   SizedBox(height: 12.h),
                   TextButton(
-                    onPressed: _routeAfterSessionCheck,
-                    style: TextButton.styleFrom(
-                      foregroundColor: twitchPurple,
-                    ),
+                    onPressed:
+                        _videoInitialized
+                            ? _routeAfterSessionCheck
+                            : _retrySplashVideo,
+                    style: TextButton.styleFrom(foregroundColor: twitchPurple),
                     child: Text(
                       'Retry',
                       style: TextStyle(
@@ -784,71 +833,10 @@ class _SplashScreenState extends State<_SplashScreen>
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SplashDotsLoader extends StatelessWidget {
-  const _SplashDotsLoader({required this.animation});
-
-  final Animation<double> animation;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        final t = animation.value;
-        const Color splashDotGold = Color(0xFFE6C571);
-        Widget dot(int index, Color color) {
-          final phase = ((t + (index * 0.18)) % 1.0);
-          final pulse = Curves.easeInOut.transform(
-            (phase < 0.5) ? (phase / 0.5) : ((1.0 - phase) / 0.5),
-          );
-          final scale = 0.78 + (0.42 * pulse);
-          final opacity = 0.35 + (0.55 * pulse);
-          return Opacity(
-            opacity: opacity,
-            child: Transform.scale(
-              scale: scale,
-              child: Container(
-                width: 8.w,
-                height: 8.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withOpacity(0.35 * opacity),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
               ),
             ),
-          );
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(top: 6.h),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              dot(0, splashDotGold),
-              SizedBox(width: 10.w),
-              dot(1, splashDotGold),
-              SizedBox(width: 10.w),
-              dot(2, splashDotGold),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

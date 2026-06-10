@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 
 import 'auth_controller.dart';
 import 'edge_glow_notification_controller.dart';
+import '../core/utils/led_notification_filter.dart';
 import '../controllers/Main Section Controllers/settings_controller.dart';
 import '../controllers/Main Section Controllers/streak_controller.dart';
 import '../core/utils/platform_token_provider.dart';
@@ -1618,10 +1619,18 @@ class ChatController extends GetxController {
   }
 
   void _maybeTriggerEdgeGlowForActivity(Map<String, dynamic> event) {
-    if (!_settings.notifications.value || !_settings.ledNotifications.value) {
+    if (!_isActivityPayload(event)) return;
+
+    final activityType = _normalizeActivityType(
+      (event['type'] ?? event['eventType'] ?? event['kind'])?.toString(),
+    );
+    if (!LedNotificationFilter.shouldTrigger(
+      settings: _settings,
+      rawActivityType: activityType,
+      event: event,
+    )) {
       return;
     }
-    if (!_isActivityPayload(event)) return;
 
     final currentUserId = _currentUserId();
     if (currentUserId.isNotEmpty && _activityUserId(event) == currentUserId) {

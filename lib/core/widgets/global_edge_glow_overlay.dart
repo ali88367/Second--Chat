@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
@@ -5,6 +6,7 @@ import 'package:get/get.dart';
 import '../../controllers/Main Section Controllers/settings_controller.dart';
 import '../../controllers/edge_glow_notification_controller.dart';
 import 'edge_glow_painter.dart';
+import 'edge_lighting_layout.dart';
 
 /// Full-screen edge LED glow for realtime activity / notifications (iOS + Android).
 class GlobalEdgeGlowOverlay extends StatefulWidget {
@@ -86,37 +88,45 @@ class _GlobalEdgeGlowOverlayState extends State<GlobalEdgeGlowOverlay>
       final colors = EdgeGlowPainter.platformColors(platform);
       final animate = _settingsCtrl.animationsEnabled;
 
+      // Read insets from FlutterView before any MediaQuery overrides in subtree.
+      final safeInsets = EdgeLightingLayout.insetsFromContext(context);
+      final view = View.of(context);
+
       return Positioned.fill(
         child: IgnorePointer(
           child: AnimatedOpacity(
             opacity: 1,
             duration: _fadeDuration,
             curve: Curves.easeOutCubic,
-            child: RepaintBoundary(
-              child: ClipRect(
-                clipBehavior: Clip.none,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return AnimatedBuilder(
-                      animation: _rotationController,
-                      builder: (context, _) {
-                        return CustomPaint(
-                          size: Size(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
-                          ),
-                          painter: EdgeGlowPainter(
-                            progress:
-                                animate ? _rotationController.value : 0.18,
-                            colors: colors,
-                            animate: animate,
-                          ),
-                        );
-                      },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final paintSize = Size(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
+                final layout = EdgeLightingLayout.resolveFromView(
+                  size: paintSize,
+                  viewPadding: safeInsets,
+                  devicePixelRatio: view.devicePixelRatio,
+                  platform: defaultTargetPlatform,
+                );
+
+                return AnimatedBuilder(
+                  animation: _rotationController,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      size: paintSize,
+                      painter: EdgeGlowPainter(
+                        progress:
+                            animate ? _rotationController.value : 0.18,
+                        colors: colors,
+                        layout: layout,
+                        animate: animate,
+                      ),
                     );
                   },
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),

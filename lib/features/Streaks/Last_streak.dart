@@ -164,20 +164,9 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
         ),
         Positioned(
           bottom: 0.h,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.asset(
-                'assets/images/Streak number.png',
-                width: 155.w,
-                height: 90.h,
-                fit: BoxFit.contain,
-              ),
-              Text(
-                '$streakCount',
-                style: sfProDisplay600(36.sp, Colors.white),
-              ),
-            ],
+          child: Text(
+            '$streakCount',
+            style: sfProDisplay600(46.sp, Colors.white),
           ),
         ),
       ],
@@ -313,7 +302,7 @@ class _StreakFreezeUseBottomSheetState extends State<StreakFreezeUseBottomSheet>
       final available = streak?.freezeTokens ?? 0;
       final isInDanger = streak?.isInDanger ?? false;
       final hasUsedFreezeToday = _streakCtrl.hasUsedFreezeToday();
-      final streakCount = streak?.currentStreak ?? 0;
+      final streakCount = _streakCtrl.headerDisplayCount;
       final rowData = _streakCtrl.buildCurrentWeekRow();
       final isLoading = _streakCtrl.isLoading.value;
 

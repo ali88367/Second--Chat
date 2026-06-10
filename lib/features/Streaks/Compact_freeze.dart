@@ -129,7 +129,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
     super.dispose();
   }
 
-  Widget _lowPowerCompactFireGraphic(BuildContext context, int longestStreak) {
+  Widget _lowPowerCompactFireGraphic(BuildContext context, int streakCount) {
     const glow = 0.325;
     return Stack(
       alignment: Alignment.center,
@@ -180,7 +180,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
               alignment: Alignment.center,
               children: [
                 Text(
-                  '$longestStreak',
+                  '$streakCount',
                   style: sfProDisplay600(55.sp, Colors.white),
                 ),
               ],
@@ -333,7 +333,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
     return Obx(() {
       final streak = _streakCtrl.streak;
       final hasCreatedStreak = streak?.hasCreatedStreak ?? false;
-      final longestStreak = streak?.longestStreak ?? 0;
+      final streakDisplayCount = _streakCtrl.headerDisplayCount;
       final currentStreakCount = streak?.currentStreak ?? 0;
       final rowData = _streakCtrl.buildCurrentWeekRow();
       // No loaders in the streak sheets. Prefetch/cached snapshots are used
@@ -413,7 +413,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                         _settings.reduceMotion
                             ? _lowPowerCompactFireGraphic(
                               context,
-                              longestStreak,
+                              streakDisplayCount,
                             )
                             : AnimatedBuilder(
                               animation: Listenable.merge([
@@ -508,7 +508,7 @@ class _StreakFreezeSingleRowPreviewBottomSheetState
                                           alignment: Alignment.center,
                                           children: [
                                             Text(
-                                              '$longestStreak',
+                                              '$streakDisplayCount',
                                               style: sfProDisplay600(
                                                 55.sp,
                                                 Colors.white,

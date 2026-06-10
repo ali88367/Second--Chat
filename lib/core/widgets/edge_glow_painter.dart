@@ -3,31 +3,23 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'edge_lighting_layout.dart';
+
 /// Edge LED that travels around the full screen perimeter (iOS + Android).
 class EdgeGlowPainter extends CustomPainter {
   EdgeGlowPainter({
     required this.progress,
     required this.colors,
+    required this.layout,
     this.animate = true,
   });
 
-  /// 0 → 1 over one lap around the border.
   final double progress;
   final List<Color> colors;
+  final EdgeLightingLayout layout;
   final bool animate;
 
-  /// Half of the widest stroke (stroke is centered on the path).
-  static const double _halfMaxStroke = 11;
-
   static const Duration rotationDuration = Duration(milliseconds: 2800);
-
-  static const double _highlightLength = 140;
-  static const double _trailLength = 220;
-
-  static double cornerRadiusFor(Size size) {
-    final shortest = size.shortestSide;
-    return math.min(30, math.max(16, shortest * 0.048));
-  }
 
   static List<Color> platformColors(String platform) {
     final key = platform.toLowerCase().trim();
@@ -55,15 +47,20 @@ class EdgeGlowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
 
-    final rect = Rect.fromLTWH(
-      _halfMaxStroke,
-      _halfMaxStroke,
-      size.width - _halfMaxStroke * 2,
-      size.height - _halfMaxStroke * 2,
+    final inset = layout.pathInset;
+    final halfStroke = layout.halfMaxStroke;
+
+    final rect = Rect.fromLTRB(
+      inset.left,
+      inset.top,
+      size.width - inset.right,
+      size.height - inset.bottom,
     );
     if (rect.width <= 4 || rect.height <= 4) return;
 
-    final radius = cornerRadiusFor(size);
+    final maxRadius = rect.shortestSide / 2;
+    final radius = layout.cornerRadius.clamp(0.0, maxRadius);
+
     final borderPath = Path()
       ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
 
@@ -72,7 +69,7 @@ class EdgeGlowPainter extends CustomPainter {
         ? 0.88 + 0.12 * (0.5 + 0.5 * math.sin(phase * math.pi * 2))
         : 1.0;
 
-    _paintAmbientRing(canvas, rect, borderPath, phase, breathing);
+    _paintAmbientRing(canvas, rect, borderPath, phase, breathing, halfStroke);
 
     final metrics = borderPath.computeMetrics().toList();
     if (metrics.isEmpty) return;
@@ -87,6 +84,7 @@ class EdgeGlowPainter extends CustomPainter {
       totalLength: total,
       headDistance: head,
       breathing: breathing,
+      halfStroke: halfStroke,
     );
   }
 
@@ -96,6 +94,7 @@ class EdgeGlowPainter extends CustomPainter {
     Path borderPath,
     double phase,
     double breathing,
+    double halfStroke,
   ) {
     final loopColors = <Color>[...colors, colors.first];
     final shader = SweepGradient(
@@ -108,10 +107,11 @@ class EdgeGlowPainter extends CustomPainter {
       tileMode: TileMode.clamp,
     ).createShader(rect);
 
-    const ambientLayers = <_GlowLayer>[
-      _GlowLayer(width: 22, alpha: 0.12),
-      _GlowLayer(width: 13, alpha: 0.22),
-      _GlowLayer(width: 4, alpha: 0.45),
+    final outer = halfStroke * 2;
+    final ambientLayers = <_GlowLayer>[
+      _GlowLayer(width: outer, alpha: 0.12),
+      _GlowLayer(width: outer * 0.58, alpha: 0.22),
+      _GlowLayer(width: outer * 0.18, alpha: 0.45),
     ];
 
     for (final layer in ambientLayers) {
@@ -133,21 +133,27 @@ class EdgeGlowPainter extends CustomPainter {
     required double totalLength,
     required double headDistance,
     required double breathing,
+    required double halfStroke,
   }) {
+    final highlightLength = layout.highlightLength;
+    final trailLength = layout.trailLength;
+
     double norm(double d) {
       var v = d % totalLength;
       if (v < 0) v += totalLength;
       return v;
     }
 
-    final segStart = norm(headDistance - _trailLength);
-    final segEnd = norm(headDistance + _highlightLength);
+    final segStart = norm(headDistance - trailLength);
+    final segEnd = norm(headDistance + highlightLength);
 
     final headColors = <Color>[
       colors.last.withValues(alpha: 0.0),
       ...colors,
       colors.first.withValues(alpha: 0.0),
     ];
+
+    final outer = halfStroke * 2;
 
     void drawSegment(double from, double to, double opacity) {
       if (to <= from) return;
@@ -165,7 +171,7 @@ class EdgeGlowPainter extends CustomPainter {
         end: Alignment.centerRight,
       ).createShader(bounds);
 
-      for (final w in [20.0, 11.0, 4.0]) {
+      for (final w in [outer * 0.9, outer * 0.5, outer * 0.16]) {
         final paint = Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = w * breathing
@@ -190,7 +196,8 @@ class EdgeGlowPainter extends CustomPainter {
   bool shouldRepaint(covariant EdgeGlowPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.animate != animate ||
-        oldDelegate.colors != colors;
+        oldDelegate.colors != colors ||
+        oldDelegate.layout != layout;
   }
 }
 

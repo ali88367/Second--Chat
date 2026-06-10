@@ -484,7 +484,8 @@ class StreakCompleteResult {
 class StreamStreaksController extends GetxController {
   static const String _kStreakCacheKey = 'second_chat.streak_overview_cache';
   static bool logStreakApiResponses = true;
-  static const int kMinimumStreamDurationSeconds = 30;
+  /// Minimum stream length required for a streak day (5 minutes).
+  static const int kMinimumStreamDurationSeconds = 5 * 60;
   static const int kFreezeAllowancePerMonth = 3;
 
   var selectedDays =
@@ -838,6 +839,7 @@ class StreamStreaksController extends GetxController {
             'selected_days': selectedDays,
             'targetDaysPerWeek': selectedDays.length,
             'target_days_per_week': selectedDays.length,
+            'minimumStreamDurationSeconds': kMinimumStreamDurationSeconds,
           },
           options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
         );
@@ -921,7 +923,7 @@ class StreamStreaksController extends GetxController {
   }
 
   Future<bool> recordStream({
-    int seconds = 30,
+    int seconds = kMinimumStreamDurationSeconds,
     DateTime? date,
     bool showErrors = false,
   }) async {

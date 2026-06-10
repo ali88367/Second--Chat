@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:second_chat/core/localization/l10n.dart';
 import 'package:second_chat/core/widgets/edge_glow_painter.dart';
+import 'package:second_chat/core/widgets/edge_lighting_layout.dart';
 
 /// Demo page for edge LED glow (same painter + timing as live app on iOS/Android).
 class EdgeGlowNotificationPage extends StatefulWidget {
@@ -94,7 +96,7 @@ class _EdgeGlowNotificationPageState extends State<EdgeGlowNotificationPage>
     final colors = EdgeGlowPainter.platformColors(_platformKey);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       body: Stack(
         fit: StackFit.expand,
         clipBehavior: Clip.none,
@@ -126,30 +128,38 @@ class _EdgeGlowNotificationPageState extends State<EdgeGlowNotificationPage>
           if (showGlow)
             Positioned.fill(
               child: IgnorePointer(
-                child: RepaintBoundary(
-                  child: ClipRect(
-                    clipBehavior: Clip.none,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return AnimatedBuilder(
-                          animation: _controller,
-                          builder: (_, __) {
-                            return CustomPaint(
-                              size: Size(
-                                constraints.maxWidth,
-                                constraints.maxHeight,
-                              ),
-                              painter: EdgeGlowPainter(
-                                progress: _controller.value,
-                                colors: colors,
-                                animate: true,
-                              ),
-                            );
-                          },
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final safeInsets = EdgeLightingLayout.insetsFromContext(
+                      context,
+                    );
+                    final view = View.of(context);
+                    final paintSize = Size(
+                      constraints.maxWidth,
+                      constraints.maxHeight,
+                    );
+                    final layout = EdgeLightingLayout.resolveFromView(
+                      size: paintSize,
+                      viewPadding: safeInsets,
+                      devicePixelRatio: view.devicePixelRatio,
+                      platform: defaultTargetPlatform,
+                    );
+
+                    return AnimatedBuilder(
+                      animation: _controller,
+                      builder: (_, __) {
+                        return CustomPaint(
+                          size: paintSize,
+                          painter: EdgeGlowPainter(
+                            progress: _controller.value,
+                            colors: colors,
+                            layout: layout,
+                            animate: true,
+                          ),
                         );
                       },
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -181,9 +191,7 @@ class _EdgeGlowNotificationPageState extends State<EdgeGlowNotificationPage>
             const Color(0xFF121212),
           ],
         ),
-        border: Border.all(
-          color: platformColor.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: platformColor.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [

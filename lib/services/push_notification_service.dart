@@ -7,6 +7,9 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../controllers/auth_controller.dart';
+import '../controllers/edge_glow_notification_controller.dart';
+import '../controllers/Main Section Controllers/settings_controller.dart';
+import '../core/utils/led_notification_filter.dart';
 
 String _safeJson(Map<String, dynamic> map) {
   try {
@@ -49,6 +52,7 @@ class PushNotificationService {
           'data=${_safeJson(message.data)}',
         );
       }
+      unawaited(_maybeTriggerEdgeLedForPush(message.data));
     });
 
     _onOpenSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
@@ -81,6 +85,39 @@ class PushNotificationService {
       if (!auth.isAuthenticated.value) return;
       await auth.registerCurrentDevicePushToken();
     });
+  }
+
+  static Future<void> _maybeTriggerEdgeLedForPush(
+    Map<String, dynamic> data,
+  ) async {
+    if (!Get.isRegistered<SettingsController>() ||
+        !Get.isRegistered<EdgeGlowNotificationController>()) {
+      return;
+    }
+
+    final settings = Get.find<SettingsController>();
+    final activityType =
+        (data['type'] ??
+                data['eventType'] ??
+                data['kind'] ??
+                data['event'] ??
+                '')
+            .toString();
+
+    if (!LedNotificationFilter.shouldTrigger(
+      settings: settings,
+      rawActivityType: activityType,
+      event: data,
+    )) {
+      return;
+    }
+
+    final platform =
+        (data['platform'] ?? data['platformName'] ?? data['source'] ?? '')
+            .toString();
+    if (platform.trim().isEmpty) return;
+
+    Get.find<EdgeGlowNotificationController>().triggerForPlatform(platform);
   }
 
   static Future<void> dispose() async {
